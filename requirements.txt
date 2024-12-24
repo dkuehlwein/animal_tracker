@@ -1,0 +1,5 @@
+python-telegram-bot==20.7
+picamera2==0.3.16
+opencv-python==4.8.1.78
+numpy==1.26.2
+python-dotenv==1.0.0 
