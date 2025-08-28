@@ -34,3 +34,4 @@ data/
 *.swo 
 
 .venv/
+raspberry5.private
