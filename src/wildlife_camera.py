@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
 import asyncio
-import telegram
 import time
 from pathlib import Path
 from config import Config
 from motion_detector import MotionDetector
 from camera_manager import CameraManager
+from telegram_service import TelegramService
 
 class WildlifeCamera:
     def __init__(self):
@@ -16,7 +16,7 @@ class WildlifeCamera:
         # Initialize components
         self.camera = CameraManager(self.config)
         self.motion_detector = MotionDetector(self.config)
-        self.bot = telegram.Bot(token=self.config.telegram_token)
+        self.telegram_service = TelegramService(self.config)
         
         # Create data directory
         self.config.data_dir.mkdir(exist_ok=True)
@@ -29,12 +29,12 @@ class WildlifeCamera:
         """Delete oldest images if we exceed the maximum limit"""
         try:
             image_files = sorted(
-                list(self.config.data_dir.glob(f"{self.config.image_prefix}*.jpg")),
+                list(self.config.storage.data_dir.glob(f"{self.config.storage.image_prefix}*.jpg")),
                 key=lambda x: x.stat().st_mtime
             )
             
-            if len(image_files) > self.config.max_images:
-                files_to_delete = image_files[:(len(image_files) - self.config.max_images)]
+            if len(image_files) > self.config.performance.max_images:
+                files_to_delete = image_files[:(len(image_files) - self.config.performance.max_images)]
                 for file in files_to_delete:
                     try:
                         file.unlink()
@@ -45,26 +45,19 @@ class WildlifeCamera:
 
     async def send_telegram_message(self, image_path):
         """Send photo to Telegram channel"""
-        try:
-            with open(image_path, 'rb') as photo:
-                await self.bot.send_photo(
-                    chat_id=self.config.telegram_chat_id,
-                    photo=photo,
-                    caption=f"Motion detected at {time.strftime('%Y-%m-%d %H:%M:%S')}"
-                )
-        except Exception as e:
-            print(f"Error sending Telegram message: {e}")
+        caption = f"Motion detected at {time.strftime('%Y-%m-%d %H:%M:%S')}"
+        return await self.telegram_service.send_photo_with_caption(image_path, caption)
 
     async def run(self):
         """Main loop for wildlife camera"""
         print("Wildlife Camera is running...")
         print(f"Motion detection parameters:")
-        print(f"- Frame rate: {1/self.config.frame_interval:.1f} FPS")
-        print(f"- Motion threshold: {self.config.motion_threshold}")
-        print(f"- Minimum contour area: {self.config.min_contour_area}")
-        print(f"- Cooldown period: {self.config.cooldown_period}s")
-        print(f"- Maximum stored images: {self.config.max_images}")
-        print(f"- Consecutive detections required: {self.config.consecutive_detections_required}")
+        print(f"- Frame rate: {1/self.config.motion.frame_interval:.1f} FPS")
+        print(f"- Motion threshold: {self.config.motion.motion_threshold}")
+        print(f"- Minimum contour area: {self.config.motion.min_contour_area}")
+        print(f"- Cooldown period: {self.config.performance.cooldown_period}s")
+        print(f"- Maximum stored images: {self.config.performance.max_images}")
+        print(f"- Consecutive detections required: {self.config.motion.consecutive_detections_required}")
         
         # Initial cleanup
         self.cleanup_old_images()
@@ -75,38 +68,40 @@ class WildlifeCamera:
                     current_time = time.time()
                     
                     # Frame rate control
-                    if current_time - self.last_frame_time < self.config.frame_interval:
-                        await asyncio.sleep(self.config.idle_sleep)
+                    if current_time - self.last_frame_time < self.config.motion.frame_interval:
+                        await asyncio.sleep(self.config.performance.idle_sleep)
                         continue
                     
                     # Cooldown period check
-                    if current_time - self.last_detection_time < self.config.cooldown_period:
-                        await asyncio.sleep(self.config.cooldown_sleep)
+                    if current_time - self.last_detection_time < self.config.performance.cooldown_period:
+                        await asyncio.sleep(self.config.performance.cooldown_sleep)
                         continue
                     
                     self.last_frame_time = current_time
                     
                     # Capture and process frame
                     frame = self.camera.capture_motion_frame()
-                    if self.motion_detector.detect(frame):
-                        print("Motion detected in central region!")
-                        self.last_detection_time = current_time
-                        
-                        # Capture and send photo
-                        image_path = self.camera.capture_photo()
-                        if image_path:
-                            await self.send_telegram_message(image_path)
-                            self.cleanup_old_images()
+                    if frame is not None:
+                        motion_result = self.motion_detector.detect(frame)
+                        if motion_result.motion_detected:
+                            print("Motion detected in central region!")
+                            self.last_detection_time = current_time
+                            
+                            # Capture and send photo
+                            image_path = self.camera.capture_and_save_photo()
+                            if image_path:
+                                await self.send_telegram_message(image_path)
+                                self.cleanup_old_images()
                     
-                    await asyncio.sleep(self.config.idle_sleep)
+                    await asyncio.sleep(self.config.performance.idle_sleep)
                     
                 except Exception as e:
                     print(f"Error in main loop: {e}")
-                    await asyncio.sleep(self.config.error_sleep)
+                    await asyncio.sleep(self.config.performance.error_sleep)
                     
         finally:
             # Cleanup on exit
-            self.camera.cleanup()
+            self.camera.stop()
 
 if __name__ == "__main__":
     camera = WildlifeCamera()

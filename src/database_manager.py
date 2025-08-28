@@ -2,7 +2,37 @@ import sqlite3
 import time
 from datetime import datetime
 from pathlib import Path
+from dataclasses import dataclass
+from typing import Optional, List
 from config import Config
+
+
+class DatabaseError(Exception):
+    """Base exception for database errors."""
+    pass
+
+
+class DatabaseConnectionError(DatabaseError):
+    """Raised when database connection fails."""
+    pass
+
+
+class DatabaseOperationError(DatabaseError):
+    """Raised when database operations fail."""
+    pass
+
+
+@dataclass
+class DetectionRecord:
+    """Data class for detection records."""
+    id: Optional[int]
+    timestamp: datetime
+    image_path: str
+    motion_area: int
+    species_name: str = "Unknown species"
+    confidence_score: float = 0.0
+    processing_time: float = 0.0
+    api_success: bool = False
 
 class DatabaseManager:
     def __init__(self, config: Config):
@@ -60,11 +90,13 @@ class DatabaseManager:
                 conn.commit()
                 print("Database initialized successfully")
                 
+        except sqlite3.Error as e:
+            raise DatabaseConnectionError(f"Failed to initialize database: {e}") from e
         except Exception as e:
-            print(f"Error initializing database: {e}")
+            raise DatabaseError(f"Unexpected error initializing database: {e}") from e
     
     def log_detection(self, image_path, motion_area, species_name="Unknown species", 
-                     confidence_score=0.0, processing_time=0.0, api_success=False):
+                     confidence_score=0.0, processing_time=0.0, api_success=False) -> Optional[int]:
         """Log a detection event to the database"""
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -98,25 +130,40 @@ class DatabaseManager:
                 conn.commit()
                 return detection_id
                 
+        except sqlite3.Error as e:
+            raise DatabaseOperationError(f"Failed to log detection: {e}") from e
         except Exception as e:
-            print(f"Error logging detection: {e}")
-            return None
+            raise DatabaseError(f"Unexpected error logging detection: {e}") from e
     
-    def get_recent_detections(self, limit=10):
+    def get_recent_detections(self, limit=10) -> List[DetectionRecord]:
         """Get recent detection records"""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
-                    SELECT timestamp, species_name, confidence_score, motion_area, image_path
+                    SELECT id, timestamp, species_name, confidence_score, motion_area, 
+                           image_path, processing_time, api_success
                     FROM detections
                     ORDER BY timestamp DESC
                     LIMIT ?
                 ''', (limit,))
-                return cursor.fetchall()
+                rows = cursor.fetchall()
+                return [
+                    DetectionRecord(
+                        id=row[0],
+                        timestamp=datetime.fromisoformat(row[1]),
+                        species_name=row[2],
+                        confidence_score=row[3],
+                        motion_area=row[4],
+                        image_path=row[5],
+                        processing_time=row[6],
+                        api_success=bool(row[7])
+                    ) for row in rows
+                ]
+        except sqlite3.Error as e:
+            raise DatabaseOperationError(f"Failed to get recent detections: {e}") from e
         except Exception as e:
-            print(f"Error getting recent detections: {e}")
-            return []
+            raise DatabaseError(f"Unexpected error getting detections: {e}") from e
     
     def get_species_stats(self):
         """Get species detection statistics"""
@@ -151,7 +198,7 @@ class DatabaseManager:
             print(f"Error getting daily detections: {e}")
             return 0
     
-    def cleanup_old_detections(self, days_to_keep=30):
+    def cleanup_old_detections(self, days_to_keep=90):
         """Remove detection records older than specified days"""
         try:
             with sqlite3.connect(self.db_path) as conn:

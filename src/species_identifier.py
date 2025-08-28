@@ -1,7 +1,30 @@
 import time
 import random
 from pathlib import Path
+from dataclasses import dataclass
+from typing import Optional, Dict, Any
 from config import Config
+
+
+class SpeciesIdentificationError(Exception):
+    """Base exception for species identification errors."""
+    pass
+
+
+class IdentificationTimeout(SpeciesIdentificationError):
+    """Raised when identification times out."""
+    pass
+
+
+@dataclass
+class IdentificationResult:
+    """Result of species identification."""
+    species_name: str
+    confidence: float
+    api_success: bool
+    processing_time: float
+    fallback_reason: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 class SpeciesIdentifier:
     """
@@ -65,13 +88,13 @@ class SpeciesIdentifier:
             
             processing_time = time.time() - start_time
             
-            return {
-                'species_name': result['species'],
-                'confidence': result['confidence'],
-                'api_success': False,  # Always False for mock
-                'processing_time': processing_time,
-                'fallback_reason': 'Mock implementation'
-            }
+            return IdentificationResult(
+                species_name=result['species'],
+                confidence=result['confidence'],
+                api_success=False,  # Always False for mock
+                processing_time=processing_time,
+                fallback_reason='Mock implementation'
+            )
             
         except Exception as e:
             return self._create_error_response(
@@ -117,13 +140,13 @@ class SpeciesIdentifier:
     
     def _create_error_response(self, start_time, reason):
         """Create standardized error response"""
-        return {
-            'species_name': 'Unknown species',
-            'confidence': 0.0,
-            'api_success': False,
-            'processing_time': time.time() - start_time,
-            'fallback_reason': reason
-        }
+        return IdentificationResult(
+            species_name='Unknown species',
+            confidence=0.0,
+            api_success=False,
+            processing_time=time.time() - start_time,
+            fallback_reason=reason
+        )
     
     def health_check(self):
         """
@@ -150,3 +173,30 @@ class SpeciesIdentifier:
             'most_common_species': "European Hedgehog",
             'service_uptime': "100%"  # Mock always available
         }
+
+
+class MockSpeciesIdentifier(SpeciesIdentifier):
+    """Extended mock implementation with additional test features."""
+    
+    def __init__(self, config: Config, fail_rate: float = 0.0):
+        super().__init__(config)
+        self.fail_rate = fail_rate
+        self.call_count = 0
+    
+    def identify_species(self, image_path, timeout=None) -> IdentificationResult:
+        """Mock identification with controllable failure rate."""
+        self.call_count += 1
+        
+        # Simulate failures based on fail_rate
+        if random.random() < self.fail_rate:
+            raise SpeciesIdentificationError("Mock identification failure")
+        
+        # Simulate timeout
+        if timeout and timeout < 0.1:
+            raise IdentificationTimeout("Mock timeout")
+        
+        return super().identify_species(image_path, timeout)
+    
+    def reset_stats(self):
+        """Reset call counter for testing."""
+        self.call_count = 0
