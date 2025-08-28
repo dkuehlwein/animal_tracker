@@ -142,9 +142,6 @@ class WildlifeSystem:
                 caption = f"Motion detected at {timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
                 await self.telegram_service.send_photo_with_caption(image_path, caption)
     
-    async def send_telegram_notification(self, species_result: dict, motion_area: int, timestamp: datetime):
-        """Backward compatibility method for sending notifications"""
-        return await self.send_notification(species_result, motion_area, timestamp)
     
     async def run(self):
         """Main loop for wildlife detection system"""
@@ -239,17 +236,6 @@ class WildlifeSystem:
             self.camera.stop()
 
 
-# Backward compatibility classes
-class WildlifeCamera(WildlifeSystem):
-    """Backward compatibility: Simple mode wildlife system (like original wildlife_camera)"""
-    def __init__(self):
-        super().__init__(advanced_mode=False)
-
-
-class WildlifeDetector(WildlifeSystem):
-    """Backward compatibility: Advanced mode wildlife system (like original wildlife_detector)"""
-    def __init__(self):
-        super().__init__(advanced_mode=True)
 
 
 if __name__ == "__main__":
