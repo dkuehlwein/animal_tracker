@@ -1,28 +1,27 @@
 #!/usr/bin/env python3
 """
-Camera test and focus adjustment script.
+Headless camera test and capture script for Pi Zero over SSH.
 
 Features:
-- Live preview with camera settings display
-- High-resolution capture on spacebar
+- Headless operation (no GUI)
+- High-resolution image capture
 - Real-time camera statistics
 - Proper error handling and cleanup
 - Direct picamera2 integration for better control
 
-Controls:
-- SPACE: Capture high-res image
-- ESC/Q: Exit
-- C: Display camera info
-- S: Show statistics
+Commands:
+- Press ENTER to capture image
+- Type 'q' + ENTER to quit
+- Type 'c' + ENTER for camera info
+- Type 's' + ENTER for statistics
 """
 
-import cv2
 import sys
 import time
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
 # Setup logging
 logging.basicConfig(
@@ -32,7 +31,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Add src to path
-sys.path.insert(0, str(Path(__file__).parent / 'src'))
+sys.path.insert(0, str(Path(__file__).parent.parent / 'src'))
+# Add system packages for libcamera access
+sys.path.insert(0, '/usr/lib/python3/dist-packages')
 
 try:
     from config import Config
@@ -50,16 +51,13 @@ except ImportError:
 
 
 class CameraTestApp:
-    """Enhanced camera test application with better control and feedback."""
+    """Headless camera test application for Pi Zero over SSH."""
     
     def __init__(self):
-        self.config = Config()
+        self.config = Config.create_test_config()
         self.camera_manager: Optional[CameraManager] = None
         self.capture_count = 0
         self.start_time = time.time()
-        self.frame_count = 0
-        self.last_fps_time = time.time()
-        self.fps = 0.0
         
         # Determine camera type
         self.use_mock = not self._is_pi_camera_available()
@@ -87,44 +85,6 @@ class CameraTestApp:
             logger.info(f"Pi camera not accessible ({e}) - using mock camera")
             return False
     
-    def _update_fps(self):
-        """Calculate and update FPS counter."""
-        self.frame_count += 1
-        current_time = time.time()
-        
-        if current_time - self.last_fps_time >= 1.0:  # Update every second
-            self.fps = self.frame_count / (current_time - self.last_fps_time)
-            self.frame_count = 0
-            self.last_fps_time = current_time
-    
-    def _draw_overlay(self, frame) -> None:
-        """Draw informational overlay on frame."""
-        if frame is None or len(frame.shape) < 2:
-            return
-            
-        height, width = frame.shape[:2]
-        
-        # Prepare overlay text
-        overlay_lines = [
-            f"FPS: {self.fps:.1f}",
-            f"Captures: {self.capture_count}",
-            f"Resolution: {width}x{height}",
-            f"Camera: {'Pi Camera' if not self.use_mock else 'Mock'}",
-            "",
-            "SPACE: Capture  ESC/Q: Exit",
-            "C: Camera Info  S: Stats"
-        ]
-        
-        # Draw semi-transparent background
-        overlay_height = len(overlay_lines) * 25 + 10
-        cv2.rectangle(frame, (10, 10), (300, overlay_height), (0, 0, 0), -1)
-        cv2.rectangle(frame, (10, 10), (300, overlay_height), (255, 255, 255), 1)
-        
-        # Draw text
-        for i, line in enumerate(overlay_lines):
-            y_pos = 30 + i * 25
-            color = (0, 255, 0) if line.startswith(("FPS", "Captures")) else (255, 255, 255)
-            cv2.putText(frame, line, (20, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 1)
     
     def _print_camera_info(self):
         """Print detailed camera information."""
@@ -154,12 +114,11 @@ class CameraTestApp:
         print(f"\n📊 Session Statistics:")
         print(f"   Runtime: {runtime:.1f} seconds")
         print(f"   Images Captured: {self.capture_count}")
-        print(f"   Average FPS: {self.fps:.1f}")
         print(f"   Images per minute: {(self.capture_count / runtime * 60):.1f}")
     
     def run(self):
-        """Main application loop."""
-        print("🎥 Camera Test & Focus Adjustment Tool")
+        """Main headless application loop."""
+        print("🎥 Headless Camera Test & Capture Tool")
         print("="*50)
         
         if self.use_mock:
@@ -182,51 +141,29 @@ class CameraTestApp:
             logger.error(f"Unexpected error during camera initialization: {e}")
             return 1
         
-        # Setup display
-        window_name = 'Camera Test - Press SPACE to capture'
-        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(window_name, 800, 600)
-        
         try:
-            print("\n🚀 Camera ready! Press 'h' for help")
+            print("\n🚀 Camera ready!")
+            self._print_help()
             
             while True:
-                # Capture preview frame
-                frame = self.camera_manager.capture_motion_frame()
-                
-                if frame is not None:
-                    # Convert grayscale to BGR for display
-                    if len(frame.shape) == 2:
-                        display_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+                try:
+                    user_input = input("\nCommand (ENTER=capture, q=quit, c=info, s=stats, h=help): ").strip().lower()
+                    
+                    if user_input == 'q':
+                        break
+                    elif user_input == 'c':
+                        self._print_camera_info()
+                    elif user_input == 's':
+                        self._print_statistics()
+                    elif user_input == 'h':
+                        self._print_help()
+                    elif user_input == '' or user_input == 'capture':
+                        self._capture_image()
                     else:
-                        display_frame = frame.copy()
-                    
-                    # Add overlay
-                    self._draw_overlay(display_frame)
-                    self._update_fps()
-                    
-                    # Display frame
-                    cv2.imshow(window_name, display_frame)
-                else:
-                    logger.warning("Failed to capture frame")
-                
-                # Handle keyboard input
-                key = cv2.waitKey(1) & 0xFF
-                
-                if key == ord(' '):  # Spacebar - capture
-                    self._capture_image()
-                    
-                elif key in [27, ord('q'), ord('Q')]:  # ESC or Q - quit
+                        print("Unknown command. Type 'h' for help.")
+                        
+                except EOFError:
                     break
-                    
-                elif key in [ord('c'), ord('C')]:  # Camera info
-                    self._print_camera_info()
-                    
-                elif key in [ord('s'), ord('S')]:  # Statistics
-                    self._print_statistics()
-                    
-                elif key in [ord('h'), ord('H')]:  # Help
-                    self._print_help()
                     
         except KeyboardInterrupt:
             print("\n\n🛑 Interrupted by user")
@@ -258,12 +195,12 @@ class CameraTestApp:
     
     def _print_help(self):
         """Print help information."""
-        print("\n📖 HELP - Keyboard Controls:")
-        print("   SPACE    - Capture high-resolution image")
-        print("   ESC/Q    - Exit application") 
-        print("   C        - Show camera information")
-        print("   S        - Show session statistics")
-        print("   H        - Show this help")
+        print("\n📖 HELP - Available Commands:")
+        print("   ENTER (or 'capture') - Capture high-resolution image")
+        print("   q                    - Exit application") 
+        print("   c                    - Show camera information")
+        print("   s                    - Show session statistics")
+        print("   h                    - Show this help")
         print()
     
     def _cleanup(self):
@@ -275,8 +212,6 @@ class CameraTestApp:
                 self.camera_manager.stop()
             except Exception as e:
                 logger.error(f"Error stopping camera: {e}")
-                
-        cv2.destroyAllWindows()
         
         # Final statistics
         runtime = time.time() - self.start_time
