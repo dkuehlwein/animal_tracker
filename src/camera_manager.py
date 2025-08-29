@@ -256,22 +256,6 @@ class PiCameraManager(CameraInterface):
             self._handle_capture_error(f"high-res frame capture: {e}")
             return None
     
-    def capture_and_save_direct(self, file_path: Path) -> bool:
-        """Capture and save image directly using Picamera2's native methods."""
-        try:
-            # Ensure directory exists
-            file_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            # Use Picamera2's direct file capture for proper color handling
-            self.camera.capture_file(str(file_path))
-            
-            logger.debug(f"Image saved directly to {file_path}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error in direct capture to {file_path}: {e}")
-            return False
-
     def save_frame_to_file(self, frame: FrameData, file_path: Path) -> bool:
         """Save frame to file with error handling."""
         try:

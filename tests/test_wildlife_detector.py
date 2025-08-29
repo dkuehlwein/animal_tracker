@@ -15,7 +15,7 @@ from datetime import datetime
 import sys
 sys.path.append('src')
 
-from wildlife_detector import WildlifeDetector, WildlifeDetectorError
+from wildlife_system import WildlifeSystem, WildlifeSystemError
 from config import Config
 from camera_manager import CameraManager
 from motion_detector import MotionDetector
@@ -23,7 +23,7 @@ from species_identifier import SpeciesIdentifier
 from database_manager import DatabaseManager
 
 
-class TestWildlifeDetectorInitialization:
+class TestWildlifeSystemInitialization:
     """Test wildlife detector initialization and configuration."""
     
     def setup_method(self):
@@ -40,7 +40,7 @@ class TestWildlifeDetectorInitialization:
     
     def test_wildlife_detector_initialization(self):
         """Test wildlife detector initialization."""
-        detector = WildlifeDetector(self.config, use_mock_components=True)
+        detector = WildlifeSystem(advanced_mode=True)
         
         assert detector.config == self.config
         assert isinstance(detector.camera_manager, CameraManager)
@@ -55,22 +55,22 @@ class TestWildlifeDetectorInitialization:
         invalid_config = Config.create_test_config()
         invalid_config.storage.database_path = Path("/invalid/path/db.sqlite")
         
-        with pytest.raises(WildlifeDetectorError, match="Failed to initialize database"):
-            WildlifeDetector(invalid_config, use_mock_components=True)
+        with pytest.raises(WildlifeSystemError, match="Failed to initialize database"):
+            WildlifeSystem(invalid_config, use_mock_components=True)
     
     def test_wildlife_detector_mock_vs_real_components(self):
         """Test mock vs real component selection."""
         # Mock components
-        mock_detector = WildlifeDetector(self.config, use_mock_components=True)
+        mock_detector = WildlifeSystem(self.config, use_mock_components=True)
         assert mock_detector.camera_manager._camera.__class__.__name__ == 'MockCameraManager'
         
         # Real components (but will use mock since we're not on Pi)
-        real_detector = WildlifeDetector(self.config, use_mock_components=False)
+        real_detector = WildlifeSystem(self.config, use_mock_components=False)
         # Should still use mock on non-Pi systems
         assert real_detector.camera_manager._camera is not None
 
 
-class TestWildlifeDetectorLifecycle:
+class TestWildlifeSystemLifecycle:
     """Test wildlife detector startup and shutdown lifecycle."""
     
     def setup_method(self):
@@ -80,7 +80,7 @@ class TestWildlifeDetectorLifecycle:
         self.config.storage.data_dir = self.temp_dir
         self.config.storage.database_path = self.temp_dir / "test.db"
         self.config.storage.image_dir = self.temp_dir / "images"
-        self.detector = WildlifeDetector(self.config, use_mock_components=True)
+        self.detector = WildlifeSystem(self.config, use_mock_components=True)
     
     def teardown_method(self):
         """Clean up test environment."""
@@ -134,7 +134,7 @@ class TestWildlifeDetectorLifecycle:
         assert not self.detector.is_running
 
 
-class TestWildlifeDetectorDetection:
+class TestWildlifeSystemDetection:
     """Test wildlife detection functionality."""
     
     def setup_method(self):
@@ -149,7 +149,7 @@ class TestWildlifeDetectorDetection:
         self.config.performance.cooldown_period = 1  # 1 second cooldown
         self.config.motion.motion_threshold = 100   # Lower threshold
         
-        self.detector = WildlifeDetector(self.config, use_mock_components=True)
+        self.detector = WildlifeSystem(self.config, use_mock_components=True)
     
     def teardown_method(self):
         """Clean up test environment."""
@@ -295,7 +295,7 @@ class TestWildlifeDetectorDetection:
                 mock_send.assert_called_once()
 
 
-class TestWildlifeDetectorErrorHandling:
+class TestWildlifeSystemErrorHandling:
     """Test error handling in wildlife detector."""
     
     def setup_method(self):
@@ -305,7 +305,7 @@ class TestWildlifeDetectorErrorHandling:
         self.config.storage.data_dir = self.temp_dir
         self.config.storage.database_path = self.temp_dir / "test.db"
         self.config.storage.image_dir = self.temp_dir / "images"
-        self.detector = WildlifeDetector(self.config, use_mock_components=True)
+        self.detector = WildlifeSystem(self.config, use_mock_components=True)
     
     def teardown_method(self):
         """Clean up test environment."""
@@ -403,7 +403,7 @@ class TestWildlifeDetectorErrorHandling:
                 assert result['telegram_sent'] is False
 
 
-class TestWildlifeDetectorPerformance:
+class TestWildlifeSystemPerformance:
     """Test performance and resource management."""
     
     def setup_method(self):
@@ -413,7 +413,7 @@ class TestWildlifeDetectorPerformance:
         self.config.storage.data_dir = self.temp_dir
         self.config.storage.database_path = self.temp_dir / "test.db"
         self.config.storage.image_dir = self.temp_dir / "images"
-        self.detector = WildlifeDetector(self.config, use_mock_components=True)
+        self.detector = WildlifeSystem(self.config, use_mock_components=True)
     
     def teardown_method(self):
         """Clean up test environment."""
@@ -472,7 +472,7 @@ class TestWildlifeDetectorPerformance:
             image_file.parent.mkdir(parents=True, exist_ok=True)
             image_file.write_bytes(b"fake_image_data")
         
-        detector = WildlifeDetector(self.config, use_mock_components=True)
+        detector = WildlifeSystem(advanced_mode=True)
         
         # Trigger cleanup
         detector._cleanup_old_images()
@@ -482,7 +482,7 @@ class TestWildlifeDetectorPerformance:
         assert len(remaining_files) <= self.config.performance.max_images
 
 
-class TestWildlifeDetectorMonitoring:
+class TestWildlifeSystemMonitoring:
     """Test monitoring and status reporting."""
     
     def setup_method(self):
@@ -492,7 +492,7 @@ class TestWildlifeDetectorMonitoring:
         self.config.storage.data_dir = self.temp_dir
         self.config.storage.database_path = self.temp_dir / "test.db"
         self.config.storage.image_dir = self.temp_dir / "images"
-        self.detector = WildlifeDetector(self.config, use_mock_components=True)
+        self.detector = WildlifeSystem(self.config, use_mock_components=True)
     
     def teardown_method(self):
         """Clean up test environment."""
@@ -550,7 +550,7 @@ class TestWildlifeDetectorMonitoring:
 
 
 @pytest.mark.integration
-class TestWildlifeDetectorIntegration:
+class TestWildlifeSystemIntegration:
     """Integration tests requiring all components."""
     
     def setup_method(self):
@@ -571,7 +571,7 @@ class TestWildlifeDetectorIntegration:
     @pytest.mark.asyncio
     async def test_full_detection_pipeline(self):
         """Test complete detection pipeline integration."""
-        detector = WildlifeDetector(self.config, use_mock_components=True)
+        detector = WildlifeSystem(advanced_mode=True)
         
         async with detector:
             # Run detection loop for a short time
@@ -594,7 +594,7 @@ class TestWildlifeDetectorIntegration:
     @pytest.mark.asyncio
     async def test_end_to_end_mock_scenario(self):
         """Test end-to-end scenario with controlled mock data."""
-        detector = WildlifeDetector(self.config, use_mock_components=True)
+        detector = WildlifeSystem(advanced_mode=True)
         
         # Force motion detection for this test
         async with detector:
