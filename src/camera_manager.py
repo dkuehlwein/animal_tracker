@@ -256,14 +256,31 @@ class PiCameraManager(CameraInterface):
             self._handle_capture_error(f"high-res frame capture: {e}")
             return None
     
+    def capture_and_save_direct(self, file_path: Path) -> bool:
+        """Capture and save image directly using Picamera2's native methods."""
+        try:
+            # Ensure directory exists
+            file_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Use Picamera2's direct file capture for proper color handling
+            self.camera.capture_file(str(file_path))
+            
+            logger.debug(f"Image saved directly to {file_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error in direct capture to {file_path}: {e}")
+            return False
+
     def save_frame_to_file(self, frame: FrameData, file_path: Path) -> bool:
         """Save frame to file with error handling."""
         try:
             # Ensure directory exists
             file_path.parent.mkdir(parents=True, exist_ok=True)
             
-            # Convert RGB to BGR for OpenCV
+            # Handle color format - Picamera2 captures RGB but OpenCV expects BGR
             if len(frame.shape) == 3 and frame.shape[2] == 3:
+                # Convert RGB to BGR for proper color saving with OpenCV
                 bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
             else:
                 bgr_frame = frame
@@ -431,17 +448,15 @@ class CameraManager:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             file_path = self.config.storage.image_dir / f"{self.config.storage.image_prefix}{timestamp}.jpg"
             
-            # Capture frame
-            frame = self._camera.capture_high_res_frame()
-            if frame is None:
-                logger.error("Failed to capture high resolution frame")
-                return None
-            
-            # Save to file using camera manager's optimized saving
+            # Use direct capture for PiCamera to avoid color issues
             if isinstance(self._camera, PiCameraManager):
-                success = self._camera.save_frame_to_file(frame, file_path)
+                success = self._camera.capture_and_save_direct(file_path)
             else:
-                # For mock camera, use simple save
+                # For mock camera, use existing method
+                frame = self._camera.capture_high_res_frame()
+                if frame is None:
+                    logger.error("Failed to capture high resolution frame")
+                    return None
                 success = self._camera.save_frame_to_file(frame, file_path)
             
             if success:
