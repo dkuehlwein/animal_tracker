@@ -45,6 +45,13 @@ def test_color_formats():
         
         print(f"Frame shape: {frame.shape}")
         print(f"Frame dtype: {frame.dtype}")
+        print(f"Frame min/max values: {frame.min()}/{frame.max()}")
+        print(f"Frame mean: {frame.mean():.2f}")
+        
+        # Check if frame data looks valid
+        if len(frame.shape) == 3:
+            print(f"Channel shapes: R={frame[:,:,0].shape}, G={frame[:,:,1].shape}, B={frame[:,:,2].shape}")
+            print(f"Channel means: R={frame[:,:,0].mean():.2f}, G={frame[:,:,1].mean():.2f}, B={frame[:,:,2].mean():.2f}")
         
         if len(frame.shape) == 3 and frame.shape[2] == 3:
             # Test different conversion approaches
