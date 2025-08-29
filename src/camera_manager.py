@@ -278,12 +278,9 @@ class PiCameraManager(CameraInterface):
             # Ensure directory exists
             file_path.parent.mkdir(parents=True, exist_ok=True)
             
-            # Handle color format - Picamera2 captures RGB but OpenCV expects BGR
-            if len(frame.shape) == 3 and frame.shape[2] == 3:
-                # Convert RGB to BGR for proper color saving with OpenCV
-                bgr_frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-            else:
-                bgr_frame = frame
+            # Picamera2 appears to already provide BGR format on this hardware
+            # Skip color conversion to fix yellow->blue, red->purple color swap
+            bgr_frame = frame
             
             # Save with compression for Pi Zero storage efficiency
             success = cv2.imwrite(
@@ -448,15 +445,17 @@ class CameraManager:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             file_path = self.config.storage.image_dir / f"{self.config.storage.image_prefix}{timestamp}.jpg"
             
-            # Use direct capture for PiCamera to avoid color issues
+            # Capture frame
+            frame = self._camera.capture_high_res_frame()
+            if frame is None:
+                logger.error("Failed to capture high resolution frame")
+                return None
+            
+            # Save to file using camera manager's optimized saving
             if isinstance(self._camera, PiCameraManager):
-                success = self._camera.capture_and_save_direct(file_path)
+                success = self._camera.save_frame_to_file(frame, file_path)
             else:
-                # For mock camera, use existing method
-                frame = self._camera.capture_high_res_frame()
-                if frame is None:
-                    logger.error("Failed to capture high resolution frame")
-                    return None
+                # For mock camera, use simple save
                 success = self._camera.save_frame_to_file(frame, file_path)
             
             if success:
