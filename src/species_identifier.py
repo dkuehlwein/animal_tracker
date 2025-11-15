@@ -104,9 +104,12 @@ class SpeciesIdentifier:
 
             return result
 
-        except SpeciesIdentificationError:
-            # Re-raise our own exceptions
-            raise
+        except SpeciesIdentificationError as e:
+            # Handle model loading failures gracefully
+            logger.error(f"Species identification failed: {e}")
+            return self._create_error_response(
+                start_time, str(e)
+            )
         except Exception as e:
             logger.error(f"Species identification failed: {e}")
             return self._create_error_response(

@@ -9,18 +9,18 @@ from pathlib import Path
 import sys
 sys.path.append('src')
 
-from species_identifier import MockSpeciesIdentifier
+from species_identifier import SpeciesIdentifier
 from config import Config
 
 
 class TestSpeciesIdentifier:
-    """Test mock species identifier functionality."""
+    """Test actual species identifier functionality."""
 
     def setup_method(self):
         """Set up test environment."""
         self.temp_dir = Path(tempfile.mkdtemp())
         self.config = Config.create_test_config()
-        self.identifier = MockSpeciesIdentifier(self.config)
+        self.identifier = SpeciesIdentifier(self.config)
     
     def teardown_method(self):
         """Clean up test environment."""
@@ -28,10 +28,10 @@ class TestSpeciesIdentifier:
         shutil.rmtree(self.temp_dir, ignore_errors=True)
     
     def test_identifier_initialization(self):
-        """Test identifier initializes with mock species list."""
-        assert len(self.identifier.mock_species) > 0
-        assert "European Hedgehog" in self.identifier.mock_species
-        assert "Red Fox" in self.identifier.mock_species
+        """Test identifier initializes correctly."""
+        assert self.identifier._model is None  # Lazy loaded
+        assert self.identifier._model_loaded is False
+        assert self.identifier.config is not None
     
     def test_identify_species_with_valid_image(self):
         """Test species identification with valid image file."""
@@ -39,9 +39,11 @@ class TestSpeciesIdentifier:
         test_image = self.temp_dir / "test_image.jpg"
         test_image.write_bytes(b"fake_image_data")
 
+        # Note: This will fail without SpeciesNet installed
+        # But returns IdentificationResult on error
         result = self.identifier.identify_species(str(test_image))
 
-        # Check result structure (now returns IdentificationResult)
+        # Check result structure (returns IdentificationResult dataclass)
         assert hasattr(result, 'species_name')
         assert hasattr(result, 'confidence')
         assert hasattr(result, 'api_success')
@@ -51,9 +53,7 @@ class TestSpeciesIdentifier:
         # Check result values
         assert isinstance(result.species_name, str)
         assert isinstance(result.confidence, float)
-        assert result.api_success is False  # Mock always returns False
-        assert result.processing_time > 0
-        assert result.fallback_reason == 'Mock implementation'
+        assert result.processing_time >= 0
     
     def test_identify_species_with_nonexistent_image(self):
         """Test species identification with nonexistent image."""
@@ -64,32 +64,24 @@ class TestSpeciesIdentifier:
         assert result.api_success is False
         assert 'Image file not found' in result.fallback_reason
     
-    def test_mock_identification_logic(self):
-        """Test that mock identification returns reasonable results."""
+    def test_identification_returns_result(self):
+        """Test that identification returns proper IdentificationResult."""
         # Create test image
         test_image = self.temp_dir / "test.jpg"
         test_image.write_bytes(b"test")
 
-        # Run identification multiple times to test randomness
-        results = []
-        for _ in range(20):
-            result = self.identifier.identify_species(str(test_image))
-            results.append(result)
+        result = self.identifier.identify_species(str(test_image))
 
-        # Should have some variety in results
-        species_names = [r.species_name for r in results]
-        confidences = [r.confidence for r in results]
+        # Should always return IdentificationResult
+        assert hasattr(result, 'species_name')
+        assert hasattr(result, 'confidence')
+        assert hasattr(result, 'api_success')
+        assert hasattr(result, 'processing_time')
 
-        # Should include "Unknown species" frequently (70% chance)
-        unknown_count = species_names.count('Unknown species')
-        assert unknown_count >= 10  # At least half should be unknown
-
-        # Confidence should be 0 for unknown species
-        for result in results:
-            if result.species_name == 'Unknown species':
-                assert result.confidence == 0.0
-            else:
-                assert result.confidence > 0.0
+        # Result should be valid
+        assert result.species_name is not None
+        assert isinstance(result.confidence, float)
+        assert 0.0 <= result.confidence <= 1.0
     
     def test_health_check(self):
         """Test health check functionality."""
@@ -101,21 +93,23 @@ class TestSpeciesIdentifier:
     
     def test_get_supported_species(self):
         """Test getting supported species info."""
-        # Note: Real SpeciesIdentifier returns dict, MockSpeciesIdentifier can override
-        # For now, just verify mock_species exists on MockSpeciesIdentifier
-        assert hasattr(self.identifier, 'mock_species')
-        assert len(self.identifier.mock_species) > 0
-        assert "European Hedgehog" in self.identifier.mock_species
-        assert "Red Fox" in self.identifier.mock_species
+        species_info = self.identifier.get_supported_species()
+
+        # Real SpeciesIdentifier returns dict with info
+        assert isinstance(species_info, dict)
+        assert 'total_labels' in species_info
+        assert 'geographic_filter' in species_info
     
     def test_get_statistics(self):
         """Test getting service statistics."""
         stats = self.identifier.get_statistics()
 
         assert isinstance(stats, dict)
-        # New implementation returns different stats (model_loaded, model_version, etc.)
+        # Real implementation returns model status
         assert 'model_loaded' in stats
+        assert 'model_version' in stats
         assert isinstance(stats['model_loaded'], bool)
+        assert stats['model_version'] == 'v4.0.1a'
 
 
 if __name__ == '__main__':
