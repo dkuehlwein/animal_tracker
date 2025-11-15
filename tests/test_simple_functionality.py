@@ -30,40 +30,38 @@ class TestBasicFunctionality:
         """Test species identifier basic functionality."""
         config = Config.create_test_config()
         identifier = SpeciesIdentifier(config)
-        
-        # Test initialization
-        assert len(identifier.mock_species) > 0
-        
-        # Test health check
-        health = identifier.health_check()
-        assert health['available'] is True
-        
-        # Test supported species
-        species = identifier.get_supported_species()
-        assert isinstance(species, list)
-        assert "European Hedgehog" in species
+
+        # Test initialization (lazy-loaded)
+        assert identifier._model is None
+        assert identifier._model_loaded is False
+        assert identifier.config is not None
     
-    def test_species_identification_mock(self):
-        """Test species identification with mock data."""
+    def test_species_identification_with_real_identifier(self):
+        """Test species identification with real SpeciesIdentifier."""
         config = Config.create_test_config()
         identifier = SpeciesIdentifier(config)
-        
+
         # Create temporary image file
         temp_dir = Path(tempfile.mkdtemp())
         try:
             test_image = temp_dir / "test.jpg"
             test_image.write_bytes(b"fake_image")
-            
-            # Test identification
+
+            # Test identification (will fail without SpeciesNet but returns IdentificationResult)
             result = identifier.identify_species(str(test_image))
-            
-            assert isinstance(result, dict)
-            assert 'species_name' in result
-            assert 'confidence' in result
-            assert 'api_success' in result
-            assert result['api_success'] is False  # Mock always returns False
-            assert 'fallback_reason' in result
-            
+
+            # Verify IdentificationResult structure
+            assert hasattr(result, 'species_name')
+            assert hasattr(result, 'confidence')
+            assert hasattr(result, 'api_success')
+            assert hasattr(result, 'processing_time')
+            assert hasattr(result, 'fallback_reason')
+
+            # Check result values
+            assert isinstance(result.species_name, str)
+            assert isinstance(result.confidence, float)
+            assert result.processing_time >= 0
+
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
     

@@ -92,7 +92,7 @@ class StorageConfig:
     logs_dir: Path = field(default_factory=lambda: Path("data/logs"))
     database_path: str = "data/detections.db"
     image_prefix: str = "capture_"
-    
+
     def __post_init__(self):
         """Validate and ensure directories exist."""
         for directory in [self.data_dir, self.image_dir, self.logs_dir]:
@@ -101,6 +101,43 @@ class StorageConfig:
             except OSError as e:
                 logger.error(f"Failed to create directory {directory}: {e}")
                 raise
+
+
+@dataclass(frozen=True)
+class SpeciesConfig:
+    """Species identification configuration."""
+    # Model settings
+    model_version: str = "v4.0.1a"  # always-crop variant
+    use_ensemble: bool = True  # Use detector + classifier
+
+    # Geographic filtering
+    country_code: str = "DEU"  # ISO 3166-1 Alpha-3 for Germany
+    admin1_region: str = "NW"  # North Rhine-Westphalia (Bonn)
+
+    # Confidence thresholds
+    min_detection_confidence: float = 0.6  # MegaDetector threshold
+    min_classification_confidence: float = 0.5  # Species classification threshold
+    unknown_species_threshold: float = 0.5  # Below this = "Unknown species"
+
+    # Performance settings
+    model_cache_dir: Path = field(default_factory=lambda: Path.home() / ".cache" / "speciesnet")
+    enable_gpu: bool = False  # Pi 5 doesn't have NVIDIA GPU
+    processing_timeout: float = 30.0  # Max time for identification
+
+    # Behavior settings
+    return_top_k: int = 5  # Return top 5 species predictions
+    crop_padding: float = 0.1  # Padding around detected objects
+
+    def __post_init__(self):
+        """Validate species configuration."""
+        if not (0.0 <= self.min_detection_confidence <= 1.0):
+            raise ValueError("Detection confidence must be between 0 and 1")
+        if not (0.0 <= self.min_classification_confidence <= 1.0):
+            raise ValueError("Classification confidence must be between 0 and 1")
+        if not (0.0 <= self.unknown_species_threshold <= 1.0):
+            raise ValueError("Unknown species threshold must be between 0 and 1")
+        if self.model_version not in ["v4.0.1a", "v4.0.1b"]:
+            raise ValueError(f"Invalid model version: {self.model_version}")
 
 
 class ConfigurationError(Exception):
@@ -117,29 +154,30 @@ class Config:
     def __init__(self, env_file: Optional[Union[str, Path]] = None):
         """
         Initialize configuration from environment variables.
-        
+
         Args:
             env_file: Optional path to .env file
-            
+
         Raises:
             ConfigurationError: If required configuration is missing or invalid
         """
         # Load environment variables
         load_dotenv(env_file)
-        
+
         # Initialize sub-configurations
         self.camera = self._load_camera_config()
         self.motion = self._load_motion_config()
         self.performance = self._load_performance_config()
         self.storage = self._load_storage_config()
-        
+        self.species = self._load_species_config()
+
         # Load Telegram settings
         self.telegram_token = self._get_required_env("TELEGRAM_BOT_TOKEN")
         self.telegram_chat_id = self._get_required_env("TELEGRAM_CHAT_ID")
-        
+
         # Validate complete configuration
         self._validate_configuration()
-        
+
         logger.info("Configuration loaded successfully")
     
     def _get_required_env(self, key: str) -> str:
@@ -217,6 +255,32 @@ class Config:
                 "STORAGE_DATABASE_PATH", str(data_dir / "detections.db")
             )
         )
+
+    def _load_species_config(self) -> SpeciesConfig:
+        """Load species identification configuration with environment overrides."""
+        return SpeciesConfig(
+            model_version=self._get_optional_env(
+                "SPECIES_MODEL_VERSION", "v4.0.1a"
+            ),
+            country_code=self._get_optional_env(
+                "SPECIES_COUNTRY_CODE", "DEU"
+            ),
+            admin1_region=self._get_optional_env(
+                "SPECIES_REGION", "NW"
+            ),
+            min_detection_confidence=self._get_optional_env(
+                "SPECIES_MIN_DETECTION_CONF", "0.6", float
+            ),
+            min_classification_confidence=self._get_optional_env(
+                "SPECIES_MIN_CLASS_CONF", "0.5", float
+            ),
+            unknown_species_threshold=self._get_optional_env(
+                "SPECIES_UNKNOWN_THRESHOLD", "0.5", float
+            ),
+            processing_timeout=self._get_optional_env(
+                "SPECIES_PROCESSING_TIMEOUT", "30.0", float
+            )
+        )
     
     def _parse_resolution(self, resolution_str: str) -> Tuple[int, int]:
         """Parse resolution string like '1920x1080' to tuple."""
@@ -261,6 +325,13 @@ class Config:
             "storage": {
                 "data_dir": str(self.storage.data_dir),
                 "database_path": self.storage.database_path
+            },
+            "species": {
+                "model_version": self.species.model_version,
+                "country": self.species.country_code,
+                "region": self.species.admin1_region,
+                "min_detection_confidence": self.species.min_detection_confidence,
+                "unknown_threshold": self.species.unknown_species_threshold
             }
         }
     
