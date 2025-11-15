@@ -26,31 +26,27 @@ class WildlifeSystemError(Exception):
 
 class WildlifeSystem:
     """
-    Unified wildlife detection system with configurable modes:
-    - simple_mode: Just motion detection and photo capture (like original wildlife_camera)
-    - advanced_mode: Full species identification and database logging (like wildlife_detector)
+    Unified wildlife detection system with SpeciesNet-powered species identification.
+    Combines motion detection, species identification, database logging, and Telegram notifications.
     """
-    
-    def __init__(self, advanced_mode: bool = True):
+
+    def __init__(self):
         # Load configuration
         self.config = Config()
-        self.advanced_mode = advanced_mode
-        
-        # Initialize core components (always needed)
+
+        # Initialize all components
         self.camera = CameraManager(self.config)
         self.motion_detector = MotionDetector(self.config)
         self.telegram_service = TelegramService(self.config)
-        
-        # Initialize advanced components (only if needed)
-        if self.advanced_mode:
-            self.system_monitor = SystemMonitor(self.config)
-            self.file_manager = FileManager(self.config)
-            self.file_manager.ensure_directories()
-            
-            self.database = DatabaseManager(self.config)
-            self.species_identifier = SpeciesIdentifier(self.config)
-            self.telegram_service.set_database_reference(self.database)
-        
+        self.system_monitor = SystemMonitor(self.config)
+        self.file_manager = FileManager(self.config)
+        self.database = DatabaseManager(self.config)
+        self.species_identifier = SpeciesIdentifier(self.config)
+
+        # Setup
+        self.file_manager.ensure_directories()
+        self.telegram_service.set_database_reference(self.database)
+
         # State variables
         self.last_frame_time = 0
         self.last_detection_time = 0
@@ -74,24 +70,14 @@ class WildlifeSystem:
             print(f"Error in cleanup: {e}")
     
     def process_detection(self, image_path: Path, motion_area: int) -> tuple:
-        """Process a detection with optional species identification and database logging"""
+        """Process a detection with species identification and database logging"""
         timestamp = datetime.now()
-        
-        if not self.advanced_mode:
-            # Simple mode: just return basic info
-            return {
-                'species_name': 'Motion detected',
-                'confidence': 1.0,
-                'api_success': False,
-                'processing_time': 0.0,
-                'fallback_reason': 'Simple mode'
-            }, timestamp
-        
+
         try:
-            # Advanced mode: species identification with performance timing
+            # Species identification with performance timing
             with PerformanceTimer("Species identification"):
                 species_result = self.species_identifier.identify_species(image_path)
-            
+
             # Log to database
             detection_id = self.database.log_detection(
                 image_path=image_path,
@@ -101,11 +87,11 @@ class WildlifeSystem:
                 processing_time=species_result.processing_time,
                 api_success=species_result.api_success
             )
-            
+
             print(f"Detection {detection_id}: {species_result.species_name} "
                   f"(confidence: {species_result.confidence:.2f}, "
                   f"motion: {motion_area} pixels)")
-            
+
             # Convert IdentificationResult to dict for compatibility
             result_dict = {
                 'species_name': species_result.species_name,
@@ -114,9 +100,9 @@ class WildlifeSystem:
                 'processing_time': species_result.processing_time,
                 'fallback_reason': species_result.fallback_reason
             }
-            
+
             return result_dict, timestamp
-            
+
         except Exception as e:
             print(f"Error processing detection: {e}")
             # Return fallback result
@@ -128,25 +114,18 @@ class WildlifeSystem:
                 'fallback_reason': f'Processing error: {e}'
             }, timestamp
     
-    async def send_notification(self, species_result: dict, motion_area: int, 
+    async def send_notification(self, species_result: dict, motion_area: int,
                                timestamp: datetime, image_path: Optional[Path] = None):
-        """Send appropriate notification based on mode and settings"""
-        if self.advanced_mode:
-            # Advanced mode: text notifications with species info
-            await self.telegram_service.send_detection_notification(
-                species_result, motion_area, timestamp
-            )
-        else:
-            # Simple mode: photo notifications
-            if image_path:
-                caption = f"Motion detected at {timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
-                await self.telegram_service.send_photo_with_caption(image_path, caption)
+        """Send notification with species identification info"""
+        # Send text notification with species info
+        await self.telegram_service.send_detection_notification(
+            species_result, motion_area, timestamp
+        )
     
     
     async def run(self):
         """Main loop for wildlife detection system"""
-        mode_str = "Advanced" if self.advanced_mode else "Simple"
-        print(f"Wildlife Detection System ({mode_str} Mode) is running...")
+        print("Wildlife Detection System with SpeciesNet is running...")
         print(f"Motion detection parameters:")
         print(f"- Motion resolution: {self.config.camera.motion_detection_resolution} ({self.config.camera.motion_detection_format})")
         print(f"- Motion threshold: {self.config.motion.motion_threshold} pixels")
@@ -154,10 +133,13 @@ class WildlifeSystem:
         print(f"- Cooldown period: {self.config.performance.cooldown_period}s")
         print(f"- Maximum stored images: {self.config.performance.max_images}")
         print(f"- Consecutive detections required: {self.config.motion.consecutive_detections_required}")
-        
-        if self.advanced_mode:
-            # Log initial system status
-            self.system_monitor.log_system_status()
+        print(f"Species identification:")
+        print(f"- Model: {self.config.species.model_version}")
+        print(f"- Location: {self.config.species.country_code}/{self.config.species.admin1_region}")
+        print(f"- Unknown threshold: {self.config.species.unknown_species_threshold}")
+
+        # Log initial system status
+        self.system_monitor.log_system_status()
         
         # Initial cleanup
         self.cleanup_old_images()
@@ -176,9 +158,9 @@ class WildlifeSystem:
                     if current_time - self.last_detection_time < self.config.performance.cooldown_period:
                         await asyncio.sleep(self.config.performance.cooldown_sleep)
                         continue
-                    
-                    # Memory check for advanced mode
-                    if self.advanced_mode and self.system_monitor.should_skip_processing():
+
+                    # Memory check
+                    if self.system_monitor.should_skip_processing():
                         self.system_monitor.memory_manager.force_cleanup()
                         await asyncio.sleep(self.config.performance.error_sleep)
                         continue
@@ -211,23 +193,20 @@ class WildlifeSystem:
                             
                             # Cleanup old images
                             self.cleanup_old_images()
-                            
-                            # Log system status after processing (advanced mode only)
-                            if (self.advanced_mode and 
-                                motion_area > self.config.motion.motion_threshold * 2):
+
+                            # Log system status after large detections
+                            if motion_area > self.config.motion.motion_threshold * 2:
                                 self.system_monitor.log_system_status()
-                        
-                        # Force cleanup after detection processing (advanced mode)
-                        if self.advanced_mode:
-                            self.system_monitor.memory_manager.force_cleanup()
+
+                        # Force cleanup after detection processing
+                        self.system_monitor.memory_manager.force_cleanup()
                     
                     await asyncio.sleep(self.config.performance.idle_sleep)
                     
                 except Exception as e:
                     print(f"Error in main loop: {e}")
-                    # Force cleanup on error (advanced mode)
-                    if self.advanced_mode:
-                        self.system_monitor.memory_manager.force_cleanup()
+                    # Force cleanup on error
+                    self.system_monitor.memory_manager.force_cleanup()
                     await asyncio.sleep(self.config.performance.error_sleep)
                     
         finally:
@@ -239,12 +218,5 @@ class WildlifeSystem:
 
 
 if __name__ == "__main__":
-    import sys
-    
-    # Determine mode from command line argument
-    advanced_mode = True
-    if len(sys.argv) > 1 and sys.argv[1].lower() in ['simple', 'camera']:
-        advanced_mode = False
-    
-    system = WildlifeSystem(advanced_mode=advanced_mode)
+    system = WildlifeSystem()
     asyncio.run(system.run())
