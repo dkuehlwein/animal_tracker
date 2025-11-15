@@ -70,13 +70,28 @@ class WildlifeSystem:
             print(f"Error in cleanup: {e}")
     
     def process_detection(self, image_path: Path, motion_area: int) -> tuple:
-        """Process a detection with species identification and database logging"""
+        """Process a detection with two-stage species identification and database logging"""
         timestamp = datetime.now()
 
         try:
-            # Species identification with performance timing
-            with PerformanceTimer("Species identification"):
+            # Two-stage species identification with performance timing
+            with PerformanceTimer("Two-stage species identification"):
                 species_result = self.species_identifier.identify_species(image_path)
+
+            # Log detection information
+            if species_result.detection_result:
+                det = species_result.detection_result
+                print(f"  Stage 1 - MegaDetector: Found {det.detection_count} animals "
+                      f"({det.processing_time:.2f}s)")
+                if det.animals_detected:
+                    print(f"  Stage 2 - Classifier: {species_result.species_name} "
+                          f"(confidence: {species_result.confidence:.2f})")
+                else:
+                    print(f"  Stage 2 - Skipped (no animals detected)")
+            else:
+                # Legacy path without detection info
+                print(f"  Identified: {species_result.species_name} "
+                      f"(confidence: {species_result.confidence:.2f})")
 
             # Log to database
             detection_id = self.database.log_detection(
@@ -88,9 +103,8 @@ class WildlifeSystem:
                 api_success=species_result.api_success
             )
 
-            print(f"Detection {detection_id}: {species_result.species_name} "
-                  f"(confidence: {species_result.confidence:.2f}, "
-                  f"motion: {motion_area} pixels)")
+            print(f"Detection {detection_id} logged: {species_result.species_name} "
+                  f"(total time: {species_result.processing_time:.2f}s, motion: {motion_area} pixels)")
 
             # Convert IdentificationResult to dict for compatibility
             result_dict = {
@@ -98,7 +112,9 @@ class WildlifeSystem:
                 'confidence': species_result.confidence,
                 'api_success': species_result.api_success,
                 'processing_time': species_result.processing_time,
-                'fallback_reason': species_result.fallback_reason
+                'fallback_reason': species_result.fallback_reason,
+                'animals_detected': species_result.animals_detected,
+                'detection_count': species_result.detection_result.detection_count if species_result.detection_result else 0
             }
 
             return result_dict, timestamp
@@ -111,7 +127,9 @@ class WildlifeSystem:
                 'confidence': 0.0,
                 'api_success': False,
                 'processing_time': 0.0,
-                'fallback_reason': f'Processing error: {e}'
+                'fallback_reason': f'Processing error: {e}',
+                'animals_detected': False,
+                'detection_count': 0
             }, timestamp
     
     async def send_notification(self, species_result: dict, motion_area: int,
@@ -133,9 +151,10 @@ class WildlifeSystem:
         print(f"- Cooldown period: {self.config.performance.cooldown_period}s")
         print(f"- Maximum stored images: {self.config.performance.max_images}")
         print(f"- Consecutive detections required: {self.config.motion.consecutive_detections_required}")
-        print(f"Species identification:")
-        print(f"- Model: {self.config.species.model_version}")
-        print(f"- Location: {self.config.species.country_code}/{self.config.species.admin1_region}")
+        print(f"Species identification (Two-stage pipeline):")
+        print(f"- Stage 1: MegaDetector (min confidence: {self.config.species.min_detection_confidence})")
+        print(f"- Stage 2: SpeciesNet classifier (model: {self.config.species.model_version})")
+        print(f"- Location filtering: {self.config.species.country_code}/{self.config.species.admin1_region}")
         print(f"- Unknown threshold: {self.config.species.unknown_species_threshold}")
 
         # Log initial system status
