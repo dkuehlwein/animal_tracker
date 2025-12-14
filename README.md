@@ -56,7 +56,27 @@ cp .env.example .env
 
 ## Usage
 
-1. Ensure your camera module is properly connected to the Raspberry Pi
+### Camera Setup and Focus Adjustment
+
+Before running the system, you should adjust the camera focus and positioning:
+
+1. Run the camera preview server:
+```bash
+python3 scripts/camera_preview.py
+```
+
+2. Open a web browser and navigate to `http://<raspberry-pi-ip>:8000`
+
+3. Adjust the camera lens focus ring while watching the live preview:
+   - For distant objects (wildlife at a distance), rotate towards infinity focus
+   - Fine-tune the focus for your specific target area (e.g., bird feeder, squirrel house)
+   - The preview shows full 1920x1080 resolution for precise focus checking
+
+4. Press Ctrl+C in the terminal to stop the preview server
+
+### Running the Detection System
+
+1. Ensure your camera module is properly connected and focused
 
 2. Run the wildlife detection system:
 ```bash
@@ -119,6 +139,8 @@ animal_tracker/
 │   ├── database_manager.py      # SQLite database
 │   ├── telegram_service.py      # Telegram notifications
 │   └── utils.py                 # Utilities
+├── scripts/
+│   └── camera_preview.py        # Live camera preview for focus adjustment
 ├── data/
 │   ├── images/                  # Captured photos
 │   ├── logs/                    # System logs
@@ -153,6 +175,8 @@ Common expected species:
 1. Ensure the camera module is properly connected
 2. Check camera permissions: `sudo usermod -a -G video $USER`
 3. Test camera: `libcamera-hello`
+4. Adjust focus using the preview script: `python3 scripts/camera_preview.py`
+5. For blurry images at distance, rotate focus ring to infinity (opposite end from minimum focus)
 
 **SpeciesNet Issues:**
 1. Ensure models are downloaded (first run takes time)

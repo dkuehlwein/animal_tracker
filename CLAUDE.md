@@ -8,6 +8,12 @@ This is a Raspberry Pi 5-based wildlife camera system that automatically detects
 
 ## Key Commands
 
+### Camera preview for focus adjustment
+```bash
+python3 scripts/camera_preview.py
+```
+Starts MJPEG web stream on port 8000 for adjusting camera focus and positioning. Access at `http://<pi-ip>:8000`.
+
 ### Running the system
 ```bash
 python src/wildlife_system.py
@@ -49,6 +55,7 @@ The system follows a modular architecture with these main components:
 - **`species_identifier.py`**: SpeciesNet AI integration for wildlife species identification
 - **`database_manager.py`**: SQLite database for detection logging
 - **`telegram_service.py`**: Telegram notification service
+- **`scripts/camera_preview.py`**: MJPEG streaming server for live camera preview (focus adjustment tool)
 
 ### Data Flow
 
@@ -95,6 +102,7 @@ The camera system supports multiple implementations through the `CameraInterface
 - **MockCameraManager**: Test implementation for development without hardware
 - **Dual-stream capture**: Separate low-res motion detection and high-res photo capture
 - **Resource management**: Automatic cleanup and memory management for Pi Zero compatibility
+- **Camera Preview Tool**: `scripts/camera_preview.py` provides MJPEG web streaming for focus adjustment (based on official Picamera2 example)
 
 ### Motion Detection Strategy
 
