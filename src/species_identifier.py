@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Optional, Dict, Any
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from config import Config
 
 logger = logging.getLogger(__name__)
@@ -238,11 +239,11 @@ class SpeciesIdentifier:
             )
 
     def _run_detection(self, image_path: Path, timeout: float):
-        """Run MegaDetector to find animals (Stage 1)."""
-        try:
+        """Run MegaDetector to find animals (Stage 1) with timeout enforcement."""
+        def _predict():
             # Run full prediction pipeline (detection + classification + ensemble)
             # SpeciesNet.predict() runs all stages and returns combined results
-            predictions = self._model.predict(
+            return self._model.predict(
                 filepaths=[str(image_path)],
                 country=self.config.species.country_code,
                 admin1_region=self.config.species.admin1_region,
@@ -250,26 +251,57 @@ class SpeciesIdentifier:
                 progress_bars=False
             )
 
-            return predictions
+        try:
+            if timeout:
+                # Run with timeout enforcement
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(_predict)
+                    try:
+                        predictions = future.result(timeout=timeout)
+                        return predictions
+                    except FutureTimeoutError:
+                        logger.error(f"MegaDetector timed out after {timeout}s")
+                        raise IdentificationTimeout(f"Detection exceeded timeout of {timeout}s")
+            else:
+                # No timeout specified, run directly
+                return _predict()
 
+        except IdentificationTimeout:
+            raise
         except Exception as e:
             logger.error(f"MegaDetector inference failed: {e}")
             raise SpeciesIdentificationError(f"Detection error: {e}")
 
     def _run_classification(self, image_path: Path, detection_result: DetectionResult, timeout: float):
-        """Run SpeciesNet classifier on detected regions (Stage 2)."""
-        try:
+        """Run SpeciesNet classifier on detected regions (Stage 2) with timeout enforcement."""
+        def _predict():
             # Note: In the full pipeline, predict() already runs classification
             # This method is kept for compatibility but just re-runs the full pipeline
-            predictions = self._model.predict(
+            return self._model.predict(
                 filepaths=[str(image_path)],
                 country=self.config.species.country_code,
                 admin1_region=self.config.species.admin1_region,
                 run_mode='single_thread',
                 progress_bars=False
             )
-            return predictions
 
+        try:
+            if timeout:
+                # Run with timeout enforcement
+                with ThreadPoolExecutor(max_workers=1) as executor:
+                    future = executor.submit(_predict)
+                    try:
+                        predictions = future.result(timeout=timeout)
+                        return predictions
+                    except FutureTimeoutError:
+                        logger.error(f"SpeciesNet classification timed out after {timeout}s")
+                        raise IdentificationTimeout(f"Classification exceeded timeout of {timeout}s")
+            else:
+                # No timeout specified, run directly
+                return _predict()
+
+        except IdentificationTimeout:
+            raise
         except Exception as e:
             logger.error(f"SpeciesNet classification failed: {e}")
             raise SpeciesIdentificationError(f"Classification error: {e}")

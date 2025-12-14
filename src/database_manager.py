@@ -92,7 +92,6 @@ class DatabaseManager:
                 
                 conn.commit()
                 logger.info("Database initialized successfully")
-                
         except sqlite3.Error as e:
             raise DatabaseConnectionError(f"Failed to initialize database: {e}") from e
         except Exception as e:
@@ -180,7 +179,7 @@ class DatabaseManager:
                 ''')
                 return cursor.fetchall()
         except Exception as e:
-            logger.error(f"Error getting species stats: {e}")
+            logger.error(f"Error getting species stats: {e}", exc_info=True)
             return []
     
     def get_daily_detections(self, date=None):
@@ -198,7 +197,7 @@ class DatabaseManager:
                 ''', (date,))
                 return cursor.fetchone()[0]
         except Exception as e:
-            logger.error(f"Error getting daily detections: {e}")
+            logger.error(f"Error getting daily detections: {e}", exc_info=True)
             return 0
     
     def cleanup_old_detections(self, days_to_keep=90):
@@ -206,15 +205,17 @@ class DatabaseManager:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
+                # Use parameterized query to prevent SQL injection
                 cursor.execute('''
                     DELETE FROM detections
-                    WHERE timestamp < datetime('now', ?)
-                ''', (f'-{int(days_to_keep)} days',))
+                    WHERE timestamp < datetime('now', ? || ' days')
+                ''', (f'-{days_to_keep}',))
                 deleted_count = cursor.rowcount
                 conn.commit()
+                logger.info(f"Cleaned up {deleted_count} old detections (older than {days_to_keep} days)")
                 return deleted_count
         except Exception as e:
-            logger.error(f"Error cleaning up old detections: {e}")
+            logger.error(f"Error cleaning up old detections: {e}", exc_info=True)
             return 0
     
     def is_first_detection_today(self, species_name):
@@ -232,5 +233,5 @@ class DatabaseManager:
                 count = cursor.fetchone()[0]
                 return count == 0  # True if no detections today
         except Exception as e:
-            logger.error(f"Error checking first detection: {e}")
+            logger.error(f"Error checking first detection: {e}", exc_info=True)
             return False

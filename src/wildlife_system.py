@@ -10,6 +10,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from concurrent.futures import ThreadPoolExecutor
 
 from config import Config
 from motion_detector import MotionDetector
@@ -46,6 +47,9 @@ class WildlifeSystem:
         self.database = DatabaseManager(self.config)
         self.species_identifier = SpeciesIdentifier(self.config)
 
+        # Thread pool for blocking operations (camera, species ID)
+        self.executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="wildlife")
+
         # Setup
         self.file_manager.ensure_directories()
         self.telegram_service.set_database_reference(self.database)
@@ -53,7 +57,14 @@ class WildlifeSystem:
         # State variables
         self.last_frame_time = 0
         self.last_detection_time = 0
-
+    
+    def cleanup_old_images(self):
+        """Delete oldest images if we exceed the maximum limit - delegates to FileManager"""
+        try:
+            self.file_manager.cleanup_old_images()
+        except Exception as e:
+            logger.error(f"Error in cleanup: {e}", exc_info=True)
+    
     def process_detection(self, image_path: Path, motion_area: int) -> tuple:
         """Process a detection with two-stage species identification and database logging"""
         timestamp = datetime.now()
@@ -105,7 +116,7 @@ class WildlifeSystem:
             return result_dict, timestamp
 
         except Exception as e:
-            logger.error(f"Error processing detection: {e}")
+            logger.error(f"Error processing detection: {e}", exc_info=True)
             # Return fallback result
             return {
                 'species_name': 'Unknown species',
@@ -170,33 +181,45 @@ class WildlifeSystem:
                         continue
                     
                     self.last_frame_time = current_time
-                    
-                    # Capture and process frame
-                    frame = self.camera.capture_motion_frame()
+
+                    # Capture and process frame (run in executor to avoid blocking)
+                    loop = asyncio.get_event_loop()
+                    frame = await loop.run_in_executor(self.executor, self.camera.capture_motion_frame)
+
                     if frame is not None:
                         motion_result = self.motion_detector.detect(frame)
                         motion_detected = motion_result.motion_detected
                         motion_area = motion_result.motion_area
                     else:
                         motion_detected, motion_area = False, 0
-                    
+
                     if motion_detected:
                         logger.info(f"Motion detected in central region! Area: {motion_area} pixels")
                         self.last_detection_time = current_time
-                        
-                        # Capture high-resolution photo
+
+                        # Capture high-resolution photo (run in executor)
                         with PerformanceTimer("High-res capture"):
-                            image_path = self.camera.capture_and_save_photo()
-                        
+                            image_path = await loop.run_in_executor(
+                                self.executor,
+                                self.camera.capture_and_save_photo
+                            )
+
                         if image_path:
-                            # Process detection (species ID + database logging in advanced mode)
-                            species_result, timestamp = self.process_detection(image_path, motion_area)
-                            
+                            # Process detection (species ID + database logging)
+                            # Run in executor to avoid blocking event loop during 15-20s SpeciesNet inference
+                            species_result, timestamp = await loop.run_in_executor(
+                                self.executor,
+                                self.process_detection,
+                                image_path,
+                                motion_area
+                            )
+
                             # Send notification
                             await self.send_notification(species_result, motion_area, timestamp, image_path)
-                            
-                            # Cleanup old images
-                            self.file_manager.cleanup_old_images()
+
+                            # Cleanup old images (now only when needed, not in hot path)
+                            # Only cleanup after successful detection to avoid overhead
+                            await loop.run_in_executor(self.executor, self.cleanup_old_images)
 
                             # Log system status after large detections
                             if motion_area > self.config.motion.motion_threshold * 2:
@@ -208,7 +231,7 @@ class WildlifeSystem:
                     await asyncio.sleep(self.config.performance.idle_sleep)
                     
                 except Exception as e:
-                    logger.error(f"Error in main loop: {e}")
+                    logger.error(f"Error in main loop: {e}", exc_info=True)
                     # Force cleanup on error
                     self.system_monitor.memory_manager.force_cleanup()
                     await asyncio.sleep(self.config.performance.error_sleep)
@@ -217,6 +240,7 @@ class WildlifeSystem:
             # Cleanup on exit
             logger.info("Cleaning up resources...")
             self.camera.stop()
+            self.executor.shutdown(wait=True, cancel_futures=True)
 
 
 

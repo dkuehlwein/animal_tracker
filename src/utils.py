@@ -75,15 +75,15 @@ class FileManager:
                         file_path.unlink()
                         deleted_count += 1
                     except Exception as e:
-                        logger.error(f"Error deleting {file_path}: {e}")
+                        logger.error(f"Error deleting {file_path}: {e}", exc_info=True)
 
                 logger.info(f"Cleaned up {deleted_count} old images")
                 return deleted_count
-            
+
             return 0
 
         except Exception as e:
-            logger.error(f"Error in image cleanup: {e}")
+            logger.error(f"Error in image cleanup: {e}", exc_info=True)
             return 0
     
     def get_storage_info(self):
