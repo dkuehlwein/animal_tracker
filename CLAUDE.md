@@ -19,9 +19,24 @@ Starts MJPEG web stream on port 8000 for adjusting camera focus and positioning.
 python src/wildlife_system.py
 ```
 
-### Installing dependencies
+### Package Management
+
+This project uses **UV** for fast, reliable Python package management.
+
+**Installing/syncing dependencies**:
 ```bash
-pip install -r requirements.txt
+uv sync
+```
+
+**Running Python scripts with UV**:
+```bash
+uv run python scripts/test_classification.py
+uv run python src/wildlife_system.py
+```
+
+**Running tests**:
+```bash
+uv run pytest tests/ -v
 ```
 
 ### Downloading SpeciesNet models (first time only)
@@ -29,16 +44,11 @@ pip install -r requirements.txt
 python -c "from speciesnet.ensemble import SpeciesNetEnsemble; SpeciesNetEnsemble(country='DEU')"
 ```
 
-### Running tests
-```bash
-python -m pytest tests/ -v
-```
-
 ### Running specific test files
 ```bash
-python -m pytest tests/test_config.py -v
-python -m pytest tests/test_camera_manager.py -v
-python -m pytest tests/test_motion_detector.py -v
+uv run pytest tests/test_config.py -v
+uv run pytest tests/test_camera_manager.py -v
+uv run pytest tests/test_motion_detector.py -v
 ```
 
 ### Text editor preference
