@@ -137,14 +137,16 @@ class TestConfig:
         assert isinstance(config.performance, PerformanceConfig)
         assert isinstance(config.storage, StorageConfig)
     
-    def test_missing_telegram_token(self):
+    @patch('config.load_dotenv', return_value=None)
+    def test_missing_telegram_token(self, mock_load_dotenv):
         """Test missing Telegram token."""
         with patch.dict(os.environ, {}, clear=True):
             with pytest.raises(ConfigurationError, match="TELEGRAM_BOT_TOKEN"):
                 Config()
-    
+
+    @patch('config.load_dotenv', return_value=None)
     @patch.dict(os.environ, {'TELEGRAM_BOT_TOKEN': 'test'})
-    def test_missing_telegram_chat_id(self):
+    def test_missing_telegram_chat_id(self, mock_load_dotenv):
         """Test missing Telegram chat ID."""
         with pytest.raises(ConfigurationError, match="TELEGRAM_CHAT_ID"):
             Config()

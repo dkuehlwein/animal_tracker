@@ -16,12 +16,17 @@ Starts MJPEG web stream on port 8000 for adjusting camera focus and positioning.
 
 ### Running the system
 ```bash
-python src/wildlife_system.py
+uv run python src/wildlife_system.py
 ```
 
 ### Package Management
 
-This project uses **UV** for fast, reliable Python package management.
+This project uses **UV** for fast, reliable Python package management with Python 3.13.
+
+**Note**: UV binary is located at `~/.local/bin/uv` and should already be in your PATH from `.bashrc`. If running scripts in non-interactive shells (e.g., cron jobs, systemd services), you may need to explicitly set PATH:
+```bash
+export PATH="$HOME/.local/bin:/usr/bin:$PATH"
+```
 
 **Installing/syncing dependencies**:
 ```bash
@@ -39,10 +44,11 @@ uv run python src/wildlife_system.py
 uv run pytest tests/ -v
 ```
 
-### Downloading SpeciesNet models (first time only)
+**Testing species classification**:
 ```bash
-python -c "from speciesnet.ensemble import SpeciesNetEnsemble; SpeciesNetEnsemble(country='DEU')"
+uv run python scripts/test_classification.py
 ```
+This captures a photo and runs the full SpeciesNet pipeline (MegaDetector + species classifier). First run downloads ~214MB model files from Kaggle.
 
 ### Running specific test files
 ```bash
@@ -97,13 +103,23 @@ The system uses a sophisticated configuration system with:
 
 ### Species Identification Architecture
 
-The species identification system integrates Google SpeciesNet:
-- **SpeciesIdentifier**: Main class that wraps SpeciesNet ensemble (detector + classifier)
-- **Lazy Loading**: Model loads on first identification request (not at startup)
-- **Geographic Filtering**: Configured for Bonn, Germany (DEU/NW region)
+The species identification system integrates Google SpeciesNet v5.0.2:
+
+- **SpeciesIdentifier**: Main class that wraps SpeciesNet (uses `SpeciesNet` class, not `SpeciesNetEnsemble`)
+- **API**: Uses `predict()` method with `filepaths`, `country`, and `admin1_region` parameters
+- **Model**: Default is `kaggle:google/speciesnet/pyTorch/v4.0.1a/1` (auto-downloaded from Kaggle on first use)
+- **Components**: Loads detector (MegaDetector), classifier, and ensemble combiner
+- **Lazy Loading**: Model loads on first identification request (not at startup) - takes ~6 seconds
+- **Geographic Filtering**: Configured for Bonn, Germany (DEU/NW region) via geofencing
 - **Confidence Thresholds**: Two-stage filtering (detection @ 0.6, classification @ 0.5)
 - **Error Resilience**: Always returns valid IdentificationResult, never crashes
 - **MockSpeciesIdentifier**: Test implementation for development without SpeciesNet
+
+**SpeciesNet Dependencies**:
+- Requires `ml-dtypes>=0.5.0` for float4_e2m1fn support
+- Requires `numpy>=2.1.0` (ml-dtypes 0.5+ dependency)
+- Requires `opencv-python>=4.10.0` (for NumPy 2.x compatibility)
+- Uses ONNX for model inference (PyTorch backend)
 
 ### Camera Manager Architecture
 
@@ -136,11 +152,12 @@ Additional optional environment variables for fine-tuning:
 ### Hardware Dependencies
 
 - **Raspberry Pi 5 with 8GB RAM** (required for SpeciesNet)
-- **Raspberry Pi Camera Module** (any compatible module)
-- **Storage**: ~2GB for models and images
-- Uses Picamera2 for native Pi camera control
-- OpenCV for computer vision processing
-- SpeciesNet for AI species identification (PyTorch-based)
+- **Raspberry Pi Camera Module** (any compatible module, tested with IMX477)
+- **Storage**: ~2GB for models and images (SpeciesNet models: ~214MB)
+- **Python 3.13** with system site packages access (for libcamera)
+- Uses Picamera2 for native Pi camera control (requires libcamera system package)
+- OpenCV 4.11+ for computer vision processing
+- SpeciesNet 5.0.2 for AI species identification (PyTorch-based, ONNX runtime)
 
 ### Error Handling
 
@@ -175,5 +192,38 @@ MockSpeciesIdentifier is available for testing without SpeciesNet dependency.
 - Geographic filtering automatically restricts predictions to region-appropriate species
 - Configuration system supports both defaults and environment-based overrides
 - All major components are thoroughly unit tested
-- **Performance**: SpeciesNet inference takes ~5-10 seconds on Pi 5 CPU (no GPU acceleration)
+- **Performance**: SpeciesNet inference takes ~17 seconds on Pi 5 CPU (no GPU acceleration)
+  - Model loading: ~6 seconds (first time only, cached afterward)
+  - Detection + classification: ~11 seconds per image
 - **Memory**: System uses ~2-3GB RAM during species identification
+
+### UV and Virtual Environment Setup
+
+The project uses UV with a Python 3.13 virtual environment that has system site packages enabled (required for libcamera access):
+
+```bash
+# Virtual environment is at .venv with system-site-packages = true
+# This allows access to system-installed libcamera Python bindings
+# To recreate if needed:
+uv venv --python /usr/bin/python3 --system-site-packages
+uv sync
+```
+
+The `.venv/pyvenv.cfg` file should have `include-system-site-packages = true`.
+
+### Common Dependency Issues
+
+**ml-dtypes and NumPy compatibility**:
+- ml-dtypes 0.5.0+ requires NumPy 2.1.0+
+- Older OpenCV versions (< 4.10) don't support NumPy 2.x
+- Solution: Use opencv-python >= 4.10.0 with numpy >= 2.1.0
+
+**PATH issues in non-interactive shells**:
+- UV is at `~/.local/bin/uv` (already in PATH for interactive shells)
+- For cron jobs or systemd services, explicitly set: `PATH=$HOME/.local/bin:/usr/bin:$PATH`
+- Note: Interactive terminal sessions via `.bashrc` have this configured correctly
+
+**libcamera access**:
+- libcamera is a system package (python3-libcamera) from apt
+- UV venv must have system-site-packages enabled
+- Python 3.13 is required (matches system Python version)
