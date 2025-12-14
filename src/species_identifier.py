@@ -66,19 +66,28 @@ class SpeciesIdentifier:
 
         try:
             logger.info("Loading SpeciesNet model (this may take 10-15 seconds)...")
-            from speciesnet.ensemble import SpeciesNetEnsemble
+            from speciesnet import SpeciesNet
 
-            # Initialize ensemble (detector + classifier)
-            self._model = SpeciesNetEnsemble(
-                country=self.config.species.country_code,
-                region=self.config.species.admin1_region,
-                classifier_version=self.config.species.model_version,
-                cache_dir=str(self.config.species.model_cache_dir)
+            # Build model name from config version (e.g., "kaggle:google/speciesnet/pyTorch/v4.0.2a/1")
+            # Default to v4.0.1a if not specified (to match downloaded model)
+            model_version = self.config.species.model_version or "v4.0.1a"
+            if not model_version.startswith("kaggle:") and not model_version.startswith("hf:"):
+                # Construct full Kaggle model path
+                model_name = f"kaggle:google/speciesnet/pyTorch/{model_version}/1"
+            else:
+                model_name = model_version
+
+            # Initialize SpeciesNet with all components (detector + classifier + ensemble)
+            # Geographic filtering is handled via predict() method parameters
+            self._model = SpeciesNet(
+                model_name=model_name,
+                components='all',  # Load detector, classifier, and ensemble
+                geofence=True  # Enable geographic filtering
             )
 
             self._model_loaded = True
-            logger.info(f"SpeciesNet loaded successfully: {self.config.species.model_version} "
-                       f"(Country: {self.config.species.country_code}, "
+            logger.info(f"SpeciesNet loaded successfully: {model_name} "
+                       f"(Geofencing enabled for: {self.config.species.country_code}, "
                        f"Region: {self.config.species.admin1_region})")
 
         except Exception as e:
@@ -231,16 +240,15 @@ class SpeciesIdentifier:
     def _run_detection(self, image_path: Path, timeout: float):
         """Run MegaDetector to find animals (Stage 1)."""
         try:
-            # SpeciesNet expects list of image info dicts
-            image_info = [{
-                'filepath': str(image_path),
-                'country': self.config.species.country_code,
-                'admin1_region': self.config.species.admin1_region
-            }]
-
-            # Run ensemble prediction (includes detection + classification)
-            # Note: SpeciesNet.predict() runs both stages internally
-            predictions = self._model.predict(image_info)
+            # Run full prediction pipeline (detection + classification + ensemble)
+            # SpeciesNet.predict() runs all stages and returns combined results
+            predictions = self._model.predict(
+                filepaths=[str(image_path)],
+                country=self.config.species.country_code,
+                admin1_region=self.config.species.admin1_region,
+                run_mode='single_thread',  # Single image, no need for threading
+                progress_bars=False
+            )
 
             return predictions
 
@@ -251,16 +259,15 @@ class SpeciesIdentifier:
     def _run_classification(self, image_path: Path, detection_result: DetectionResult, timeout: float):
         """Run SpeciesNet classifier on detected regions (Stage 2)."""
         try:
-            # SpeciesNet ensemble already ran detection, so we use existing predictions
-            # In a true separate implementation, we'd crop and classify here
-            # For now, we'll re-use the ensemble approach but track the stages
-            image_info = [{
-                'filepath': str(image_path),
-                'country': self.config.species.country_code,
-                'admin1_region': self.config.species.admin1_region
-            }]
-
-            predictions = self._model.predict(image_info)
+            # Note: In the full pipeline, predict() already runs classification
+            # This method is kept for compatibility but just re-runs the full pipeline
+            predictions = self._model.predict(
+                filepaths=[str(image_path)],
+                country=self.config.species.country_code,
+                admin1_region=self.config.species.admin1_region,
+                run_mode='single_thread',
+                progress_bars=False
+            )
             return predictions
 
         except Exception as e:
