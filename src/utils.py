@@ -1,9 +1,12 @@
 import gc
+import logging
 import psutil
 import time
 from pathlib import Path
 from datetime import datetime
 from config import Config
+
+logger = logging.getLogger(__name__)
 
 
 class UtilsError(Exception):
@@ -22,7 +25,7 @@ class MemoryManager:
         try:
             return psutil.virtual_memory().percent / 100.0
         except Exception as e:
-            print(f"Error getting memory usage: {e}")
+            logger.error(f"Error getting memory usage: {e}")
             return 0.5  # Default to 50% if unable to determine
     
     def is_memory_available(self):
@@ -35,7 +38,7 @@ class MemoryManager:
             gc.collect()
             return True
         except Exception as e:
-            print(f"Error in force cleanup: {e}")
+            logger.error(f"Error in force cleanup: {e}")
             return False
     
     def get_memory_info(self):
@@ -50,7 +53,7 @@ class MemoryManager:
                 'free_mb': mem.free / (1024 * 1024)
             }
         except Exception as e:
-            print(f"Error getting memory info: {e}")
+            logger.error(f"Error getting memory info: {e}")
             return None
 
 class FileManager:
@@ -76,15 +79,15 @@ class FileManager:
                         file_path.unlink()
                         deleted_count += 1
                     except Exception as e:
-                        print(f"Error deleting {file_path}: {e}")
-                
-                print(f"Cleaned up {deleted_count} old images")
+                        logger.error(f"Error deleting {file_path}: {e}")
+
+                logger.info(f"Cleaned up {deleted_count} old images")
                 return deleted_count
             
             return 0
-            
+
         except Exception as e:
-            print(f"Error in image cleanup: {e}")
+            logger.error(f"Error in image cleanup: {e}")
             return 0
     
     def get_storage_info(self):
@@ -98,7 +101,7 @@ class FileManager:
                 'percent': (usage.used / usage.total) * 100
             }
         except Exception as e:
-            print(f"Error getting storage info: {e}")
+            logger.error(f"Error getting storage info: {e}")
             return None
     
     def ensure_directories(self):
@@ -109,7 +112,7 @@ class FileManager:
             self.config.storage.logs_dir.mkdir(exist_ok=True)
             return True
         except Exception as e:
-            print(f"Error creating directories: {e}")
+            logger.error(f"Error creating directories: {e}")
             return False
     
     def get_image_count(self):
@@ -117,7 +120,7 @@ class FileManager:
         try:
             return len(list(self.config.storage.image_dir.glob(f"{self.config.storage.image_prefix}*.jpg")))
         except Exception as e:
-            print(f"Error counting images: {e}")
+            logger.error(f"Error counting images: {e}")
             return 0
 
 class SystemMonitor:
@@ -141,7 +144,7 @@ class SystemMonitor:
     def should_skip_processing(self):
         """Determine if processing should be skipped due to resource constraints"""
         if not self.memory_manager.is_memory_available():
-            print(f"Skipping processing: Memory usage above {self.config.performance.memory_threshold*100}%")
+            logger.warning(f"Skipping processing: Memory usage above {self.config.performance.memory_threshold*100}%")
             return True
         return False
     
@@ -149,12 +152,12 @@ class SystemMonitor:
         """Log current system status"""
         status = self.get_system_status()
         if status['memory']:
-            print(f"Memory: {status['memory']['percent']:.1f}% used "
-                  f"({status['memory']['available_mb']:.0f}MB available)")
+            logger.info(f"Memory: {status['memory']['percent']:.1f}% used "
+                        f"({status['memory']['available_mb']:.0f}MB available)")
         if status['storage']:
-            print(f"Storage: {status['storage']['percent']:.1f}% used "
-                  f"({status['storage']['free_mb']:.0f}MB free)")
-        print(f"Images stored: {status['image_count']}")
+            logger.info(f"Storage: {status['storage']['percent']:.1f}% used "
+                        f"({status['storage']['free_mb']:.0f}MB free)")
+        logger.info(f"Images stored: {status['image_count']}")
 
 class PerformanceTimer:
     """Performance timing utility"""
@@ -187,7 +190,7 @@ class PerformanceTimer:
         """Context manager exit"""
         duration = self.stop()
         if duration > 1.0:  # Log slow operations
-            print(f"{self.operation_name} took {duration:.2f}s")
+            logger.info(f"{self.operation_name} took {duration:.2f}s")
 
 
 class ImageUtils:
@@ -248,7 +251,7 @@ class TelegramFormatter:
         time_str = timestamp.strftime("%H:%M")
         
         if species_name == "Unknown species":
-            return f"🔍 Unknown species detected at {time_str}\\nMotion area: {motion_area:,} pixels"
+            return f"🔍 Unknown species detected at {time_str}\nMotion area: {motion_area:,} pixels"
         
         # Emoji mapping
         emoji_map = {
@@ -263,17 +266,17 @@ class TelegramFormatter:
                 break
         
         if confidence > 0.8:
-            return f"{emoji} {species_name} detected at {time_str}\\nConfidence: {confidence*100:.0f}%"
+            return f"{emoji} {species_name} detected at {time_str}\nConfidence: {confidence*100:.0f}%"
         else:
-            return f"🔍 Possible {species_name} detected at {time_str}\\nConfidence: {confidence*100:.0f}%"
+            return f"🔍 Possible {species_name} detected at {time_str}\nConfidence: {confidence*100:.0f}%"
     
     @staticmethod
-    def format_system_status(memory_percent: float, storage_percent: float, 
+    def format_system_status(memory_percent: float, storage_percent: float,
                            image_count: int) -> str:
         """Format system status message."""
-        return (f"📊 System Status\\n"
-                f"Memory: {memory_percent:.1f}% used\\n"
-                f"Storage: {storage_percent:.1f}% used\\n"
+        return (f"📊 System Status\n"
+                f"Memory: {memory_percent:.1f}% used\n"
+                f"Storage: {storage_percent:.1f}% used\n"
                 f"Images stored: {image_count}")
 
 

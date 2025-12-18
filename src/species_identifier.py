@@ -274,10 +274,6 @@ class SpeciesIdentifier:
             logger.error(f"SpeciesNet classification failed: {e}")
             raise SpeciesIdentificationError(f"Classification error: {e}")
 
-    def _run_inference(self, image_path: Path, timeout: float):
-        """Legacy method - Run SpeciesNet inference with timeout protection."""
-        return self._run_detection(image_path, timeout)
-
     def _parse_detections(self, predictions, start_time) -> DetectionResult:
         """
         Parse MegaDetector results from SpeciesNet predictions (Stage 1).
@@ -383,33 +379,6 @@ class SpeciesIdentifier:
             detection_result=detection_result,
             animals_detected=detection_result.animals_detected
         )
-
-    def _parse_predictions(self, predictions, start_time) -> IdentificationResult:
-        """
-        Legacy method: Parse SpeciesNet predictions using two-stage approach.
-        Now delegates to _parse_detections and _parse_classifications.
-        """
-        # First parse detections
-        detection_result = self._parse_detections(predictions, start_time)
-
-        # Then parse classifications if animals were detected
-        if detection_result.animals_detected:
-            return self._parse_classifications(predictions, start_time, detection_result)
-        else:
-            # No animals detected
-            all_categories = [d.get('category', 'unknown') for d in detection_result.detections]
-            categories_str = ", ".join(set(all_categories)) if all_categories else "nothing"
-
-            return IdentificationResult(
-                species_name='Unknown species',
-                confidence=0.0,
-                api_success=True,  # Model ran successfully
-                processing_time=time.time() - start_time,
-                fallback_reason=f'No animals detected (found: {categories_str})',
-                metadata={'detections': detection_result.detections},
-                detection_result=detection_result,
-                animals_detected=False
-            )
 
     def _create_error_response(self, start_time, reason, detection_result=None):
         """Create standardized error response."""

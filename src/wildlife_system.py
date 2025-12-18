@@ -5,6 +5,7 @@ Combines motion detection, species identification, database logging, and Telegra
 """
 
 import asyncio
+import logging
 import time
 from datetime import datetime
 from pathlib import Path
@@ -17,6 +18,8 @@ from database_manager import DatabaseManager
 from species_identifier import SpeciesIdentifier
 from telegram_service import TelegramService
 from utils import SystemMonitor, PerformanceTimer, FileManager
+
+logger = logging.getLogger(__name__)
 
 
 class WildlifeSystemError(Exception):
@@ -50,25 +53,7 @@ class WildlifeSystem:
         # State variables
         self.last_frame_time = 0
         self.last_detection_time = 0
-    
-    def cleanup_old_images(self):
-        """Delete oldest images if we exceed the maximum limit"""
-        try:
-            image_files = sorted(
-                list(self.config.storage.data_dir.glob(f"{self.config.storage.image_prefix}*.jpg")),
-                key=lambda x: x.stat().st_mtime
-            )
-            
-            if len(image_files) > self.config.performance.max_images:
-                files_to_delete = image_files[:(len(image_files) - self.config.performance.max_images)]
-                for file in files_to_delete:
-                    try:
-                        file.unlink()
-                    except Exception as e:
-                        print(f"Error deleting {file}: {e}")
-        except Exception as e:
-            print(f"Error in cleanup: {e}")
-    
+
     def process_detection(self, image_path: Path, motion_area: int) -> tuple:
         """Process a detection with two-stage species identification and database logging"""
         timestamp = datetime.now()
@@ -81,17 +66,17 @@ class WildlifeSystem:
             # Log detection information
             if species_result.detection_result:
                 det = species_result.detection_result
-                print(f"  Stage 1 - MegaDetector: Found {det.detection_count} animals "
-                      f"({det.processing_time:.2f}s)")
+                logger.info(f"Stage 1 - MegaDetector: Found {det.detection_count} animals "
+                            f"({det.processing_time:.2f}s)")
                 if det.animals_detected:
-                    print(f"  Stage 2 - Classifier: {species_result.species_name} "
-                          f"(confidence: {species_result.confidence:.2f})")
+                    logger.info(f"Stage 2 - Classifier: {species_result.species_name} "
+                                f"(confidence: {species_result.confidence:.2f})")
                 else:
-                    print(f"  Stage 2 - Skipped (no animals detected)")
+                    logger.info("Stage 2 - Skipped (no animals detected)")
             else:
                 # Legacy path without detection info
-                print(f"  Identified: {species_result.species_name} "
-                      f"(confidence: {species_result.confidence:.2f})")
+                logger.info(f"Identified: {species_result.species_name} "
+                            f"(confidence: {species_result.confidence:.2f})")
 
             # Log to database
             detection_id = self.database.log_detection(
@@ -103,8 +88,8 @@ class WildlifeSystem:
                 api_success=species_result.api_success
             )
 
-            print(f"Detection {detection_id} logged: {species_result.species_name} "
-                  f"(total time: {species_result.processing_time:.2f}s, motion: {motion_area} pixels)")
+            logger.info(f"Detection {detection_id} logged: {species_result.species_name} "
+                        f"(total time: {species_result.processing_time:.2f}s, motion: {motion_area} pixels)")
 
             # Convert IdentificationResult to dict for compatibility
             result_dict = {
@@ -120,7 +105,7 @@ class WildlifeSystem:
             return result_dict, timestamp
 
         except Exception as e:
-            print(f"Error processing detection: {e}")
+            logger.error(f"Error processing detection: {e}")
             # Return fallback result
             return {
                 'species_name': 'Unknown species',
@@ -143,25 +128,25 @@ class WildlifeSystem:
     
     async def run(self):
         """Main loop for wildlife detection system"""
-        print("Wildlife Detection System with SpeciesNet is running...")
-        print(f"Motion detection parameters:")
-        print(f"- Motion resolution: {self.config.camera.motion_detection_resolution} ({self.config.camera.motion_detection_format})")
-        print(f"- Motion threshold: {self.config.motion.motion_threshold} pixels")
-        print(f"- Frame interval: {self.config.motion.frame_interval}s ({1/self.config.motion.frame_interval:.1f} FPS)")
-        print(f"- Cooldown period: {self.config.performance.cooldown_period}s")
-        print(f"- Maximum stored images: {self.config.performance.max_images}")
-        print(f"- Consecutive detections required: {self.config.motion.consecutive_detections_required}")
-        print(f"Species identification (Two-stage pipeline):")
-        print(f"- Stage 1: MegaDetector (min confidence: {self.config.species.min_detection_confidence})")
-        print(f"- Stage 2: SpeciesNet classifier (model: {self.config.species.model_version})")
-        print(f"- Location filtering: {self.config.species.country_code}/{self.config.species.admin1_region}")
-        print(f"- Unknown threshold: {self.config.species.unknown_species_threshold}")
+        logger.info("Wildlife Detection System with SpeciesNet is running...")
+        logger.info("Motion detection parameters:")
+        logger.info(f"- Motion resolution: {self.config.camera.motion_detection_resolution} ({self.config.camera.motion_detection_format})")
+        logger.info(f"- Motion threshold: {self.config.motion.motion_threshold} pixels")
+        logger.info(f"- Frame interval: {self.config.motion.frame_interval}s ({1/self.config.motion.frame_interval:.1f} FPS)")
+        logger.info(f"- Cooldown period: {self.config.performance.cooldown_period}s")
+        logger.info(f"- Maximum stored images: {self.config.performance.max_images}")
+        logger.info(f"- Consecutive detections required: {self.config.motion.consecutive_detections_required}")
+        logger.info("Species identification (Two-stage pipeline):")
+        logger.info(f"- Stage 1: MegaDetector (min confidence: {self.config.species.min_detection_confidence})")
+        logger.info(f"- Stage 2: SpeciesNet classifier (model: {self.config.species.model_version})")
+        logger.info(f"- Location filtering: {self.config.species.country_code}/{self.config.species.admin1_region}")
+        logger.info(f"- Unknown threshold: {self.config.species.unknown_species_threshold}")
 
         # Log initial system status
         self.system_monitor.log_system_status()
         
         # Initial cleanup
-        self.cleanup_old_images()
+        self.file_manager.cleanup_old_images()
         
         try:
             while True:
@@ -196,7 +181,7 @@ class WildlifeSystem:
                         motion_detected, motion_area = False, 0
                     
                     if motion_detected:
-                        print(f"Motion detected in central region! Area: {motion_area} pixels")
+                        logger.info(f"Motion detected in central region! Area: {motion_area} pixels")
                         self.last_detection_time = current_time
                         
                         # Capture high-resolution photo
@@ -211,7 +196,7 @@ class WildlifeSystem:
                             await self.send_notification(species_result, motion_area, timestamp, image_path)
                             
                             # Cleanup old images
-                            self.cleanup_old_images()
+                            self.file_manager.cleanup_old_images()
 
                             # Log system status after large detections
                             if motion_area > self.config.motion.motion_threshold * 2:
@@ -223,14 +208,14 @@ class WildlifeSystem:
                     await asyncio.sleep(self.config.performance.idle_sleep)
                     
                 except Exception as e:
-                    print(f"Error in main loop: {e}")
+                    logger.error(f"Error in main loop: {e}")
                     # Force cleanup on error
                     self.system_monitor.memory_manager.force_cleanup()
                     await asyncio.sleep(self.config.performance.error_sleep)
                     
         finally:
             # Cleanup on exit
-            print("Cleaning up resources...")
+            logger.info("Cleaning up resources...")
             self.camera.stop()
 
 

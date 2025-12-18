@@ -4,12 +4,15 @@ Provides centralized Telegram bot functionality with message formatting.
 """
 
 import asyncio
+import logging
 import telegram
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 from config import Config
 from utils import TelegramFormatter
+
+logger = logging.getLogger(__name__)
 
 
 class TelegramError(Exception):
@@ -51,7 +54,7 @@ class TelegramService:
             return True
             
         except Exception as e:
-            print(f"Error sending Telegram notification: {e}")
+            logger.error(f"Error sending Telegram notification: {e}")
             return False
     
     async def send_photo_with_caption(self, image_path: Path, 
@@ -59,7 +62,7 @@ class TelegramService:
         """Send photo to Telegram channel with optional caption."""
         try:
             if not image_path.exists():
-                print(f"Image file not found: {image_path}")
+                logger.warning(f"Image file not found: {image_path}")
                 return False
             
             default_caption = f"Motion detected at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
@@ -75,7 +78,7 @@ class TelegramService:
             return True
             
         except Exception as e:
-            print(f"Error sending Telegram photo: {e}")
+            logger.error(f"Error sending Telegram photo: {e}")
             return False
     
     async def send_system_status(self, memory_percent: float, 
@@ -94,7 +97,7 @@ class TelegramService:
             return True
             
         except Exception as e:
-            print(f"Error sending system status: {e}")
+            logger.error(f"Error sending system status: {e}")
             return False
     
     async def send_text_message(self, message: str) -> bool:
@@ -107,7 +110,7 @@ class TelegramService:
             return True
             
         except Exception as e:
-            print(f"Error sending text message: {e}")
+            logger.error(f"Error sending text message: {e}")
             return False
     
     def set_database_reference(self, database):
@@ -118,8 +121,8 @@ class TelegramService:
         """Test Telegram bot connection."""
         try:
             bot_info = await self.bot.get_me()
-            print(f"Telegram bot connected: {bot_info.username}")
+            logger.info(f"Telegram bot connected: {bot_info.username}")
             return True
         except Exception as e:
-            print(f"Telegram connection test failed: {e}")
+            logger.error(f"Telegram connection test failed: {e}")
             return False
