@@ -243,10 +243,7 @@ class PiCameraManager(CameraInterface):
             # Capture high resolution frame
             frame = self.camera.capture_array("main")
             frame_copy = frame.copy()
-            
-            # Immediate cleanup for Pi Zero memory management
-            del frame
-            
+
             self._resource_manager.unregister_frame(frame_id)
             self._reset_error_count()
             
@@ -268,16 +265,11 @@ class PiCameraManager(CameraInterface):
             
             # Save with compression for Pi Zero storage efficiency
             success = cv2.imwrite(
-                str(file_path), 
+                str(file_path),
                 bgr_frame,
                 [cv2.IMWRITE_JPEG_QUALITY, 85]
             )
-            
-            # Cleanup
-            if len(frame.shape) == 3:
-                del bgr_frame
-            gc.collect()
-            
+
             if success:
                 logger.debug(f"Frame saved to {file_path}")
             else:
