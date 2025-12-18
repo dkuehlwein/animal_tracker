@@ -208,8 +208,8 @@ class DatabaseManager:
                 cursor = conn.cursor()
                 cursor.execute('''
                     DELETE FROM detections
-                    WHERE timestamp < datetime('now', ? || ' days')
-                ''', (f'-{int(days_to_keep)}',))
+                    WHERE timestamp < datetime('now', ?)
+                ''', (f'-{int(days_to_keep)} days',))
                 deleted_count = cursor.rowcount
                 conn.commit()
                 return deleted_count
