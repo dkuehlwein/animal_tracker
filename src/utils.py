@@ -9,10 +9,6 @@ from config import Config
 logger = logging.getLogger(__name__)
 
 
-class UtilsError(Exception):
-    """Base exception for utilities errors."""
-    pass
-
 class MemoryManager:
     """Memory management utilities for Pi Zero 2 W"""
     

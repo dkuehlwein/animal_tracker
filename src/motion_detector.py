@@ -183,19 +183,11 @@ class WeightedMotionDetector(BaseMotionDetector):
 
 class MotionDetector:
     """Main motion detector facade that uses WeightedMotionDetector as implementation."""
-    
+
     def __init__(self, config: Config):
         self.config = config
         self._implementation = WeightedMotionDetector(config)
-    
+
     def detect(self, frame) -> MotionResult:
         """Detect motion using the underlying implementation."""
         return self._implementation.detect(frame)
-    
-    def __enter__(self):
-        """Context manager entry."""
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit."""
-        pass 
