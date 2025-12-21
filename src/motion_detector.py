@@ -71,9 +71,11 @@ class BaseMotionDetector:
             
             # Apply background subtraction and threshold
             fgmask = self.background_subtractor.apply(gray)
+            # Use a low threshold (25) to detect pixel changes
+            # motion_threshold is used later for total area
             _, thresh = cv2.threshold(
                 fgmask, 
-                self.config.motion.motion_threshold,
+                25,  # Low threshold to detect any pixel-level changes
                 255,
                 cv2.THRESH_BINARY
             )
