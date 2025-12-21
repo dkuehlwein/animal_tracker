@@ -327,9 +327,10 @@ class SpeciesIdentifier:
         detections = pred.get('detections', [])
 
         # Filter for animal detections above confidence threshold
+        # MegaDetector categories: 1=animal, 2=person, 3=vehicle
         animal_detections = [
             d for d in detections
-            if d['category'] == 'animal'
+            if d['category'] in [1, '1', 'animal']  # Support both numeric and string format
             and d['conf'] >= self.config.species.min_detection_confidence
         ]
 
@@ -381,6 +382,23 @@ class SpeciesIdentifier:
         final_species = pred.get('prediction', 'Unknown species')
         final_confidence = pred.get('prediction_score', 0.0)
 
+        # Extract top predictions safely
+        # SpeciesNet returns classifications as {'classes': [...], 'scores': [...]}
+        classifications = pred.get('classifications', {})
+        if isinstance(classifications, dict) and 'classes' in classifications and 'scores' in classifications:
+            # Zip classes and scores together
+            classes = classifications.get('classes', [])
+            scores = classifications.get('scores', [])
+            top_predictions = [
+                {'label': cls, 'score': score}
+                for cls, score in zip(classes, scores)
+            ][:self.config.species.return_top_k]
+        elif isinstance(classifications, list):
+            # Fallback for list format
+            top_predictions = classifications[:self.config.species.return_top_k]
+        else:
+            top_predictions = []
+
         # Apply confidence threshold
         if final_confidence < self.config.species.unknown_species_threshold:
             return IdentificationResult(
@@ -392,7 +410,7 @@ class SpeciesIdentifier:
                 metadata={
                     'raw_prediction': final_species,
                     'raw_confidence': final_confidence,
-                    'top_predictions': pred.get('classifications', [])[:self.config.species.return_top_k]
+                    'top_predictions': top_predictions
                 },
                 detection_result=detection_result,
                 animals_detected=detection_result.animals_detected
@@ -406,7 +424,7 @@ class SpeciesIdentifier:
             api_success=True,
             processing_time=processing_time,
             metadata={
-                'top_predictions': pred.get('classifications', [])[:self.config.species.return_top_k]
+                'top_predictions': top_predictions
             },
             detection_result=detection_result,
             animals_detected=detection_result.animals_detected

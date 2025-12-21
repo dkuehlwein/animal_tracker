@@ -183,19 +183,31 @@ animal_tracker/
 
 The system uses **Google SpeciesNet**, a state-of-the-art AI model specifically designed for camera trap wildlife identification:
 
+- **Two-Stage Pipeline**: 
+  - Stage 1: MegaDetector finds animals in images (categories: animal, person, vehicle)
+  - Stage 2: SpeciesNet classifies detected animals to species level
 - **Accuracy**: 94.5% species-level identification
 - **Coverage**: 2000+ species labels
 - **Geographic Filtering**: Automatically filters to species found in your region
 - **Local Processing**: Runs entirely on Raspberry Pi 5 (no cloud required)
-- **Performance**: ~5-10 seconds per image on Pi 5
+- **Performance**: ~15-20 seconds per image on Pi 5 (detection + classification)
 
 **Configured for Bonn, Germany** (Country: DEU, Region: NW)
 
+**Species Name Format**: SpeciesNet returns taxonomic paths in the format:
+```
+UUID;class;order;family;genus;species;common_name
+```
+Example: `e4d1e892-0e4b-475a-a8ac-b5c3502e0d55;mammalia;rodentia;sciuridae;;;sciuridae family`
+
+The system extracts the common name (last field) for display in notifications.
+
 Common expected species:
-- European Hedgehog (*Erinaceus europaeus*)
-- Red Fox (*Vulpes vulpes*)
-- European Robin (*Erithacus rubecula*)
-- Domestic Cat (*Felis catus*)
+- European Hedgehog (*Erinaceus europaeus*) - Eurasian hedgehog
+- Red Fox (*Vulpes vulpes*) - Red fox  
+- European Robin (*Erithacus rubecula*) - European robin
+- Domestic Cat (*Felis catus*) - Domestic cat
+- Red Squirrel (*Sciurus vulgaris*) - Eurasian red squirrel
 - Various garden birds
 
 ## Troubleshooting

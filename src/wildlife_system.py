@@ -110,7 +110,8 @@ class WildlifeSystem:
                 'processing_time': species_result.processing_time,
                 'fallback_reason': species_result.fallback_reason,
                 'animals_detected': species_result.animals_detected,
-                'detection_count': species_result.detection_result.detection_count if species_result.detection_result else 0
+                'detection_count': species_result.detection_result.detection_count if species_result.detection_result else 0,
+                'detection_result': species_result.detection_result  # Include full detection info
             }
 
             return result_dict, timestamp
@@ -128,17 +129,54 @@ class WildlifeSystem:
                 'detection_count': 0
             }, timestamp
     
+    def _extract_species_name(self, species_name_raw: str) -> str:
+        """Extract human-readable name from taxonomic path."""
+        # Format: UUID;class;order;family;genus;species;common_name
+        if ';' in species_name_raw:
+            parts = species_name_raw.split(';')
+            species_name = parts[-1].strip() if parts[-1].strip() else 'Unknown species'
+            return species_name.title()
+        return species_name_raw
+    
+    def _build_caption(self, species_result: dict, motion_area: int, timestamp: datetime) -> str:
+        """Build notification caption based on detection results."""
+        species_name = self._extract_species_name(species_result.get('species_name', 'Unknown species'))
+        confidence = species_result.get('confidence', 0.0)
+        time_str = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Check what MegaDetector found
+        detection_result = species_result.get('detection_result')
+        detected_items = []
+        animals_detected = False
+        
+        if detection_result and detection_result.detections:
+            category_names = {1: 'animal', 2: 'person', 3: 'vehicle'}
+            for det in detection_result.detections:
+                cat = det.get('category')
+                conf = det.get('conf', 0.0)
+                cat_name = category_names.get(cat, f'unknown (category {cat})')
+                detected_items.append(f"{cat_name} ({conf:.1%})")
+                if cat == 1:  # Animal category
+                    animals_detected = True
+        
+        # If animals were detected, show species identification
+        if animals_detected:
+            return f"🦌 {species_name}\nConfidence: {confidence:.1%}\nMotion area: {motion_area} px\n{time_str}"
+        
+        # Otherwise show what was detected
+        if detected_items:
+            items_str = ", ".join(detected_items)
+            return f"👁️ Motion detected\nFound: {items_str}\nNo animals above threshold\nMotion area: {motion_area} px\n{time_str}"
+        
+        return f"👁️ Motion detected\nNo objects identified by detector\nMotion area: {motion_area} px\n{time_str}"
+    
     async def send_notification(self, species_result: dict, motion_area: int,
                                timestamp: datetime, image_path: Optional[Path] = None):
         """Send notification with species identification info"""
-        # Send photo with species identification caption
         if image_path and image_path.exists():
-            species_name = species_result.get('species_name', 'Unknown species')
-            confidence = species_result.get('confidence', 0.0)
-            caption = f"🦌 {species_name}\nConfidence: {confidence:.1%}\nMotion area: {motion_area} px\n{timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
+            caption = self._build_caption(species_result, motion_area, timestamp)
             await self.telegram_service.send_photo_with_caption(image_path, caption)
         else:
-            # Fallback to text notification if no image
             await self.telegram_service.send_detection_notification(
                 species_result, motion_area, timestamp
             )
