@@ -18,7 +18,7 @@ from camera_manager import CameraManager
 from database_manager import DatabaseManager
 from species_identifier import SpeciesIdentifier
 from telegram_service import TelegramService
-from utils import SystemMonitor, PerformanceTimer, FileManager
+from utils import SystemMonitor, PerformanceTimer, FileManager, SunChecker
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,7 @@ class WildlifeSystem:
         self.file_manager = FileManager(self.config)
         self.database = DatabaseManager(self.config)
         self.species_identifier = SpeciesIdentifier(self.config)
+        self.sun_checker = SunChecker(self.config)
 
         # Thread pool for blocking operations (camera, species ID)
         self.executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="wildlife")
@@ -202,6 +203,15 @@ class WildlifeSystem:
         logger.info(f"- Location filtering: {self.config.species.country_code}/{self.config.species.admin1_region}")
         logger.info(f"- Unknown threshold: {self.config.species.unknown_species_threshold}")
 
+        # Log daylight settings
+        if self.config.performance.daylight_only:
+            sun_info = self.sun_checker.get_sun_info()
+            logger.info(f"Daylight tracking enabled:")
+            logger.info(f"- Sunrise: {sun_info['sunrise']}, Sunset: {sun_info['sunset']}")
+            logger.info(f"- Currently: {'Daytime' if sun_info['is_daytime'] else 'Nighttime'}")
+        else:
+            logger.info("24/7 tracking enabled (daylight checking disabled)")
+
         # Log initial system status
         self.system_monitor.log_system_status()
         
@@ -217,6 +227,12 @@ class WildlifeSystem:
                 while True:
                     try:
                         current_time = time.time()
+                        
+                        # Check daylight if enabled
+                        if self.config.performance.daylight_only and not self.sun_checker.is_daytime():
+                            # Sleep longer during nighttime to save resources
+                            await asyncio.sleep(600)  # Check every minute at night
+                            continue
                         
                         # Frame rate control
                         if current_time - self.last_frame_time < self.config.motion.frame_interval:

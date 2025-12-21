@@ -66,6 +66,21 @@ class MotionConfig:
 
 
 @dataclass(frozen=True)
+class LocationConfig:
+    """Location configuration for sun calculations."""
+    latitude: float = 50.7374  # Bonn, Germany
+    longitude: float = 7.0982
+    timezone: str = "Europe/Berlin"
+    
+    def __post_init__(self):
+        """Validate location configuration."""
+        if not (-90.0 <= self.latitude <= 90.0):
+            raise ValueError("Latitude must be between -90 and 90")
+        if not (-180.0 <= self.longitude <= 180.0):
+            raise ValueError("Longitude must be between -180 and 180")
+
+
+@dataclass(frozen=True)
 class PerformanceConfig:
     """Performance and resource management configuration."""
     cooldown_period: float = 30.0
@@ -77,6 +92,7 @@ class PerformanceConfig:
     error_sleep: float = 5.0
     cleanup_days: int = 30
     capture_delay: float = 0.75  # Delay before capturing high-res photo (allows animal to settle)
+    daylight_only: bool = True  # Only track during daylight hours
     
     def __post_init__(self):
         """Validate performance configuration."""
@@ -172,6 +188,7 @@ class Config:
         self.performance = self._load_performance_config()
         self.storage = self._load_storage_config()
         self.species = self._load_species_config()
+        self.location = self._load_location_config()
 
         # Load Telegram settings
         self.telegram_token = self._get_required_env("TELEGRAM_BOT_TOKEN")
@@ -246,6 +263,23 @@ class Config:
             ),
             capture_delay=self._get_optional_env(
                 "PERFORMANCE_CAPTURE_DELAY", "0.75", float
+            ),
+            daylight_only=self._get_optional_env(
+                "DAYLIGHT_ONLY", "True", lambda x: x.lower() in ("true", "1", "yes")
+            )
+        )
+    
+    def _load_location_config(self) -> LocationConfig:
+        """Load location configuration with environment overrides."""
+        return LocationConfig(
+            latitude=self._get_optional_env(
+                "LOCATION_LATITUDE", "50.7374", float
+            ),
+            longitude=self._get_optional_env(
+                "LOCATION_LONGITUDE", "7.0982", float
+            ),
+            timezone=self._get_optional_env(
+                "LOCATION_TIMEZONE", "Europe/Berlin"
             )
         )
     

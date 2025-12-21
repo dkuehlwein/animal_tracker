@@ -4,6 +4,8 @@ import psutil
 import time
 from pathlib import Path
 from datetime import datetime
+from astral import LocationInfo
+from astral.sun import sun
 from config import Config
 
 logger = logging.getLogger(__name__)
@@ -316,4 +318,68 @@ class PerformanceTracker:
     def reset_metrics(self):
         """Reset all metrics."""
         self.metrics.clear()
+        self.start_times.clear()
+
+
+class SunChecker:
+    """Check if it's currently daytime based on sunrise/sunset times."""
+    
+    def __init__(self, config: Config):
+        self.config = config
+        self.location = LocationInfo(
+            name="Location",
+            region=config.location.timezone,
+            timezone=config.location.timezone,
+            latitude=config.location.latitude,
+            longitude=config.location.longitude
+        )
+        self._last_check_date = None
+        self._sunrise = None
+        self._sunset = None
+        logger.info(f"SunChecker initialized for location: "
+                   f"{config.location.latitude:.4f}, {config.location.longitude:.4f}")
+    
+    def _update_sun_times(self):
+        """Update sunrise/sunset times for today."""
+        from datetime import date, timezone
+        try:
+            today = date.today()
+            if self._last_check_date != today:
+                s = sun(self.location.observer, date=today)
+                self._sunrise = s['sunrise']
+                self._sunset = s['sunset']
+                self._last_check_date = today
+                logger.info(f"Sun times updated - Sunrise: {self._sunrise.strftime('%H:%M')}, "
+                           f"Sunset: {self._sunset.strftime('%H:%M')}")
+        except Exception as e:
+            logger.error(f"Error calculating sun times: {e}")
+            # Fallback to safe defaults (6am - 8pm local time)
+            from datetime import datetime, time
+            now = datetime.now()
+            self._sunrise = datetime.combine(now.date(), time(6, 0))
+            self._sunset = datetime.combine(now.date(), time(20, 0))
+    
+    def is_daytime(self) -> bool:
+        """Check if it's currently daytime."""
+        from datetime import datetime, timezone
+        self._update_sun_times()
+        
+        now = datetime.now(timezone.utc)
+        
+        # Make sure sunrise and sunset are timezone-aware
+        if self._sunrise and self._sunset:
+            is_day = self._sunrise <= now <= self._sunset
+            return is_day
+        
+        # Fallback if times aren't set
+        return True
+    
+    def get_sun_info(self) -> dict:
+        """Get sunrise/sunset information."""
+        self._update_sun_times()
+        return {
+            'sunrise': self._sunrise.strftime('%H:%M') if self._sunrise else 'Unknown',
+            'sunset': self._sunset.strftime('%H:%M') if self._sunset else 'Unknown',
+            'is_daytime': self.is_daytime()
+        }
         self.start_times.clear()
