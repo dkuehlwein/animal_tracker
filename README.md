@@ -54,6 +54,35 @@ cp .env.example .env
 # Edit .env with your Telegram bot token and chat ID
 ```
 
+### Getting Your Telegram Group Chat ID
+
+To send notifications to a Telegram group:
+
+1. **Create a bot** via [@BotFather](https://t.me/BotFather):
+   - Send `/newbot` and follow instructions
+   - Save the bot token
+
+2. **Disable Privacy Mode**:
+   - Send `/setprivacy` to @BotFather
+   - Select your bot
+   - Choose "Disable"
+
+3. **Get your group chat ID**:
+   - Add [@JSONDumpBot](https://t.me/JSONDumpBot) to your group
+   - Forward any message from your group to @JSONDumpBot
+   - It will show the chat ID (e.g., `-1001234567890`)
+   - Remove @JSONDumpBot from the group
+
+4. **Add your bot to the group**:
+   - Add your bot to the group
+   - Optionally make it an administrator for reliable message delivery
+
+5. **Update your `.env` file**:
+   ```bash
+   TELEGRAM_BOT_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+   TELEGRAM_CHAT_ID=-1001234567890
+   ```
+
 ## Usage
 
 ### Camera Setup and Focus Adjustment

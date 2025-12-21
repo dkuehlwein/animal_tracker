@@ -69,16 +69,24 @@ class BaseMotionDetector:
                 
             gray = frame.astype('uint8')  # Ensure proper data type
             
+            # Apply Gaussian blur to reduce camera noise
+            if self.config.motion.blur_kernel_size > 0:
+                gray = cv2.GaussianBlur(gray, (self.config.motion.blur_kernel_size, self.config.motion.blur_kernel_size), 0)
+            
             # Apply background subtraction and threshold
             fgmask = self.background_subtractor.apply(gray)
-            # Use a low threshold (25) to detect pixel changes
-            # motion_threshold is used later for total area
+            # Increased threshold to 50 to ignore minor pixel fluctuations
             _, thresh = cv2.threshold(
                 fgmask, 
-                25,  # Low threshold to detect any pixel-level changes
+                50,  # Higher threshold to filter camera noise
                 255,
                 cv2.THRESH_BINARY
             )
+            
+            # Apply morphological operations to remove noise
+            kernel = np.ones((3,3), np.uint8)
+            thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)  # Remove small noise
+            thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)  # Fill small holes
             
             # Apply central region weighting
             weighted_thresh = cv2.multiply(

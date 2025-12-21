@@ -131,10 +131,17 @@ class WildlifeSystem:
     async def send_notification(self, species_result: dict, motion_area: int,
                                timestamp: datetime, image_path: Optional[Path] = None):
         """Send notification with species identification info"""
-        # Send text notification with species info
-        await self.telegram_service.send_detection_notification(
-            species_result, motion_area, timestamp
-        )
+        # Send photo with species identification caption
+        if image_path and image_path.exists():
+            species_name = species_result.get('species_name', 'Unknown species')
+            confidence = species_result.get('confidence', 0.0)
+            caption = f"🦌 {species_name}\nConfidence: {confidence:.1%}\nMotion area: {motion_area} px\n{timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
+            await self.telegram_service.send_photo_with_caption(image_path, caption)
+        else:
+            # Fallback to text notification if no image
+            await self.telegram_service.send_detection_notification(
+                species_result, motion_area, timestamp
+            )
     
     
     async def run(self):

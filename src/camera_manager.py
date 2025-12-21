@@ -263,12 +263,8 @@ class PiCameraManager(CameraInterface):
             # Skip color conversion to fix yellow->blue, red->purple color swap
             bgr_frame = frame
             
-            # Save with compression for Pi Zero storage efficiency
-            success = cv2.imwrite(
-                str(file_path),
-                bgr_frame,
-                [cv2.IMWRITE_JPEG_QUALITY, 85]
-            )
+            # Save image (use default JPEG compression)
+            success = cv2.imwrite(str(file_path), bgr_frame)
 
             if success:
                 logger.debug(f"Frame saved to {file_path}")

@@ -47,9 +47,10 @@ class MotionConfig:
     motion_threshold: int = 2000
     min_contour_area: int = 50
     background_history: int = 100
-    background_threshold: int = 20
+    background_threshold: int = 40  # Increased from 20 to reduce noise sensitivity
     frame_interval: float = 0.2  # 5 FPS
     consecutive_detections_required: int = 2
+    blur_kernel_size: int = 5  # Gaussian blur to reduce camera noise
     central_region_bounds: Tuple[float, float] = (0.2, 0.8)
     center_weight: float = 1.0
     edge_weight: float = 0.2
