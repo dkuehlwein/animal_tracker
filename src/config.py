@@ -76,6 +76,7 @@ class PerformanceConfig:
     cooldown_sleep: float = 0.1
     error_sleep: float = 5.0
     cleanup_days: int = 30
+    capture_delay: float = 0.75  # Delay before capturing high-res photo (allows animal to settle)
     
     def __post_init__(self):
         """Validate performance configuration."""
@@ -242,6 +243,9 @@ class Config:
             ),
             max_images=self._get_optional_env(
                 "PERFORMANCE_MAX_IMAGES", "100", int
+            ),
+            capture_delay=self._get_optional_env(
+                "PERFORMANCE_CAPTURE_DELAY", "0.75", float
             )
         )
     

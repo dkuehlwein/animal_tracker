@@ -24,19 +24,28 @@ class BaseMotionDetector:
     """Base motion detector implementation."""
     def __init__(self, config: Config):
         self.config = config
-        
+
         # Initialize motion detection
         self.background_subtractor = cv2.createBackgroundSubtractorMOG2(
             history=config.motion.background_history,
             varThreshold=config.motion.background_threshold,
             detectShadows=False
         )
-        
+
         # Create central region mask for new resolution
         self.central_region_mask = self._create_central_region_mask(
             config.camera.motion_detection_resolution[::-1]  # height, width
         )
-        
+
+        self.consecutive_detections = 0
+
+    def reset_background_model(self):
+        """Reset the background subtractor model to prevent false positives after detection."""
+        self.background_subtractor = cv2.createBackgroundSubtractorMOG2(
+            history=self.config.motion.background_history,
+            varThreshold=self.config.motion.background_threshold,
+            detectShadows=False
+        )
         self.consecutive_detections = 0
 
     def _create_central_region_mask(self, shape):
@@ -201,3 +210,7 @@ class MotionDetector:
     def detect(self, frame) -> MotionResult:
         """Detect motion using the underlying implementation."""
         return self._implementation.detect(frame)
+
+    def reset_background_model(self):
+        """Reset the background subtractor model to prevent false positives after detection."""
+        self._implementation.reset_background_model()

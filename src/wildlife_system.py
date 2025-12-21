@@ -153,8 +153,11 @@ class WildlifeSystem:
             category_names = {1: 'animal', 2: 'person', 3: 'vehicle'}
             for det in detection_result.detections:
                 cat = det.get('category')
+                # Convert to int if it's a string
+                if isinstance(cat, str):
+                    cat = int(cat)
                 conf = det.get('conf', 0.0)
-                cat_name = category_names.get(cat, f'unknown (category {cat})')
+                cat_name = category_names.get(cat, f'category {cat}')
                 detected_items.append(f"{cat_name} ({conf:.1%})")
                 if cat == 1:  # Animal category
                     animals_detected = True
@@ -190,6 +193,7 @@ class WildlifeSystem:
         logger.info(f"- Motion threshold: {self.config.motion.motion_threshold} pixels")
         logger.info(f"- Frame interval: {self.config.motion.frame_interval}s ({1/self.config.motion.frame_interval:.1f} FPS)")
         logger.info(f"- Cooldown period: {self.config.performance.cooldown_period}s")
+        logger.info(f"- Capture delay: {self.config.performance.capture_delay}s (wait for animal to settle)")
         logger.info(f"- Maximum stored images: {self.config.performance.max_images}")
         logger.info(f"- Consecutive detections required: {self.config.motion.consecutive_detections_required}")
         logger.info("Species identification (Two-stage pipeline):")
@@ -251,6 +255,11 @@ class WildlifeSystem:
                             logger.info(f"Motion detected in central region! Area: {motion_area} pixels")
                             self.last_detection_time = current_time
 
+                            # Wait for animal to settle before capturing
+                            if self.config.performance.capture_delay > 0:
+                                logger.info(f"Waiting {self.config.performance.capture_delay}s for animal to settle...")
+                                await asyncio.sleep(self.config.performance.capture_delay)
+
                             # Capture high-resolution photo (run in executor)
                             with PerformanceTimer("High-res capture"):
                                 image_path = await loop.run_in_executor(
@@ -278,6 +287,10 @@ class WildlifeSystem:
                                 # Log system status after large detections
                                 if motion_area > self.config.motion.motion_threshold * 2:
                                     self.system_monitor.log_system_status()
+
+                            # Reset background model to prevent false positives from lingering motion
+                            self.motion_detector.reset_background_model()
+                            logger.info("Background model reset to prevent false alarms")
 
                             # Force cleanup after detection processing
                             self.system_monitor.memory_manager.force_cleanup()
