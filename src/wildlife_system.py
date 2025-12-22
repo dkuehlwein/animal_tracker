@@ -18,7 +18,7 @@ from camera_manager import CameraManager
 from database_manager import DatabaseManager
 from species_identifier import SpeciesIdentifier
 from telegram_service import TelegramService
-from utils import SystemMonitor, PerformanceTimer, FileManager, SunChecker
+from utils import SystemMonitor, PerformanceTimer, FileManager, SunChecker, MotionVisualizer
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,8 @@ class WildlifeSystem:
         # State variables
         self.last_frame_time = 0
         self.last_detection_time = 0
+        self.last_motion_frame = None
+        self.last_motion_result = None
     
     def cleanup_old_images(self):
         """Delete oldest images if we exceed the maximum limit - delegates to FileManager"""
@@ -175,11 +177,21 @@ class WildlifeSystem:
         return f"👁️ Motion detected\nNo objects identified by detector\nMotion area: {motion_area} px\n{time_str}"
     
     async def send_notification(self, species_result: dict, motion_area: int,
-                               timestamp: datetime, image_path: Optional[Path] = None):
-        """Send notification with species identification info"""
+                               timestamp: datetime, image_path: Optional[Path] = None,
+                               annotated_path: Optional[Path] = None):
+        """Send notification with species identification info and motion visualization"""
         if image_path and image_path.exists():
             caption = self._build_caption(species_result, motion_area, timestamp)
-            await self.telegram_service.send_photo_with_caption(image_path, caption)
+
+            # If we have both original and annotated images, send as media group
+            if annotated_path and annotated_path.exists():
+                await self.telegram_service.send_media_group(
+                    [image_path, annotated_path],
+                    caption
+                )
+            else:
+                # Fallback to single image
+                await self.telegram_service.send_photo_with_caption(image_path, caption)
         else:
             await self.telegram_service.send_detection_notification(
                 species_result, motion_area, timestamp
@@ -260,6 +272,11 @@ class WildlifeSystem:
                             motion_result = self.motion_detector.detect(frame)
                             motion_detected = motion_result.motion_detected
                             motion_area = motion_result.motion_area
+
+                            # Store frame and result for later annotation
+                            self.last_motion_frame = frame.copy()
+                            self.last_motion_result = motion_result
+
                             # Log motion status periodically (every 5 seconds)
                             if int(current_time) % 5 == 0 and current_time - self.last_frame_time < 0.3:
                                 logger.info(f"Monitoring... motion_area={motion_area} (threshold={self.config.motion.motion_threshold})")
@@ -293,8 +310,21 @@ class WildlifeSystem:
                                     motion_area
                                 )
 
-                                # Send notification
-                                await self.send_notification(species_result, motion_area, timestamp, image_path)
+                                # Create annotated image showing motion detection regions
+                                annotated_path = None
+                                if self.last_motion_frame is not None and self.last_motion_result is not None:
+                                    annotated_path = await loop.run_in_executor(
+                                        self.executor,
+                                        MotionVisualizer.create_annotated_image,
+                                        image_path,
+                                        self.last_motion_frame,
+                                        self.config,
+                                        self.last_motion_result
+                                    )
+
+                                # Send notification with both original and annotated images
+                                await self.send_notification(species_result, motion_area, timestamp,
+                                                            image_path, annotated_path)
 
                                 # Cleanup old images (now only when needed, not in hot path)
                                 # Only cleanup after successful detection to avoid overhead

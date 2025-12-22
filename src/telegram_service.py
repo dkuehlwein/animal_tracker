@@ -57,29 +57,86 @@ class TelegramService:
             logger.error(f"Error sending Telegram notification: {e}")
             return False
     
-    async def send_photo_with_caption(self, image_path: Path, 
+    async def send_photo_with_caption(self, image_path: Path,
                                      caption: str = None) -> bool:
         """Send photo to Telegram channel with optional caption."""
         try:
             if not image_path.exists():
                 logger.warning(f"Image file not found: {image_path}")
                 return False
-            
+
             default_caption = f"Motion detected at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
             caption = caption or default_caption
-            
+
             with open(image_path, 'rb') as photo:
                 await self.bot.send_photo(
                     chat_id=self.config.telegram_chat_id,
                     photo=photo,
                     caption=caption
                 )
-            
+
             return True
-            
+
         except Exception as e:
             logger.error(f"Error sending Telegram photo: {e}")
             return False
+
+    async def send_media_group(self, image_paths: list[Path], caption: str = None) -> bool:
+        """Send multiple photos as a media group to Telegram channel."""
+        files = []
+        try:
+            if not image_paths:
+                logger.warning("No images provided to send_media_group")
+                return False
+
+            # Filter out non-existent files
+            valid_paths = [p for p in image_paths if p.exists()]
+            if not valid_paths:
+                logger.warning("No valid image files found")
+                return False
+
+            # Create media group (max 10 images per Telegram limitation)
+            # Open all files and keep handles in list
+            media = []
+            for i, path in enumerate(valid_paths[:10]):
+                # Open file and keep handle in list
+                file_handle = open(path, 'rb')
+                files.append(file_handle)
+
+                # Only first photo gets the caption
+                if i == 0 and caption:
+                    media.append(telegram.InputMediaPhoto(
+                        media=file_handle,
+                        caption=caption
+                    ))
+                else:
+                    media.append(telegram.InputMediaPhoto(media=file_handle))
+
+            await self.bot.send_media_group(
+                chat_id=self.config.telegram_chat_id,
+                media=media,
+                read_timeout=30,
+                write_timeout=30,
+                connect_timeout=30
+            )
+
+            return True
+
+        except telegram.error.TimedOut as e:
+            # Telegram timeout errors are often false alarms - images may still be uploaded
+            logger.warning(f"Telegram API timeout (images may still have been sent): {e}")
+            # Return True anyway since images often go through despite timeout
+            return True
+        except Exception as e:
+            logger.error(f"Error sending Telegram media group: {e}")
+            return False
+        finally:
+            # Close all file handles
+            for f in files:
+                try:
+                    f.close()
+                except:
+                    pass
     
     async def send_system_status(self, memory_percent: float, 
                                 storage_percent: float, image_count: int) -> bool:

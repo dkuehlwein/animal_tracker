@@ -2,6 +2,8 @@ import gc
 import logging
 import psutil
 import time
+import cv2
+import numpy as np
 from pathlib import Path
 from datetime import datetime
 from astral import LocationInfo
@@ -61,21 +63,30 @@ class FileManager:
         self.config = config
     
     def cleanup_old_images(self):
-        """Delete oldest images if exceeding max limit"""
+        """Delete oldest images if exceeding max limit (includes annotated versions)"""
         try:
-            image_files = sorted(
-                list(self.config.storage.image_dir.glob(f"{self.config.storage.image_prefix}*.jpg")),
+            # Get all original images (not annotated)
+            original_images = sorted(
+                [f for f in self.config.storage.image_dir.glob(f"{self.config.storage.image_prefix}*.jpg")
+                 if "_annotated" not in f.stem],
                 key=lambda x: x.stat().st_mtime
             )
-            
-            if len(image_files) > self.config.performance.max_images:
-                files_to_delete = image_files[:(len(image_files) - self.config.performance.max_images)]
+
+            if len(original_images) > self.config.performance.max_images:
+                files_to_delete = original_images[:(len(original_images) - self.config.performance.max_images)]
                 deleted_count = 0
-                
+
                 for file_path in files_to_delete:
                     try:
+                        # Delete the original image
                         file_path.unlink()
                         deleted_count += 1
+
+                        # Also delete the annotated version if it exists
+                        annotated_path = file_path.parent / f"{file_path.stem}_annotated{file_path.suffix}"
+                        if annotated_path.exists():
+                            annotated_path.unlink()
+                            deleted_count += 1
                     except Exception as e:
                         logger.error(f"Error deleting {file_path}: {e}", exc_info=True)
 
@@ -193,7 +204,7 @@ class PerformanceTimer:
 
 class ImageUtils:
     """Image processing utilities."""
-    
+
     @staticmethod
     def validate_image_path(image_path) -> bool:
         """Validate image file exists and has correct extension."""
@@ -202,19 +213,18 @@ class ImageUtils:
             return path.exists() and path.suffix.lower() in ['.jpg', '.jpeg', '.png']
         except Exception:
             return False
-    
+
     @staticmethod
     def get_image_info(image_path) -> dict:
         """Get image information."""
         try:
-            import cv2
             img = cv2.imread(str(image_path))
             if img is None:
                 return {'error': 'Could not read image'}
-            
+
             height, width = img.shape[:2]
             channels = img.shape[2] if len(img.shape) > 2 else 1
-            
+
             return {
                 'width': width,
                 'height': height,
@@ -223,20 +233,124 @@ class ImageUtils:
             }
         except Exception as e:
             return {'error': str(e)}
-    
+
     @staticmethod
     def create_thumbnail(image_path, output_path, size=(128, 128)) -> bool:
         """Create thumbnail of image."""
         try:
-            import cv2
             img = cv2.imread(str(image_path))
             if img is None:
                 return False
-            
+
             thumbnail = cv2.resize(img, size)
             return cv2.imwrite(str(output_path), thumbnail)
         except Exception:
             return False
+
+
+class MotionVisualizer:
+    """Create annotated images showing motion detection regions."""
+
+    @staticmethod
+    def create_annotated_image(image_path: Path, motion_frame, config, motion_result) -> Path:
+        """
+        Create annotated version of image showing motion detection regions.
+
+        Args:
+            image_path: Path to the original high-res image
+            motion_frame: The low-res grayscale frame used for motion detection
+            config: System configuration
+            motion_result: MotionResult object with detection details
+
+        Returns:
+            Path to the annotated image file
+        """
+        try:
+            # Load the high-res image
+            img = cv2.imread(str(image_path))
+            if img is None:
+                logger.error(f"Could not load image: {image_path}")
+                return None
+
+            img_height, img_width = img.shape[:2]
+
+            # Get motion detection parameters
+            motion_width, motion_height = config.camera.motion_detection_resolution
+
+            # Calculate scaling factors from motion frame to high-res image
+            scale_x = img_width / motion_width
+            scale_y = img_height / motion_height
+
+            # Draw central region boundary (where motion is prioritized)
+            bounds = config.motion.central_region_bounds
+            center_x1 = int(img_width * bounds[0])
+            center_x2 = int(img_width * bounds[1])
+            center_y1 = int(img_height * bounds[0])
+            center_y2 = int(img_height * bounds[1])
+
+            # Draw semi-transparent overlay for central region
+            overlay = img.copy()
+            cv2.rectangle(overlay, (center_x1, center_y1), (center_x2, center_y2),
+                         (0, 255, 0), 2)
+            cv2.addWeighted(overlay, 0.3, img, 0.7, 0, img)
+
+            # Draw the actual motion detection point if available
+            if motion_result.center_x is not None and motion_result.center_y is not None:
+                # Scale the detection point to high-res coordinates
+                det_x = int(motion_result.center_x * scale_x)
+                det_y = int(motion_result.center_y * scale_y)
+
+                # Draw crosshair at detection point
+                cv2.drawMarker(img, (det_x, det_y), (0, 0, 255),
+                              markerType=cv2.MARKER_CROSS, markerSize=50, thickness=3)
+
+                # Draw circle around detection point
+                cv2.circle(img, (det_x, det_y), 30, (0, 0, 255), 3)
+
+            # Add text annotations
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 0.7
+            thickness = 2
+
+            # Motion info text
+            text_lines = [
+                f"Motion Area: {motion_result.motion_area} px",
+                f"Threshold: {config.motion.motion_threshold} px",
+                f"Contours: {motion_result.contour_count}",
+                f"Confidence: {motion_result.detection_confidence:.1%}"
+            ]
+
+            # Add text with background for readability
+            y_offset = 30
+            for line in text_lines:
+                text_size = cv2.getTextSize(line, font, font_scale, thickness)[0]
+                # Draw black background rectangle
+                cv2.rectangle(img, (5, y_offset - 25),
+                            (text_size[0] + 15, y_offset + 5),
+                            (0, 0, 0), -1)
+                # Draw white text
+                cv2.putText(img, line, (10, y_offset), font, font_scale,
+                           (255, 255, 255), thickness)
+                y_offset += 35
+
+            # Add legend
+            legend_y = img_height - 70
+            cv2.rectangle(img, (5, legend_y - 25), (270, img_height - 10), (0, 0, 0), -1)
+            cv2.putText(img, "Green: Central Region", (10, legend_y),
+                       font, 0.5, (0, 255, 0), 1)
+            cv2.putText(img, "Red: Motion Detection Point", (10, legend_y + 25),
+                       font, 0.5, (0, 0, 255), 1)
+
+            # Save annotated image with _annotated suffix
+            annotated_path = image_path.parent / f"{image_path.stem}_annotated{image_path.suffix}"
+            cv2.imwrite(str(annotated_path), img)
+
+            logger.info(f"Created annotated image: {annotated_path}")
+            return annotated_path
+
+        except Exception as e:
+            logger.error(f"Error creating annotated image: {e}", exc_info=True)
+            return None
 
 
 class TelegramFormatter:

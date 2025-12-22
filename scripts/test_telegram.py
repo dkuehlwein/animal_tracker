@@ -15,6 +15,8 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from config import Config
 from telegram_service import TelegramService
+from utils import MotionVisualizer
+from motion_detector import MotionResult
 import cv2
 import numpy as np
 
@@ -32,15 +34,65 @@ def create_test_image(output_path: Path) -> Path:
     # Create a simple test image with text
     img = np.zeros((480, 640, 3), dtype=np.uint8)
     img[:] = (50, 100, 50)  # Dark green background
-    
+
     # Add text
-    cv2.putText(img, "Telegram Bot Test", (150, 200), 
+    cv2.putText(img, "Telegram Bot Test", (150, 200),
                 cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-    cv2.putText(img, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), 
+    cv2.putText(img, datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                 (150, 280), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (200, 200, 200), 1)
-    
+
     cv2.imwrite(str(output_path), img)
     return output_path
+
+
+def create_test_image_with_motion(output_path: Path, config) -> tuple[Path, np.ndarray, MotionResult]:
+    """Create a test image simulating a wildlife detection with fake motion data."""
+    # Create a more realistic wildlife scene
+    img = np.zeros((1080, 1920, 3), dtype=np.uint8)
+
+    # Create gradient background (sky to ground)
+    for y in range(1080):
+        color = int(30 + (y / 1080) * 70)
+        img[y, :] = (color, color + 20, color)
+
+    # Draw a simple "animal" (circle representing a squirrel or bird)
+    animal_center = (960, 540)  # Center of image
+    cv2.circle(img, animal_center, 80, (60, 100, 180), -1)  # Brown-ish animal
+    cv2.circle(img, (940, 520), 20, (40, 40, 40), -1)  # Eye
+    cv2.circle(img, (980, 520), 20, (40, 40, 40), -1)  # Eye
+
+    # Add some "grass" or foliage
+    for _ in range(50):
+        x = np.random.randint(0, 1920)
+        y = np.random.randint(800, 1080)
+        size = np.random.randint(10, 40)
+        cv2.circle(img, (x, y), size, (30, 80, 30), -1)
+
+    # Add timestamp
+    timestamp_text = f"Test Capture: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+    cv2.putText(img, timestamp_text, (50, 50),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+
+    # Save the image
+    cv2.imwrite(str(output_path), img)
+
+    # Create fake motion frame (low-res grayscale)
+    motion_frame = cv2.cvtColor(
+        cv2.resize(img, config.camera.motion_detection_resolution),
+        cv2.COLOR_BGR2GRAY
+    )
+
+    # Create fake motion result (simulating detection at center)
+    motion_result = MotionResult(
+        motion_detected=True,
+        motion_area=4500,
+        detection_confidence=1.0,
+        center_x=320,  # Center of 640x480 frame
+        center_y=240,
+        contour_count=12
+    )
+
+    return output_path, motion_frame, motion_result
 
 
 async def test_telegram_service():
@@ -158,13 +210,68 @@ async def test_telegram_service():
         except Exception as e:
             print(f"✗ Failed to send system status: {e}")
             print()
-        
+
+        # Test 6: Motion Visualization (NEW!)
+        print("Test 6: Motion Visualization with Media Group")
+        print("-" * 40)
+        try:
+            # Create test image with fake motion detection
+            test_image_path = config.storage.image_dir / "motion_test_original.jpg"
+            image_path, motion_frame, motion_result = create_test_image_with_motion(
+                test_image_path, config
+            )
+            print(f"  Created test image: {test_image_path}")
+            print(f"  Fake motion area: {motion_result.motion_area} px")
+            print(f"  Motion center: ({motion_result.center_x}, {motion_result.center_y})")
+
+            # Create annotated version
+            annotated_path = MotionVisualizer.create_annotated_image(
+                image_path, motion_frame, config, motion_result
+            )
+
+            if annotated_path:
+                print(f"  Created annotated image: {annotated_path}")
+
+                # Send both images as media group
+                caption = (
+                    "🎯 Motion Visualization Test\n"
+                    f"Motion Area: {motion_result.motion_area} px\n"
+                    f"Detection at center of frame"
+                )
+                success = await telegram_service.send_media_group(
+                    [image_path, annotated_path],
+                    caption
+                )
+
+                if success:
+                    print("✓ Media group sent successfully")
+                    print("  You should see:")
+                    print("    1. Original image with fake animal")
+                    print("    2. Annotated image with motion markers")
+                else:
+                    print("✗ Media group sending failed")
+            else:
+                print("✗ Failed to create annotated image")
+
+            print()
+        except Exception as e:
+            print(f"✗ Failed motion visualization test: {e}")
+            logger.exception("Motion visualization test failed")
+            print()
+
         # Summary
         print("=" * 60)
         print("✅ TELEGRAM BOT TEST COMPLETED")
         print("=" * 60)
         print()
         print("Check your Telegram chat to verify all messages arrived!")
+        print()
+        print("Expected in Telegram:")
+        print("  - Text message")
+        print("  - Detection notification (European Robin)")
+        print("  - Single test photo")
+        print("  - System status message")
+        print("  - Media group with original + annotated images (Test 6)")
         print()
         
         return True
