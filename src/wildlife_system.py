@@ -18,7 +18,7 @@ from camera_manager import CameraManager
 from database_manager import DatabaseManager
 from species_identifier import SpeciesIdentifier
 from telegram_service import TelegramService
-from utils import SystemMonitor, PerformanceTimer, FileManager, SunChecker, MotionVisualizer
+from utils import SystemMonitor, PerformanceTimer, FileManager, SunChecker, MotionVisualizer, SharpnessAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -132,6 +132,64 @@ class WildlifeSystem:
                 'detection_count': 0
             }, timestamp
     
+    def _capture_and_select_best_frame(self) -> tuple:
+        """
+        Capture burst of frames, analyze sharpness, save best frame.
+        Returns (image_path, sharpness_info_dict) or (None, None) on failure.
+        """
+        try:
+            # Capture burst frames
+            frames = self.camera._camera.capture_burst_frames(
+                count=self.config.performance.multi_frame_count,
+                interval=self.config.performance.multi_frame_interval
+            )
+            
+            if not frames:
+                logger.error("Burst capture failed, no frames captured")
+                return None, None
+            
+            # Analyze sharpness and select best frame
+            best_frame, selected_index, best_score, all_scores = SharpnessAnalyzer.select_sharpest_frame(frames)
+            
+            if best_frame is None:
+                logger.error("Sharpness analysis failed")
+                return None, None
+            
+            # Check if sharpness meets minimum threshold
+            if best_score < self.config.performance.min_sharpness_threshold:
+                logger.warning(f"Best frame sharpness ({best_score:.1f}) below threshold "
+                             f"({self.config.performance.min_sharpness_threshold})")
+            
+            # Generate timestamped filename and save best frame
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            file_path = self.config.storage.image_dir / f"{self.config.storage.image_prefix}{timestamp}.jpg"
+            
+            # Save the best frame
+            import cv2
+            success = cv2.imwrite(str(file_path), best_frame)
+            
+            if not success:
+                logger.error(f"Failed to save best frame to {file_path}")
+                return None, None
+            
+            logger.info(f"Burst capture complete: saved frame {selected_index + 1}/{len(frames)} "
+                       f"(sharpness: {best_score:.1f})")
+            
+            # Build sharpness info dict for notification
+            sharpness_info = {
+                'sharpness_score': best_score,
+                'selected_frame_index': selected_index,
+                'frame_count': len(frames),
+                'all_scores': all_scores,
+                'meets_threshold': best_score >= self.config.performance.min_sharpness_threshold
+            }
+            
+            return file_path, sharpness_info
+        
+        except Exception as e:
+            logger.error(f"Error in burst capture and selection: {e}", exc_info=True)
+            return None, None
+    
     def _extract_species_name(self, species_name_raw: str) -> str:
         """Extract human-readable name from taxonomic path."""
         # Format: UUID;class;order;family;genus;species;common_name
@@ -165,16 +223,29 @@ class WildlifeSystem:
                 if cat == 1:  # Animal category
                     animals_detected = True
         
+        # Build base caption
+        caption = ""
+        
         # If animals were detected, show species identification
         if animals_detected:
-            return f"🦌 {species_name}\nConfidence: {confidence:.1%}\nMotion area: {motion_area} px\n{time_str}"
-        
+            caption = f"🦌 {species_name}\nConfidence: {confidence:.1%}\nMotion area: {motion_area} px\n{time_str}"
         # Otherwise show what was detected
-        if detected_items:
+        elif detected_items:
             items_str = ", ".join(detected_items)
-            return f"👁️ Motion detected\nFound: {items_str}\nNo animals above threshold\nMotion area: {motion_area} px\n{time_str}"
+            caption = f"👁️ Motion detected\nFound: {items_str}\nNo animals above threshold\nMotion area: {motion_area} px\n{time_str}"
+        else:
+            caption = f"👁️ Motion detected\nNo objects identified by detector\nMotion area: {motion_area} px\n{time_str}"
         
-        return f"👁️ Motion detected\nNo objects identified by detector\nMotion area: {motion_area} px\n{time_str}"
+        # Add sharpness info if available
+        sharpness_info = species_result.get('sharpness_info')
+        if sharpness_info:
+            caption += f"\n\n📸 Image Quality:"
+            caption += f"\nSharpness: {sharpness_info['sharpness_score']:.1f}"
+            caption += f"\nSelected: Frame {sharpness_info['selected_frame_index'] + 1}/{sharpness_info['frame_count']}"
+            if not sharpness_info['meets_threshold']:
+                caption += f"\n⚠️ Below quality threshold ({self.config.performance.min_sharpness_threshold:.0f})"
+        
+        return caption
     
     async def send_notification(self, species_result: dict, motion_area: int,
                                timestamp: datetime, image_path: Optional[Path] = None,
@@ -214,6 +285,18 @@ class WildlifeSystem:
         logger.info(f"- Stage 2: SpeciesNet classifier (model: {self.config.species.model_version})")
         logger.info(f"- Location filtering: {self.config.species.country_code}/{self.config.species.admin1_region}")
         logger.info(f"- Unknown threshold: {self.config.species.unknown_species_threshold}")
+        
+        # Log multi-frame capture settings
+        logger.info("Image capture:")
+        if self.config.performance.enable_multi_frame:
+            logger.info(f"- Multi-frame burst capture: ENABLED")
+            logger.info(f"  • Frames per burst: {self.config.performance.multi_frame_count}")
+            logger.info(f"  • Interval: {self.config.performance.multi_frame_interval}s")
+            logger.info(f"  • Total burst time: ~{self.config.performance.multi_frame_count * self.config.performance.multi_frame_interval:.1f}s")
+            logger.info(f"  • Sharpness threshold: {self.config.performance.min_sharpness_threshold}")
+            logger.info(f"  • Selection: Best frame by Laplacian variance")
+        else:
+            logger.info(f"- Multi-frame burst capture: DISABLED (single frame mode)")
 
         # Log daylight settings
         if self.config.performance.daylight_only:
@@ -288,17 +371,21 @@ class WildlifeSystem:
                             logger.info(f"Motion detected in central region! Area: {motion_area} pixels")
                             self.last_detection_time = current_time
 
-                            # Wait for animal to settle before capturing
-                            if self.config.performance.capture_delay > 0:
-                                logger.info(f"Waiting {self.config.performance.capture_delay}s for animal to settle...")
-                                await asyncio.sleep(self.config.performance.capture_delay)
-
-                            # Capture high-resolution photo (run in executor)
-                            with PerformanceTimer("High-res capture"):
-                                image_path = await loop.run_in_executor(
-                                    self.executor,
-                                    self.camera.capture_and_save_photo
-                                )
+                            # Multi-frame or single-frame capture based on config
+                            sharpness_info = None
+                            if self.config.performance.enable_multi_frame:
+                                with PerformanceTimer("Multi-frame burst capture"):
+                                    image_path, sharpness_info = await loop.run_in_executor(
+                                        self.executor,
+                                        self._capture_and_select_best_frame
+                                    )
+                            else:
+                                # Fallback to single-frame capture
+                                with PerformanceTimer("High-res capture"):
+                                    image_path = await loop.run_in_executor(
+                                        self.executor,
+                                        self.camera.capture_and_save_photo
+                                    )
 
                             if image_path:
                                 # Process detection (species ID + database logging)
@@ -309,6 +396,10 @@ class WildlifeSystem:
                                     image_path,
                                     motion_area
                                 )
+                                
+                                # Add sharpness info to species result for notification
+                                if sharpness_info:
+                                    species_result['sharpness_info'] = sharpness_info
 
                                 # Create annotated image showing motion detection regions
                                 annotated_path = None

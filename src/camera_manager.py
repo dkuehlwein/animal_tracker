@@ -56,6 +56,11 @@ class CameraInterface(ABC):
         pass
     
     @abstractmethod
+    def capture_burst_frames(self, count: int, interval: float) -> list:
+        """Capture multiple high-resolution frames in quick succession."""
+        pass
+    
+    @abstractmethod
     def is_available(self) -> bool:
         """Check if camera is available."""
         pass
@@ -253,6 +258,34 @@ class PiCameraManager(CameraInterface):
             self._handle_capture_error(f"high-res frame capture: {e}")
             return None
     
+    def capture_burst_frames(self, count: int, interval: float) -> list:
+        """Capture multiple high-resolution frames in quick succession."""
+        if not self._is_running or not self.camera:
+            raise CameraOperationError("Camera not initialized")
+        
+        frames = []
+        try:
+            logger.info(f"Starting burst capture: {count} frames at {interval}s intervals")
+            
+            for i in range(count):
+                frame = self.capture_high_res_frame()
+                if frame is not None:
+                    frames.append(frame)
+                    logger.debug(f"Captured burst frame {i+1}/{count}")
+                else:
+                    logger.warning(f"Failed to capture burst frame {i+1}/{count}")
+                
+                # Wait between frames (except after last frame)
+                if i < count - 1 and interval > 0:
+                    time.sleep(interval)
+            
+            logger.info(f"Burst capture complete: {len(frames)}/{count} frames captured")
+            return frames
+            
+        except Exception as e:
+            logger.error(f"Error during burst capture: {e}")
+            return frames  # Return what we captured so far
+    
     def save_frame_to_file(self, frame: FrameData, file_path: Path) -> bool:
         """Save frame to file with error handling."""
         try:
@@ -361,6 +394,27 @@ class MockCameraManager(CameraInterface):
         # Create mock RGB frame
         frame = np.random.randint(0, 255, (h, w, 3), dtype=np.uint8)
         return frame
+    
+    def capture_burst_frames(self, count: int, interval: float) -> list:
+        """Return mock burst frames with varying sharpness."""
+        if not self._is_running:
+            return []
+        
+        import numpy as np
+        h, w = self.config.camera.main_resolution[1], self.config.camera.main_resolution[0]
+        
+        frames = []
+        for i in range(count):
+            # Create frames with varying sharpness (simulate real scenario)
+            # Middle frames tend to be sharper
+            sharpness_factor = 1.0 - abs(i - count // 2) * 0.15
+            frame = np.random.randint(0, int(255 * sharpness_factor), (h, w, 3), dtype=np.uint8)
+            frames.append(frame)
+            
+            if i < count - 1 and interval > 0:
+                time.sleep(interval)
+        
+        return frames
     
     def save_frame_to_file(self, frame: FrameData, file_path: Path) -> bool:
         """Mock save frame to file."""

@@ -93,13 +93,25 @@ class PerformanceConfig:
     cleanup_days: int = 30
     capture_delay: float = 0.75  # Delay before capturing high-res photo (allows animal to settle)
     daylight_only: bool = True  # Only track during daylight hours
-    
+
+    # Multi-frame burst capture settings
+    enable_multi_frame: bool = True  # Enable multi-frame burst capture with sharpness analysis
+    multi_frame_count: int = 5  # Number of frames to capture in burst
+    multi_frame_interval: float = 0.1  # Interval between burst frames in seconds
+    min_sharpness_threshold: float = 100.0  # Minimum acceptable sharpness score
+
     def __post_init__(self):
         """Validate performance configuration."""
         if not (0.0 < self.memory_threshold < 1.0):
             raise ValueError("Memory threshold must be between 0 and 1")
         if self.max_images <= 0:
             raise ValueError("Max images must be positive")
+        if self.multi_frame_count < 1:
+            raise ValueError("Multi-frame count must be at least 1")
+        if self.multi_frame_interval < 0:
+            raise ValueError("Multi-frame interval must be non-negative")
+        if self.min_sharpness_threshold < 0:
+            raise ValueError("Minimum sharpness threshold must be non-negative")
 
 
 @dataclass(frozen=True)

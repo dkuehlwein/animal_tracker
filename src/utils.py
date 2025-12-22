@@ -435,6 +435,74 @@ class PerformanceTracker:
         self.start_times.clear()
 
 
+class SharpnessAnalyzer:
+    """Analyze image sharpness using Laplacian variance for burst capture selection."""
+    
+    @staticmethod
+    def calculate_sharpness(frame: np.ndarray) -> float:
+        """
+        Calculate image sharpness using Laplacian variance.
+        Higher values indicate sharper images.
+        
+        Args:
+            frame: BGR or grayscale image array
+            
+        Returns:
+            Sharpness score (higher = sharper)
+        """
+        try:
+            # Convert to grayscale if needed
+            if len(frame.shape) == 3:
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = frame
+            
+            # Calculate Laplacian variance (measures edge strength)
+            # Higher variance = more edges = sharper image
+            laplacian = cv2.Laplacian(gray, cv2.CV_64F)
+            variance = laplacian.var()
+            
+            return float(variance)
+        
+        except Exception as e:
+            logger.error(f"Error calculating sharpness: {e}")
+            return 0.0
+    
+    @staticmethod
+    def select_sharpest_frame(frames: list) -> tuple:
+        """
+        Analyze multiple frames and select the sharpest one.
+        
+        Args:
+            frames: List of numpy arrays (BGR or grayscale images)
+            
+        Returns:
+            Tuple of (best_frame, selected_index, best_score, all_scores)
+        """
+        if not frames:
+            logger.warning("No frames provided for sharpness analysis")
+            return None, -1, 0.0, []
+        
+        try:
+            # Calculate sharpness for all frames
+            scores = [SharpnessAnalyzer.calculate_sharpness(frame) for frame in frames]
+            
+            # Find the frame with highest sharpness
+            best_index = scores.index(max(scores))
+            best_frame = frames[best_index]
+            best_score = scores[best_index]
+            
+            logger.info(f"Sharpness analysis: scores={[f'{s:.1f}' for s in scores]}, "
+                       f"selected frame {best_index + 1}/{len(frames)} (score: {best_score:.1f})")
+            
+            return best_frame, best_index, best_score, scores
+        
+        except Exception as e:
+            logger.error(f"Error in sharpness analysis: {e}")
+            # Return first frame as fallback
+            return frames[0] if frames else None, 0, 0.0, []
+
+
 class SunChecker:
     """Check if it's currently daytime based on sunrise/sunset times."""
     
