@@ -40,7 +40,8 @@ class DetectionRecord:
 class DatabaseManager:
     def __init__(self, config: Config):
         self.config = config
-        self.db_path = config.storage.database_path
+        # Ensure database path is absolute to avoid path resolution issues
+        self.db_path = str(Path(config.storage.database_path).resolve())
         self.init_database()
     
     def init_database(self):
