@@ -89,6 +89,8 @@ All configuration is centralized in `Config` class with nested dataclasses:
 
 - **Motion Detection**: `motion_threshold` (2000), `min_contour_area` (50), `consecutive_detections_required` (2)
 - **Camera**: Dual resolution streams with frame rate limiting (`frame_duration`: 100000 microseconds)
+  - **Exposure Control**: `exposure_time` (2000μs = 1/500s) and `analogue_gain` (2.5x) for motion freeze
+  - Set either to `None` to enable auto-exposure mode
 - **Timing**: `cooldown_period` (30s), `frame_interval` (0.2s for 5 FPS)
 - **Storage**: `max_images` (100) with automatic cleanup of oldest files
 - **Species Identification**: `model_version` (v4.0.1a), `country_code` (DEU), `admin1_region` (NW), `unknown_species_threshold` (0.5)
@@ -145,7 +147,7 @@ Requires `.env` file with:
 
 Additional optional environment variables for fine-tuning:
 - Motion: `MOTION_THRESHOLD`, `MOTION_CONSECUTIVE_REQUIRED`, `MOTION_FRAME_INTERVAL`
-- Camera: `CAMERA_MAIN_RESOLUTION`, `CAMERA_MOTION_RESOLUTION`
+- Camera: `CAMERA_MAIN_RESOLUTION`, `CAMERA_MOTION_RESOLUTION`, `CAMERA_EXPOSURE_TIME`, `CAMERA_ANALOGUE_GAIN`
 - Performance: `PERFORMANCE_COOLDOWN`, `PERFORMANCE_MAX_IMAGES`
 - Species: `SPECIES_COUNTRY_CODE`, `SPECIES_REGION`, `SPECIES_UNKNOWN_THRESHOLD`
 

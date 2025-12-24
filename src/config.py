@@ -24,6 +24,11 @@ class CameraConfig:
     frame_format: str = "RGB888"
     frame_duration: int = 100000  # microseconds
     startup_delay: float = 2.0
+    # Exposure control (motion freeze settings)
+    # None = auto-exposure (adapts to lighting, but may have motion blur)
+    # Manual: Bright sun: 2000μs + 2.5x | Cloudy: 15000μs + 8.0x | Current: auto
+    exposure_time: Optional[int] = None  # microseconds, None for auto-exposure
+    analogue_gain: Optional[float] = None  # Sensor gain (1.0-8.0), None for auto
     
     def __post_init__(self):
         """Validate camera configuration."""
@@ -33,6 +38,10 @@ class CameraConfig:
             raise ValueError(f"Invalid motion detection resolution: {self.motion_detection_resolution}")
         if self.motion_detection_format not in ["YUV420", "RGB888"]:
             raise ValueError(f"Invalid motion detection format: {self.motion_detection_format}")
+        if self.exposure_time is not None and (self.exposure_time < 100 or self.exposure_time > 1000000):
+            raise ValueError(f"Exposure time must be between 100-1000000 μs (got {self.exposure_time})")
+        if self.analogue_gain is not None and (self.analogue_gain < 1.0 or self.analogue_gain > 8.0):
+            raise ValueError(f"Analogue gain must be between 1.0-8.0 (got {self.analogue_gain})")
     
     @staticmethod
     def _validate_resolution(resolution: Tuple[int, int]) -> bool:
@@ -99,6 +108,8 @@ class PerformanceConfig:
     multi_frame_count: int = 5  # Number of frames to capture in burst
     multi_frame_interval: float = 0.1  # Interval between burst frames in seconds
     min_sharpness_threshold: float = 100.0  # Minimum acceptable sharpness score
+    motion_aware_selection: bool = True  # Use foreground detection to avoid selecting empty frames
+    min_foreground_ratio: float = 15.0  # Minimum foreground content (0-100%) to prefer a frame
 
     def __post_init__(self):
         """Validate performance configuration."""
@@ -112,6 +123,8 @@ class PerformanceConfig:
             raise ValueError("Multi-frame interval must be non-negative")
         if self.min_sharpness_threshold < 0:
             raise ValueError("Minimum sharpness threshold must be non-negative")
+        if not (0.0 <= self.min_foreground_ratio <= 100.0):
+            raise ValueError("Minimum foreground ratio must be between 0 and 100")
 
 
 @dataclass(frozen=True)
@@ -229,6 +242,26 @@ class Config:
     
     def _load_camera_config(self) -> CameraConfig:
         """Load camera configuration with environment overrides."""
+        # Use dataclass defaults, override only if env vars are set
+        defaults = CameraConfig.__dataclass_fields__
+
+        # Parse exposure settings (empty string or missing = use dataclass default)
+        exposure_time_str = os.getenv("CAMERA_EXPOSURE_TIME")
+        if exposure_time_str == "":
+            exposure_time = None  # Empty string means auto-exposure
+        elif exposure_time_str:
+            exposure_time = int(exposure_time_str)  # Use env value
+        else:
+            exposure_time = defaults['exposure_time'].default  # Use dataclass default
+
+        analogue_gain_str = os.getenv("CAMERA_ANALOGUE_GAIN")
+        if analogue_gain_str == "":
+            analogue_gain = None  # Empty string means auto-gain
+        elif analogue_gain_str:
+            analogue_gain = float(analogue_gain_str)  # Use env value
+        else:
+            analogue_gain = defaults['analogue_gain'].default  # Use dataclass default
+
         return CameraConfig(
             main_resolution=self._parse_resolution(
                 os.getenv("CAMERA_MAIN_RESOLUTION", "1920x1080")
@@ -244,7 +277,9 @@ class Config:
             ),
             startup_delay=self._get_optional_env(
                 "CAMERA_STARTUP_DELAY", "2.0", float
-            )
+            ),
+            exposure_time=exposure_time,
+            analogue_gain=analogue_gain
         )
     
     def _load_motion_config(self) -> MotionConfig:

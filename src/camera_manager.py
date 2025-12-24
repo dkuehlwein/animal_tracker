@@ -158,7 +158,7 @@ class PiCameraManager(CameraInterface):
         
         self.camera = Picamera2()
         
-        # Configure dual streams with error checking
+        # Configure dual streams
         try:
             preview_config = self.camera.create_preview_configuration(
                 main={
@@ -173,18 +173,29 @@ class PiCameraManager(CameraInterface):
             self.camera.configure(preview_config)
         except Exception as e:
             raise CameraInitializationError(f"Failed to configure camera streams: {e}") from e
-        
-        # Set frame rate control
+
+        # Set camera controls BEFORE starting camera
         try:
-            self.camera.set_controls({
+            controls = {
                 "FrameDurationLimits": (
                     self.config.camera.frame_duration,
                     self.config.camera.frame_duration
                 )
-            })
+            }
+
+            # Manual exposure mode: disable AE/AGC and set fixed values
+            if self.config.camera.exposure_time is not None and self.config.camera.analogue_gain is not None:
+                controls["AeEnable"] = False  # Disable auto-exposure
+                controls["ExposureTime"] = self.config.camera.exposure_time
+                controls["AnalogueGain"] = self.config.camera.analogue_gain
+                logger.info(f"Manual exposure mode: ExposureTime={self.config.camera.exposure_time}μs "
+                           f"(1/{1000000/self.config.camera.exposure_time:.0f}s), "
+                           f"Gain={self.config.camera.analogue_gain}x")
+
+            self.camera.set_controls(controls)
         except Exception as e:
-            logger.warning(f"Failed to set frame duration limits: {e}")
-        
+            logger.warning(f"Failed to set camera controls: {e}")
+
         # Start camera
         try:
             self.camera.start()

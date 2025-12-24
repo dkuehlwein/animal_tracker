@@ -148,8 +148,12 @@ class WildlifeSystem:
                 logger.error("Burst capture failed, no frames captured")
                 return None, None
             
-            # Analyze sharpness and select best frame
-            best_frame, selected_index, best_score, all_scores = SharpnessAnalyzer.select_sharpest_frame(frames)
+            # Analyze sharpness and select best frame (motion-aware if enabled)
+            best_frame, selected_index, best_score, all_scores = SharpnessAnalyzer.select_sharpest_frame(
+                frames,
+                motion_aware=self.config.performance.motion_aware_selection,
+                min_foreground_ratio=self.config.performance.min_foreground_ratio
+            )
             
             if best_frame is None:
                 logger.error("Sharpness analysis failed")
