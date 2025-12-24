@@ -53,13 +53,13 @@ class BaseMotionDetector:
         height, width = shape
         center_y, center_x = height // 2, width // 2
         Y, X = np.ogrid[:height, :width]
-        
+
         # Calculate normalized distances from center
         dist_from_center = np.sqrt(
-            (X - center_x)**2 / (width/2)**2 + 
+            (X - center_x)**2 / (width/2)**2 +
             (Y - center_y)**2 / (height/2)**2
         )
-        
+
         # Create weight mask
         weight_range = self.config.motion.center_weight - self.config.motion.edge_weight
         return np.clip(
@@ -68,42 +68,75 @@ class BaseMotionDetector:
             self.config.motion.center_weight
         )
 
+    def _calculate_color_variance(self, bgr_frame, motion_mask):
+        """
+        Calculate color variance in the motion region.
+        Higher variance indicates varied colors (animals), lower indicates uniform color (leaves).
+
+        Args:
+            bgr_frame: BGR color frame
+            motion_mask: Binary mask of motion regions (0 or 255)
+
+        Returns:
+            Color variance score (higher = more color variety)
+        """
+        # Extract pixels in the motion region
+        motion_pixels = bgr_frame[motion_mask > 0]
+
+        if len(motion_pixels) == 0:
+            return 0.0
+
+        # Calculate variance in each color channel
+        b_var = np.var(motion_pixels[:, 0])
+        g_var = np.var(motion_pixels[:, 1])
+        r_var = np.var(motion_pixels[:, 2])
+
+        # Total color variance (sum of variances across channels)
+        total_variance = b_var + g_var + r_var
+
+        return float(total_variance)
+
     def detect(self, frame) -> MotionResult:
-        """Detect motion in YUV420 frame with central region focus"""
+        """Detect motion in frame (RGB or grayscale) with color filtering and central region focus"""
         try:
-            # Frame is already Y channel (grayscale) from YUV420 format
-            # No conversion needed - frame is already grayscale luminance
             if frame is None:
                 return MotionResult(motion_detected=False, motion_area=0)
-                
-            gray = frame.astype('uint8')  # Ensure proper data type
-            
+
+            # Determine if frame is RGB or grayscale
+            is_color = len(frame.shape) == 3 and frame.shape[2] == 3
+
+            # Convert to grayscale for background subtraction
+            if is_color:
+                gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            else:
+                gray = frame.astype('uint8')
+
             # Apply Gaussian blur to reduce camera noise
             if self.config.motion.blur_kernel_size > 0:
                 gray = cv2.GaussianBlur(gray, (self.config.motion.blur_kernel_size, self.config.motion.blur_kernel_size), 0)
-            
+
             # Apply background subtraction and threshold
             fgmask = self.background_subtractor.apply(gray)
             # Increased threshold to 50 to ignore minor pixel fluctuations
             _, thresh = cv2.threshold(
-                fgmask, 
+                fgmask,
                 50,  # Higher threshold to filter camera noise
                 255,
                 cv2.THRESH_BINARY
             )
-            
+
             # Apply morphological operations to remove noise
             kernel = np.ones((3,3), np.uint8)
             thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)  # Remove small noise
             thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)  # Fill small holes
-            
+
             # Apply central region weighting
             weighted_thresh = cv2.multiply(
                 thresh.astype(np.float32),
                 self.central_region_mask,
                 dtype=cv2.CV_32F
             )
-            
+
             # Find contours
             contours, _ = cv2.findContours(
                 weighted_thresh.astype(np.uint8),
@@ -141,6 +174,31 @@ class BaseMotionDetector:
             
             # Check if total motion area exceeds Pi Zero threshold
             if significant_motion_detected and motion_area >= self.config.motion.motion_threshold:
+                # Color variance filtering (if enabled and color frame available)
+                passes_color_filter = True
+                if is_color and self.config.motion.enable_color_filtering:
+                    # Calculate color variance in the motion region
+                    # Create a mask of the motion region
+                    motion_mask = (thresh > 0).astype(np.uint8)
+
+                    # Calculate color variance within the motion region
+                    color_variance = self._calculate_color_variance(frame, motion_mask)
+
+                    # Filter out low color variance (uniform color = leaves/inanimate objects)
+                    if color_variance < self.config.motion.min_color_variance:
+                        passes_color_filter = False
+
+                if not passes_color_filter:
+                    # Motion detected but filtered out due to low color variance
+                    return MotionResult(
+                        motion_detected=False,
+                        motion_area=motion_area,
+                        detection_confidence=0.3,  # Low confidence - filtered
+                        center_x=center_x,
+                        center_y=center_y,
+                        contour_count=len(contours)
+                    )
+
                 self.consecutive_detections += 1
                 if self.consecutive_detections >= self.config.motion.consecutive_detections_required:
                     self.consecutive_detections = 0

@@ -63,7 +63,13 @@ class MotionConfig:
     central_region_bounds: Tuple[float, float] = (0.2, 0.8)
     center_weight: float = 1.0
     edge_weight: float = 0.2
-    
+
+    # Color-based motion filtering (reduces false alarms from uniform-color leaves)
+    # Note: Disabled by default as motion-aware frame selection handles most false alarms
+    enable_color_filtering: bool = False  # Enable color variance analysis
+    min_color_variance: float = 200.0  # Minimum color variance to consider motion valid
+    use_rgb_motion_detection: bool = False  # Use RGB instead of grayscale for motion detection
+
     def __post_init__(self):
         """Validate motion detection configuration."""
         if self.motion_threshold <= 0:
@@ -72,6 +78,8 @@ class MotionConfig:
             raise ValueError("Invalid central region bounds")
         if self.center_weight <= 0 or self.edge_weight < 0:
             raise ValueError("Invalid weight values")
+        if self.min_color_variance < 0:
+            raise ValueError("Minimum color variance must be non-negative")
 
 
 @dataclass(frozen=True)

@@ -219,30 +219,47 @@ class PiCameraManager(CameraInterface):
             logger.error(f"Error stopping camera: {e}")
     
     def capture_motion_frame(self) -> Optional[FrameData]:
-        """Capture YUV420 frame for motion detection with error handling."""
+        """Capture frame for motion detection (RGB or grayscale based on config)."""
         if not self._is_running or not self.camera:
             raise CameraOperationError("Camera not initialized")
-        
+
         try:
             frame_id = f"motion_{time.time()}"
             self._resource_manager.register_frame(frame_id)
-            
-            # Capture YUV420 frame
-            yuv_frame = self.camera.capture_array("lores")
-            
-            # Extract Y channel (luminance) for motion detection
-            h, w = self.config.camera.motion_detection_resolution[1], self.config.camera.motion_detection_resolution[0]
-            y_channel = yuv_frame[:h, :w].copy()
-            
-            # Ensure proper data type
-            if y_channel.dtype != 'uint8':
-                y_channel = y_channel.astype('uint8')
-            
-            self._resource_manager.unregister_frame(frame_id)
-            self._reset_error_count()
-            
-            return y_channel
-            
+
+            # Check if we should use RGB for motion detection
+            if self.config.motion.use_rgb_motion_detection:
+                # Capture RGB frame from lores stream
+                # Picamera2 lores stream is configured as YUV420, need to convert
+                yuv_frame = self.camera.capture_array("lores")
+                h, w = self.config.camera.motion_detection_resolution[1], self.config.camera.motion_detection_resolution[0]
+
+                # Convert YUV420 to BGR (OpenCV format)
+                # YUV420 format: Y plane (h x w), followed by U and V planes (h/2 x w/2 each)
+                yuv_full = yuv_frame.reshape((h * 3 // 2, w))
+                bgr_frame = cv2.cvtColor(yuv_full, cv2.COLOR_YUV2BGR_I420)
+
+                self._resource_manager.unregister_frame(frame_id)
+                self._reset_error_count()
+
+                return bgr_frame
+            else:
+                # Original grayscale (Y channel only) for motion detection
+                yuv_frame = self.camera.capture_array("lores")
+
+                # Extract Y channel (luminance) for motion detection
+                h, w = self.config.camera.motion_detection_resolution[1], self.config.camera.motion_detection_resolution[0]
+                y_channel = yuv_frame[:h, :w].copy()
+
+                # Ensure proper data type
+                if y_channel.dtype != 'uint8':
+                    y_channel = y_channel.astype('uint8')
+
+                self._resource_manager.unregister_frame(frame_id)
+                self._reset_error_count()
+
+                return y_channel
+
         except Exception as e:
             self._handle_capture_error(f"motion frame capture: {e}")
             return None
@@ -383,16 +400,21 @@ class MockCameraManager(CameraInterface):
         logger.info("Mock camera stopped")
     
     def capture_motion_frame(self) -> Optional[FrameData]:
-        """Return mock motion detection frame."""
+        """Return mock motion detection frame (RGB or grayscale based on config)."""
         if not self._is_running:
             return None
-        
+
         import numpy as np
         h, w = self.config.camera.motion_detection_resolution[1], self.config.camera.motion_detection_resolution[0]
-        
-        # Create mock grayscale frame with some "motion"
-        frame = np.random.randint(0, 255, (h, w), dtype=np.uint8)
-        return frame
+
+        if self.config.motion.use_rgb_motion_detection:
+            # Create mock RGB frame with some "motion"
+            frame = np.random.randint(0, 255, (h, w, 3), dtype=np.uint8)
+            return frame
+        else:
+            # Create mock grayscale frame with some "motion"
+            frame = np.random.randint(0, 255, (h, w), dtype=np.uint8)
+            return frame
     
     def capture_high_res_frame(self) -> Optional[FrameData]:
         """Return mock high resolution frame."""

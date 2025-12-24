@@ -1,69 +1,80 @@
 # Wildlife Camera System Architecture
 
 ## Overview
-Raspberry Pi Zero 2 W-based garden wildlife detection system with motion detection, species identification via iNaturalist API, and Telegram notifications.
+Raspberry Pi 5-based wildlife camera system with motion detection, AI-powered species identification via Google SpeciesNet, and Telegram notifications.
 
 ## Hardware Configuration
-- **Device**: Raspberry Pi Zero 2 W (512MB RAM)
-- **Camera**: 12.3MP Pi HQ Camera (4056x3040 max resolution)
-- **Setup**: Indoor camera pointing at garden through window
-- **Network**: Wi-Fi connection for API calls and Telegram
+- **Device**: Raspberry Pi 5 (8GB RAM)
+- **Camera**: Raspberry Pi Camera Module (any compatible module, tested with IMX477)
+- **Setup**: Outdoor wildlife camera for garden monitoring
+- **Network**: Wi-Fi connection for Telegram notifications
+- **Processing**: All AI inference runs locally (no cloud dependencies)
 
 ## System Architecture
 
 ### Core Components
 
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│  Motion         │    │  Camera         │    │  Species        │
-│  Detection      │    │  Management     │    │  Identification │
-│  (MOG2)         │    │  (Dual-res)     │    │  (iNaturalist)  │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────────┐
+│  Motion         │    │  Camera         │    │  Species            │
+│  Detection      │    │  Management     │    │  Identification     │
+│  (MOG2)         │    │  (Dual-stream)  │    │  (SpeciesNet AI)    │
+│                 │    │                 │    │  - MegaDetector     │
+│                 │    │                 │    │  - Classifier       │
+└─────────────────┘    └─────────────────┘    └─────────────────────┘
          │                       │                       │
          └───────────────────────┼───────────────────────┘
                                  │
          ┌─────────────────┐     │     ┌─────────────────┐
          │   Database      │     │     │   Telegram      │
-         │   (SQLite)      │     │     │   Notifications │
+         │   (SQLite)      │     │     │   Service       │
          └─────────────────┘     │     └─────────────────┘
                                  │
                     ┌─────────────────┐
                     │  Main Control   │
                     │  Loop           │
+                    │  (async/await)  │
                     └─────────────────┘
 ```
 
 ### Data Flow
 
-1. **Motion Detection**: Continuous monitoring at 640x480 @ 10fps
-2. **Motion Trigger**: 2000+ pixel area threshold activates capture
-3. **High-res Capture**: Switch to 1920x1080 for species identification
-4. **API Processing**: Send image to iNaturalist for species identification
-5. **Telegram Alert**: Send species name and confidence as text message
-6. **Data Logging**: Store results and metadata in SQLite database
-7. **Cooldown**: 30-second pause before next detection cycle
+1. **Motion Detection**: Continuous monitoring at 640x480 (configurable FPS)
+2. **Motion Trigger**: Configurable pixel threshold + consecutive detection filter
+3. **Settling Delay**: 0.75s wait for camera stabilization
+4. **Burst Capture**: Capture 5 high-res frames (1920x1080) in 0.5s
+5. **Frame Selection**: Analyze sharpness + foreground content, select best frame
+6. **AI Detection**: MegaDetector validates animals present (~2s)
+7. **AI Classification**: SpeciesNet identifies species (~8-11s, only if animals detected)
+8. **Data Logging**: Store detection with species, confidence, metadata in SQLite
+9. **Telegram Notification**: Send species name, confidence, image quality metrics
+10. **Cooldown**: 30-second pause before next detection cycle
 
 ## Technical Specifications
 
 ### Resolution Strategy
-- **Motion Detection Stream**: 640x480 @ 10fps (continuous)
-- **Species ID Capture**: 1920x1080 (triggered)
-- **Image Optimization**: Max 2048px longest side, 90% JPEG quality for API
-- **Storage Format**: Original resolution stored locally
+- **Motion Detection Stream**: 640x480 (low-res, continuous)
+- **Capture Stream**: 1920x1080 (high-res, triggered)
+- **Dual-Stream**: Picamera2 manages both streams simultaneously
+- **Storage Format**: JPEG at full resolution (1920x1080)
 
-### API Integration
-- **Service**: iNaturalist Computer Vision API
-- **Endpoint**: `https://api.inaturalist.org/v1/computervision/score_image`
-- **Rate Limit**: 100 requests/minute (no authentication required)
-- **Input**: Base64 encoded JPEG
-- **Timeout**: 30 seconds per request
-- **Retry Logic**: 3 attempts with exponential backoff
+### AI Integration (SpeciesNet v5.0.2)
+- **Framework**: Google SpeciesNet (local PyTorch/ONNX inference)
+- **Model**: v4.0.1a (always-crop variant) with geographic filtering
+- **Geographic Filter**: Germany (DEU) / North Rhine-Westphalia (NW)
+- **Two-Stage Pipeline**:
+  - Stage 1: MegaDetector (animal detection with bounding boxes)
+  - Stage 2: Species Classifier (species identification from crops)
+- **Processing Time**: ~17s total (~6s model load first time, ~11s inference)
+- **Confidence Thresholds**: Detection @ 0.6, Classification @ 0.5
+- **Model Cache**: ~/.cache/speciesnet (~214MB)
 
-### Performance Constraints (Pi Zero 2 W)
-- **RAM Limit**: 512MB (vs 4-8GB on Pi 4/5)
-- **Processing Time**: 1-3 seconds per detection
-- **Memory Management**: Process images in chunks, immediate cleanup
-- **Fallback Strategy**: Reduce resolution if memory pressure detected
+### Performance Profile (Pi 5 8GB)
+- **RAM Usage**: ~2-3GB during species identification
+- **Processing Time**: ~17s per detection (MegaDetector + Classifier)
+- **Early Exit Optimization**: Skip classifier if no animals detected (~8-10s saved)
+- **Burst Capture Overhead**: ~0.55s (5 frames + sharpness analysis)
+- **Memory Management**: Automatic cleanup, system monitoring
 
 ### Database Schema
 
@@ -74,19 +85,10 @@ CREATE TABLE detections (
     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
     image_path TEXT NOT NULL,
     motion_area INTEGER,
-    api_success BOOLEAN,
-    species_predictions TEXT,  -- JSON array
+    species_name TEXT,
     confidence_score REAL,
-    processing_time REAL
-);
-
--- Species tracking
-CREATE TABLE species (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    scientific_name TEXT UNIQUE,
-    common_name TEXT,
-    first_detected DATETIME,
-    detection_count INTEGER DEFAULT 1
+    processing_time REAL,
+    api_success BOOLEAN
 );
 ```
 
@@ -95,103 +97,183 @@ CREATE TABLE species (
 ### 1. Motion Detection (`motion_detector.py`)
 - **Algorithm**: OpenCV MOG2 Background Subtractor
 - **Features**: Adapts to lighting changes, shadow detection disabled
-- **Filtering**: Central region weighting, consecutive detection requirement
-- **Threshold**: 2000+ pixels minimum area
+- **Filtering**:
+  - Central region weighting (prioritizes center of frame)
+  - Consecutive detection requirement (reduces false positives)
+  - Optional color variance filtering (for uniform leaf motion)
+- **Configurable Thresholds**: Motion area, contour size, detection count
 
 ### 2. Camera Management (`camera_manager.py`)
-- **Dual Stream**: Low-res continuous + high-res triggered
-- **Format**: RGB888 for both streams
-- **Frame Rate**: 10fps limit via FrameDurationLimits
-- **Auto-switching**: Seamless transition between resolutions
+- **Implementation**: Picamera2 for native Pi camera control
+- **Dual-Stream Configuration**:
+  - Main stream: 1920x1080 for capture
+  - Low-res stream: 640x480 for motion detection
+- **Exposure Control**: Configurable exposure time and analogue gain (or auto-exposure)
+- **Burst Capture**: Multi-frame capture with configurable interval
+- **Mock Implementation**: Available for testing without hardware
 
-### 3. Species Identification (`species_identifier.py`) - NEW
-- **API Client**: HTTP requests with error handling
-- **Image Processing**: Resize and optimize before upload
-- **Response Parsing**: Extract top predictions with confidence scores
-- **Fallback**: Graceful degradation on API failures
+### 3. Species Identification (`species_identifier.py`)
+- **AI Framework**: Google SpeciesNet v5.0.2 (local inference)
+- **Two-Stage Pipeline**:
+  - `detect_animals()`: MegaDetector finds animals with bounding boxes
+  - `classify_species()`: SpeciesNet classifier identifies species (only if animals detected)
+- **Geographic Filtering**: Built-in filtering for Germany/NW region
+- **Lazy Loading**: Model loads on first detection request (~6s)
+- **Error Resilience**: Always returns valid result, never crashes
+- **Mock Implementation**: Available for testing without SpeciesNet
 
-### 4. Database Management (`database_manager.py`) - NEW
-- **Engine**: SQLite (no external dependencies)
-- **Operations**: Insert detections, update species counts
-- **Analytics**: Query patterns, species frequency
-- **Maintenance**: Automatic cleanup of old records
+### 4. Burst Capture & Frame Selection (`utils.py`)
+- **Multi-Frame Capture**: 5 frames at 0.1s intervals (configurable)
+- **Sharpness Analysis**: Laplacian variance measurement
+- **Motion-Aware Selection**:
+  - Analyzes foreground content (edge density, intensity variance, contour count)
+  - Prefers frames with actual animals over sharp empty backgrounds
+  - Falls back to sharpest frame if no foreground detected
+- **Performance**: <50ms analysis time for 5-frame burst
 
-### 5. Telegram Integration (Enhanced)
-- **Change**: Send text messages instead of photos
-- **Format**: Species name, confidence, timestamp
-- **Speed**: Instant delivery vs slow photo uploads
-- **Fallback**: Send "Unknown species" if API fails
+### 5. Database Management (`database_manager.py`)
+- **Engine**: SQLite with absolute path resolution
+- **Operations**: Log detections with species, confidence, processing time
+- **Thread-Safe**: Connection pooling for async operations
+- **Schema**: Single `detections` table with all metadata
 
-### 6. Configuration (`config.py`) - Updated
-```python
-# New Pi Zero optimized settings
-motion_detection_resolution = (640, 480)
-api_capture_resolution = (1920, 1080)
-motion_threshold = 2000  # pixels
-cooldown_period = 30  # seconds
-api_timeout = 30  # seconds
-max_memory_usage = 80  # percent
-```
+### 6. Telegram Service (`telegram_service.py`)
+- **Async Integration**: python-telegram-bot with async/await
+- **Features**:
+  - Detection notifications with species, confidence, motion metrics
+  - Photo upload with captions
+  - Media groups (original + annotated motion visualization)
+  - System status messages
+- **Error Handling**: Graceful failure, continues logging even if Telegram fails
 
-## Implementation Phases
+### 7. Configuration (`config.py`)
+- **Type-Safe Dataclasses**: Nested config structure
+  - `CameraConfig`: Resolution, exposure, frame rate
+  - `MotionConfig`: Thresholds, filtering, consecutive detection
+  - `PerformanceConfig`: Cooldown, burst capture, frame selection
+  - `StorageConfig`: Paths, image limits, cleanup
+  - `SpeciesConfig`: Model version, geographic filter, thresholds
+- **Environment Overrides**: All settings configurable via .env
+- **Validation**: Built-in validation with meaningful error messages
+- **Test Factory**: `Config.create_test_config()` for unit tests
 
-### Phase 1: Foundation
-- Update configuration for new resolution requirements
-- Enhance camera manager for optimized dual-resolution capture
-- Create database management and image optimization modules
+## Key Features
 
-### Phase 2: API Integration  
-- Implement iNaturalist species identification service
-- Modify main loop to integrate API calls between capture and notification
-- Update Telegram messaging to send species text instead of photos
+### Multi-Frame Burst Capture (ADR-003)
+- Captures 5 high-resolution frames in 0.5 seconds
+- Analyzes each frame for sharpness (Laplacian variance)
+- Selects best frame before running species identification
+- Significantly reduces blurry images from moving animals
 
-### Phase 3: Optimization
-- Add Pi Zero memory management and monitoring
-- Implement graceful degradation for system stability
-- Add performance analytics and health monitoring
+### Motion-Aware Frame Selection
+- Analyzes foreground content in addition to sharpness
+- Prevents selecting sharp but empty frames
+- Multi-metric analysis (edge density, intensity variance, contour count)
+- Ensures selected frame actually contains the detected animal
 
-## Performance Expectations
+### Two-Stage AI Pipeline (ADR-002)
+- Stage 1: MegaDetector validates animals are present
+- Stage 2: SpeciesNet classifier identifies species (only if animals detected)
+- Early exit optimization saves ~8-10s when no animals detected
+- Better performance and clearer pipeline logic
 
-### Typical Operation
-- **Detection Frequency**: 1-5 per hour (depends on garden activity)
-- **Processing Time**: 2-4 seconds per detection (motion → notification)
-- **Memory Usage**: 200-400MB during normal operation
-- **Storage**: ~1MB per detection (image + metadata)
+### Geographic Filtering
+- SpeciesNet configured for Germany (DEU) / North Rhine-Westphalia (NW)
+- Automatically filters predictions to regionally-appropriate species
+- Reduces false positives from exotic species
 
-### Expected Limitations
-- **Species Accuracy**: 70-85% for common UK garden animals
-- **Image Quality**: Limited by Pi Zero processing power
-- **API Dependency**: System degrades gracefully if iNaturalist unavailable
-- **Memory Constraints**: May skip detections if memory >80% usage
+## Performance Profile
+
+### Typical Operation (Pi 5)
+- **Detection Frequency**: Variable (depends on wildlife activity)
+- **Processing Time**:
+  - Motion detection: Continuous at ~5 FPS
+  - Burst capture + selection: ~0.55s
+  - MegaDetector: ~2s
+  - Species classification: ~8-11s (only if animals detected)
+  - Total: ~17-20s per detection with animal, ~3s without
+- **Memory Usage**:
+  - Baseline: ~500MB
+  - During SpeciesNet inference: ~2-3GB
+  - Peak: ~3GB (comfortable on 8GB Pi 5)
+- **Storage**: ~1-2MB per detection (JPEG + database entry)
+
+### Accuracy Expectations
+- **MegaDetector**: 99.4% animal detection accuracy
+- **SpeciesNet**: 94.5% species-level accuracy (trained on camera trap data)
+- **Geographic Filtering**: Limits predictions to German wildlife
+- **Confidence Thresholds**: Detection @ 0.6, Classification @ 0.5
 
 ## Error Handling & Recovery
 
-### API Failures
-- Retry logic with exponential backoff
-- Fallback to "Unknown species detected" messages
-- Continue local storage and database logging
+### AI Model Failures
+- **Lazy Loading**: Model loads on first use, startup unaffected by model issues
+- **Graceful Degradation**: Always returns "Unknown species" on failures
+- **Error Logging**: Full error details logged for debugging
+- **No Crashes**: System continues operating even if SpeciesNet fails
 
 ### Camera Issues
-- Automatic camera restart on capture failures
-- Graceful resolution fallback (1920x1080 → 1280x720 → 640x480)
-- System health monitoring
+- **Automatic Recovery**: Camera restart on repeated errors
+- **Resource Cleanup**: Proper frame disposal to prevent memory leaks
+- **Mock Fallback**: MockCameraManager available for testing without hardware
 
-### Memory Management
-- Garbage collection after large image operations
-- Monitor RAM usage, skip processing if >80%
-- Emergency cleanup routines
+### Memory Management (Pi 5)
+- **System Monitor**: Tracks RAM and disk usage
+- **Automatic Cleanup**: Old images deleted when limit reached
+- **Frame Cleanup**: Burst frames released immediately after selection
+- **Sufficient Headroom**: 8GB RAM provides comfortable margin for 3GB peak usage
 
 ## Monitoring & Analytics
 
 ### Real-time Monitoring
-- System resource usage (RAM, CPU, disk)
-- API response times and success rates
-- Detection frequency and patterns
+- **System Resources**: RAM, disk usage via SystemMonitor
+- **Detection Metrics**: Motion area, consecutive detections, trigger frequency
+- **AI Performance**: Processing time, confidence scores, detection vs classification time
+- **Image Quality**: Sharpness scores, foreground content, selected frame index
 
-### Historical Analysis
-- Species identification over time
-- Most active periods (time of day/season)
-- API accuracy trends
-- System performance metrics
+### Database Analytics
+- **Detection History**: All detections logged with full metadata
+- **Species Tracking**: Which species detected, when, and how often
+- **Performance Trends**: Processing times, success rates over time
+- **Quality Metrics**: Sharpness scores, confidence distributions
 
-This architecture balances the ambitious species identification goals with the practical constraints of Pi Zero 2 W hardware while maintaining system reliability and user experience.
+### Telegram Integration
+- Real-time notifications with species, confidence, and quality metrics
+- Media groups showing original + motion-annotated images
+- System status messages on demand
+
+## Testing Infrastructure
+
+### Unit Tests
+- Component-level tests for all major modules
+- Mock implementations (MockCameraManager, MockSpeciesIdentifier)
+- Configuration validation tests
+- Database operations testing
+
+### Integration Tests
+- End-to-end pipeline testing
+- Two-stage AI pipeline validation
+- Burst capture and frame selection
+- Telegram notification delivery
+
+### Test Scripts
+- [camera_preview.py](../scripts/camera_preview.py): Live camera preview for focus adjustment
+- [test_classification.py](../scripts/test_classification.py): Full SpeciesNet pipeline test
+- [test_telegram.py](../scripts/test_telegram.py): Telegram bot integration test
+
+## Documentation
+
+### Architecture Decision Records (ADRs)
+- **ADR-002**: Two-Stage Detection and Classification Pipeline
+- **ADR-003**: Multi-Frame Burst Capture with Sharpness Analysis
+
+### Configuration
+- All settings documented in [CLAUDE.md](../CLAUDE.md)
+- Environment variable overrides for production deployment
+- Test configuration factory for unit tests
+
+---
+
+**Last Updated**: 2024-12-24
+**System Version**: Pi 5 with SpeciesNet v5.0.2
+**Status**: Production-ready with comprehensive testing
