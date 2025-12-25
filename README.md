@@ -105,11 +105,41 @@ python3 scripts/camera_preview.py
 
 ### Running the Detection System
 
-1. Ensure your camera module is properly connected and focused
+**Manual Mode:**
 
-2. Run the wildlife detection system:
+Run the wildlife detection system directly:
 ```bash
 python src/wildlife_system.py
+```
+
+**Auto-start on Boot (Recommended):**
+
+Set up the system as a systemd service to automatically start on boot and restart on crashes:
+
+1. Install the service:
+```bash
+sudo cp wildlife-camera.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable wildlife-camera.service
+sudo systemctl start wildlife-camera.service
+```
+
+2. Manage the service:
+```bash
+# Check service status
+sudo systemctl status wildlife-camera.service
+
+# View logs
+sudo systemctl status wildlife-camera.service  # Recent logs
+sudo journalctl -u wildlife-camera.service -n 50 -f  # Follow logs
+
+# Stop/start/restart
+sudo systemctl stop wildlife-camera.service
+sudo systemctl start wildlife-camera.service
+sudo systemctl restart wildlife-camera.service
+
+# Disable auto-start
+sudo systemctl disable wildlife-camera.service
 ```
 
 The system will automatically:
@@ -119,6 +149,7 @@ The system will automatically:
 - Send Telegram notifications with species information
 - Store photos in the `data/images` directory
 - Log all detections to SQLite database
+- Restart automatically on crashes (when running as service)
 
 ## Configuration
 

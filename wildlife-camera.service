@@ -1,0 +1,20 @@
+[Unit]
+Description=Wildlife Camera Detection System
+After=network.target
+
+[Service]
+Type=simple
+User=daniel
+WorkingDirectory=/home/daniel/animal_tracker
+Environment="PATH=/home/daniel/.local/bin:/usr/bin:/bin"
+ExecStart=/home/daniel/.local/bin/uv run python src/wildlife_system.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Resource limits
+Nice=10
+
+[Install]
+WantedBy=multi-user.target
