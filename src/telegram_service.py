@@ -29,7 +29,8 @@ class TelegramService:
         self.formatter = TelegramFormatter()
     
     async def send_detection_notification(self, species_result: dict, 
-                                         motion_area: int, timestamp: datetime) -> bool:
+                                         motion_area: int, timestamp: datetime,
+                                         temperature: float = None) -> bool:
         """Send species detection notification to Telegram."""
         try:
             species_name = species_result.get('species_name', 'Unknown species')
@@ -37,7 +38,7 @@ class TelegramService:
             
             # Use TelegramFormatter to create message
             message = self.formatter.format_detection_message(
-                species_name, confidence, motion_area, timestamp
+                species_name, confidence, motion_area, timestamp, temperature
             )
             
             # Check if this is first sighting today (if database is available)

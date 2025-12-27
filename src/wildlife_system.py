@@ -261,9 +261,15 @@ class WildlifeSystem:
                                timestamp: datetime, image_path: Optional[Path] = None,
                                annotated_path: Optional[Path] = None):
         """Send notification with species identification info and motion visualization"""
+        # Get system temperature
+        temperature = self.system_monitor.get_cpu_temperature()
+        
         if image_path and image_path.exists():
             caption = self._build_caption(species_result, motion_area, timestamp)
-
+            
+            if temperature:
+                caption += f"\n🌡️ {temperature:.1f}°C"
+                
             # If we have both original and annotated images, send as media group
             if annotated_path and annotated_path.exists():
                 await self.telegram_service.send_media_group(
@@ -275,7 +281,7 @@ class WildlifeSystem:
                 await self.telegram_service.send_photo_with_caption(image_path, caption)
         else:
             await self.telegram_service.send_detection_notification(
-                species_result, motion_area, timestamp
+                species_result, motion_area, timestamp, temperature
             )
     
     

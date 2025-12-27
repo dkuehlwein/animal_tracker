@@ -147,7 +147,8 @@ class SystemMonitor:
             'memory': self.memory_manager.get_memory_info(),
             'storage': self.file_manager.get_storage_info(),
             'image_count': self.file_manager.get_image_count(),
-            'memory_available': self.memory_manager.is_memory_available()
+            'memory_available': self.memory_manager.is_memory_available(),
+            'cpu_temp': self.get_cpu_temperature()
         }
     
     def should_skip_processing(self):
@@ -166,7 +167,19 @@ class SystemMonitor:
         if status['storage']:
             logger.info(f"Storage: {status['storage']['percent']:.1f}% used "
                         f"({status['storage']['free_mb']:.0f}MB free)")
+        if status['cpu_temp']:
+            logger.info(f"CPU Temp: {status['cpu_temp']:.1f}°C")
         logger.info(f"Images stored: {status['image_count']}")
+    
+    def get_cpu_temperature(self) -> float | None:
+        """Get Raspberry Pi CPU temperature. Returns None on error."""
+        try:
+            with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
+                temp_str = f.read()
+            return float(temp_str) / 1000.0
+        except Exception as e:
+            logger.error(f"Error reading CPU temperature: {e}")
+            return None
 
 class PerformanceTimer:
     """Performance timing utility"""
@@ -357,8 +370,9 @@ class TelegramFormatter:
     """Telegram message formatting utilities."""
     
     @staticmethod
-    def format_detection_message(species_name: str, confidence: float, 
-                               motion_area: int, timestamp: datetime) -> str:
+    def format_detection_message(species_name: str, confidence: float,
+                               motion_area: int, timestamp: datetime,
+                               temperature: float = None) -> str:
         """Format detection message for Telegram."""
         time_str = timestamp.strftime("%H:%M")
         
@@ -378,9 +392,14 @@ class TelegramFormatter:
                 break
         
         if confidence > 0.8:
-            return f"{emoji} {species_name} detected at {time_str}\nConfidence: {confidence*100:.0f}%"
+            message = f"{emoji} {species_name} detected at {time_str}\nConfidence: {confidence*100:.0f}%"
         else:
-            return f"🔍 Possible {species_name} detected at {time_str}\nConfidence: {confidence*100:.0f}%"
+            message = f"🔍 Possible {species_name} detected at {time_str}\nConfidence: {confidence*100:.0f}%"
+            
+        if temperature:
+            message += f"\n🌡️ {temperature:.1f}°C"
+            
+        return message
     
     @staticmethod
     def format_system_status(memory_percent: float, storage_percent: float,
