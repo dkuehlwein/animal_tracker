@@ -115,7 +115,7 @@ class PerformanceConfig:
     enable_multi_frame: bool = True  # Enable multi-frame burst capture with sharpness analysis
     multi_frame_count: int = 5  # Number of frames to capture in burst
     multi_frame_interval: float = 0.1  # Interval between burst frames in seconds
-    min_sharpness_threshold: float = 100.0  # Minimum acceptable sharpness score
+    min_sharpness_threshold: float = 15.0  # Minimum acceptable sharpness score (scene-dependent, 15-30 typical for outdoor)
     motion_aware_selection: bool = True  # Use foreground detection to avoid selecting empty frames
     min_foreground_ratio: float = 15.0  # Minimum foreground content (0-100%) to prefer a frame
 

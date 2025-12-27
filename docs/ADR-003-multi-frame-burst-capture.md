@@ -323,6 +323,86 @@ Result: Saved image shows the animal clearly
 
 ---
 
+## Enhancement: Reference-Based Frame Selection (2024-12-27)
+
+**Problem Discovered**: The foreground analysis approach (edge density, variance, contours) was unreliable in outdoor scenes. All frames scored similarly (~60% foreground) regardless of subject position, causing the algorithm to default to pure sharpness selection - which often picked frames where the subject was at the edge of frame (entering/exiting) rather than fully visible.
+
+### Root Cause Analysis
+
+Field testing revealed:
+1. **Buffer staleness**: NOT the issue - diagnostic logging confirmed fresh frames
+2. **Sharpness threshold**: Too high (100.0) for outdoor scenes (typical: 20-30)
+3. **Frame selection**: Algorithm favored sharp "edge-of-frame" moments over centered subject
+
+### Solution: Background Comparison
+
+Instead of analyzing each frame in isolation, compare against a cached "empty scene" reference:
+
+```
+Reference Frame (cached when no motion):
+┌─────────────────────────────────┐
+│                                 │
+│       [Empty Background]        │
+│                                 │
+└─────────────────────────────────┘
+
+Burst Frame with Subject:
+┌─────────────────────────────────┐
+│                                 │
+│       [Subject Here] ←──────────┼── High difference = subject visible
+│                                 │
+└─────────────────────────────────┘
+```
+
+**Key insight**: Frame with biggest difference from empty background = most subject content visible.
+
+### Implementation
+
+**Reference frame caching** (`wildlife_system.py`):
+```python
+# Cache background when scene is empty
+self.reference_frame = None
+self.reference_frame_time = 0
+self.reference_update_interval = 600  # 10 minutes
+
+# Update when no motion detected
+if not motion_detected and motion_area == 0:
+    if time_since_ref_update >= self.reference_update_interval:
+        self.reference_frame = self.camera.capture_high_res_frame()
+```
+
+**Combined scoring** (`utils.py`):
+```python
+# 40% sharpness + 60% difference from background
+combined_scores = [
+    0.4 * normalized_sharpness + 0.6 * normalized_diff
+    for each frame
+]
+# Select frame with highest combined score
+```
+
+### Log Output Example
+
+```
+Reference-based selection:
+  sharpness=['24.2', '25.0', '23.6', '20.6', '20.3'],
+  diff_from_bg=['26.1', '27.1', '33.2', '38.0', '36.9'],
+  combined=['0.80', '0.83', '0.90', '0.93', '0.91'],
+  selected frame 4/5 (sharpness: 20.6, diff: 38.0)
+```
+
+The algorithm correctly selected frame 4 with the highest `diff_from_bg` (38.0), indicating maximum subject presence.
+
+### Removed Code
+
+The following methods were removed as they're no longer used:
+- `SharpnessAnalyzer.calculate_foreground_area()` - Replaced by reference comparison
+- `SharpnessAnalyzer.calculate_subject_score()` - Never used in production
+
+The `min_foreground_ratio` config parameter is retained for API compatibility but is now ignored.
+
+---
+
 ## Future Enhancements
 
 1. **Adaptive Burst**: Adjust frame count based on detected motion speed
@@ -331,6 +411,7 @@ Result: Saved image shows the animal clearly
 4. **Sharpness Trends**: Log sharpness over time to tune thresholds
 5. **Preview Mode**: Show all burst frames in debug mode
 6. **Color-Based Motion Filtering**: Add RGB motion detection to filter uniform leaf motion
+7. **Adaptive Reference Update**: Update reference more frequently during rapid lighting changes
 
 ---
 
@@ -367,6 +448,15 @@ Result: Saved image shows the animal clearly
 - [x] Performance impact measured (<0.1s overhead)
 - [x] Documentation updated (this ADR)
 
+### Reference-Based Frame Selection (2024-12-27)
+- [x] Replaced foreground analysis with reference-based comparison
+- [x] `calculate_difference_from_reference()` added to `SharpnessAnalyzer`
+- [x] Reference frame caching in `WildlifeSystem` (updates every 10 minutes)
+- [x] Combined scoring: 40% sharpness + 60% difference from background
+- [x] Removed unused methods: `calculate_foreground_area()`, `calculate_subject_score()`
+- [x] Lowered `min_sharpness_threshold` from 100.0 to 15.0 for outdoor scenes
+- [x] Field tested with real detections
+
 ---
 
 **Implementation History**:
@@ -378,9 +468,13 @@ Result: Saved image shows the animal clearly
   - Foreground content analysis added
   - Prevents selecting empty frames
   - Validated with real wildlife images
+- **2024-12-27**: Reference-based frame selection
+  - Replaced foreground analysis with background comparison
+  - Fixes issue where frame selection picked subject at edge of frame
+  - See detailed investigation: `docs/investigation-delayed-capture.md`
 
 ---
 
-**Document Version**: 2.0
-**Last Updated**: 2024-12-24
-**Status**: Production-ready with motion-aware selection
+**Document Version**: 3.0
+**Last Updated**: 2024-12-27
+**Status**: Production-ready with reference-based frame selection

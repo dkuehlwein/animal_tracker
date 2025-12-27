@@ -60,6 +60,11 @@ class WildlifeSystem:
         self.last_detection_time = 0
         self.last_motion_frame = None
         self.last_motion_result = None
+
+        # Reference frame for burst selection (cached background when no motion)
+        self.reference_frame = None
+        self.reference_frame_time = 0
+        self.reference_update_interval = 600  # Update every 10 minutes
     
     def cleanup_old_images(self):
         """Delete oldest images if we exceed the maximum limit - delegates to FileManager"""
@@ -148,11 +153,12 @@ class WildlifeSystem:
                 logger.error("Burst capture failed, no frames captured")
                 return None, None
             
-            # Analyze sharpness and select best frame (motion-aware if enabled)
+            # Analyze sharpness and select best frame (using cached reference if available)
             best_frame, selected_index, best_score, all_scores = SharpnessAnalyzer.select_sharpest_frame(
                 frames,
                 motion_aware=self.config.performance.motion_aware_selection,
-                min_foreground_ratio=self.config.performance.min_foreground_ratio
+                min_foreground_ratio=self.config.performance.min_foreground_ratio,
+                reference_frame=self.reference_frame
             )
             
             if best_frame is None:
@@ -321,6 +327,16 @@ class WildlifeSystem:
         logger.info("Initializing camera...")
         with self.camera.camera_session():
             logger.info("Camera initialized successfully!")
+
+            # Capture initial reference frame for burst selection
+            try:
+                ref_frame = self.camera._camera.capture_high_res_frame()
+                if ref_frame is not None:
+                    self.reference_frame = ref_frame.copy()
+                    self.reference_frame_time = time.time()
+                    logger.info("Captured initial reference frame for burst selection")
+            except Exception as e:
+                logger.warning(f"Failed to capture initial reference frame: {e}")
             
             try:
                 while True:
@@ -363,6 +379,18 @@ class WildlifeSystem:
                             # Store frame and result for later annotation
                             self.last_motion_frame = frame.copy()
                             self.last_motion_result = motion_result
+
+                            # Cache reference frame when no motion detected (for burst frame selection)
+                            # Update every 10 minutes to account for lighting changes
+                            if not motion_detected and motion_area == 0:
+                                time_since_ref_update = current_time - self.reference_frame_time
+                                if time_since_ref_update >= self.reference_update_interval:
+                                    # Capture high-res reference frame
+                                    ref_frame = self.camera._camera.capture_high_res_frame()
+                                    if ref_frame is not None:
+                                        self.reference_frame = ref_frame.copy()
+                                        self.reference_frame_time = current_time
+                                        logger.info(f"Updated reference frame for burst selection (age: {time_since_ref_update:.0f}s)")
 
                             # Log motion status periodically (every 5 seconds)
                             if int(current_time) % 5 == 0 and current_time - self.last_frame_time < 0.3:

@@ -469,16 +469,17 @@ class SharpnessAnalyzer:
             return 0.0
 
     @staticmethod
-    def calculate_foreground_area(frame: np.ndarray) -> float:
+    def calculate_difference_from_reference(frame: np.ndarray, reference: np.ndarray) -> float:
         """
-        Calculate amount of foreground content in frame using edge density and variance.
-        Higher values indicate more distinct objects (likely an animal) vs uniform background.
+        Calculate how different a frame is from a reference (background) frame.
+        Higher score = more difference = more subject content visible.
 
         Args:
-            frame: BGR or grayscale image array
+            frame: BGR or grayscale image
+            reference: Reference (background) frame to compare against
 
         Returns:
-            Foreground area score (higher = more foreground content)
+            Difference score (mean absolute difference)
         """
         try:
             # Convert to grayscale if needed
@@ -487,63 +488,42 @@ class SharpnessAnalyzer:
             else:
                 gray = frame
 
-            # Method 1: Edge density in central region (indicates distinct objects)
-            height, width = gray.shape
-            center_y1 = height // 4
-            center_y2 = 3 * height // 4
-            center_x1 = width // 4
-            center_x2 = 3 * width // 4
-            central_region = gray[center_y1:center_y2, center_x1:center_x2]
+            if len(reference.shape) == 3:
+                ref_gray = cv2.cvtColor(reference, cv2.COLOR_BGR2GRAY)
+            else:
+                ref_gray = reference
 
-            # Detect edges using Canny
-            edges = cv2.Canny(central_region, 50, 150)
-            edge_density = np.sum(edges > 0) / edges.size
+            # Resize reference to match frame if needed
+            if gray.shape != ref_gray.shape:
+                ref_gray = cv2.resize(ref_gray, (gray.shape[1], gray.shape[0]))
 
-            # Method 2: Intensity variance in central region (uniform = low variance)
-            intensity_variance = np.var(central_region)
+            # Calculate absolute difference
+            diff = cv2.absdiff(gray, ref_gray)
 
-            # Method 3: Contour detection for distinct objects
-            # Apply threshold to get potential object regions
-            _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-            contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-            # Count significant contours in central region
-            significant_contours = 0
-            for contour in contours:
-                area = cv2.contourArea(contour)
-                if area > 100:  # Minimum area threshold
-                    M = cv2.moments(contour)
-                    if M["m00"] > 0:
-                        cx = int(M["m10"] / M["m00"])
-                        cy = int(M["m01"] / M["m00"])
-                        # Check if contour is in central region
-                        if center_x1 < cx < center_x2 and center_y1 < cy < center_y2:
-                            significant_contours += 1
-
-            # Combine metrics into a score
-            # Edge density contributes 40%, variance 40%, contour count 20%
-            edge_score = edge_density * 40.0
-            variance_score = min(intensity_variance / 1000.0, 1.0) * 40.0  # Normalize variance
-            contour_score = min(significant_contours * 10.0, 20.0)  # Cap at 20%
-
-            total_score = edge_score + variance_score + contour_score
-
-            return float(total_score)
+            # Return mean difference (higher = more subject content)
+            return float(np.mean(diff))
 
         except Exception as e:
-            logger.error(f"Error calculating foreground area: {e}")
+            logger.error(f"Error calculating difference from reference: {e}")
             return 0.0
 
     @staticmethod
     def select_sharpest_frame(frames: list, motion_aware: bool = True,
-                             min_foreground_ratio: float = 0.5) -> tuple:
+                             min_foreground_ratio: float = 0.5,
+                             reference_frame: np.ndarray = None) -> tuple:
         """
-        Analyze multiple frames and select the sharpest one with motion-aware filtering.
+        Analyze multiple frames and select the best one using combined scoring.
+
+        When motion_aware is True and reference_frame is provided:
+        - Compares each frame to the cached background reference
+        - Frame with biggest difference has most subject content visible
+        - Combined with sharpness for final selection
 
         Args:
             frames: List of numpy arrays (BGR or grayscale images)
-            motion_aware: If True, prefer frames with foreground objects
-            min_foreground_ratio: Minimum foreground area ratio (0-100) to consider a frame
+            motion_aware: If True, use reference-based scoring when available
+            min_foreground_ratio: Unused, kept for API compatibility
+            reference_frame: Cached background frame from when scene was empty
 
         Returns:
             Tuple of (best_frame, selected_index, best_score, all_scores)
@@ -556,45 +536,49 @@ class SharpnessAnalyzer:
             # Calculate sharpness for all frames
             sharpness_scores = [SharpnessAnalyzer.calculate_sharpness(frame) for frame in frames]
 
-            if not motion_aware:
-                # Original behavior: just pick sharpest
+            # If no reference frame or motion_aware disabled, just use sharpness
+            if not motion_aware or reference_frame is None:
                 best_index = sharpness_scores.index(max(sharpness_scores))
                 best_frame = frames[best_index]
                 best_score = sharpness_scores[best_index]
 
-                logger.info(f"Sharpness analysis: scores={[f'{s:.1f}' for s in sharpness_scores]}, "
-                           f"selected frame {best_index + 1}/{len(frames)} (score: {best_score:.1f})")
+                logger.info(f"Sharpness-only selection: scores={[f'{s:.1f}' for s in sharpness_scores]}, "
+                           f"selected frame {best_index + 1}/{len(frames)} (score: {best_score:.1f})"
+                           f"{' (no reference)' if motion_aware else ''}")
 
                 return best_frame, best_index, best_score, sharpness_scores
 
-            # Motion-aware selection: calculate foreground content for each frame
-            foreground_scores = [SharpnessAnalyzer.calculate_foreground_area(frame) for frame in frames]
+            # Reference-based selection: compare each frame to cached background
+            diff_scores = [
+                SharpnessAnalyzer.calculate_difference_from_reference(frame, reference_frame)
+                for frame in frames
+            ]
 
-            # Filter frames that have sufficient foreground content
-            valid_indices = [i for i, fg_score in enumerate(foreground_scores)
-                           if fg_score >= min_foreground_ratio]
+            # Normalize scores to 0-1 range for combining
+            max_sharpness = max(sharpness_scores) if max(sharpness_scores) > 0 else 1
+            max_diff = max(diff_scores) if max(diff_scores) > 0 else 1
 
-            if valid_indices:
-                # Pick the sharpest frame among those with foreground content
-                best_index = max(valid_indices, key=lambda i: sharpness_scores[i])
-                best_frame = frames[best_index]
-                best_score = sharpness_scores[best_index]
+            normalized_sharpness = [s / max_sharpness for s in sharpness_scores]
+            normalized_diff = [d / max_diff for d in diff_scores]
 
-                logger.info(f"Motion-aware selection: "
-                           f"sharpness={[f'{s:.1f}' for s in sharpness_scores]}, "
-                           f"foreground={[f'{fg:.1f}%' for fg in foreground_scores]}, "
-                           f"valid_frames={len(valid_indices)}/{len(frames)}, "
-                           f"selected frame {best_index + 1} (sharpness: {best_score:.1f}, "
-                           f"foreground: {foreground_scores[best_index]:.1f}%)")
-            else:
-                # Fallback: no frames with sufficient foreground, pick sharpest overall
-                best_index = sharpness_scores.index(max(sharpness_scores))
-                best_frame = frames[best_index]
-                best_score = sharpness_scores[best_index]
+            # Combined score: 40% sharpness, 60% difference from background
+            # Prioritize frames where subject is most visible
+            combined_scores = [
+                0.4 * ns + 0.6 * nd
+                for ns, nd in zip(normalized_sharpness, normalized_diff)
+            ]
 
-                logger.warning(f"No frames with sufficient foreground content "
-                             f"(min {min_foreground_ratio}%), falling back to sharpest. "
-                             f"Foreground scores: {[f'{fg:.1f}%' for fg in foreground_scores]}")
+            # Select frame with best combined score
+            best_index = combined_scores.index(max(combined_scores))
+            best_frame = frames[best_index]
+            best_score = sharpness_scores[best_index]
+
+            logger.info(f"Reference-based selection: "
+                       f"sharpness={[f'{s:.1f}' for s in sharpness_scores]}, "
+                       f"diff_from_bg={[f'{d:.1f}' for d in diff_scores]}, "
+                       f"combined={[f'{c:.2f}' for c in combined_scores]}, "
+                       f"selected frame {best_index + 1}/{len(frames)} "
+                       f"(sharpness: {best_score:.1f}, diff: {diff_scores[best_index]:.1f})")
 
             return best_frame, best_index, best_score, sharpness_scores
 

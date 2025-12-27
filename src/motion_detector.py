@@ -1,8 +1,12 @@
 import cv2
 import numpy as np
-from dataclasses import dataclass
-from typing import Tuple, Optional
+import logging
+import time
+from dataclasses import dataclass, field
+from typing import Tuple, Optional, List
 from config import Config
+
+logger = logging.getLogger(__name__)
 
 
 class MotionDetectionError(Exception):
@@ -19,6 +23,11 @@ class MotionResult:
     center_x: Optional[int] = None
     center_y: Optional[int] = None
     contour_count: int = 0
+    # Diagnostic fields
+    largest_contour_area: int = 0
+    contour_areas: List[int] = field(default_factory=list)
+    foreground_pixel_count: int = 0
+    processing_time_ms: float = 0.0
 
 class BaseMotionDetector:
     """Base motion detector implementation."""
@@ -98,6 +107,8 @@ class BaseMotionDetector:
 
     def detect(self, frame) -> MotionResult:
         """Detect motion in frame (RGB or grayscale) with color filtering and central region focus"""
+        detect_start = time.time()
+
         try:
             if frame is None:
                 return MotionResult(motion_detected=False, motion_area=0)
@@ -117,6 +128,10 @@ class BaseMotionDetector:
 
             # Apply background subtraction and threshold
             fgmask = self.background_subtractor.apply(gray)
+
+            # DIAGNOSTIC: Count raw foreground pixels before thresholding
+            raw_fg_pixels = np.sum(fgmask > 0)
+
             # Increased threshold to 50 to ignore minor pixel fluctuations
             _, thresh = cv2.threshold(
                 fgmask,
@@ -125,10 +140,16 @@ class BaseMotionDetector:
                 cv2.THRESH_BINARY
             )
 
+            # DIAGNOSTIC: Count foreground pixels after threshold
+            thresh_fg_pixels = np.sum(thresh > 0)
+
             # Apply morphological operations to remove noise
             kernel = np.ones((3,3), np.uint8)
             thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)  # Remove small noise
             thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)  # Fill small holes
+
+            # DIAGNOSTIC: Count foreground pixels after morphology
+            morph_fg_pixels = np.sum(thresh > 0)
 
             # Apply central region weighting
             weighted_thresh = cv2.multiply(
@@ -143,39 +164,49 @@ class BaseMotionDetector:
                 cv2.RETR_EXTERNAL,
                 cv2.CHAIN_APPROX_SIMPLE
             )
-            
+
+            # DIAGNOSTIC: Collect all contour areas
+            contour_areas = [int(cv2.contourArea(c)) for c in contours]
+            contour_areas_sorted = sorted(contour_areas, reverse=True)
+            largest_contour = contour_areas_sorted[0] if contour_areas_sorted else 0
+
             # Check contours efficiently with Pi Zero optimized thresholds
             motion_area = 0
             significant_motion_detected = False
             center_x, center_y = None, None
-            
+            significant_contour_count = 0
+
             for contour in contours:
                 contour_area = cv2.contourArea(contour)
                 motion_area += contour_area
-                
+
                 if contour_area > self.config.motion.min_contour_area:
+                    significant_contour_count += 1
                     M = cv2.moments(contour)
                     if M["m00"] > 0:
                         # Calculate centroid
                         cx = int(M["m10"] / M["m00"])
                         cy = int(M["m01"] / M["m00"])
-                        
+
                         # Check if centroid is in central region
                         h, w = gray.shape
                         min_x = w * self.config.motion.central_region_bounds[0]
                         max_x = w * self.config.motion.central_region_bounds[1]
                         min_y = h * self.config.motion.central_region_bounds[0]
                         max_y = h * self.config.motion.central_region_bounds[1]
-                        
+
                         if min_x < cx < max_x and min_y < cy < max_y:
                             significant_motion_detected = True
                             center_x, center_y = cx, cy
                             break
-            
+
+            processing_time_ms = (time.time() - detect_start) * 1000
+
             # Check if total motion area exceeds Pi Zero threshold
             if significant_motion_detected and motion_area >= self.config.motion.motion_threshold:
                 # Color variance filtering (if enabled and color frame available)
                 passes_color_filter = True
+                color_variance = None
                 if is_color and self.config.motion.enable_color_filtering:
                     # Calculate color variance in the motion region
                     # Create a mask of the motion region
@@ -189,6 +220,9 @@ class BaseMotionDetector:
                         passes_color_filter = False
 
                 if not passes_color_filter:
+                    # DIAGNOSTIC: Log filtered motion
+                    logger.info(f"[DIAG-MOTION] Filtered by color: area={motion_area}, "
+                               f"color_var={color_variance:.1f}, threshold={self.config.motion.min_color_variance}")
                     # Motion detected but filtered out due to low color variance
                     return MotionResult(
                         motion_detected=False,
@@ -196,19 +230,41 @@ class BaseMotionDetector:
                         detection_confidence=0.3,  # Low confidence - filtered
                         center_x=center_x,
                         center_y=center_y,
-                        contour_count=len(contours)
+                        contour_count=len(contours),
+                        largest_contour_area=largest_contour,
+                        contour_areas=contour_areas_sorted[:10],
+                        foreground_pixel_count=morph_fg_pixels,
+                        processing_time_ms=processing_time_ms
                     )
 
                 self.consecutive_detections += 1
+
+                # DIAGNOSTIC: Log consecutive detection buildup
+                logger.info(f"[DIAG-MOTION] Consecutive detection {self.consecutive_detections}/{self.config.motion.consecutive_detections_required}: "
+                           f"area={motion_area}, largest_contour={largest_contour}, "
+                           f"sig_contours={significant_contour_count}, center=({center_x},{center_y}), "
+                           f"fg_pixels: raw={raw_fg_pixels}, thresh={thresh_fg_pixels}, morph={morph_fg_pixels}")
+
                 if self.consecutive_detections >= self.config.motion.consecutive_detections_required:
                     self.consecutive_detections = 0
+
+                    # DIAGNOSTIC: Log confirmed detection with full details
+                    logger.info(f"[DIAG-MOTION] === CONFIRMED DETECTION === "
+                               f"area={motion_area}, threshold={self.config.motion.motion_threshold}, "
+                               f"largest_contour={largest_contour}, total_contours={len(contours)}, "
+                               f"top5_contours={contour_areas_sorted[:5]}")
+
                     return MotionResult(
                         motion_detected=True,
                         motion_area=motion_area,
                         detection_confidence=1.0,
                         center_x=center_x,
                         center_y=center_y,
-                        contour_count=len(contours)
+                        contour_count=len(contours),
+                        largest_contour_area=largest_contour,
+                        contour_areas=contour_areas_sorted[:10],
+                        foreground_pixel_count=morph_fg_pixels,
+                        processing_time_ms=processing_time_ms
                     )
                 return MotionResult(
                     motion_detected=False,
@@ -216,16 +272,39 @@ class BaseMotionDetector:
                     detection_confidence=0.5,
                     center_x=center_x,
                     center_y=center_y,
-                    contour_count=len(contours)
+                    contour_count=len(contours),
+                    largest_contour_area=largest_contour,
+                    contour_areas=contour_areas_sorted[:10],
+                    foreground_pixel_count=morph_fg_pixels,
+                    processing_time_ms=processing_time_ms
                 )
-            
+
+            # DIAGNOSTIC: Periodic logging of why motion wasn't detected (every ~100 frames to avoid spam)
+            if hasattr(self, '_diag_frame_count'):
+                self._diag_frame_count += 1
+            else:
+                self._diag_frame_count = 0
+
+            if self._diag_frame_count % 100 == 0 and motion_area > 0:
+                reason = []
+                if not significant_motion_detected:
+                    reason.append("no_central_contour")
+                if motion_area < self.config.motion.motion_threshold:
+                    reason.append(f"area_below_threshold({motion_area}<{self.config.motion.motion_threshold})")
+                logger.debug(f"[DIAG-MOTION] No detection: {', '.join(reason) if reason else 'no_motion'}, "
+                            f"area={motion_area}, contours={len(contours)}, largest={largest_contour}")
+
             self.consecutive_detections = max(0, self.consecutive_detections - 1)
             return MotionResult(
                 motion_detected=False,
                 motion_area=0,
-                contour_count=len(contours)
+                contour_count=len(contours),
+                largest_contour_area=largest_contour,
+                contour_areas=contour_areas_sorted[:10],
+                foreground_pixel_count=morph_fg_pixels,
+                processing_time_ms=processing_time_ms
             )
-            
+
         except Exception as e:
             raise MotionDetectionError(f"Error in motion detection: {e}") from e
 

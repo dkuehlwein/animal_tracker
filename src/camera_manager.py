@@ -290,26 +290,81 @@ class PiCameraManager(CameraInterface):
         """Capture multiple high-resolution frames in quick succession."""
         if not self._is_running or not self.camera:
             raise CameraOperationError("Camera not initialized")
-        
+
         frames = []
+        frame_metadata = []  # Diagnostic: track frame timing
+        burst_start_time = time.time()
+
         try:
             logger.info(f"Starting burst capture: {count} frames at {interval}s intervals")
-            
+
+            # DIAGNOSTIC: Flush buffer with dummy capture
+            flush_start = time.time()
+            try:
+                _ = self.camera.capture_array("main")
+                flush_time_ms = (time.time() - flush_start) * 1000
+                logger.info(f"[DIAG] Buffer flush: {flush_time_ms:.1f}ms")
+            except Exception as e:
+                logger.warning(f"[DIAG] Buffer flush failed: {e}")
+
             for i in range(count):
+                frame_start = time.time()
                 frame = self.capture_high_res_frame()
+                capture_time_ms = (time.time() - frame_start) * 1000
+
                 if frame is not None:
                     frames.append(frame)
-                    logger.debug(f"Captured burst frame {i+1}/{count}")
+
+                    # DIAGNOSTIC: Try to get frame metadata from camera
+                    try:
+                        metadata = self.camera.capture_metadata()
+                        sensor_timestamp = metadata.get('SensorTimestamp', 0)
+                        exposure_time = metadata.get('ExposureTime', 0)
+                        frame_duration = metadata.get('FrameDuration', 0)
+
+                        frame_info = {
+                            'frame_num': i + 1,
+                            'capture_time_ms': capture_time_ms,
+                            'sensor_timestamp_us': sensor_timestamp / 1000 if sensor_timestamp else 0,
+                            'exposure_us': exposure_time,
+                            'frame_duration_us': frame_duration,
+                            'time_since_burst_start_ms': (time.time() - burst_start_time) * 1000
+                        }
+                        frame_metadata.append(frame_info)
+
+                        logger.info(f"[DIAG] Frame {i+1}/{count}: capture={capture_time_ms:.1f}ms, "
+                                   f"sensor_ts={sensor_timestamp/1e6:.3f}s, "
+                                   f"exposure={exposure_time}us, "
+                                   f"since_burst={frame_info['time_since_burst_start_ms']:.1f}ms")
+                    except Exception as e:
+                        logger.debug(f"[DIAG] Could not get metadata for frame {i+1}: {e}")
+                        frame_metadata.append({'frame_num': i + 1, 'capture_time_ms': capture_time_ms})
                 else:
                     logger.warning(f"Failed to capture burst frame {i+1}/{count}")
-                
+
                 # Wait between frames (except after last frame)
                 if i < count - 1 and interval > 0:
                     time.sleep(interval)
-            
-            logger.info(f"Burst capture complete: {len(frames)}/{count} frames captured")
+
+            total_burst_time = (time.time() - burst_start_time) * 1000
+            logger.info(f"Burst capture complete: {len(frames)}/{count} frames in {total_burst_time:.1f}ms")
+
+            # DIAGNOSTIC: Analyze frame timing for staleness
+            if len(frame_metadata) >= 2:
+                sensor_times = [m.get('sensor_timestamp_us', 0) for m in frame_metadata if m.get('sensor_timestamp_us')]
+                if len(sensor_times) >= 2:
+                    time_gaps = [sensor_times[i+1] - sensor_times[i] for i in range(len(sensor_times)-1)]
+                    avg_gap_ms = sum(time_gaps) / len(time_gaps) / 1000
+                    logger.info(f"[DIAG] Sensor timestamp gaps (ms): {[f'{g/1000:.1f}' for g in time_gaps]}, avg={avg_gap_ms:.1f}ms")
+
+                    # Check if first frame might be stale (sensor timestamp older than expected)
+                    if sensor_times[0] > 0 and avg_gap_ms > 0:
+                        expected_first_frame_age = avg_gap_ms  # Should be roughly one frame interval
+                        if time_gaps[0] / 1000 > avg_gap_ms * 2:
+                            logger.warning(f"[DIAG] First frame gap ({time_gaps[0]/1000:.1f}ms) is >2x average - possible stale buffer!")
+
             return frames
-            
+
         except Exception as e:
             logger.error(f"Error during burst capture: {e}")
             return frames  # Return what we captured so far
