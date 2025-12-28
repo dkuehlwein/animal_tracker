@@ -289,47 +289,6 @@ class SpeciesIdentifier:
             animals_detected=detection_result.animals_detected if detection_result else False
         )
 
-    def health_check(self):
-        """Check if SpeciesNet service is available."""
-        try:
-            self._ensure_model_loaded()
-            return {
-                'available': True,
-                'service': 'SpeciesNet',
-                'version': self.config.species.model_version,
-                'country': self.config.species.country_code,
-                'region': self.config.species.admin1_region,
-                'supported_formats': ['jpg', 'jpeg', 'png']
-            }
-        except Exception as e:
-            return {
-                'available': False,
-                'error': str(e)
-            }
-
-    def get_supported_species(self):
-        """
-        Return information about supported species.
-        Note: SpeciesNet supports 2000+ species, filtered by geography.
-        """
-        return {
-            'total_labels': '2000+',
-            'geographic_filter': f"{self.config.species.country_code}/{self.config.species.admin1_region}",
-            'note': 'Species automatically filtered to region-appropriate wildlife'
-        }
-
-    def get_statistics(self):
-        """Get statistics for the identification service."""
-        return {
-            'model_loaded': self._model_loaded,
-            'model_version': self.config.species.model_version,
-            'country': self.config.species.country_code,
-            'region': self.config.species.admin1_region,
-            'min_detection_conf': self.config.species.min_detection_confidence,
-            'unknown_threshold': self.config.species.unknown_species_threshold
-        }
-
-
 # Keep MockSpeciesIdentifier for testing purposes
 class MockSpeciesIdentifier(SpeciesIdentifier):
     """
