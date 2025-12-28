@@ -661,11 +661,17 @@ class SunChecker:
         return True
     
     def get_sun_info(self) -> dict:
-        """Get sunrise/sunset information."""
+        """Get sunrise/sunset information in local time."""
+        import zoneinfo
         self._update_sun_times()
+
+        # Convert UTC times to local timezone for display
+        local_tz = zoneinfo.ZoneInfo(self.config.location.timezone)
+        sunrise_local = self._sunrise.astimezone(local_tz) if self._sunrise else None
+        sunset_local = self._sunset.astimezone(local_tz) if self._sunset else None
+
         return {
-            'sunrise': self._sunrise.strftime('%H:%M') if self._sunrise else 'Unknown',
-            'sunset': self._sunset.strftime('%H:%M') if self._sunset else 'Unknown',
+            'sunrise': sunrise_local.strftime('%H:%M') if sunrise_local else 'Unknown',
+            'sunset': sunset_local.strftime('%H:%M') if sunset_local else 'Unknown',
             'is_daytime': self.is_daytime()
         }
-        self.start_times.clear()
