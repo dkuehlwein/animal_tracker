@@ -65,10 +65,11 @@ class MotionConfig:
     edge_weight: float = 0.2
 
     # Color-based motion filtering (reduces false alarms from uniform-color leaves)
-    # Note: Disabled by default as motion-aware frame selection handles most false alarms
-    enable_color_filtering: bool = False  # Enable color variance analysis
+    # When enabled, captures RGB frames instead of grayscale and filters out motion
+    # from uniform-color objects (like waving leaves). Slower but more accurate.
+    # Disabled by default as motion-aware frame selection handles most false alarms.
+    enable_color_filtering: bool = False
     min_color_variance: float = 200.0  # Minimum color variance to consider motion valid
-    use_rgb_motion_detection: bool = False  # Use RGB instead of grayscale for motion detection
 
     def __post_init__(self):
         """Validate motion detection configuration."""
@@ -116,8 +117,7 @@ class PerformanceConfig:
     multi_frame_count: int = 5  # Number of frames to capture in burst
     multi_frame_interval: float = 0.1  # Interval between burst frames in seconds
     min_sharpness_threshold: float = 15.0  # Minimum acceptable sharpness score (scene-dependent, 15-30 typical for outdoor)
-    motion_aware_selection: bool = True  # Use foreground detection to avoid selecting empty frames
-    min_foreground_ratio: float = 15.0  # Minimum foreground content (0-100%) to prefer a frame
+    motion_aware_selection: bool = True  # Use reference-based scoring to select frames with most subject content
 
     def __post_init__(self):
         """Validate performance configuration."""
@@ -131,8 +131,6 @@ class PerformanceConfig:
             raise ValueError("Multi-frame interval must be non-negative")
         if self.min_sharpness_threshold < 0:
             raise ValueError("Minimum sharpness threshold must be non-negative")
-        if not (0.0 <= self.min_foreground_ratio <= 100.0):
-            raise ValueError("Minimum foreground ratio must be between 0 and 100")
 
 
 @dataclass(frozen=True)

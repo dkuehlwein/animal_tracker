@@ -213,8 +213,8 @@ class PiCameraManager(CameraInterface):
             frame_id = f"motion_{time.time()}"
             self._resource_manager.register_frame(frame_id)
 
-            # Check if we should use RGB for motion detection
-            if self.config.motion.use_rgb_motion_detection:
+            # Use RGB for motion detection if color filtering is enabled
+            if self.config.motion.enable_color_filtering:
                 # Capture RGB frame from lores stream
                 # Picamera2 lores stream is configured as YUV420, need to convert
                 yuv_frame = self.camera.capture_array("lores")
@@ -448,7 +448,7 @@ class MockCameraManager(CameraInterface):
         import numpy as np
         h, w = self.config.camera.motion_detection_resolution[1], self.config.camera.motion_detection_resolution[0]
 
-        if self.config.motion.use_rgb_motion_detection:
+        if self.config.motion.enable_color_filtering:
             # Create mock RGB frame with some "motion"
             frame = np.random.randint(0, 255, (h, w, 3), dtype=np.uint8)
             return frame
@@ -572,14 +572,22 @@ class CameraManager:
             # Force cleanup for Pi Zero
             gc.collect()
     
+    def capture_high_res_frame(self) -> Optional[FrameData]:
+        """Capture high resolution frame."""
+        return self._camera.capture_high_res_frame()
+
+    def capture_burst_frames(self, count: int, interval: float) -> list:
+        """Capture multiple high-resolution frames in quick succession."""
+        return self._camera.capture_burst_frames(count, interval)
+
     def start(self) -> None:
         """Start the camera system."""
         self._camera.start()
-    
+
     def stop(self) -> None:
         """Stop the camera system."""
         self._camera.stop()
-    
+
     def is_operational(self) -> bool:
         """Check if camera system is operational."""
         return self._camera.is_available()

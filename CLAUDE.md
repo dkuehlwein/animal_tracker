@@ -70,7 +70,11 @@ The system follows a modular architecture with these main components:
 - **`motion_detector.py`**: OpenCV-based motion detection with central region weighting and consecutive detection filtering
 - **`species_identifier.py`**: SpeciesNet AI integration for wildlife species identification
 - **`database_manager.py`**: SQLite database for detection logging
-- **`telegram_service.py`**: Telegram notification service
+- **`notification_service.py`**: Telegram notification service with message formatting
+- **`resource_manager.py`**: Memory management, storage cleanup, and system monitoring
+- **`models.py`**: Consolidated data models (MotionResult, DetectionResult, IdentificationResult, DetectionRecord)
+- **`exceptions.py`**: Unified exception hierarchy for all components
+- **`utils.py`**: Utilities (PerformanceTimer, MotionVisualizer, SharpnessAnalyzer, SunChecker)
 - **`scripts/camera_preview.py`**: MJPEG streaming server for live camera preview (focus adjustment tool)
 
 ### Data Flow

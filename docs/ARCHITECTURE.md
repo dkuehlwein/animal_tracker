@@ -26,7 +26,7 @@ Raspberry Pi 5-based wildlife camera system with motion detection, AI-powered sp
          └───────────────────────┼───────────────────────┘
                                  │
          ┌─────────────────┐     │     ┌─────────────────┐
-         │   Database      │     │     │   Telegram      │
+         │   Database      │     │     │   Notification  │
          │   (SQLite)      │     │     │   Service       │
          └─────────────────┘     │     └─────────────────┘
                                  │
@@ -137,7 +137,7 @@ CREATE TABLE detections (
 - **Thread-Safe**: Connection pooling for async operations
 - **Schema**: Single `detections` table with all metadata
 
-### 6. Telegram Service (`telegram_service.py`)
+### 6. Notification Service (`notification_service.py`)
 - **Async Integration**: python-telegram-bot with async/await
 - **Features**:
   - Detection notifications with species, confidence, motion metrics
@@ -146,7 +146,25 @@ CREATE TABLE detections (
   - System status messages
 - **Error Handling**: Graceful failure, continues logging even if Telegram fails
 
-### 7. Configuration (`config.py`)
+### 7. Resource Management (`resource_manager.py`)
+- **MemoryManager**: RAM monitoring, garbage collection, threshold checking
+- **StorageManager**: Image storage, cleanup, disk space monitoring
+- **SystemMonitor**: Unified system status (CPU temp, memory, storage)
+- **Automatic Cleanup**: Old images deleted when limit reached
+
+### 8. Data Models (`models.py`)
+- **MotionResult**: Motion detection results with area, confidence, contours
+- **DetectionResult**: MegaDetector animal detection results
+- **IdentificationResult**: Species classification results
+- **DetectionRecord**: Database record structure
+
+### 9. Exception Hierarchy (`exceptions.py`)
+- **WildlifeSystemError**: Base exception for all system errors
+- **HardwareError**: Camera and database errors
+- **ProcessingError**: Motion detection and species ID errors
+- **NotificationError**: Telegram communication errors
+
+### 10. Configuration (`config.py`)
 - **Type-Safe Dataclasses**: Nested config structure
   - `CameraConfig`: Resolution, exposure, frame rate
   - `MotionConfig`: Thresholds, filtering, consecutive detection

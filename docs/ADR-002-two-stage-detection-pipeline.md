@@ -67,6 +67,8 @@ From literature review and SpeciesNet documentation:
 
 #### 1. New Data Structures
 
+Located in `models.py` (consolidated data models module):
+
 ```python
 @dataclass
 class DetectionResult:
@@ -87,8 +89,8 @@ class IdentificationResult:
     fallback_reason: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
     # Two-stage pipeline info
-    detection_result: Optional[DetectionResult] = None  # NEW
-    animals_detected: bool = True  # NEW - for backward compatibility
+    detection_result: Optional[DetectionResult] = None
+    animals_detected: bool = True
 ```
 
 #### 2. Separated Methods

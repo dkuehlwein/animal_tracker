@@ -1,60 +1,115 @@
 """
-Telegram notification service for wildlife detection system.
-Provides centralized Telegram bot functionality with message formatting.
+Notification service for the wildlife detection system.
+
+Consolidates Telegram bot functionality and message formatting
+into a unified notification interface.
 """
 
 import logging
 import telegram
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
+
 from config import Config
-from utils import TelegramFormatter
-from exceptions import TelegramError
 
 logger = logging.getLogger(__name__)
 
 
-class TelegramService:
-    """Centralized Telegram notification service."""
-    
+class NotificationFormatter:
+    """Message formatting utilities for notifications."""
+
+    @staticmethod
+    def format_detection_message(species_name: str, confidence: float,
+                                 motion_area: int, timestamp: datetime,
+                                 temperature: Optional[float] = None) -> str:
+        """Format detection message for Telegram."""
+        time_str = timestamp.strftime("%H:%M")
+
+        if species_name == "Unknown species":
+            return f"🔍 Unknown species detected at {time_str}\nMotion area: {motion_area:,} pixels"
+
+        # Emoji mapping
+        emoji_map = {
+            "Hedgehog": "🦔", "Fox": "🦊", "Squirrel": "🐿️",
+            "Cat": "🐱", "Bird": "🐦", "Robin": "🐦", "Blackbird": "🐦"
+        }
+
+        emoji = "🔍"
+        for animal, symbol in emoji_map.items():
+            if animal in species_name:
+                emoji = symbol
+                break
+
+        if confidence > 0.8:
+            message = f"{emoji} {species_name} detected at {time_str}\nConfidence: {confidence*100:.0f}%"
+        else:
+            message = f"🔍 Possible {species_name} detected at {time_str}\nConfidence: {confidence*100:.0f}%"
+
+        if temperature is not None:
+            message += f"\n🌡️ {temperature:.1f}°C"
+
+        return message
+
+    @staticmethod
+    def format_system_status(memory_percent: float, storage_percent: float,
+                             image_count: int) -> str:
+        """Format system status message."""
+        return (f"📊 System Status\n"
+                f"Memory: {memory_percent:.1f}% used\n"
+                f"Storage: {storage_percent:.1f}% used\n"
+                f"Images stored: {image_count}")
+
+
+class NotificationService:
+    """
+    Unified notification service for wildlife detection system.
+
+    Provides Telegram bot functionality with integrated message formatting.
+    """
+
     def __init__(self, config: Config):
         self.config = config
         self.bot = telegram.Bot(token=config.telegram_token)
-        self.formatter = TelegramFormatter()
-    
-    async def send_detection_notification(self, species_result: dict, 
-                                         motion_area: int, timestamp: datetime,
-                                         temperature: float = None) -> bool:
+        self.formatter = NotificationFormatter()
+        self._database = None
+
+    def set_database_reference(self, database) -> None:
+        """Set database reference for first sighting checks."""
+        self._database = database
+
+    async def send_detection_notification(self, species_result: dict,
+                                          motion_area: int, timestamp: datetime,
+                                          temperature: float = None) -> bool:
         """Send species detection notification to Telegram."""
         try:
             species_name = species_result.get('species_name', 'Unknown species')
             confidence = species_result.get('confidence', 0.0)
-            
-            # Use TelegramFormatter to create message
+
+            # Use formatter to create message
             message = self.formatter.format_detection_message(
                 species_name, confidence, motion_area, timestamp, temperature
             )
-            
+
             # Check if this is first sighting today (if database is available)
-            if hasattr(self, 'database') and species_name != "Unknown species":
-                is_first_today = self.database.is_first_detection_today(species_name)
+            if self._database and species_name != "Unknown species":
+                is_first_today = self._database.is_first_detection_today(species_name)
                 if is_first_today:
                     message += " - First sighting today!"
-            
+
             await self.bot.send_message(
                 chat_id=self.config.telegram_chat_id,
                 text=message
             )
-            
+
             return True
-            
+
         except Exception as e:
             logger.error(f"Error sending Telegram notification: {e}")
             return False
-    
+
     async def send_photo_with_caption(self, image_path: Path,
-                                     caption: str = None) -> bool:
+                                      caption: str = None) -> bool:
         """Send photo to Telegram channel with optional caption."""
         try:
             if not image_path.exists():
@@ -77,7 +132,7 @@ class TelegramService:
             logger.error(f"Error sending Telegram photo: {e}")
             return False
 
-    async def send_media_group(self, image_paths: list[Path], caption: str = None) -> bool:
+    async def send_media_group(self, image_paths: List[Path], caption: str = None) -> bool:
         """Send multiple photos as a media group to Telegram channel."""
         files = []
         try:
@@ -131,28 +186,28 @@ class TelegramService:
             for f in files:
                 try:
                     f.close()
-                except:
+                except Exception:
                     pass
-    
-    async def send_system_status(self, memory_percent: float, 
-                                storage_percent: float, image_count: int) -> bool:
+
+    async def send_system_status(self, memory_percent: float,
+                                 storage_percent: float, image_count: int) -> bool:
         """Send system status message."""
         try:
             message = self.formatter.format_system_status(
                 memory_percent, storage_percent, image_count
             )
-            
+
             await self.bot.send_message(
                 chat_id=self.config.telegram_chat_id,
                 text=message
             )
-            
+
             return True
-            
+
         except Exception as e:
             logger.error(f"Error sending system status: {e}")
             return False
-    
+
     async def send_text_message(self, message: str) -> bool:
         """Send simple text message."""
         try:
@@ -161,15 +216,11 @@ class TelegramService:
                 text=message
             )
             return True
-            
+
         except Exception as e:
             logger.error(f"Error sending text message: {e}")
             return False
-    
-    def set_database_reference(self, database):
-        """Set database reference for first sighting checks."""
-        self.database = database
-    
+
     async def test_connection(self) -> bool:
         """Test Telegram bot connection."""
         try:

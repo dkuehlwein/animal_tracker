@@ -1,215 +1,60 @@
-import gc
+"""
+Utility classes for the wildlife detection system.
+
+This module contains:
+- PerformanceTimer: Timing utility for performance measurement
+- MotionVisualizer: Create annotated images showing motion detection regions
+- SharpnessAnalyzer: Image sharpness analysis for burst capture selection
+- SunChecker: Daylight checking based on sunrise/sunset times
+"""
+
 import logging
-import psutil
 import time
+import zoneinfo
+from datetime import datetime, date, timezone, time as dt_time
+
 import cv2
 import numpy as np
 from pathlib import Path
-from datetime import datetime
+from typing import Optional
+
 from astral import LocationInfo
 from astral.sun import sun
+
 from config import Config
 
 logger = logging.getLogger(__name__)
 
 
-class MemoryManager:
-    """Memory management utilities for Pi Zero 2 W"""
-    
-    def __init__(self, config: Config):
-        self.config = config
-        self.memory_threshold = config.performance.memory_threshold
-    
-    def get_memory_usage(self):
-        """Get current memory usage percentage"""
-        try:
-            return psutil.virtual_memory().percent / 100.0
-        except Exception as e:
-            logger.error(f"Error getting memory usage: {e}")
-            return 0.5  # Default to 50% if unable to determine
-    
-    def is_memory_available(self):
-        """Check if memory usage is below threshold"""
-        return self.get_memory_usage() < self.memory_threshold
-    
-    def force_cleanup(self):
-        """Force garbage collection and cleanup"""
-        try:
-            gc.collect()
-            return True
-        except Exception as e:
-            logger.error(f"Error in force cleanup: {e}")
-            return False
-    
-    def get_memory_info(self):
-        """Get detailed memory information"""
-        try:
-            mem = psutil.virtual_memory()
-            return {
-                'total_mb': mem.total / (1024 * 1024),
-                'available_mb': mem.available / (1024 * 1024),
-                'used_mb': mem.used / (1024 * 1024),
-                'percent': mem.percent,
-                'free_mb': mem.free / (1024 * 1024)
-            }
-        except Exception as e:
-            logger.error(f"Error getting memory info: {e}")
-            return None
-
-class FileManager:
-    """File management utilities for Pi Zero 2 W"""
-    
-    def __init__(self, config: Config):
-        self.config = config
-    
-    def cleanup_old_images(self):
-        """Delete oldest images if exceeding max limit (includes annotated versions)"""
-        try:
-            # Get all original images (not annotated)
-            original_images = sorted(
-                [f for f in self.config.storage.image_dir.glob(f"{self.config.storage.image_prefix}*.jpg")
-                 if "_annotated" not in f.stem],
-                key=lambda x: x.stat().st_mtime
-            )
-
-            if len(original_images) > self.config.performance.max_images:
-                files_to_delete = original_images[:(len(original_images) - self.config.performance.max_images)]
-                deleted_count = 0
-
-                for file_path in files_to_delete:
-                    try:
-                        # Delete the original image
-                        file_path.unlink()
-                        deleted_count += 1
-
-                        # Also delete the annotated version if it exists
-                        annotated_path = file_path.parent / f"{file_path.stem}_annotated{file_path.suffix}"
-                        if annotated_path.exists():
-                            annotated_path.unlink()
-                            deleted_count += 1
-                    except Exception as e:
-                        logger.error(f"Error deleting {file_path}: {e}", exc_info=True)
-
-                logger.info(f"Cleaned up {deleted_count} old images")
-                return deleted_count
-
-            return 0
-
-        except Exception as e:
-            logger.error(f"Error in image cleanup: {e}", exc_info=True)
-            return 0
-    
-    def get_storage_info(self):
-        """Get storage space information"""
-        try:
-            usage = psutil.disk_usage(self.config.storage.data_dir)
-            return {
-                'total_mb': usage.total / (1024 * 1024),
-                'used_mb': usage.used / (1024 * 1024),
-                'free_mb': usage.free / (1024 * 1024),
-                'percent': (usage.used / usage.total) * 100
-            }
-        except Exception as e:
-            logger.error(f"Error getting storage info: {e}")
-            return None
-    
-    def ensure_directories(self):
-        """Ensure all required directories exist"""
-        try:
-            self.config.storage.data_dir.mkdir(exist_ok=True)
-            self.config.storage.image_dir.mkdir(exist_ok=True)
-            self.config.storage.logs_dir.mkdir(exist_ok=True)
-            return True
-        except Exception as e:
-            logger.error(f"Error creating directories: {e}")
-            return False
-    
-    def get_image_count(self):
-        """Get current number of stored images"""
-        try:
-            return len(list(self.config.storage.image_dir.glob(f"{self.config.storage.image_prefix}*.jpg")))
-        except Exception as e:
-            logger.error(f"Error counting images: {e}")
-            return 0
-
-class SystemMonitor:
-    """System monitoring utilities for Pi Zero 2 W"""
-    
-    def __init__(self, config: Config):
-        self.config = config
-        self.memory_manager = MemoryManager(config)
-        self.file_manager = FileManager(config)
-    
-    def get_system_status(self):
-        """Get comprehensive system status"""
-        return {
-            'timestamp': datetime.now().isoformat(),
-            'memory': self.memory_manager.get_memory_info(),
-            'storage': self.file_manager.get_storage_info(),
-            'image_count': self.file_manager.get_image_count(),
-            'memory_available': self.memory_manager.is_memory_available(),
-            'cpu_temp': self.get_cpu_temperature()
-        }
-    
-    def should_skip_processing(self):
-        """Determine if processing should be skipped due to resource constraints"""
-        if not self.memory_manager.is_memory_available():
-            logger.warning(f"Skipping processing: Memory usage above {self.config.performance.memory_threshold*100}%")
-            return True
-        return False
-    
-    def log_system_status(self):
-        """Log current system status"""
-        status = self.get_system_status()
-        if status['memory']:
-            logger.info(f"Memory: {status['memory']['percent']:.1f}% used "
-                        f"({status['memory']['available_mb']:.0f}MB available)")
-        if status['storage']:
-            logger.info(f"Storage: {status['storage']['percent']:.1f}% used "
-                        f"({status['storage']['free_mb']:.0f}MB free)")
-        if status['cpu_temp']:
-            logger.info(f"CPU Temp: {status['cpu_temp']:.1f}°C")
-        logger.info(f"Images stored: {status['image_count']}")
-    
-    def get_cpu_temperature(self) -> float | None:
-        """Get Raspberry Pi CPU temperature. Returns None on error."""
-        try:
-            with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
-                temp_str = f.read()
-            return float(temp_str) / 1000.0
-        except Exception as e:
-            logger.error(f"Error reading CPU temperature: {e}")
-            return None
-
 class PerformanceTimer:
-    """Performance timing utility"""
-    
+    """Performance timing utility."""
+
     def __init__(self, operation_name="Operation"):
         self.operation_name = operation_name
         self.start_time = None
         self.end_time = None
-    
+
     def start(self):
-        """Start timing"""
+        """Start timing."""
         self.start_time = time.time()
         return self
-    
+
     def stop(self):
-        """Stop timing and return duration"""
+        """Stop timing and return duration."""
         if self.start_time is None:
             return 0.0
-        
+
         self.end_time = time.time()
         duration = self.end_time - self.start_time
         return duration
-    
+
     def __enter__(self):
-        """Context manager entry"""
+        """Context manager entry."""
         self.start()
         return self
-    
+
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit"""
+        """Context manager exit."""
         duration = self.stop()
         if duration > 1.0:  # Log slow operations
             logger.info(f"{self.operation_name} took {duration:.2f}s")
@@ -219,7 +64,7 @@ class MotionVisualizer:
     """Create annotated images showing motion detection regions."""
 
     @staticmethod
-    def create_annotated_image(image_path: Path, motion_frame, config, motion_result) -> Path:
+    def create_annotated_image(image_path: Path, motion_frame, config, motion_result) -> Optional[Path]:
         """
         Create annotated version of image showing motion detection regions.
 
@@ -320,51 +165,6 @@ class MotionVisualizer:
             return None
 
 
-class TelegramFormatter:
-    """Telegram message formatting utilities."""
-    
-    @staticmethod
-    def format_detection_message(species_name: str, confidence: float,
-                               motion_area: int, timestamp: datetime,
-                               temperature: float = None) -> str:
-        """Format detection message for Telegram."""
-        time_str = timestamp.strftime("%H:%M")
-        
-        if species_name == "Unknown species":
-            return f"🔍 Unknown species detected at {time_str}\nMotion area: {motion_area:,} pixels"
-        
-        # Emoji mapping
-        emoji_map = {
-            "Hedgehog": "🦔", "Fox": "🦊", "Squirrel": "🐿️", 
-            "Cat": "🐱", "Bird": "🐦", "Robin": "🐦", "Blackbird": "🐦"
-        }
-        
-        emoji = "🔍"
-        for animal, symbol in emoji_map.items():
-            if animal in species_name:
-                emoji = symbol
-                break
-        
-        if confidence > 0.8:
-            message = f"{emoji} {species_name} detected at {time_str}\nConfidence: {confidence*100:.0f}%"
-        else:
-            message = f"🔍 Possible {species_name} detected at {time_str}\nConfidence: {confidence*100:.0f}%"
-            
-        if temperature:
-            message += f"\n🌡️ {temperature:.1f}°C"
-            
-        return message
-    
-    @staticmethod
-    def format_system_status(memory_percent: float, storage_percent: float,
-                           image_count: int) -> str:
-        """Format system status message."""
-        return (f"📊 System Status\n"
-                f"Memory: {memory_percent:.1f}% used\n"
-                f"Storage: {storage_percent:.1f}% used\n"
-                f"Images stored: {image_count}")
-
-
 class SharpnessAnalyzer:
     """Analyze image sharpness using Laplacian variance for burst capture selection."""
 
@@ -439,7 +239,6 @@ class SharpnessAnalyzer:
 
     @staticmethod
     def select_sharpest_frame(frames: list, motion_aware: bool = True,
-                             min_foreground_ratio: float = 0.5,
                              reference_frame: np.ndarray = None) -> tuple:
         """
         Analyze multiple frames and select the best one using combined scoring.
@@ -452,7 +251,6 @@ class SharpnessAnalyzer:
         Args:
             frames: List of numpy arrays (BGR or grayscale images)
             motion_aware: If True, use reference-based scoring when available
-            min_foreground_ratio: Unused, kept for API compatibility
             reference_frame: Cached background frame from when scene was empty
 
         Returns:
@@ -520,9 +318,10 @@ class SharpnessAnalyzer:
 
 class SunChecker:
     """Check if it's currently daytime based on sunrise/sunset times."""
-    
+
     def __init__(self, config: Config):
         self.config = config
+        self._local_tz = zoneinfo.ZoneInfo(config.location.timezone)
         self.location = LocationInfo(
             name="Location",
             region=config.location.timezone,
@@ -534,52 +333,55 @@ class SunChecker:
         self._sunrise = None
         self._sunset = None
         logger.info(f"SunChecker initialized for location: "
-                   f"{config.location.latitude:.4f}, {config.location.longitude:.4f}")
-    
+                   f"{config.location.latitude:.4f}, {config.location.longitude:.4f} "
+                   f"(timezone: {config.location.timezone})")
+
     def _update_sun_times(self):
-        """Update sunrise/sunset times for today."""
-        from datetime import date, timezone
+        """Update sunrise/sunset times for today (handles DST automatically)."""
         try:
             today = date.today()
             if self._last_check_date != today:
+                # astral returns timezone-aware UTC times
                 s = sun(self.location.observer, date=today)
                 self._sunrise = s['sunrise']
                 self._sunset = s['sunset']
                 self._last_check_date = today
-                logger.info(f"Sun times updated - Sunrise: {self._sunrise.strftime('%H:%M')}, "
-                           f"Sunset: {self._sunset.strftime('%H:%M')}")
+                # Log in local time for readability (DST-aware via zoneinfo)
+                sunrise_local = self._sunrise.astimezone(self._local_tz)
+                sunset_local = self._sunset.astimezone(self._local_tz)
+                logger.info(f"Sun times updated - Sunrise: {sunrise_local.strftime('%H:%M')}, "
+                           f"Sunset: {sunset_local.strftime('%H:%M')} (local time)")
         except Exception as e:
             logger.error(f"Error calculating sun times: {e}")
-            # Fallback to safe defaults (6am - 8pm local time)
-            from datetime import datetime, time
-            now = datetime.now()
-            self._sunrise = datetime.combine(now.date(), time(6, 0))
-            self._sunset = datetime.combine(now.date(), time(20, 0))
-    
+            # Fallback to safe defaults (6am - 8pm in local timezone, DST-aware)
+            now = datetime.now(self._local_tz)
+            self._sunrise = datetime.combine(
+                now.date(), dt_time(6, 0), tzinfo=self._local_tz
+            )
+            self._sunset = datetime.combine(
+                now.date(), dt_time(20, 0), tzinfo=self._local_tz
+            )
+
     def is_daytime(self) -> bool:
         """Check if it's currently daytime."""
-        from datetime import datetime, timezone
-        self._update_sun_times()
-        
-        now = datetime.now(timezone.utc)
-        
-        # Make sure sunrise and sunset are timezone-aware
-        if self._sunrise and self._sunset:
-            is_day = self._sunrise <= now <= self._sunset
-            return is_day
-        
-        # Fallback if times aren't set
-        return True
-    
-    def get_sun_info(self) -> dict:
-        """Get sunrise/sunset information in local time."""
-        import zoneinfo
         self._update_sun_times()
 
-        # Convert UTC times to local timezone for display
-        local_tz = zoneinfo.ZoneInfo(self.config.location.timezone)
-        sunrise_local = self._sunrise.astimezone(local_tz) if self._sunrise else None
-        sunset_local = self._sunset.astimezone(local_tz) if self._sunset else None
+        now = datetime.now(timezone.utc)
+
+        # Both sunrise/sunset are timezone-aware, comparison works correctly
+        if self._sunrise and self._sunset:
+            return self._sunrise <= now <= self._sunset
+
+        # Fallback if times aren't set
+        return True
+
+    def get_sun_info(self) -> dict:
+        """Get sunrise/sunset information in local time (DST-aware)."""
+        self._update_sun_times()
+
+        # Convert to local timezone for display (handles DST automatically)
+        sunrise_local = self._sunrise.astimezone(self._local_tz) if self._sunrise else None
+        sunset_local = self._sunset.astimezone(self._local_tz) if self._sunset else None
 
         return {
             'sunrise': sunrise_local.strftime('%H:%M') if sunrise_local else 'Unknown',

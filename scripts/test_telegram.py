@@ -14,9 +14,9 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from config import Config
-from telegram_service import TelegramService
+from notification_service import NotificationService
 from utils import MotionVisualizer
-from motion_detector import MotionResult
+from models import MotionResult
 import cv2
 import numpy as np
 
@@ -95,14 +95,14 @@ def create_test_image_with_motion(output_path: Path, config) -> tuple[Path, np.n
     return output_path, motion_frame, motion_result
 
 
-async def test_telegram_service():
-    """Run comprehensive Telegram service tests."""
-    
+async def test_notification_service():
+    """Run comprehensive notification service tests."""
+
     print("=" * 60)
-    print("TELEGRAM BOT TEST")
+    print("NOTIFICATION SERVICE TEST")
     print("=" * 60)
     print()
-    
+
     try:
         # Load configuration
         print("📋 Loading configuration...")
@@ -110,18 +110,18 @@ async def test_telegram_service():
         print(f"✓ Bot token configured: {config.telegram_token[:10]}...")
         print(f"✓ Chat ID: {config.telegram_chat_id}")
         print()
-        
-        # Initialize Telegram service
-        print("🤖 Initializing Telegram service...")
-        telegram_service = TelegramService(config)
-        print("✓ Telegram service initialized")
+
+        # Initialize notification service
+        print("🤖 Initializing notification service...")
+        notification_service = NotificationService(config)
+        print("✓ Notification service initialized")
         print()
-        
+
         # Test 1: Get bot info
         print("Test 1: Bot Information")
         print("-" * 40)
         try:
-            bot_info = await telegram_service.bot.get_me()
+            bot_info = await notification_service.bot.get_me()
             print(f"✓ Bot connected successfully!")
             print(f"  Bot name: @{bot_info.username}")
             print(f"  Bot ID: {bot_info.id}")
@@ -136,7 +136,7 @@ async def test_telegram_service():
         print("-" * 40)
         try:
             test_message = f"🧪 Test message from Wildlife Detector\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-            await telegram_service.bot.send_message(
+            await notification_service.bot.send_message(
                 chat_id=config.telegram_chat_id,
                 text=test_message
             )
@@ -155,7 +155,7 @@ async def test_telegram_service():
                 'confidence': 0.87,
                 'scientific_name': 'Erithacus rubecula'
             }
-            success = await telegram_service.send_detection_notification(
+            success = await notification_service.send_detection_notification(
                 species_result=species_result,
                 motion_area=3500,
                 timestamp=datetime.now()
@@ -180,7 +180,7 @@ async def test_telegram_service():
             
             # Send photo
             caption = "📸 Test photo from Wildlife Detector"
-            success = await telegram_service.send_photo_with_caption(
+            success = await notification_service.send_photo_with_caption(
                 image_path=test_image_path,
                 caption=caption
             )
@@ -197,7 +197,7 @@ async def test_telegram_service():
         print("Test 5: Send System Status")
         print("-" * 40)
         try:
-            success = await telegram_service.send_system_status(
+            success = await notification_service.send_system_status(
                 memory_percent=45.2,
                 storage_percent=62.8,
                 image_count=42
@@ -238,7 +238,7 @@ async def test_telegram_service():
                     f"Motion Area: {motion_result.motion_area} px\n"
                     f"Detection at center of frame"
                 )
-                success = await telegram_service.send_media_group(
+                success = await notification_service.send_media_group(
                     [image_path, annotated_path],
                     caption
                 )
@@ -285,7 +285,7 @@ async def test_telegram_service():
 def main():
     """Main entry point."""
     try:
-        success = asyncio.run(test_telegram_service())
+        success = asyncio.run(test_notification_service())
         sys.exit(0 if success else 1)
     except KeyboardInterrupt:
         print("\n\n⚠️  Test interrupted by user")

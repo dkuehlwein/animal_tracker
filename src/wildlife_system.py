@@ -17,15 +17,12 @@ from motion_detector import MotionDetector
 from camera_manager import CameraManager
 from database_manager import DatabaseManager
 from species_identifier import SpeciesIdentifier
-from telegram_service import TelegramService
-from utils import SystemMonitor, PerformanceTimer, FileManager, SunChecker, MotionVisualizer, SharpnessAnalyzer
+from notification_service import NotificationService
+from resource_manager import SystemMonitor, StorageManager
+from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnalyzer
+from exceptions import WildlifeSystemError
 
 logger = logging.getLogger(__name__)
-
-
-class WildlifeSystemError(Exception):
-    """Base exception for wildlife system errors."""
-    pass
 
 
 class WildlifeSystem:
@@ -41,9 +38,9 @@ class WildlifeSystem:
         # Initialize all components
         self.camera = CameraManager(self.config)
         self.motion_detector = MotionDetector(self.config)
-        self.telegram_service = TelegramService(self.config)
+        self.telegram_service = NotificationService(self.config)
         self.system_monitor = SystemMonitor(self.config)
-        self.file_manager = FileManager(self.config)
+        self.file_manager = StorageManager(self.config)
         self.database = DatabaseManager(self.config)
         self.species_identifier = SpeciesIdentifier(self.config)
         self.sun_checker = SunChecker(self.config)
@@ -58,6 +55,7 @@ class WildlifeSystem:
         # State variables
         self.last_frame_time = 0
         self.last_detection_time = 0
+        self.last_status_log_time = 0
         self.last_motion_frame = None
         self.last_motion_result = None
 
@@ -190,7 +188,7 @@ class WildlifeSystem:
         """
         try:
             # Capture burst frames
-            frames = self.camera._camera.capture_burst_frames(
+            frames = self.camera.capture_burst_frames(
                 count=self.config.performance.multi_frame_count,
                 interval=self.config.performance.multi_frame_interval
             )
@@ -203,7 +201,6 @@ class WildlifeSystem:
             best_frame, selected_index, best_score, all_scores = SharpnessAnalyzer.select_sharpest_frame(
                 frames,
                 motion_aware=self.config.performance.motion_aware_selection,
-                min_foreground_ratio=self.config.performance.min_foreground_ratio,
                 reference_frame=self.reference_frame
             )
             
@@ -382,7 +379,7 @@ class WildlifeSystem:
 
             # Capture initial reference frame for burst selection
             try:
-                ref_frame = self.camera._camera.capture_high_res_frame()
+                ref_frame = self.camera.capture_high_res_frame()
                 if ref_frame is not None:
                     self.reference_frame = ref_frame.copy()
                     self.reference_frame_time = time.time()
@@ -440,14 +437,15 @@ class WildlifeSystem:
                                 time_since_ref_update = current_time - self.reference_frame_time
                                 if time_since_ref_update >= self.reference_update_interval:
                                     # Capture high-res reference frame
-                                    ref_frame = self.camera._camera.capture_high_res_frame()
+                                    ref_frame = self.camera.capture_high_res_frame()
                                     if ref_frame is not None:
                                         self.reference_frame = ref_frame.copy()
                                         self.reference_frame_time = current_time
                                         logger.info(f"Updated reference frame for burst selection (age: {time_since_ref_update:.0f}s)")
 
                             # Log motion status periodically (every 5 seconds)
-                            if int(current_time) % 5 == 0 and current_time - self.last_frame_time < 0.3:
+                            if current_time - self.last_status_log_time >= 5.0:
+                                self.last_status_log_time = current_time
                                 logger.info(f"Monitoring... motion_area={motion_area} (threshold={self.config.motion.motion_threshold})")
                         else:
                             motion_detected, motion_area = False, 0

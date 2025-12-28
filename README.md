@@ -191,14 +191,17 @@ See `src/config.py` for all available configuration options.
 ```
 animal_tracker/
 ├── src/
-│   ├── wildlife_system.py      # Main system orchestrator
+│   ├── wildlife_system.py       # Main system orchestrator
 │   ├── config.py                # Configuration management
 │   ├── camera_manager.py        # Camera operations
 │   ├── motion_detector.py       # Motion detection
 │   ├── species_identifier.py    # SpeciesNet integration
 │   ├── database_manager.py      # SQLite database
-│   ├── telegram_service.py      # Telegram notifications
-│   └── utils.py                 # Utilities
+│   ├── notification_service.py  # Telegram notifications
+│   ├── resource_manager.py      # Memory, storage, system monitoring
+│   ├── models.py                # Data models (MotionResult, DetectionRecord, etc.)
+│   ├── exceptions.py            # Exception hierarchy
+│   └── utils.py                 # Utilities (PerformanceTimer, SharpnessAnalyzer, etc.)
 ├── scripts/
 │   └── camera_preview.py        # Live camera preview for focus adjustment
 ├── data/
