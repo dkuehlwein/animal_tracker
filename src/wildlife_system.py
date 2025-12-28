@@ -65,7 +65,53 @@ class WildlifeSystem:
         self.reference_frame = None
         self.reference_frame_time = 0
         self.reference_update_interval = 600  # Update every 10 minutes
-    
+
+        # Daylight state tracking for start/stop notifications
+        self._was_daytime = None  # None = unknown, will be set on first check
+
+    async def _check_daylight_transition(self) -> bool:
+        """
+        Check for daylight state transitions and send notifications.
+        Returns True if currently daytime (detection should run).
+        """
+        is_daytime = self.sun_checker.is_daytime()
+        sun_info = self.sun_checker.get_sun_info()
+
+        # First check - initialize state without notification
+        if self._was_daytime is None:
+            self._was_daytime = is_daytime
+            if is_daytime:
+                logger.info("System started during daytime - detection active")
+            else:
+                logger.info("System started during nighttime - detection paused")
+            return is_daytime
+
+        # Transition from night to day - detection starting
+        if not self._was_daytime and is_daytime:
+            self._was_daytime = True
+            logger.info("Sunrise transition - starting detection")
+            await self.telegram_service.send_text_message(
+                f"🌅 Good morning! Wildlife detection starting.\n"
+                f"Sunrise: {sun_info['sunrise']}, Sunset: {sun_info['sunset']}"
+            )
+            return True
+
+        # Transition from day to night - detection stopping
+        if self._was_daytime and not is_daytime:
+            self._was_daytime = False
+            # Get today's detection stats
+            today_count = self.database.get_daily_detections()
+            logger.info(f"Sunset transition - stopping detection ({today_count} detections today)")
+            await self.telegram_service.send_text_message(
+                f"🌙 Good evening! Wildlife detection paused for the night.\n"
+                f"Today's detections: {today_count}\n"
+                f"Resuming at sunrise ({sun_info['sunrise']} tomorrow)"
+            )
+            return False
+
+        self._was_daytime = is_daytime
+        return is_daytime
+
     def cleanup_old_images(self):
         """Delete oldest images if we exceed the maximum limit - delegates to FileManager"""
         try:
@@ -348,12 +394,14 @@ class WildlifeSystem:
                 while True:
                     try:
                         current_time = time.time()
-                        
-                        # Check daylight if enabled
-                        if self.config.performance.daylight_only and not self.sun_checker.is_daytime():
-                            # Sleep longer during nighttime to save resources
-                            await asyncio.sleep(600)  # Check every minute at night
-                            continue
+
+                        # Check daylight if enabled (with transition notifications)
+                        if self.config.performance.daylight_only:
+                            is_daytime = await self._check_daylight_transition()
+                            if not is_daytime:
+                                # Sleep longer during nighttime to save resources
+                                await asyncio.sleep(60)  # Check every minute at night
+                                continue
                         
                         # Frame rate control
                         if current_time - self.last_frame_time < self.config.motion.frame_interval:

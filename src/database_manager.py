@@ -222,7 +222,7 @@ class DatabaseManager:
     def is_first_detection_today(self, species_name):
         """Check if this is the first detection of this species today"""
         today = datetime.now().strftime('%Y-%m-%d')
-        
+
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
@@ -236,3 +236,4 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Error checking first detection: {e}", exc_info=True)
             return False
+
