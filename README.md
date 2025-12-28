@@ -264,3 +264,72 @@ Common expected species:
 1. Reduce `SPECIES_PROCESSING_TIMEOUT` if inference is slow
 2. Increase cooldown period to reduce processing load
 3. Monitor system resources with `htop`
+
+## Network Watchdog
+
+The system includes a network watchdog service that monitors WiFi connectivity and takes corrective action on failures. This is especially useful for remote/outdoor deployments where the Pi may lose WiFi connection.
+
+### Features
+
+- Monitors connectivity every 30 seconds (pings gateway, Google DNS, Cloudflare DNS)
+- Automatic recovery actions on failure:
+  - After 3 failures: Restarts WiFi interface
+  - After 5 failures: Restarts NetworkManager
+  - After 8 failures: Reboots system (last resort)
+- Telegram notifications for:
+  - System startup (includes IP address and signal strength)
+  - Connectivity loss/restoration
+  - Recovery actions taken
+- Logs to systemd journal and `/var/log/network-watchdog.log`
+
+### Installation
+
+```bash
+# Install the service
+sudo cp network-watchdog.service /etc/systemd/system/
+sudo cp configs/99-wifi-stability.conf /etc/NetworkManager/conf.d/
+sudo systemctl daemon-reload
+sudo systemctl enable network-watchdog.service
+sudo systemctl start network-watchdog.service
+```
+
+### Management
+
+```bash
+# Check status
+sudo systemctl status network-watchdog
+
+# View logs
+journalctl -u network-watchdog -f
+
+# Restart after config changes
+sudo systemctl restart network-watchdog
+```
+
+### Configuration
+
+Edit `scripts/network_watchdog.sh` to adjust:
+- `CHECK_INTERVAL`: Seconds between connectivity checks (default: 30)
+- `MAX_FAILURES_BEFORE_RESTART`: Failures before WiFi restart (default: 3)
+- `MAX_FAILURES_BEFORE_REBOOT`: Failures before system reboot (default: 8)
+
+Telegram notifications are automatically enabled if `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are set in your `.env` file.
+
+## Power Consumption
+
+Running 24/7 on a Raspberry Pi 5 (8GB):
+
+| State | Power Draw |
+|-------|-----------|
+| Idle (WiFi on) | ~3-4W |
+| Motion detection | ~5-6W |
+| SpeciesNet inference | ~8-10W |
+| **Average** | **~5W** |
+
+### Annual Cost Estimate
+
+| Period | Consumption | Cost (€0.30-0.40/kWh) |
+|--------|-------------|----------------------|
+| Daily | 0.12 kWh | €0.04-0.05 |
+| Monthly | 3.6 kWh | €1.08-1.44 |
+| **Yearly** | **43.8 kWh** | **€13-18** |

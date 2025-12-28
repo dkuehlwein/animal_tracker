@@ -1,0 +1,29 @@
+[Unit]
+Description=Network Watchdog for Wildlife Camera
+Documentation=https://github.com/daniel/animal_tracker
+After=network-online.target NetworkManager.service
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart=/home/daniel/animal_tracker/scripts/network_watchdog.sh
+Restart=always
+RestartSec=30
+User=root
+Group=root
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=network-watchdog
+
+# Security hardening (limited since we need network control)
+ProtectSystem=strict
+ReadWritePaths=/var/log /tmp
+PrivateTmp=false
+NoNewPrivileges=false
+
+[Install]
+WantedBy=multi-user.target
