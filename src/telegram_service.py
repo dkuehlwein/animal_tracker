@@ -3,7 +3,6 @@ Telegram notification service for wildlife detection system.
 Provides centralized Telegram bot functionality with message formatting.
 """
 
-import asyncio
 import logging
 import telegram
 from datetime import datetime

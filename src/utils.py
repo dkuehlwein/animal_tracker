@@ -215,52 +215,6 @@ class PerformanceTimer:
             logger.info(f"{self.operation_name} took {duration:.2f}s")
 
 
-class ImageUtils:
-    """Image processing utilities."""
-
-    @staticmethod
-    def validate_image_path(image_path) -> bool:
-        """Validate image file exists and has correct extension."""
-        try:
-            path = Path(image_path)
-            return path.exists() and path.suffix.lower() in ['.jpg', '.jpeg', '.png']
-        except Exception:
-            return False
-
-    @staticmethod
-    def get_image_info(image_path) -> dict:
-        """Get image information."""
-        try:
-            img = cv2.imread(str(image_path))
-            if img is None:
-                return {'error': 'Could not read image'}
-
-            height, width = img.shape[:2]
-            channels = img.shape[2] if len(img.shape) > 2 else 1
-
-            return {
-                'width': width,
-                'height': height,
-                'channels': channels,
-                'size_bytes': Path(image_path).stat().st_size
-            }
-        except Exception as e:
-            return {'error': str(e)}
-
-    @staticmethod
-    def create_thumbnail(image_path, output_path, size=(128, 128)) -> bool:
-        """Create thumbnail of image."""
-        try:
-            img = cv2.imread(str(image_path))
-            if img is None:
-                return False
-
-            thumbnail = cv2.resize(img, size)
-            return cv2.imwrite(str(output_path), thumbnail)
-        except Exception:
-            return False
-
-
 class MotionVisualizer:
     """Create annotated images showing motion detection regions."""
 
@@ -409,49 +363,6 @@ class TelegramFormatter:
                 f"Memory: {memory_percent:.1f}% used\n"
                 f"Storage: {storage_percent:.1f}% used\n"
                 f"Images stored: {image_count}")
-
-
-class PerformanceTracker:
-    """Performance tracking and metrics utilities."""
-    
-    def __init__(self):
-        self.metrics = {}
-        self.start_times = {}
-    
-    def start_operation(self, operation_name: str):
-        """Start tracking an operation."""
-        self.start_times[operation_name] = time.time()
-    
-    def end_operation(self, operation_name: str) -> float:
-        """End tracking and return duration."""
-        if operation_name not in self.start_times:
-            return 0.0
-        
-        duration = time.time() - self.start_times[operation_name]
-        
-        if operation_name not in self.metrics:
-            self.metrics[operation_name] = []
-        
-        self.metrics[operation_name].append(duration)
-        del self.start_times[operation_name]
-        
-        return duration
-    
-    def get_average_time(self, operation_name: str) -> float:
-        """Get average time for an operation."""
-        if operation_name not in self.metrics or not self.metrics[operation_name]:
-            return 0.0
-        
-        return sum(self.metrics[operation_name]) / len(self.metrics[operation_name])
-    
-    def get_total_operations(self, operation_name: str) -> int:
-        """Get total number of operations."""
-        return len(self.metrics.get(operation_name, []))
-    
-    def reset_metrics(self):
-        """Reset all metrics."""
-        self.metrics.clear()
-        self.start_times.clear()
 
 
 class SharpnessAnalyzer:
