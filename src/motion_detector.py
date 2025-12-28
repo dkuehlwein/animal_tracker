@@ -2,32 +2,11 @@ import cv2
 import numpy as np
 import logging
 import time
-from dataclasses import dataclass, field
-from typing import Tuple, Optional, List
 from config import Config
+from models import MotionResult
+from exceptions import MotionDetectionError
 
 logger = logging.getLogger(__name__)
-
-
-class MotionDetectionError(Exception):
-    """Base exception for motion detection errors."""
-    pass
-
-
-@dataclass
-class MotionResult:
-    """Result of motion detection analysis."""
-    motion_detected: bool
-    motion_area: int
-    detection_confidence: float = 0.0
-    center_x: Optional[int] = None
-    center_y: Optional[int] = None
-    contour_count: int = 0
-    # Diagnostic fields
-    largest_contour_area: int = 0
-    contour_areas: List[int] = field(default_factory=list)
-    foreground_pixel_count: int = 0
-    processing_time_ms: float = 0.0
 
 class BaseMotionDetector:
     """Base motion detector implementation."""

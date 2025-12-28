@@ -10,13 +10,9 @@ from pathlib import Path
 from typing import Optional
 from config import Config
 from utils import TelegramFormatter
+from exceptions import TelegramError
 
 logger = logging.getLogger(__name__)
-
-
-class TelegramError(Exception):
-    """Base exception for Telegram-related errors."""
-    pass
 
 
 class TelegramService:

@@ -1,41 +1,13 @@
 import sqlite3
-import time
 import logging
 from datetime import datetime
 from pathlib import Path
-from dataclasses import dataclass
-from typing import Optional, List
+from typing import List, Optional
 from config import Config
+from models import DetectionRecord
+from exceptions import DatabaseError, DatabaseConnectionError, DatabaseOperationError
 
 logger = logging.getLogger(__name__)
-
-
-class DatabaseError(Exception):
-    """Base exception for database errors."""
-    pass
-
-
-class DatabaseConnectionError(DatabaseError):
-    """Raised when database connection fails."""
-    pass
-
-
-class DatabaseOperationError(DatabaseError):
-    """Raised when database operations fail."""
-    pass
-
-
-@dataclass
-class DetectionRecord:
-    """Data class for detection records."""
-    id: Optional[int]
-    timestamp: datetime
-    image_path: str
-    motion_area: int
-    species_name: str = "Unknown species"
-    confidence_score: float = 0.0
-    processing_time: float = 0.0
-    api_success: bool = False
 
 class DatabaseManager:
     def __init__(self, config: Config):

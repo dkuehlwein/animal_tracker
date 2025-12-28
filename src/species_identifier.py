@@ -6,46 +6,12 @@ Replaces mock implementation with real AI-powered wildlife identification.
 import time
 import logging
 from pathlib import Path
-from dataclasses import dataclass
-from typing import Optional, Dict, Any
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from config import Config
+from models import DetectionResult, IdentificationResult
+from exceptions import SpeciesIdentificationError, IdentificationTimeout
 
 logger = logging.getLogger(__name__)
-
-
-class SpeciesIdentificationError(Exception):
-    """Base exception for species identification errors."""
-    pass
-
-
-class IdentificationTimeout(SpeciesIdentificationError):
-    """Raised when identification times out."""
-    pass
-
-
-@dataclass
-class DetectionResult:
-    """Result of MegaDetector animal detection."""
-    animals_detected: bool
-    detection_count: int
-    bounding_boxes: list  # List of dicts with bbox coords and confidence
-    detections: list  # Full detection info (category, conf, bbox)
-    processing_time: float
-
-
-@dataclass
-class IdentificationResult:
-    """Result of species identification."""
-    species_name: str
-    confidence: float
-    api_success: bool
-    processing_time: float
-    fallback_reason: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
-    # Two-stage pipeline info
-    detection_result: Optional[DetectionResult] = None
-    animals_detected: bool = True  # For backward compatibility
 
 
 class SpeciesIdentifier:

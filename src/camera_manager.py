@@ -16,6 +16,7 @@ from contextlib import contextmanager
 import logging
 
 from config import Config
+from exceptions import CameraError, CameraInitializationError, CameraOperationError
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ class FrameData(Protocol):
     def shape(self) -> Tuple[int, ...]:
         """Frame shape."""
         ...
-    
+
     def copy(self) -> 'FrameData':
         """Create a copy of the frame."""
         ...
@@ -34,51 +35,36 @@ class FrameData(Protocol):
 
 class CameraInterface(ABC):
     """Abstract interface for camera implementations."""
-    
+
     @abstractmethod
     def start(self) -> None:
         """Start the camera."""
         pass
-    
+
     @abstractmethod
     def stop(self) -> None:
         """Stop the camera."""
         pass
-    
+
     @abstractmethod
     def capture_motion_frame(self) -> Optional[FrameData]:
         """Capture frame for motion detection."""
         pass
-    
+
     @abstractmethod
     def capture_high_res_frame(self) -> Optional[FrameData]:
         """Capture high resolution frame."""
         pass
-    
+
     @abstractmethod
     def capture_burst_frames(self, count: int, interval: float) -> list:
         """Capture multiple high-resolution frames in quick succession."""
         pass
-    
+
     @abstractmethod
     def is_available(self) -> bool:
         """Check if camera is available."""
         pass
-
-
-class CameraError(Exception):
-    """Base exception for camera-related errors."""
-    pass
-
-
-class CameraInitializationError(CameraError):
-    """Raised when camera initialization fails."""
-    pass
-
-
-class CameraOperationError(CameraError):
-    """Raised when camera operations fail."""
-    pass
 
 
 class ResourceManager:
