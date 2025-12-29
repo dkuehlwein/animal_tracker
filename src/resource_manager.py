@@ -68,34 +68,65 @@ class StorageManager:
         self.config = config
 
     def cleanup_old_images(self) -> int:
-        """Delete oldest images if exceeding max limit (includes annotated versions)."""
+        """
+        Delete oldest image bursts if exceeding max limit.
+        Groups burst frames together (e.g., capture_20231225_120000_frame1.jpg, _frame2.jpg, etc.)
+        and treats each burst as a single unit for cleanup purposes.
+        """
         try:
-            # Get all original images (not annotated)
-            original_images = sorted(
-                [f for f in self.config.storage.image_dir.glob(f"{self.config.storage.image_prefix}*.jpg")
-                 if "_annotated" not in f.stem],
-                key=lambda x: x.stat().st_mtime
+            # Get all capture files (excluding annotated versions)
+            all_files = [
+                f for f in self.config.storage.image_dir.glob(f"{self.config.storage.image_prefix}*.jpg")
+                if "_annotated" not in f.stem
+            ]
+
+            # Group files by burst timestamp
+            # Format: capture_20231225_120000_frame1.jpg -> base: capture_20231225_120000
+            burst_groups = {}
+            for file_path in all_files:
+                # Extract base timestamp (remove _frameN suffix if present)
+                stem = file_path.stem
+                if "_frame" in stem:
+                    # Burst frame: capture_20231225_120000_frame1 -> capture_20231225_120000
+                    base = stem.rsplit("_frame", 1)[0]
+                else:
+                    # Single frame or old format: use stem as-is
+                    base = stem
+
+                if base not in burst_groups:
+                    burst_groups[base] = []
+                burst_groups[base].append(file_path)
+
+            # Sort burst groups by oldest file in each group
+            sorted_bursts = sorted(
+                burst_groups.items(),
+                key=lambda x: min(f.stat().st_mtime for f in x[1])
             )
 
-            if len(original_images) > self.config.performance.max_images:
-                files_to_delete = original_images[:(len(original_images) - self.config.performance.max_images)]
+            # Count how many bursts we have
+            burst_count = len(sorted_bursts)
+
+            if burst_count > self.config.performance.max_images:
+                # Delete oldest bursts (including all their frames)
+                bursts_to_delete = sorted_bursts[:(burst_count - self.config.performance.max_images)]
                 deleted_count = 0
 
-                for file_path in files_to_delete:
-                    try:
-                        # Delete the original image
-                        file_path.unlink()
-                        deleted_count += 1
-
-                        # Also delete the annotated version if it exists
-                        annotated_path = file_path.parent / f"{file_path.stem}_annotated{file_path.suffix}"
-                        if annotated_path.exists():
-                            annotated_path.unlink()
+                for base, file_paths in bursts_to_delete:
+                    for file_path in file_paths:
+                        try:
+                            # Delete the capture frame
+                            file_path.unlink()
                             deleted_count += 1
-                    except Exception as e:
-                        logger.error(f"Error deleting {file_path}: {e}", exc_info=True)
 
-                logger.info(f"Cleaned up {deleted_count} old images")
+                            # Also delete the annotated version if it exists
+                            annotated_path = file_path.parent / f"{file_path.stem}_annotated{file_path.suffix}"
+                            if annotated_path.exists():
+                                annotated_path.unlink()
+                                deleted_count += 1
+                        except Exception as e:
+                            logger.error(f"Error deleting {file_path}: {e}", exc_info=True)
+
+                logger.info(f"Cleaned up {len(bursts_to_delete)} old bursts ({deleted_count} files total)")
                 return deleted_count
 
             return 0
@@ -130,9 +161,30 @@ class StorageManager:
             return False
 
     def get_image_count(self) -> int:
-        """Get current number of stored images."""
+        """
+        Get current number of stored image bursts (not individual frames).
+        Counts each burst as a single detection event.
+        """
         try:
-            return len(list(self.config.storage.image_dir.glob(f"{self.config.storage.image_prefix}*.jpg")))
+            # Get all capture files (excluding annotated versions)
+            all_files = [
+                f for f in self.config.storage.image_dir.glob(f"{self.config.storage.image_prefix}*.jpg")
+                if "_annotated" not in f.stem
+            ]
+
+            # Group by burst timestamp to count bursts, not individual frames
+            burst_bases = set()
+            for file_path in all_files:
+                stem = file_path.stem
+                if "_frame" in stem:
+                    # Burst frame: extract base timestamp
+                    base = stem.rsplit("_frame", 1)[0]
+                else:
+                    # Single frame: use stem as-is
+                    base = stem
+                burst_bases.add(base)
+
+            return len(burst_bases)
         except Exception as e:
             logger.error(f"Error counting images: {e}")
             return 0

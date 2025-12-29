@@ -79,24 +79,32 @@ The system follows a modular architecture with these main components:
 
 ### Data Flow
 
-1. **Motion Detection Loop**: Low-resolution frames (640x480) captured continuously for motion analysis using YUV420 format
-2. **Motion Processing**: Background subtraction → thresholding → contour analysis → central region filtering
+1. **Motion Detection Loop**: Low-resolution frames (640x480) captured continuously for motion analysis
+   - Uses RGB format when color filtering is enabled, YUV420 grayscale otherwise
+2. **Motion Processing**: Background subtraction → thresholding → contour analysis → central region filtering → color variance filtering (if enabled)
 3. **Photo Capture**: High-resolution frames (1920x1080) captured only when motion is detected
-4. **Species Identification**: SpeciesNet AI analyzes captured image (~5-10 seconds processing time)
-5. **Database Logging**: Detection stored with species name, confidence score, and metadata
-6. **Telegram Notification**: Async notification with species information
-7. **Cleanup**: Automatic old image cleanup to manage storage
+4. **Burst Frame Saving**: All captured frames saved for debugging (e.g., `capture_TIMESTAMP_frame1.jpg` through `_frame5.jpg`)
+5. **Species Identification**: SpeciesNet AI analyzes best/sharpest frame (~5-10 seconds processing time)
+6. **Database Logging**: Detection stored with species name, confidence score, and metadata
+7. **Telegram Notification**: Async notification with species information
+8. **Cleanup**: Automatic old image cleanup to manage storage (deletes entire bursts as units)
 
 ### Key Configuration Parameters
 
 All configuration is centralized in `Config` class with nested dataclasses:
 
-- **Motion Detection**: `motion_threshold` (2000), `min_contour_area` (50), `consecutive_detections_required` (2)
+- **Motion Detection**:
+  - `motion_threshold` (default: 2000, current: 500 px) - minimum motion area to trigger detection
+  - `min_contour_area` (50) - minimum size of individual contours
+  - `consecutive_detections_required` (2) - reduces momentary false positives
+  - **Color Filtering** (enabled): Reduces false positives from uniform vegetation
+    - `enable_color_filtering` (true) - captures RGB instead of grayscale for color analysis
+    - `min_color_variance` (200.0) - motion from low-variance objects (leaves/grass) is filtered out
 - **Camera**: Dual resolution streams with frame rate limiting (`frame_duration`: 100000 microseconds)
   - **Exposure Control**: `exposure_time` (2000μs = 1/500s) and `analogue_gain` (2.5x) for motion freeze
-  - Set either to `None` to enable auto-exposure mode
+  - Set either to `None` to enable auto-exposure mode (currently: auto-exposure enabled)
 - **Timing**: `cooldown_period` (30s), `frame_interval` (0.2s for 5 FPS)
-- **Storage**: `max_images` (100) with automatic cleanup of oldest files
+- **Storage**: `max_images` (100 bursts) with automatic cleanup of oldest bursts
 - **Species Identification**: `model_version` (v4.0.1a), `country_code` (DEU), `admin1_region` (NW), `unknown_species_threshold` (0.5)
 
 ### Configuration Architecture
@@ -140,8 +148,12 @@ The camera system supports multiple implementations through the `CameraInterface
 
 - **Background subtraction**: Uses MOG2 algorithm that adapts to lighting changes
 - **Central region weighting**: Emphasizes motion in the center of the frame
-- **Consecutive detection filtering**: Reduces false positives by requiring multiple detections
+- **Consecutive detection filtering**: Requires multiple consecutive detections to reduce momentary false positives
 - **Contour analysis**: Validates motion based on size and position
+- **Color variance filtering** (enabled): Analyzes color distribution in motion regions
+  - Captures RGB frames instead of grayscale when enabled
+  - Filters out motion from uniform-color objects (e.g., wind-blown leaves, grass)
+  - Helps distinguish vegetation movement from actual animals with varied coloring
 
 ### Environment Setup
 
@@ -150,7 +162,7 @@ Requires `.env` file with:
 - `TELEGRAM_CHAT_ID`: Target chat/channel ID
 
 Additional optional environment variables for fine-tuning:
-- Motion: `MOTION_THRESHOLD`, `MOTION_CONSECUTIVE_REQUIRED`, `MOTION_FRAME_INTERVAL`
+- Motion: `MOTION_THRESHOLD`, `MOTION_CONSECUTIVE_REQUIRED`, `MOTION_FRAME_INTERVAL`, `MOTION_ENABLE_COLOR_FILTERING`, `MOTION_MIN_COLOR_VARIANCE`
 - Camera: `CAMERA_MAIN_RESOLUTION`, `CAMERA_MOTION_RESOLUTION`, `CAMERA_EXPOSURE_TIME`, `CAMERA_ANALOGUE_GAIN`
 - Performance: `PERFORMANCE_COOLDOWN`, `PERFORMANCE_MAX_IMAGES`
 - Species: `SPECIES_COUNTRY_CODE`, `SPECIES_REGION`, `SPECIES_UNKNOWN_THRESHOLD`

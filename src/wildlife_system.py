@@ -183,8 +183,8 @@ class WildlifeSystem:
     
     def _capture_and_select_best_frame(self) -> tuple:
         """
-        Capture burst of frames, analyze sharpness, save best frame.
-        Returns (image_path, sharpness_info_dict) or (None, None) on failure.
+        Capture burst of frames, save ALL frames, analyze sharpness, select best frame.
+        Returns (best_image_path, sharpness_info_dict) or (None, None) on failure.
         """
         try:
             # Capture burst frames
@@ -192,53 +192,61 @@ class WildlifeSystem:
                 count=self.config.performance.multi_frame_count,
                 interval=self.config.performance.multi_frame_interval
             )
-            
+
             if not frames:
                 logger.error("Burst capture failed, no frames captured")
                 return None, None
-            
+
+            # Generate timestamped base filename for this burst
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            base_path = self.config.storage.image_dir / f"{self.config.storage.image_prefix}{timestamp}.jpg"
+
+            # Save ALL captured frames (for debugging false positives)
+            saved_paths = self.camera.save_burst_frames(frames, base_path)
+            if not saved_paths:
+                logger.error("Failed to save any burst frames")
+                return None, None
+
             # Analyze sharpness and select best frame (using cached reference if available)
             best_frame, selected_index, best_score, all_scores = SharpnessAnalyzer.select_sharpest_frame(
                 frames,
                 motion_aware=self.config.performance.motion_aware_selection,
                 reference_frame=self.reference_frame
             )
-            
+
             if best_frame is None:
                 logger.error("Sharpness analysis failed")
                 return None, None
-            
+
             # Check if sharpness meets minimum threshold
             if best_score < self.config.performance.min_sharpness_threshold:
                 logger.warning(f"Best frame sharpness ({best_score:.1f}) below threshold "
                              f"({self.config.performance.min_sharpness_threshold})")
-            
-            # Generate timestamped filename and save best frame
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            file_path = self.config.storage.image_dir / f"{self.config.storage.image_prefix}{timestamp}.jpg"
-            
-            # Save the best frame
-            import cv2
-            success = cv2.imwrite(str(file_path), best_frame)
-            
-            if not success:
-                logger.error(f"Failed to save best frame to {file_path}")
+
+            # The best frame was already saved as one of the burst frames
+            # Identify which saved path corresponds to the best frame
+            best_frame_path = saved_paths[selected_index] if selected_index < len(saved_paths) else None
+
+            if not best_frame_path:
+                logger.error(f"Failed to identify best frame path (index {selected_index})")
                 return None, None
-            
-            logger.info(f"Burst capture complete: saved frame {selected_index + 1}/{len(frames)} "
+
+            logger.info(f"Burst capture complete: saved all {len(frames)} frames, "
+                       f"selected frame {selected_index + 1}/{len(frames)} "
                        f"(sharpness: {best_score:.1f})")
-            
+
             # Build sharpness info dict for notification
             sharpness_info = {
                 'sharpness_score': best_score,
                 'selected_frame_index': selected_index,
                 'frame_count': len(frames),
                 'all_scores': all_scores,
-                'meets_threshold': best_score >= self.config.performance.min_sharpness_threshold
+                'meets_threshold': best_score >= self.config.performance.min_sharpness_threshold,
+                'all_frame_paths': saved_paths  # Include all saved paths for reference
             }
-            
-            return file_path, sharpness_info
-        
+
+            return best_frame_path, sharpness_info
+
         except Exception as e:
             logger.error(f"Error in burst capture and selection: {e}", exc_info=True)
             return None, None

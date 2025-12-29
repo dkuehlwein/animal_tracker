@@ -360,11 +360,11 @@ class PiCameraManager(CameraInterface):
         try:
             # Ensure directory exists
             file_path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             # Picamera2 appears to already provide BGR format on this hardware
             # Skip color conversion to fix yellow->blue, red->purple color swap
             bgr_frame = frame
-            
+
             # Save image (use default JPEG compression)
             success = cv2.imwrite(str(file_path), bgr_frame)
 
@@ -372,12 +372,48 @@ class PiCameraManager(CameraInterface):
                 logger.debug(f"Frame saved to {file_path}")
             else:
                 logger.error(f"Failed to save frame to {file_path}")
-            
+
             return success
-            
+
         except Exception as e:
             logger.error(f"Error saving frame to {file_path}: {e}")
             return False
+
+    def save_burst_frames(self, frames: list, base_path: Path) -> list:
+        """
+        Save all frames from a burst capture.
+
+        Args:
+            frames: List of frames to save
+            base_path: Base path for saving (e.g., capture_20231225_120000.jpg)
+                      Frames will be saved as: capture_20231225_120000_frame1.jpg, etc.
+
+        Returns:
+            List of paths to saved frames
+        """
+        saved_paths = []
+
+        try:
+            # Extract components from base_path
+            stem = base_path.stem  # e.g., "capture_20231225_120000"
+            suffix = base_path.suffix  # e.g., ".jpg"
+            parent = base_path.parent
+
+            for i, frame in enumerate(frames):
+                # Create filename: capture_20231225_120000_frame1.jpg
+                frame_path = parent / f"{stem}_frame{i+1}{suffix}"
+
+                if self.save_frame_to_file(frame, frame_path):
+                    saved_paths.append(frame_path)
+                else:
+                    logger.warning(f"Failed to save burst frame {i+1}/{len(frames)}")
+
+            logger.info(f"Saved {len(saved_paths)}/{len(frames)} burst frames")
+            return saved_paths
+
+        except Exception as e:
+            logger.error(f"Error saving burst frames: {e}")
+            return saved_paths
     
     def is_available(self) -> bool:
         """Check if camera is available and operational."""
@@ -579,6 +615,18 @@ class CameraManager:
     def capture_burst_frames(self, count: int, interval: float) -> list:
         """Capture multiple high-resolution frames in quick succession."""
         return self._camera.capture_burst_frames(count, interval)
+
+    def save_burst_frames(self, frames: list, base_path: Path) -> list:
+        """
+        Save all frames from a burst capture.
+        Only works with PiCameraManager - returns empty list for mock camera.
+        """
+        if isinstance(self._camera, PiCameraManager):
+            return self._camera.save_burst_frames(frames, base_path)
+        else:
+            # Mock camera - just return empty list
+            logger.debug("Mock camera: skipping burst frame save")
+            return []
 
     def start(self) -> None:
         """Start the camera system."""
