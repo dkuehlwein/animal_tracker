@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from config import Config
-from models import DetectionResult, IdentificationResult
+from data_models import DetectionResult, IdentificationResult
 from exceptions import SpeciesIdentificationError, IdentificationTimeout
 
 logger = logging.getLogger(__name__)
@@ -196,9 +196,13 @@ class SpeciesIdentifier:
         # Extract classification (ensemble result)
         final_species = pred.get('prediction', 'Unknown species')
         final_confidence = pred.get('prediction_score', 0.0)
+        prediction_source = pred.get('prediction_source', 'unknown')
 
         # Extract top predictions for metadata
         classifications = pred.get('classifications', {})
+        top_predictions = []
+        top_classifier_prediction = None
+
         if isinstance(classifications, dict) and 'classes' in classifications and 'scores' in classifications:
             classes = classifications.get('classes', [])
             scores = classifications.get('scores', [])
@@ -206,14 +210,36 @@ class SpeciesIdentifier:
                 {'label': cls, 'score': score}
                 for cls, score in zip(classes, scores)
             ][:self.config.species.return_top_k]
+
+            # Extract top classifier prediction (before geofence/rollup)
+            if classes and scores:
+                top_classifier_prediction = {
+                    'label': classes[0],
+                    'score': scores[0]
+                }
         elif isinstance(classifications, list):
             top_predictions = classifications[:self.config.species.return_top_k]
-        else:
-            top_predictions = []
+            if classifications:
+                top_classifier_prediction = classifications[0]
+
+        # Find best geofenced species-level prediction using model's geofence
+        best_geofenced_species = self._find_best_geofenced_species(
+            top_predictions,
+            self.config.species.country_code,
+            self.config.species.admin1_region
+        )
 
         logger.info(f"MegaDetector found {len(animal_detections)} animals, "
                    f"classified as: {final_species} (conf: {final_confidence:.2f}, "
-                   f"processing: {processing_time:.2f}s)")
+                   f"source: {prediction_source}, processing: {processing_time:.2f}s)")
+
+        # Build metadata with prediction source and top classifier prediction
+        metadata = {
+            'top_predictions': top_predictions,
+            'prediction_source': prediction_source,
+            'top_classifier_prediction': top_classifier_prediction,
+            'best_geofenced_species': best_geofenced_species
+        }
 
         # Apply confidence threshold
         if final_confidence < self.config.species.unknown_species_threshold:
@@ -224,9 +250,9 @@ class SpeciesIdentifier:
                 processing_time=processing_time,
                 fallback_reason=f'Confidence {final_confidence:.2f} below threshold {self.config.species.unknown_species_threshold}',
                 metadata={
+                    **metadata,
                     'raw_prediction': final_species,
                     'raw_confidence': final_confidence,
-                    'top_predictions': top_predictions
                 },
                 detection_result=detection_result,
                 animals_detected=True
@@ -238,7 +264,7 @@ class SpeciesIdentifier:
             confidence=final_confidence,
             api_success=True,
             processing_time=processing_time,
-            metadata={'top_predictions': top_predictions},
+            metadata=metadata,
             detection_result=detection_result,
             animals_detected=True
         )
@@ -254,6 +280,58 @@ class SpeciesIdentifier:
             detection_result=detection_result,
             animals_detected=detection_result.animals_detected if detection_result else False
         )
+
+    def _find_best_geofenced_species(self, top_predictions: list, country: str, admin1_region: str) -> dict:
+        """
+        Find the best species-level prediction that passes the geofence filter.
+
+        Uses SpeciesNet's internal geofence_map to filter predictions to species
+        that are actually present in the specified region.
+
+        Args:
+            top_predictions: List of prediction dicts with 'label' and 'score'
+            country: ISO 3166-1 alpha-3 country code (e.g., 'DEU')
+            admin1_region: Admin1 region code (e.g., 'NW' for Nordrhein-Westfalen)
+
+        Returns:
+            Dict with 'label' and 'score' of best geofenced species, or None
+        """
+        if not self._model_loaded or not self._model:
+            return None
+
+        try:
+            geofence_map = self._model.ensemble.geofence_map
+        except AttributeError:
+            return None
+
+        for pred in top_predictions:
+            label = pred.get('label', '')
+            parts = label.split(';')
+
+            # Skip non-species-level predictions (need genus and species parts)
+            # Format: UUID;class;order;family;genus;species;common_name
+            if len(parts) < 7 or not parts[4] or not parts[5]:
+                continue
+
+            # Build taxonomic key for geofence lookup
+            # Format: class;order;family;genus;species
+            taxonomy_key = ';'.join(parts[1:6])
+
+            # Check if this species is allowed in the specified region
+            if taxonomy_key in geofence_map:
+                geofence_data = geofence_map[taxonomy_key]
+                if isinstance(geofence_data, dict) and 'allow' in geofence_data:
+                    country_regions = geofence_data['allow'].get(country)
+                    # country_regions is a list of allowed admin1 regions
+                    # Empty list means species is allowed country-wide
+                    # None means species is NOT allowed in this country
+                    if country_regions is not None:
+                        # Species is allowed in this country
+                        if len(country_regions) == 0 or admin1_region in country_regions:
+                            return pred
+
+        return None
+
 
 # Keep MockSpeciesIdentifier for testing purposes
 class MockSpeciesIdentifier(SpeciesIdentifier):

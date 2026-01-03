@@ -299,6 +299,12 @@ class Config:
             ),
             frame_interval=self._get_optional_env(
                 "MOTION_FRAME_INTERVAL", "0.2", float
+            ),
+            enable_color_filtering=self._get_optional_env(
+                "MOTION_ENABLE_COLOR_FILTERING", "False", lambda x: x.lower() in ("true", "1", "yes")
+            ),
+            min_color_variance=self._get_optional_env(
+                "MOTION_MIN_COLOR_VARIANCE", "200.0", float
             )
         )
     

@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 from config import Config
-from models import DetectionRecord
+from data_models import DetectionRecord
 from exceptions import DatabaseError, DatabaseConnectionError, DatabaseOperationError
 
 logger = logging.getLogger(__name__)

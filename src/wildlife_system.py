@@ -163,7 +163,8 @@ class WildlifeSystem:
                 'fallback_reason': species_result.fallback_reason,
                 'animals_detected': species_result.animals_detected,
                 'detection_count': species_result.detection_result.detection_count if species_result.detection_result else 0,
-                'detection_result': species_result.detection_result  # Include full detection info
+                'detection_result': species_result.detection_result,  # Include full detection info
+                'metadata': species_result.metadata  # Include classification metadata
             }
 
             return result_dict, timestamp
@@ -260,53 +261,83 @@ class WildlifeSystem:
             return species_name.title()
         return species_name_raw
     
-    def _build_caption(self, species_result: dict, motion_area: int, timestamp: datetime) -> str:
-        """Build notification caption based on detection results."""
+    def _build_caption(self, species_result: dict, motion_area: int, timestamp: datetime,
+                        temperature: float = None) -> str:
+        """Build compact notification caption based on detection results."""
         species_name = self._extract_species_name(species_result.get('species_name', 'Unknown species'))
         confidence = species_result.get('confidence', 0.0)
-        time_str = timestamp.strftime('%Y-%m-%d %H:%M:%S')
-        
+        time_str = timestamp.strftime('%H:%M')
+
         # Check what MegaDetector found
         detection_result = species_result.get('detection_result')
-        detected_items = []
         animals_detected = False
-        
+
         if detection_result and detection_result.detections:
-            category_names = {1: 'animal', 2: 'person', 3: 'vehicle'}
             for det in detection_result.detections:
                 cat = det.get('category')
-                # Convert to int if it's a string
                 if isinstance(cat, str):
                     cat = int(cat)
-                conf = det.get('conf', 0.0)
-                cat_name = category_names.get(cat, f'category {cat}')
-                detected_items.append(f"{cat_name} ({conf:.1%})")
                 if cat == 1:  # Animal category
                     animals_detected = True
-        
-        # Build base caption
-        caption = ""
-        
-        # If animals were detected, show species identification
+                    break
+
+        # Build caption
         if animals_detected:
-            caption = f"🦌 {species_name}\nConfidence: {confidence:.1%}\nMotion area: {motion_area} px\n{time_str}"
-        # Otherwise show what was detected
-        elif detected_items:
-            items_str = ", ".join(detected_items)
-            caption = f"👁️ Motion detected\nFound: {items_str}\nNo animals above threshold\nMotion area: {motion_area} px\n{time_str}"
+            # Line 1: Species identification
+            emoji = self._get_species_emoji(species_name)
+            caption = f"{emoji} {species_name} ({confidence:.0%})"
+
+            # Add best geofenced species if rolled up
+            metadata = species_result.get('metadata', {})
+            if metadata:
+                prediction_source = metadata.get('prediction_source', '')
+                best_geofenced = metadata.get('best_geofenced_species')
+                if 'rollup' in prediction_source and best_geofenced:
+                    top_species_name = self._extract_species_name(best_geofenced.get('label', ''))
+                    top_score = best_geofenced.get('score', 0.0)
+                    if top_species_name and top_species_name.lower() != 'unknown species':
+                        caption += f" → {top_species_name} ({top_score:.0%})"
+
+            # Line 2: Stats (motion, time, temp)
+            stats = [f"{motion_area} px", time_str]
+            if temperature is not None:
+                stats.append(f"{temperature:.0f}°C")
+            caption += f"\n📍 {' | '.join(stats)}"
+
         else:
-            caption = f"👁️ Motion detected\nNo objects identified by detector\nMotion area: {motion_area} px\n{time_str}"
-        
-        # Add sharpness info if available
+            # No animals - show what was detected
+            caption = f"👁️ Motion detected | {motion_area} px | {time_str}"
+            if temperature is not None:
+                caption += f" | {temperature:.0f}°C"
+
+        # Line 3: Sharpness info (compact)
         sharpness_info = species_result.get('sharpness_info')
         if sharpness_info:
-            caption += f"\n\n📸 Image Quality:"
-            caption += f"\nSharpness: {sharpness_info['sharpness_score']:.1f}"
-            caption += f"\nSelected: Frame {sharpness_info['selected_frame_index'] + 1}/{sharpness_info['frame_count']}"
-            if not sharpness_info['meets_threshold']:
-                caption += f"\n⚠️ Below quality threshold ({self.config.performance.min_sharpness_threshold:.0f})"
-        
+            frame_info = f"Frame {sharpness_info['selected_frame_index'] + 1}/{sharpness_info['frame_count']}"
+            sharpness_val = f"sharpness {sharpness_info['sharpness_score']:.0f}"
+            warning = "" if sharpness_info['meets_threshold'] else " ⚠️"
+            caption += f"\n📸 {frame_info}, {sharpness_val}{warning}"
+
         return caption
+
+    def _get_species_emoji(self, species_name: str) -> str:
+        """Get appropriate emoji for species."""
+        name_lower = species_name.lower()
+        emoji_map = {
+            'squirrel': '🐿️', 'sciuridae': '🐿️',
+            'hedgehog': '🦔',
+            'fox': '🦊',
+            'cat': '🐱',
+            'bird': '🐦', 'robin': '🐦', 'blackbird': '🐦', 'pigeon': '🐦',
+            'rabbit': '🐰', 'hare': '🐰',
+            'deer': '🦌',
+            'badger': '🦡',
+            'mouse': '🐭', 'rat': '🐭', 'rodent': '🐭',
+        }
+        for key, emoji in emoji_map.items():
+            if key in name_lower:
+                return emoji
+        return '🦌'  # Default
     
     async def send_notification(self, species_result: dict, motion_area: int,
                                timestamp: datetime, image_path: Optional[Path] = None,
@@ -314,13 +345,10 @@ class WildlifeSystem:
         """Send notification with species identification info and motion visualization"""
         # Get system temperature
         temperature = self.system_monitor.get_cpu_temperature()
-        
+
         if image_path and image_path.exists():
-            caption = self._build_caption(species_result, motion_area, timestamp)
-            
-            if temperature:
-                caption += f"\n🌡️ {temperature:.1f}°C"
-                
+            caption = self._build_caption(species_result, motion_area, timestamp, temperature)
+
             # If we have both original and annotated images, send as media group
             if annotated_path and annotated_path.exists():
                 await self.telegram_service.send_media_group(

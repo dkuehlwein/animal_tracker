@@ -72,7 +72,7 @@ The system follows a modular architecture with these main components:
 - **`database_manager.py`**: SQLite database for detection logging
 - **`notification_service.py`**: Telegram notification service with message formatting
 - **`resource_manager.py`**: Memory management, storage cleanup, and system monitoring
-- **`models.py`**: Consolidated data models (MotionResult, DetectionResult, IdentificationResult, DetectionRecord)
+- **`data_models.py`**: Consolidated data models (MotionResult, DetectionResult, IdentificationResult, DetectionRecord) - named `data_models` to avoid conflict with YOLO's internal `models` package
 - **`exceptions.py`**: Unified exception hierarchy for all components
 - **`utils.py`**: Utilities (PerformanceTimer, MotionVisualizer, SharpnessAnalyzer, SunChecker)
 - **`scripts/camera_preview.py`**: MJPEG streaming server for live camera preview (focus adjustment tool)

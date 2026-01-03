@@ -3,7 +3,7 @@ import numpy as np
 import logging
 import time
 from config import Config
-from models import MotionResult
+from data_models import MotionResult
 from exceptions import MotionDetectionError
 
 logger = logging.getLogger(__name__)

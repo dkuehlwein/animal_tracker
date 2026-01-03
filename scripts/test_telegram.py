@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from config import Config
 from notification_service import NotificationService
 from utils import MotionVisualizer
-from models import MotionResult
+from data_models import MotionResult
 import cv2
 import numpy as np
 
