@@ -281,11 +281,36 @@ class WildlifeSystem:
                     animals_detected = True
                     break
 
+        # Get max detection confidence from bounding boxes
+        # Note: This is MegaDetector's confidence in detecting an ANIMAL (bounding box),
+        # which is different from the species classifier confidence.
+        # We use the maximum confidence across all detected animal bounding boxes
+        # from the SELECTED BEST FRAME (not all 5 burst frames).
+        max_detection_conf = 0.0
+        if detection_result and detection_result.bounding_boxes:
+            max_detection_conf = max(
+                bb.get('confidence', 0.0) for bb in detection_result.bounding_boxes
+            )
+            logger.info(f"Detection bounding boxes: {len(detection_result.bounding_boxes)} boxes, "
+                       f"max confidence: {max_detection_conf:.2f}")
+        else:
+            logger.warning(f"No bounding boxes found - detection_result: {detection_result is not None}, "
+                          f"bounding_boxes: {detection_result.bounding_boxes if detection_result else None}")
+
         # Build caption
         if animals_detected:
-            # Line 1: Species identification
+            # Line 1: Timestamp (prominent)
+            caption = f"📅 {timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
+
+            # Line 2: Species identification with confidences
             emoji = self._get_species_emoji(species_name)
-            caption = f"{emoji} {species_name} ({confidence:.0%})"
+            species_line = f"{emoji} {species_name} ({confidence:.0%})"
+
+            # Add bounding box confidence if available
+            if max_detection_conf > 0:
+                species_line += f" | Box: {max_detection_conf:.0%}"
+
+            caption += f"\n{species_line}"
 
             # Add best geofenced species if rolled up
             metadata = species_result.get('metadata', {})
@@ -298,15 +323,15 @@ class WildlifeSystem:
                     if top_species_name and top_species_name.lower() != 'unknown species':
                         caption += f" → {top_species_name} ({top_score:.0%})"
 
-            # Line 2: Stats (motion, time, temp)
-            stats = [f"{motion_area} px", time_str]
+            # Line 3: Stats (motion, temp)
+            stats = [f"{motion_area} px"]
             if temperature is not None:
                 stats.append(f"{temperature:.0f}°C")
             caption += f"\n📍 {' | '.join(stats)}"
 
         else:
             # No animals - show what was detected
-            caption = f"👁️ Motion detected | {motion_area} px | {time_str}"
+            caption = f"📅 {timestamp.strftime('%Y-%m-%d %H:%M:%S')}\n👁️ Motion detected | {motion_area} px"
             if temperature is not None:
                 caption += f" | {temperature:.0f}°C"
 

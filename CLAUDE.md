@@ -125,7 +125,7 @@ The species identification system integrates Google SpeciesNet v5.0.2:
 - **Components**: Loads detector (MegaDetector), classifier, and ensemble combiner
 - **Lazy Loading**: Model loads on first identification request (not at startup) - takes ~6 seconds
 - **Geographic Filtering**: Configured for Bonn, Germany (DEU/NW region) via geofencing
-- **Confidence Thresholds**: Two-stage filtering (detection @ 0.6, classification @ 0.5)
+- **Confidence Thresholds**: Two-stage filtering (detection @ 0.5, classification @ 0.5)
 - **Error Resilience**: Always returns valid IdentificationResult, never crashes
 - **MockSpeciesIdentifier**: Test implementation for development without SpeciesNet
 
