@@ -19,6 +19,7 @@ class CameraConfig(BaseSettings):
     main_resolution: Tuple[int, int] = (1920, 1080)
     motion_detection_resolution: Tuple[int, int] = (640, 480)
     motion_detection_format: str = "YUV420"
+    frame_format: str = "RGB888"  # Main stream format for capture
     frame_duration: int = 100000  # microseconds
     startup_delay: float = 2.0
     exposure_time: Optional[int] = None  # None = auto-exposure
@@ -57,7 +58,7 @@ class MotionConfig(BaseSettings):
     frame_interval: float = 0.2  # 5 FPS
     consecutive_required: int = 2
     blur_kernel_size: int = 5
-    central_region_bounds: Tuple[float, float] = (0.2, 0.8)
+    central_region_bounds: Tuple[float, float] = (0.1, 0.9)
     center_weight: float = 1.0
     edge_weight: float = 0.2
     enable_color_filtering: bool = False

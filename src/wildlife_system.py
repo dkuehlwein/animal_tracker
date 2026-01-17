@@ -268,18 +268,9 @@ class WildlifeSystem:
         confidence = species_result.get('confidence', 0.0)
         time_str = timestamp.strftime('%H:%M')
 
-        # Check what MegaDetector found
+        # Check what MegaDetector found - use the pre-computed flag from species_identifier
         detection_result = species_result.get('detection_result')
-        animals_detected = False
-
-        if detection_result and detection_result.detections:
-            for det in detection_result.detections:
-                cat = det.get('category')
-                if isinstance(cat, str):
-                    cat = int(cat)
-                if cat == 1:  # Animal category
-                    animals_detected = True
-                    break
+        animals_detected = species_result.get('animals_detected', False)
 
         # Get max detection confidence from bounding boxes
         # Note: This is MegaDetector's confidence in detecting an ANIMAL (bounding box),

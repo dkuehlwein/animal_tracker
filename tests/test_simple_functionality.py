@@ -95,5 +95,82 @@ class TestBasicFunctionality:
             db_path.unlink()
 
 
+class TestWildlifeSystemCaptionBuilder:
+    """Test caption building in WildlifeSystem."""
+
+    def test_build_caption_with_species_detected(self):
+        """Test caption shows species when animals_detected is True."""
+        from wildlife_system import WildlifeSystem
+        from data_models import DetectionResult
+        from datetime import datetime
+
+        system = WildlifeSystem()
+
+        # Simulate a species result with animals detected
+        detection_result = DetectionResult(
+            animals_detected=True,
+            detection_count=1,
+            bounding_boxes=[{'confidence': 0.75, 'bbox': [0.1, 0.2, 0.3, 0.4]}],
+            detections=[{'category': '1', 'conf': 0.75}],
+            processing_time=1.5
+        )
+
+        species_result = {
+            'species_name': 'aba05f1e;mammalia;rodentia;sciuridae;sciurus;vulgaris;eurasian red squirrel',
+            'confidence': 0.85,
+            'animals_detected': True,
+            'detection_result': detection_result,
+            'metadata': {},
+        }
+
+        caption = system._build_caption(
+            species_result,
+            motion_area=1500,
+            timestamp=datetime(2026, 1, 17, 10, 30, 0),
+            temperature=22.5
+        )
+
+        # Should show species info, not just "Motion detected"
+        assert 'Eurasian Red Squirrel' in caption
+        assert '85%' in caption
+        assert 'Motion detected' not in caption
+
+    def test_build_caption_no_animals_detected(self):
+        """Test caption shows motion only when animals_detected is False."""
+        from wildlife_system import WildlifeSystem
+        from data_models import DetectionResult
+        from datetime import datetime
+
+        system = WildlifeSystem()
+
+        # Simulate result with no animals detected
+        detection_result = DetectionResult(
+            animals_detected=False,
+            detection_count=0,
+            bounding_boxes=[],
+            detections=[],
+            processing_time=1.0
+        )
+
+        species_result = {
+            'species_name': 'Unknown species',
+            'confidence': 0.0,
+            'animals_detected': False,
+            'detection_result': detection_result,
+            'metadata': {},
+        }
+
+        caption = system._build_caption(
+            species_result,
+            motion_area=800,
+            timestamp=datetime(2026, 1, 17, 10, 30, 0),
+            temperature=20.0
+        )
+
+        # Should show motion detected, not species
+        assert 'Motion detected' in caption
+        assert '800 px' in caption
+
+
 if __name__ == '__main__':
     pytest.main([__file__])
