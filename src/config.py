@@ -114,7 +114,7 @@ class PerformanceConfig(BaseSettings):
     enable_multi_frame: bool = True
     multi_frame_count: int = 5
     multi_frame_interval: float = 0.1
-    min_sharpness_threshold: float = 15.0
+    min_sharpness_threshold: float = 19.0
     motion_aware_selection: bool = True
 
 

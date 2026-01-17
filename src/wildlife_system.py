@@ -219,10 +219,11 @@ class WildlifeSystem:
                 logger.error("Sharpness analysis failed")
                 return None, None
 
-            # Check if sharpness meets minimum threshold
+            # Check if sharpness meets minimum threshold - skip if too blurry
             if best_score < self.config.performance.min_sharpness_threshold:
-                logger.warning(f"Best frame sharpness ({best_score:.1f}) below threshold "
-                             f"({self.config.performance.min_sharpness_threshold})")
+                logger.info(f"Best frame sharpness ({best_score:.1f}) below threshold "
+                           f"({self.config.performance.min_sharpness_threshold}) - skipping")
+                return None, None
 
             # The best frame was already saved as one of the burst frames
             # Identify which saved path corresponds to the best frame
