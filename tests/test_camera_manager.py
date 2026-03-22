@@ -11,10 +11,8 @@ import time
 import sys
 sys.path.append('src')
 
-from camera_manager import (
-    CameraManager, MockCameraManager, PiCameraManager,
-    CameraError, CameraInitializationError, CameraOperationError,
-)
+from camera_manager import CameraManager, MockCameraManager, PiCameraManager
+from exceptions import CameraError, CameraInitializationError, CameraOperationError
 from config import Config
 
 

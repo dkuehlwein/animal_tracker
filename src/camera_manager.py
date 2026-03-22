@@ -259,9 +259,9 @@ class PiCameraManager(CameraInterface):
             try:
                 _ = self.camera.capture_array("main")
                 flush_time_ms = (time.time() - flush_start) * 1000
-                logger.info(f"[DIAG] Buffer flush: {flush_time_ms:.1f}ms")
+                logger.debug(f"[DIAG] Buffer flush: {flush_time_ms:.1f}ms")
             except Exception as e:
-                logger.warning(f"[DIAG] Buffer flush failed: {e}")
+                logger.debug(f"[DIAG] Buffer flush failed: {e}")
 
             for i in range(count):
                 frame_start = time.time()
@@ -288,7 +288,7 @@ class PiCameraManager(CameraInterface):
                         }
                         frame_metadata.append(frame_info)
 
-                        logger.info(f"[DIAG] Frame {i+1}/{count}: capture={capture_time_ms:.1f}ms, "
+                        logger.debug(f"[DIAG] Frame {i+1}/{count}: capture={capture_time_ms:.1f}ms, "
                                    f"sensor_ts={sensor_timestamp/1e6:.3f}s, "
                                    f"exposure={exposure_time}us, "
                                    f"since_burst={frame_info['time_since_burst_start_ms']:.1f}ms")
@@ -311,13 +311,12 @@ class PiCameraManager(CameraInterface):
                 if len(sensor_times) >= 2:
                     time_gaps = [sensor_times[i+1] - sensor_times[i] for i in range(len(sensor_times)-1)]
                     avg_gap_ms = sum(time_gaps) / len(time_gaps) / 1000
-                    logger.info(f"[DIAG] Sensor timestamp gaps (ms): {[f'{g/1000:.1f}' for g in time_gaps]}, avg={avg_gap_ms:.1f}ms")
+                    logger.debug(f"[DIAG] Sensor timestamp gaps (ms): {[f'{g/1000:.1f}' for g in time_gaps]}, avg={avg_gap_ms:.1f}ms")
 
                     # Check if first frame might be stale (sensor timestamp older than expected)
                     if sensor_times[0] > 0 and avg_gap_ms > 0:
-                        expected_first_frame_age = avg_gap_ms  # Should be roughly one frame interval
                         if time_gaps[0] / 1000 > avg_gap_ms * 2:
-                            logger.warning(f"[DIAG] First frame gap ({time_gaps[0]/1000:.1f}ms) is >2x average - possible stale buffer!")
+                            logger.debug(f"[DIAG] First frame gap ({time_gaps[0]/1000:.1f}ms) is >2x average - possible stale buffer!")
 
             return frames
 
