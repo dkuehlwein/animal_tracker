@@ -29,15 +29,23 @@ class NotificationFormatter:
         if species_name == "Unknown species":
             return f"🔍 Unknown species detected at {time_str}\nMotion area: {motion_area:,} pixels"
 
-        # Emoji mapping
+        # Emoji mapping (consolidated, lowercase matching)
         emoji_map = {
-            "Hedgehog": "🦔", "Fox": "🦊", "Squirrel": "🐿️",
-            "Cat": "🐱", "Bird": "🐦", "Robin": "🐦", "Blackbird": "🐦"
+            'squirrel': '🐿️', 'sciuridae': '🐿️',
+            'hedgehog': '🦔',
+            'fox': '🦊',
+            'cat': '🐱',
+            'bird': '🐦', 'robin': '🐦', 'blackbird': '🐦', 'pigeon': '🐦',
+            'rabbit': '🐰', 'hare': '🐰',
+            'deer': '🦌',
+            'badger': '🦡',
+            'mouse': '🐭', 'rat': '🐭', 'rodent': '🐭',
         }
 
         emoji = "🔍"
-        for animal, symbol in emoji_map.items():
-            if animal in species_name:
+        name_lower = species_name.lower()
+        for key, symbol in emoji_map.items():
+            if key in name_lower:
                 emoji = symbol
                 break
 
