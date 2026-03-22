@@ -95,12 +95,10 @@ class DatabaseManager:
                         VALUES (?, ?, 1)
                     ''', (species_name, datetime.now()))
                     
-                    cursor.execute('''
-                        UPDATE species SET detection_count = detection_count + 1
-                        WHERE name = ? AND EXISTS (
-                            SELECT 1 FROM species WHERE name = ? AND detection_count > 0
-                        )
-                    ''', (species_name, species_name))
+                    cursor.execute(
+                        'UPDATE species SET detection_count = detection_count + 1 WHERE name = ?',
+                        (species_name,)
+                    )
                 
                 conn.commit()
                 return detection_id
