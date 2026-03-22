@@ -105,6 +105,7 @@ All configuration is centralized in `Config` class with nested dataclasses:
   - Set either to `None` to enable auto-exposure mode (currently: auto-exposure enabled)
 - **Timing**: `cooldown_period` (30s), `frame_interval` (0.2s for 5 FPS)
 - **Storage**: `max_images` (100 bursts) with automatic cleanup of oldest bursts
+- **Debug**: `send_annotated_image` (false) - when enabled, sends motion detection overlay image alongside the original photo in Telegram
 - **Species Identification**: `model_version` (v4.0.1a), `country_code` (DEU), `admin1_region` (NW), `unknown_species_threshold` (0.5)
 
 ### Configuration Architecture
@@ -164,7 +165,7 @@ Requires `.env` file with:
 Additional optional environment variables for fine-tuning:
 - Motion: `MOTION_THRESHOLD`, `MOTION_CONSECUTIVE_REQUIRED`, `MOTION_FRAME_INTERVAL`, `MOTION_ENABLE_COLOR_FILTERING`, `MOTION_MIN_COLOR_VARIANCE`
 - Camera: `CAMERA_MAIN_RESOLUTION`, `CAMERA_MOTION_RESOLUTION`, `CAMERA_EXPOSURE_TIME`, `CAMERA_ANALOGUE_GAIN`
-- Performance: `PERFORMANCE_COOLDOWN`, `PERFORMANCE_MAX_IMAGES`
+- Performance: `PERFORMANCE_COOLDOWN`, `PERFORMANCE_MAX_IMAGES`, `PERFORMANCE_SEND_ANNOTATED_IMAGE` (debug: send motion overlay alongside original, default false)
 - Species: `SPECIES_COUNTRY_CODE`, `SPECIES_REGION`, `SPECIES_UNKNOWN_THRESHOLD`
 
 ### Hardware Dependencies

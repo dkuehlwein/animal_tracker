@@ -50,7 +50,7 @@ class TestMotionConfig:
         config = MotionConfig()
         assert config.threshold == 2000
         assert config.motion_threshold == 2000  # Alias
-        assert config.central_region_bounds == (0.2, 0.8)
+        assert config.central_region_bounds == (0.1, 0.9)
 
     def test_backward_compatibility_aliases(self):
         """Test backward compatibility aliases work."""

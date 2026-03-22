@@ -116,6 +116,7 @@ class PerformanceConfig(BaseSettings):
     multi_frame_interval: float = 0.1
     min_sharpness_threshold: float = 19.0
     motion_aware_selection: bool = True
+    send_annotated_image: bool = False  # Debug: send motion detection overlay alongside original
 
 
 class StorageConfig(BaseSettings):

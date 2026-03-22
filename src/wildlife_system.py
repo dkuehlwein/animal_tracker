@@ -263,7 +263,7 @@ class WildlifeSystem:
         return species_name_raw
     
     def _build_caption(self, species_result: dict, motion_area: int, timestamp: datetime,
-                        temperature: float = None) -> str:
+                        temperature: Optional[float] = None) -> str:
         """Build compact notification caption based on detection results."""
         species_name = self._extract_species_name(species_result.get('species_name', 'Unknown species'))
         confidence = species_result.get('confidence', 0.0)
@@ -286,8 +286,9 @@ class WildlifeSystem:
             logger.info(f"Detection bounding boxes: {len(detection_result.bounding_boxes)} boxes, "
                        f"max confidence: {max_detection_conf:.2f}")
         else:
-            logger.warning(f"No bounding boxes found - detection_result: {detection_result is not None}, "
-                          f"bounding_boxes: {detection_result.bounding_boxes if detection_result else None}")
+            logger.warning("No bounding boxes found - detection_result: %s, bounding_boxes: %s",
+                          detection_result is not None,
+                          detection_result.bounding_boxes if detection_result else None)
 
         # Build caption
         if animals_detected:
@@ -538,9 +539,11 @@ class WildlifeSystem:
                                 if sharpness_info:
                                     species_result['sharpness_info'] = sharpness_info
 
-                                # Create annotated image showing motion detection regions
+                                # Create annotated image showing motion detection regions (debug only)
                                 annotated_path = None
-                                if self.last_motion_frame is not None and self.last_motion_result is not None:
+                                if (self.config.performance.send_annotated_image
+                                        and self.last_motion_frame is not None
+                                        and self.last_motion_result is not None):
                                     annotated_path = await loop.run_in_executor(
                                         self.executor,
                                         MotionVisualizer.create_annotated_image,
@@ -550,7 +553,7 @@ class WildlifeSystem:
                                         self.last_motion_result
                                     )
 
-                                # Send notification with both original and annotated images
+                                # Send notification with image (and annotated image if debug enabled)
                                 await self.send_notification(species_result, motion_area, timestamp,
                                                             image_path, annotated_path)
 
