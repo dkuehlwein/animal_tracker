@@ -8,8 +8,10 @@ from exceptions import MotionDetectionError
 
 logger = logging.getLogger(__name__)
 
-class BaseMotionDetector:
-    """Base motion detector implementation."""
+
+class MotionDetector:
+    """Motion detector with radial central region weighting and optional color filtering."""
+
     def __init__(self, config: Config):
         self.config = config
 
@@ -26,6 +28,7 @@ class BaseMotionDetector:
         )
 
         self.consecutive_detections = 0
+        self._diag_frame_count = 0
 
     def reset_background_model(self):
         """Reset the background subtractor model to prevent false positives after detection."""
@@ -181,17 +184,14 @@ class BaseMotionDetector:
 
             processing_time_ms = (time.time() - detect_start) * 1000
 
-            # Check if total motion area exceeds Pi Zero threshold
+            # Check if total motion area exceeds threshold
             if significant_motion_detected and motion_area >= self.config.motion.motion_threshold:
                 # Color variance filtering (if enabled and color frame available)
                 passes_color_filter = True
                 color_variance = None
                 if is_color and self.config.motion.enable_color_filtering:
                     # Calculate color variance in the motion region
-                    # Create a mask of the motion region
                     motion_mask = (thresh > 0).astype(np.uint8)
-
-                    # Calculate color variance within the motion region
                     color_variance = self._calculate_color_variance(frame, motion_mask)
 
                     # Filter out low color variance (uniform color = leaves/inanimate objects)
@@ -199,9 +199,8 @@ class BaseMotionDetector:
                         passes_color_filter = False
 
                 if not passes_color_filter:
-                    # DIAGNOSTIC: Log filtered motion
-                    logger.info(f"[DIAG-MOTION] Filtered by color: area={motion_area}, "
-                               f"color_var={color_variance:.1f}, threshold={self.config.motion.min_color_variance}")
+                    logger.debug(f"[DIAG-MOTION] Filtered by color: area={motion_area}, "
+                                 f"color_var={color_variance:.1f}, threshold={self.config.motion.min_color_variance}")
                     # Motion detected but filtered out due to low color variance
                     return MotionResult(
                         motion_detected=False,
@@ -218,20 +217,18 @@ class BaseMotionDetector:
 
                 self.consecutive_detections += 1
 
-                # DIAGNOSTIC: Log consecutive detection buildup
-                logger.info(f"[DIAG-MOTION] Consecutive detection {self.consecutive_detections}/{self.config.motion.consecutive_detections_required}: "
-                           f"area={motion_area}, largest_contour={largest_contour}, "
-                           f"sig_contours={significant_contour_count}, center=({center_x},{center_y}), "
-                           f"fg_pixels: raw={raw_fg_pixels}, thresh={thresh_fg_pixels}, morph={morph_fg_pixels}")
+                logger.debug(f"[DIAG-MOTION] Consecutive detection {self.consecutive_detections}/{self.config.motion.consecutive_detections_required}: "
+                             f"area={motion_area}, largest_contour={largest_contour}, "
+                             f"sig_contours={significant_contour_count}, center=({center_x},{center_y}), "
+                             f"fg_pixels: raw={raw_fg_pixels}, thresh={thresh_fg_pixels}, morph={morph_fg_pixels}")
 
                 if self.consecutive_detections >= self.config.motion.consecutive_detections_required:
                     self.consecutive_detections = 0
 
-                    # DIAGNOSTIC: Log confirmed detection with full details
-                    logger.info(f"[DIAG-MOTION] === CONFIRMED DETECTION === "
-                               f"area={motion_area}, threshold={self.config.motion.motion_threshold}, "
-                               f"largest_contour={largest_contour}, total_contours={len(contours)}, "
-                               f"top5_contours={contour_areas_sorted[:5]}")
+                    logger.debug(f"[DIAG-MOTION] === CONFIRMED DETECTION === "
+                                 f"area={motion_area}, threshold={self.config.motion.motion_threshold}, "
+                                 f"largest_contour={largest_contour}, total_contours={len(contours)}, "
+                                 f"top5_contours={contour_areas_sorted[:5]}")
 
                     return MotionResult(
                         motion_detected=True,
@@ -259,10 +256,7 @@ class BaseMotionDetector:
                 )
 
             # DIAGNOSTIC: Periodic logging of why motion wasn't detected (every ~100 frames to avoid spam)
-            if hasattr(self, '_diag_frame_count'):
-                self._diag_frame_count += 1
-            else:
-                self._diag_frame_count = 0
+            self._diag_frame_count += 1
 
             if self._diag_frame_count % 100 == 0 and motion_area > 0:
                 reason = []
@@ -271,7 +265,7 @@ class BaseMotionDetector:
                 if motion_area < self.config.motion.motion_threshold:
                     reason.append(f"area_below_threshold({motion_area}<{self.config.motion.motion_threshold})")
                 logger.debug(f"[DIAG-MOTION] No detection: {', '.join(reason) if reason else 'no_motion'}, "
-                            f"area={motion_area}, contours={len(contours)}, largest={largest_contour}")
+                             f"area={motion_area}, contours={len(contours)}, largest={largest_contour}")
 
             self.consecutive_detections = max(0, self.consecutive_detections - 1)
             return MotionResult(
@@ -286,47 +280,3 @@ class BaseMotionDetector:
 
         except Exception as e:
             raise MotionDetectionError(f"Error in motion detection: {e}") from e
-
-
-class WeightedMotionDetector(BaseMotionDetector):
-    """Enhanced motion detector with configurable weighting strategies."""
-    
-    def __init__(self, config: Config, weight_strategy: str = "radial"):
-        super().__init__(config)
-        self.weight_strategy = weight_strategy
-        self._update_weight_mask()
-    
-    def _update_weight_mask(self):
-        """Update weight mask based on strategy."""
-        if self.weight_strategy == "radial":
-            # Use existing radial weighting
-            pass
-        elif self.weight_strategy == "rectangular":
-            # Create rectangular central region weighting
-            height, width = self.config.camera.motion_detection_resolution[::-1]
-            mask = np.full((height, width), self.config.motion.edge_weight, dtype=np.float32)
-            
-            # Define central rectangle
-            h_start = int(height * self.config.motion.central_region_bounds[0])
-            h_end = int(height * self.config.motion.central_region_bounds[1])
-            w_start = int(width * self.config.motion.central_region_bounds[0])
-            w_end = int(width * self.config.motion.central_region_bounds[1])
-            
-            mask[h_start:h_end, w_start:w_end] = self.config.motion.center_weight
-            self.central_region_mask = mask
-
-
-class MotionDetector:
-    """Main motion detector facade that uses WeightedMotionDetector as implementation."""
-
-    def __init__(self, config: Config):
-        self.config = config
-        self._implementation = WeightedMotionDetector(config)
-
-    def detect(self, frame) -> MotionResult:
-        """Detect motion using the underlying implementation."""
-        return self._implementation.detect(frame)
-
-    def reset_background_model(self):
-        """Reset the background subtractor model to prevent false positives after detection."""
-        self._implementation.reset_background_model()

@@ -10,8 +10,7 @@ import sys
 sys.path.append('src')
 
 from motion_detector import (
-    MotionDetector, MotionDetectionError, MotionResult,
-    BaseMotionDetector, WeightedMotionDetector
+    MotionDetector, MotionDetectionError, MotionResult
 )
 from config import Config
 
@@ -46,12 +45,12 @@ class TestMotionResult:
 
 
 class TestBaseMotionDetector:
-    """Test base motion detection implementation."""
+    """Test motion detection implementation."""
 
     def setup_method(self):
         """Set up test configuration."""
         self.config = Config.create_test_config()
-        self.detector = BaseMotionDetector(self.config)
+        self.detector = MotionDetector(self.config)
 
     def test_detector_initialization(self):
         """Test detector initialization."""
@@ -150,7 +149,7 @@ class TestBaseMotionDetector:
         center_result = self.detector.detect(center_motion)
 
         # Reset detector
-        self.detector = BaseMotionDetector(self.config)
+        self.detector = MotionDetector(self.config)
         for _ in range(10):
             self.detector.detect(background)
 
@@ -170,7 +169,7 @@ class TestMotionDetector:
         detector = MotionDetector(config)
 
         assert detector.config == config
-        assert detector._implementation is not None
+        assert detector.background_subtractor is not None
 
     def test_motion_detector_basic_detection(self):
         """Test basic motion detection."""
