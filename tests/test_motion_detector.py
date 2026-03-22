@@ -44,7 +44,7 @@ class TestMotionResult:
         assert result.motion_area == 0
 
 
-class TestBaseMotionDetector:
+class TestMotionDetector:
     """Test motion detection implementation."""
 
     def setup_method(self):
@@ -160,7 +160,7 @@ class TestBaseMotionDetector:
         assert isinstance(edge_result, MotionResult)
 
 
-class TestMotionDetector:
+class TestMotionDetectorInterface:
     """Test high-level motion detector interface."""
 
     def test_motion_detector_initialization(self):

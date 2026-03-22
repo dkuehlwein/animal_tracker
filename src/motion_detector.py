@@ -88,7 +88,7 @@ class MotionDetector:
         return float(total_variance)
 
     def detect(self, frame) -> MotionResult:
-        """Detect motion in frame (RGB or grayscale) with color filtering and central region focus"""
+        """Detect motion in frame (BGR or grayscale) with color filtering and central region focus"""
         detect_start = time.time()
 
         try:
