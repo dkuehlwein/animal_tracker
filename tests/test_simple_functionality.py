@@ -69,28 +69,82 @@ class TestBasicFunctionality:
         """Test database manager basic functionality."""
         # Use default test config and let it create database in default location
         config = Config.create_test_config()
-        
+
         # Create data directory if it doesn't exist
         config.storage.data_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Import and test database manager
         from database_manager import DatabaseManager
         db_manager = DatabaseManager(config)
-        
+
         # Test basic logging
         detection_id = db_manager.log_detection("test.jpg", 1500)
         assert detection_id is not None
-        
+
         # Test recent detections
         recent = db_manager.get_recent_detections(1)
         assert len(recent) >= 1
-        
+
         # Test cleanup
         cleaned = db_manager.cleanup_old_detections(days_to_keep=30)
         assert isinstance(cleaned, int)
-        
+
         # Cleanup test database
         db_path = Path(config.storage.database_path)
+        if db_path.exists():
+            db_path.unlink()
+
+    def test_database_species_count_accuracy(self):
+        """Test that species detection count is accurate (no off-by-one error)."""
+        import sqlite3
+        from database_manager import DatabaseManager
+
+        # Use test config with clean database
+        config = Config.create_test_config()
+        config.storage.data_dir.mkdir(parents=True, exist_ok=True)
+
+        # Clean up any existing test database
+        db_path = Path(config.storage.database_path)
+        if db_path.exists():
+            db_path.unlink()
+
+        db_manager = DatabaseManager(config)
+
+        # First detection of a new species
+        db_manager.log_detection("test1.jpg", 1500, species_name="Red Fox")
+
+        # Query species table directly
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT detection_count FROM species WHERE name = ?", ("Red Fox",))
+            count = cursor.fetchone()[0]
+
+        # After first detection, count should be 1 (not 2)
+        assert count == 1, f"First detection should have count=1, got {count}"
+
+        # Second detection of the same species
+        db_manager.log_detection("test2.jpg", 1600, species_name="Red Fox")
+
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT detection_count FROM species WHERE name = ?", ("Red Fox",))
+            count = cursor.fetchone()[0]
+
+        # After second detection, count should be 2
+        assert count == 2, f"Second detection should have count=2, got {count}"
+
+        # Third detection
+        db_manager.log_detection("test3.jpg", 1700, species_name="Red Fox")
+
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT detection_count FROM species WHERE name = ?", ("Red Fox",))
+            count = cursor.fetchone()[0]
+
+        # After third detection, count should be 3
+        assert count == 3, f"Third detection should have count=3, got {count}"
+
+        # Cleanup test database
         if db_path.exists():
             db_path.unlink()
 

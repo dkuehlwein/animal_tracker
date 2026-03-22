@@ -92,9 +92,9 @@ class DatabaseManager:
                 if species_name != "Unknown species":
                     cursor.execute('''
                         INSERT OR IGNORE INTO species (name, first_detected, detection_count)
-                        VALUES (?, ?, 1)
+                        VALUES (?, ?, 0)
                     ''', (species_name, datetime.now()))
-                    
+
                     cursor.execute(
                         'UPDATE species SET detection_count = detection_count + 1 WHERE name = ?',
                         (species_name,)
