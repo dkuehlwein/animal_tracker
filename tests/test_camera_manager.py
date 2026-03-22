@@ -14,59 +14,9 @@ sys.path.append('src')
 from camera_manager import (
     CameraManager, MockCameraManager, PiCameraManager,
     CameraError, CameraInitializationError, CameraOperationError,
-    ResourceManager
 )
 from config import Config
 
-
-class TestResourceManager:
-    """Test resource management functionality."""
-    
-    def test_resource_registration(self):
-        """Test frame resource registration and cleanup."""
-        rm = ResourceManager()
-        
-        # Test registration
-        rm.register_frame("frame_1")
-        rm.register_frame("frame_2")
-        assert rm.get_active_count() == 2
-        
-        # Test unregistration
-        rm.unregister_frame("frame_1")
-        assert rm.get_active_count() == 1
-        
-        # Test cleanup all
-        rm.cleanup_all()
-        assert rm.get_active_count() == 0
-    
-    def test_thread_safety(self):
-        """Test thread safety of resource manager."""
-        import threading
-        
-        rm = ResourceManager()
-        errors = []
-        
-        def register_frames(start_id):
-            try:
-                for i in range(100):
-                    rm.register_frame(f"frame_{start_id}_{i}")
-            except Exception as e:
-                errors.append(e)
-        
-        # Start multiple threads
-        threads = []
-        for i in range(5):
-            thread = threading.Thread(target=register_frames, args=(i,))
-            threads.append(thread)
-            thread.start()
-        
-        # Wait for completion
-        for thread in threads:
-            thread.join()
-        
-        # Should have no errors and correct count
-        assert len(errors) == 0
-        assert rm.get_active_count() == 500
 
 
 class TestMockCameraManager:
@@ -154,15 +104,17 @@ class TestCameraManager:
         """Test camera manager with mock camera."""
         config = Config.create_test_config()
         manager = CameraManager(config, use_mock=True)
-        
-        # Test context manager
-        with manager:
+
+        manager.start()
+        try:
             assert manager.is_operational()
-            
+
             # Test motion frame capture
             frame = manager.capture_motion_frame()
             assert frame is not None
-        
+        finally:
+            manager.stop()
+
         # Should be stopped after context
         assert not manager.is_operational()
     

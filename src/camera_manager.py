@@ -7,7 +7,6 @@ from __future__ import annotations
 import cv2
 import time
 import gc
-import threading
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
@@ -66,34 +65,15 @@ class CameraInterface(ABC):
         """Check if camera is available."""
         pass
 
+    @abstractmethod
+    def save_frame_to_file(self, frame, file_path: Path) -> bool:
+        """Save a frame to a file."""
+        pass
 
-class ResourceManager:
-    """Manages camera resources and memory cleanup."""
-    
-    def __init__(self):
-        self._active_frames = set()
-        self._lock = threading.Lock()
-    
-    def register_frame(self, frame_id: str):
-        """Register an active frame."""
-        with self._lock:
-            self._active_frames.add(frame_id)
-    
-    def unregister_frame(self, frame_id: str):
-        """Unregister an active frame."""
-        with self._lock:
-            self._active_frames.discard(frame_id)
-    
-    def cleanup_all(self):
-        """Force cleanup of all registered frames."""
-        with self._lock:
-            self._active_frames.clear()
-            gc.collect()
-    
-    def get_active_count(self) -> int:
-        """Get number of active frames."""
-        with self._lock:
-            return len(self._active_frames)
+    @abstractmethod
+    def save_burst_frames(self, frames: list, base_path: Path) -> list:
+        """Save all frames from a burst capture."""
+        pass
 
 
 class PiCameraManager(CameraInterface):
@@ -106,7 +86,6 @@ class PiCameraManager(CameraInterface):
         self.config = config
         self.camera = None
         self._is_running = False
-        self._resource_manager = ResourceManager()
         self._last_error_time = 0
         self._error_count = 0
         self._max_retries = 3
@@ -198,7 +177,7 @@ class PiCameraManager(CameraInterface):
             if self.camera:
                 self.camera.stop()
                 self.camera = None
-            self._resource_manager.cleanup_all()
+            gc.collect()
             self._is_running = False
             logger.info("Camera stopped successfully")
         except Exception as e:
@@ -210,9 +189,6 @@ class PiCameraManager(CameraInterface):
             raise CameraOperationError("Camera not initialized")
 
         try:
-            frame_id = f"motion_{time.time()}"
-            self._resource_manager.register_frame(frame_id)
-
             # Use RGB for motion detection if color filtering is enabled
             if self.config.motion.enable_color_filtering:
                 # Capture RGB frame from lores stream
@@ -225,7 +201,6 @@ class PiCameraManager(CameraInterface):
                 yuv_full = yuv_frame.reshape((h * 3 // 2, w))
                 bgr_frame = cv2.cvtColor(yuv_full, cv2.COLOR_YUV2BGR_I420)
 
-                self._resource_manager.unregister_frame(frame_id)
                 self._reset_error_count()
 
                 return bgr_frame
@@ -241,7 +216,6 @@ class PiCameraManager(CameraInterface):
                 if y_channel.dtype != 'uint8':
                     y_channel = y_channel.astype('uint8')
 
-                self._resource_manager.unregister_frame(frame_id)
                 self._reset_error_count()
 
                 return y_channel
@@ -256,16 +230,12 @@ class PiCameraManager(CameraInterface):
             raise CameraOperationError("Camera not initialized")
         
         try:
-            frame_id = f"highres_{time.time()}"
-            self._resource_manager.register_frame(frame_id)
-            
             # Capture high resolution frame
             frame = self.camera.capture_array("main")
             frame_copy = frame.copy()
 
-            self._resource_manager.unregister_frame(frame_id)
             self._reset_error_count()
-            
+
             return frame_copy
             
         except Exception as e:
@@ -427,7 +397,7 @@ class PiCameraManager(CameraInterface):
         return {
             "is_running": self._is_running,
             "error_count": self._error_count,
-            "active_frames": self._resource_manager.get_active_count(),
+            "active_frames": 0,
             "last_error_time": self._last_error_time
         }
     
@@ -440,7 +410,7 @@ class PiCameraManager(CameraInterface):
         # Force cleanup on repeated errors
         if self._error_count > 5:
             logger.warning("Multiple camera errors, forcing resource cleanup")
-            self._resource_manager.cleanup_all()
+            gc.collect()
         
         # Attempt recovery if too many errors
         if self._error_count > 10:
@@ -531,7 +501,19 @@ class MockCameraManager(CameraInterface):
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.touch()  # Create empty file
         return True
-    
+
+    def save_burst_frames(self, frames: list, base_path: Path) -> list:
+        """Mock save burst frames."""
+        saved_paths = []
+        stem = base_path.stem
+        suffix = base_path.suffix
+        parent = base_path.parent
+        for i, frame in enumerate(frames):
+            frame_path = parent / f"{stem}_frame{i+1}{suffix}"
+            if self.save_frame_to_file(frame, frame_path):
+                saved_paths.append(frame_path)
+        return saved_paths
+
     def is_available(self) -> bool:
         """Mock camera is always available when running."""
         return self._is_running
@@ -587,12 +569,8 @@ class CameraManager:
                 logger.error("Failed to capture high resolution frame")
                 return None
             
-            # Save to file using camera manager's optimized saving
-            if isinstance(self._camera, PiCameraManager):
-                success = self._camera.save_frame_to_file(frame, file_path)
-            else:
-                # For mock camera, use simple save
-                success = self._camera.save_frame_to_file(frame, file_path)
+            # Save to file
+            success = self._camera.save_frame_to_file(frame, file_path)
             
             if success:
                 logger.info(f"Photo saved: {file_path}")
@@ -617,16 +595,8 @@ class CameraManager:
         return self._camera.capture_burst_frames(count, interval)
 
     def save_burst_frames(self, frames: list, base_path: Path) -> list:
-        """
-        Save all frames from a burst capture.
-        Only works with PiCameraManager - returns empty list for mock camera.
-        """
-        if isinstance(self._camera, PiCameraManager):
-            return self._camera.save_burst_frames(frames, base_path)
-        else:
-            # Mock camera - just return empty list
-            logger.debug("Mock camera: skipping burst frame save")
-            return []
+        """Save all frames from a burst capture."""
+        return self._camera.save_burst_frames(frames, base_path)
 
     def start(self) -> None:
         """Start the camera system."""
@@ -657,11 +627,3 @@ class CameraManager:
             }
         }
     
-    def __enter__(self):
-        """Context manager entry."""
-        self.start()
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit."""
-        self.stop()
