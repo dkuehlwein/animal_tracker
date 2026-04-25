@@ -53,7 +53,7 @@ class MotionConfig(BaseSettings):
 
     threshold: int = 2000
     min_contour_area: int = 50
-    background_history: int = 100
+    background_history: int = 500
     background_threshold: int = 40
     frame_interval: float = 0.2  # 5 FPS
     consecutive_required: int = 2

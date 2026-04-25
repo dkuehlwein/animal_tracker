@@ -565,9 +565,9 @@ class WildlifeSystem:
                                 if motion_area > self.config.motion.motion_threshold * 2:
                                     self.system_monitor.log_system_status()
 
-                            # Reset background model to prevent false positives from lingering motion
-                            self.motion_detector.reset_background_model()
-                            logger.info("Background model reset to prevent false alarms")
+                            # Disabled: was wiping MOG2 shadow model on every detection;
+                            # rely on natural background adaptation (history=500) + shadow detection instead.
+                            # self.motion_detector.reset_background_model()
 
                             # Force cleanup after detection processing
                             self.system_monitor.memory_manager.force_cleanup()

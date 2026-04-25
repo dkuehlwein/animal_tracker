@@ -19,7 +19,7 @@ class MotionDetector:
         self.background_subtractor = cv2.createBackgroundSubtractorMOG2(
             history=config.motion.background_history,
             varThreshold=config.motion.background_threshold,
-            detectShadows=False
+            detectShadows=True
         )
 
         # Create central region mask for new resolution
@@ -35,7 +35,7 @@ class MotionDetector:
         self.background_subtractor = cv2.createBackgroundSubtractorMOG2(
             history=self.config.motion.background_history,
             varThreshold=self.config.motion.background_threshold,
-            detectShadows=False
+            detectShadows=True
         )
         self.consecutive_detections = 0
 
@@ -111,13 +111,13 @@ class MotionDetector:
             # Apply background subtraction and threshold
             fgmask = self.background_subtractor.apply(gray)
 
-            # DIAGNOSTIC: Count raw foreground pixels before thresholding
-            raw_fg_pixels = np.sum(fgmask > 0)
+            # DIAGNOSTIC: Count raw foreground pixels (excluding MOG2 shadow markers at 127)
+            raw_fg_pixels = np.sum(fgmask == 255)
 
-            # Increased threshold to 50 to ignore minor pixel fluctuations
+            # Drop MOG2 shadow-marked pixels (value 127), keep true foreground (value 255)
             _, thresh = cv2.threshold(
                 fgmask,
-                50,  # Higher threshold to filter camera noise
+                200,
                 255,
                 cv2.THRESH_BINARY
             )

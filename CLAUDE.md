@@ -97,8 +97,8 @@ All configuration is centralized in `Config` class with nested dataclasses:
   - `motion_threshold` (default: 2000, current: 500 px) - minimum motion area to trigger detection
   - `min_contour_area` (50) - minimum size of individual contours
   - `consecutive_detections_required` (2) - reduces momentary false positives
-  - **Color Filtering** (enabled): Reduces false positives from uniform vegetation
-    - `enable_color_filtering` (true) - captures RGB instead of grayscale for color analysis
+  - **Color Filtering** (disabled by default): Reduces false positives from uniform vegetation
+    - `enable_color_filtering` (false) - when enabled, captures RGB instead of grayscale for color analysis
     - `min_color_variance` (200.0) - motion from low-variance objects (leaves/grass) is filtered out
 - **Camera**: Dual resolution streams with frame rate limiting (`frame_duration`: 100000 microseconds)
   - **Exposure Control**: `exposure_time` (2000μs = 1/500s) and `analogue_gain` (2.5x) for motion freeze
@@ -148,10 +148,12 @@ The camera system supports multiple implementations through the `CameraInterface
 ### Motion Detection Strategy
 
 - **Background subtraction**: Uses MOG2 algorithm that adapts to lighting changes
+  - **Shadow detection** is enabled (`detectShadows=True`); the foreground threshold is set to 200 to drop MOG2's shadow markers (value 127) and keep only true foreground (value 255). This suppresses false positives from moving tree shadows.
+  - The background model is **not reset** after detections — MOG2's natural adaptation (history=500) plus shadow detection are relied upon instead, so the learned shadow distribution survives across triggers.
 - **Central region weighting**: Emphasizes motion in the center of the frame
 - **Consecutive detection filtering**: Requires multiple consecutive detections to reduce momentary false positives
 - **Contour analysis**: Validates motion based on size and position
-- **Color variance filtering** (enabled): Analyzes color distribution in motion regions
+- **Color variance filtering** (disabled by default): Analyzes color distribution in motion regions
   - Captures RGB frames instead of grayscale when enabled
   - Filters out motion from uniform-color objects (e.g., wind-blown leaves, grass)
   - Helps distinguish vegetation movement from actual animals with varied coloring
