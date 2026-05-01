@@ -75,6 +75,11 @@ class CameraInterface(ABC):
         """Save all frames from a burst capture."""
         pass
 
+    @abstractmethod
+    def consume_restart_flag(self) -> bool:
+        """Return True (and clear the flag) if the camera was auto-restarted since the last call."""
+        pass
+
 
 class PiCameraManager(CameraInterface):
     """
@@ -90,7 +95,8 @@ class PiCameraManager(CameraInterface):
         self._error_count = 0
         self._max_retries = 3
         self._retry_delay = 1.0
-        
+        self._restart_pending = False  # Set after a successful auto-restart; consumed by caller
+
         logger.info("Initializing PiCamera manager")
     
     def start(self) -> None:
@@ -418,6 +424,7 @@ class PiCameraManager(CameraInterface):
                 self.stop()
                 time.sleep(2)
                 self.start()
+                self._restart_pending = True
             except Exception as e:
                 logger.error(f"Camera restart failed: {e}")
     
@@ -425,6 +432,12 @@ class PiCameraManager(CameraInterface):
         """Reset error count after successful operation."""
         if self._error_count > 0:
             self._error_count = max(0, self._error_count - 1)
+
+    def consume_restart_flag(self) -> bool:
+        if self._restart_pending:
+            self._restart_pending = False
+            return True
+        return False
 
 
 class MockCameraManager(CameraInterface):
@@ -516,7 +529,10 @@ class MockCameraManager(CameraInterface):
     def is_available(self) -> bool:
         """Mock camera is always available when running."""
         return self._is_running
-    
+
+    def consume_restart_flag(self) -> bool:
+        return False
+
     def get_stats(self) -> dict:
         """Get mock camera statistics."""
         return {
@@ -608,6 +624,10 @@ class CameraManager:
     def is_operational(self) -> bool:
         """Check if camera system is operational."""
         return self._camera.is_available()
+
+    def consume_restart_flag(self) -> bool:
+        """True (and self-clearing) if the underlying camera auto-restarted since the last call."""
+        return self._camera.consume_restart_flag()
     
     def get_system_info(self) -> dict:
         """Get comprehensive camera system information."""

@@ -27,17 +27,48 @@ class MotionDetector:
             config.camera.motion_detection_resolution[::-1]  # height, width
         )
 
+        # Warmup window: suppress triggers while MOG2 learns the scene.
+        # Frames computed from seconds so the window is robust to frame_interval changes.
+        self._warmup_total_frames = max(
+            0, int(config.motion.warmup_seconds / config.motion.frame_interval)
+        )
+        self._warmup_remaining = self._warmup_total_frames
+        self._warmup_reason = "startup"
+
         self.consecutive_detections = 0
         self._diag_frame_count = 0
 
     def reset_background_model(self):
-        """Reset the background subtractor model to prevent false positives after detection."""
+        """Reset the background subtractor model and stateful counters."""
         self.background_subtractor = cv2.createBackgroundSubtractorMOG2(
             history=self.config.motion.background_history,
             varThreshold=self.config.motion.background_threshold,
             detectShadows=True
         )
         self.consecutive_detections = 0
+        self._diag_frame_count = 0
+
+    def start_warmup(self, reason: str):
+        """Reset MOG2 and re-arm the warmup window. Call on sunrise / camera restart."""
+        self.reset_background_model()
+        self._warmup_remaining = self._warmup_total_frames
+        self._warmup_reason = reason
+        logger.info(
+            f"[WARMUP] Armed for {self._warmup_total_frames} frames "
+            f"(~{self.warmup_eta_seconds:.0f}s) — reason: {reason}"
+        )
+
+    @property
+    def is_warming_up(self) -> bool:
+        return self._warmup_remaining > 0
+
+    @property
+    def warmup_reason(self) -> str:
+        return self._warmup_reason
+
+    @property
+    def warmup_eta_seconds(self) -> float:
+        return self._warmup_remaining * self.config.motion.frame_interval
 
     def _create_central_region_mask(self, shape):
         """Create a weighted mask that emphasizes the central region"""
@@ -110,6 +141,21 @@ class MotionDetector:
 
             # Apply background subtraction and threshold
             fgmask = self.background_subtractor.apply(gray)
+
+            # Warmup: keep feeding MOG2 (apply() above) but suppress triggers
+            # until the model has learned the scene. Reset consecutive counter so
+            # the first frame after warmup can't ride a stale streak into a trigger.
+            if self._warmup_remaining > 0:
+                self._warmup_remaining -= 1
+                self.consecutive_detections = 0
+                processing_time_ms = (time.time() - detect_start) * 1000
+                if self._warmup_remaining == 0:
+                    logger.info(f"[WARMUP] Complete — detection live (reason was: {self._warmup_reason})")
+                return MotionResult(
+                    motion_detected=False,
+                    motion_area=0,
+                    processing_time_ms=processing_time_ms
+                )
 
             # DIAGNOSTIC: Count raw foreground pixels (excluding MOG2 shadow markers at 127)
             raw_fg_pixels = np.sum(fgmask == 255)

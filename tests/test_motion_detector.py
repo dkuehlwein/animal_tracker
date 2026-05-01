@@ -94,8 +94,9 @@ class TestMotionDetector:
                 break
 
         assert isinstance(result, MotionResult)
-        # Should detect motion
-        assert result.motion_area >= 0  # Just verify it's valid, threshold may vary
+        # Tightened: with warmup_seconds=0 in test config, detection must actually fire
+        assert result.motion_detected is True
+        assert result.motion_area > 0
 
     def test_consecutive_detection_requirement(self):
         """Test consecutive detection filtering."""
@@ -214,6 +215,70 @@ class TestMotionDetectorInterface:
 
         assert len(results) == 10
         assert all(isinstance(r, MotionResult) for r in results)
+
+
+class TestMotionDetectorWarmup:
+    """Verify warmup window suppresses triggers while MOG2 learns the scene."""
+
+    def _make_config(self, warmup_seconds: float):
+        import os
+        os.environ['MOTION_WARMUP_SECONDS'] = str(warmup_seconds)
+        try:
+            return Config.create_test_config()
+        finally:
+            # Restore default for other tests
+            os.environ['MOTION_WARMUP_SECONDS'] = '0'
+
+    def test_warmup_suppresses_strong_motion(self):
+        """During warmup, even a clear motion frame must not trigger detection."""
+        # frame_interval=0.2s × 2.0s = 10 warmup frames
+        config = self._make_config(warmup_seconds=2.0)
+        detector = MotionDetector(config)
+
+        assert detector.is_warming_up is True
+        assert detector.warmup_reason == "startup"
+
+        # Strong motion frame
+        motion_frame = np.zeros((480, 640), dtype=np.uint8)
+        motion_frame[100:380, 150:490] = 255
+
+        # All detect() calls during warmup window must return suppressed results
+        for _ in range(10):
+            result = detector.detect(motion_frame)
+            assert result.motion_detected is False
+            assert result.motion_area == 0
+
+        # Warmup window should now be exhausted
+        assert detector.is_warming_up is False
+
+    def test_warmup_zero_runs_detection_immediately(self):
+        """warmup_seconds=0 (test default) means detection works on frame 1."""
+        config = Config.create_test_config()  # warmup=0
+        detector = MotionDetector(config)
+        assert detector.is_warming_up is False
+
+    def test_start_warmup_re_arms(self):
+        """start_warmup() must reset MOG2 and re-arm the suppression window."""
+        config = self._make_config(warmup_seconds=1.0)  # 5 frames
+        detector = MotionDetector(config)
+
+        # Drain warmup
+        background = np.zeros((480, 640), dtype=np.uint8)
+        for _ in range(10):
+            detector.detect(background)
+        assert detector.is_warming_up is False
+
+        # Re-arm
+        detector.start_warmup("sunrise")
+        assert detector.is_warming_up is True
+        assert detector.warmup_reason == "sunrise"
+
+        # Strong motion still suppressed during the new window
+        motion_frame = background.copy()
+        motion_frame[100:380, 150:490] = 255
+        result = detector.detect(motion_frame)
+        assert result.motion_detected is False
+        assert result.motion_area == 0
 
 
 if __name__ == '__main__':

@@ -63,6 +63,7 @@ class MotionConfig(BaseSettings):
     edge_weight: float = 0.2
     enable_color_filtering: bool = False
     min_color_variance: float = 200.0
+    warmup_seconds: float = 300.0  # Suppress detection while MOG2 learns the scene
 
     # Aliases for backward compatibility
     @property
@@ -251,6 +252,7 @@ class Config(BaseSettings):
         import os
         os.environ.setdefault('TELEGRAM_BOT_TOKEN', 'test_token')
         os.environ.setdefault('TELEGRAM_CHAT_ID', 'test_chat')
+        os.environ.setdefault('MOTION_WARMUP_SECONDS', '0')
         return cls()
 
 

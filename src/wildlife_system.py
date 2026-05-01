@@ -67,6 +67,22 @@ class WildlifeSystem:
         # Daylight state tracking for start/stop notifications
         self._was_daytime = None  # None = unknown, will be set on first check
 
+        # Track warmup completion edge to send "Detection active" when warmup ends
+        self._was_warming_up = self.motion_detector.is_warming_up
+
+    async def _send_warmup_started(self, reason: str) -> None:
+        """Arm motion-detector warmup and notify Telegram.
+
+        Reasons map to user-facing phrasing; the eta is read from the detector
+        so it stays correct if warmup_seconds is changed.
+        """
+        self.motion_detector.start_warmup(reason)
+        self._was_warming_up = True
+        eta_min = self.motion_detector.warmup_eta_seconds / 60.0
+        await self.telegram_service.send_text_message(
+            f"⏳ Sensor warmup ({reason}) — detection paused for ~{eta_min:.1f} min"
+        )
+
     async def _check_daylight_transition(self) -> bool:
         """
         Check for daylight state transitions and send notifications.
@@ -92,6 +108,7 @@ class WildlifeSystem:
                 f"🌅 Good morning! Wildlife detection starting.\n"
                 f"Sunrise: {sun_info['sunrise']}, Sunset: {sun_info['sunset']}"
             )
+            await self._send_warmup_started("sunrise")
             return True
 
         # Transition from day to night - detection stopping
@@ -440,7 +457,16 @@ class WildlifeSystem:
                     logger.info("Captured initial reference frame for burst selection")
             except Exception as e:
                 logger.warning(f"Failed to capture initial reference frame: {e}")
-            
+
+            # Send startup warmup notification only if we'll actually be processing
+            # frames now. At nighttime startup the sunrise transition will arm warmup later.
+            will_process_now = (
+                not self.config.performance.daylight_only
+                or self.sun_checker.is_daytime()
+            )
+            if will_process_now and self.motion_detector.is_warming_up:
+                await self._send_warmup_started("startup")
+
             try:
                 while True:
                     try:
@@ -476,10 +502,20 @@ class WildlifeSystem:
                         loop = asyncio.get_event_loop()
                         frame = await loop.run_in_executor(self.executor, self.camera.capture_motion_frame)
 
+                        # If the camera auto-restarted, the scene may have shifted
+                        # (auto-exposure / AWB re-converging) → re-arm warmup.
+                        if self.camera.consume_restart_flag():
+                            await self._send_warmup_started("camera restart")
+
                         if frame is not None:
                             motion_result = self.motion_detector.detect(frame)
                             motion_detected = motion_result.motion_detected
                             motion_area = motion_result.motion_area
+
+                            # Warmup True→False edge: notify that detection is live
+                            if self._was_warming_up and not self.motion_detector.is_warming_up:
+                                self._was_warming_up = False
+                                await self.telegram_service.send_text_message("✅ Detection active")
 
                             # Store frame and result for later annotation
                             self.last_motion_frame = frame.copy()
