@@ -239,19 +239,22 @@ class SharpnessAnalyzer:
 
     @staticmethod
     def select_sharpest_frame(frames: list, motion_aware: bool = True,
-                             reference_frame: np.ndarray = None) -> tuple:
+                             reference_frame: np.ndarray = None,
+                             min_sharpness: float = 0.0) -> tuple:
         """
-        Analyze multiple frames and select the best one using combined scoring.
+        Analyze multiple frames and select the one with the most subject content.
 
         When motion_aware is True and reference_frame is provided:
-        - Compares each frame to the cached background reference
-        - Frame with biggest difference has most subject content visible
-        - Combined with sharpness for final selection
+        - Picks the frame with the highest diff_from_background among frames whose
+          sharpness clears `min_sharpness` (subject visibility wins, with a sharpness
+          floor to avoid badly blurred picks).
+        - Falls back to the highest-diff frame if none clear the floor.
 
         Args:
             frames: List of numpy arrays (BGR or grayscale images)
             motion_aware: If True, use reference-based scoring when available
             reference_frame: Cached background frame from when scene was empty
+            min_sharpness: Minimum sharpness for a frame to be eligible
 
         Returns:
             Tuple of (best_frame, selected_index, best_score, all_scores)
@@ -282,29 +285,22 @@ class SharpnessAnalyzer:
                 for frame in frames
             ]
 
-            # Normalize scores to 0-1 range for combining
-            max_sharpness = max(sharpness_scores) if max(sharpness_scores) > 0 else 1
-            max_diff = max(diff_scores) if max(diff_scores) > 0 else 1
+            # Subject-first selection: among frames clearing the sharpness floor,
+            # pick the one with the most subject content (highest diff_from_bg).
+            eligible = [i for i, s in enumerate(sharpness_scores) if s >= min_sharpness]
+            if eligible:
+                best_index = max(eligible, key=lambda i: diff_scores[i])
+                selection_mode = f"eligible≥{min_sharpness:.1f}"
+            else:
+                best_index = diff_scores.index(max(diff_scores))
+                selection_mode = "fallback (none cleared sharpness floor)"
 
-            normalized_sharpness = [s / max_sharpness for s in sharpness_scores]
-            normalized_diff = [d / max_diff for d in diff_scores]
-
-            # Combined score: 40% sharpness, 60% difference from background
-            # Prioritize frames where subject is most visible
-            combined_scores = [
-                0.4 * ns + 0.6 * nd
-                for ns, nd in zip(normalized_sharpness, normalized_diff)
-            ]
-
-            # Select frame with best combined score
-            best_index = combined_scores.index(max(combined_scores))
             best_frame = frames[best_index]
             best_score = sharpness_scores[best_index]
 
-            logger.info(f"Reference-based selection: "
+            logger.info(f"Subject-first selection ({selection_mode}): "
                        f"sharpness={[f'{s:.1f}' for s in sharpness_scores]}, "
                        f"diff_from_bg={[f'{d:.1f}' for d in diff_scores]}, "
-                       f"combined={[f'{c:.2f}' for c in combined_scores]}, "
                        f"selected frame {best_index + 1}/{len(frames)} "
                        f"(sharpness: {best_score:.1f}, diff: {diff_scores[best_index]:.1f})")
 

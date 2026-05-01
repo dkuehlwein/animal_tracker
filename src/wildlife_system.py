@@ -229,7 +229,8 @@ class WildlifeSystem:
             best_frame, selected_index, best_score, all_scores = SharpnessAnalyzer.select_sharpest_frame(
                 frames,
                 motion_aware=self.config.performance.motion_aware_selection,
-                reference_frame=self.reference_frame
+                reference_frame=self.reference_frame,
+                min_sharpness=self.config.performance.min_sharpness_threshold,
             )
 
             if best_frame is None:
@@ -625,13 +626,16 @@ class WildlifeSystem:
 
 
 if __name__ == "__main__":
-    # Setup logging - INFO for most, WARNING for picamera2
+    import os
+    log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
     logging.basicConfig(
-        level=logging.INFO,
+        level=getattr(logging, log_level, logging.INFO),
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
-    # Reduce picamera2 verbosity
+    # Reduce verbosity of noisy third-party loggers
     logging.getLogger('picamera2').setLevel(logging.WARNING)
+    for noisy in ('httpx', 'httpcore', 'asyncio', 'urllib3', 'telegram'):
+        logging.getLogger(noisy).setLevel(logging.INFO)
     
     system = WildlifeSystem()
     asyncio.run(system.run())

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class CameraConfig(BaseSettings):
     """Camera-specific configuration settings."""
-    model_config = SettingsConfigDict(env_prefix='CAMERA_')
+    model_config = SettingsConfigDict(env_prefix='CAMERA_', env_file='.env', extra='ignore')
 
     main_resolution: Tuple[int, int] = (1920, 1080)
     motion_detection_resolution: Tuple[int, int] = (640, 480)
@@ -49,7 +49,7 @@ class CameraConfig(BaseSettings):
 
 class MotionConfig(BaseSettings):
     """Motion detection configuration settings."""
-    model_config = SettingsConfigDict(env_prefix='MOTION_')
+    model_config = SettingsConfigDict(env_prefix='MOTION_', env_file='.env', extra='ignore')
 
     threshold: int = 2000
     min_contour_area: int = 50
@@ -77,7 +77,7 @@ class MotionConfig(BaseSettings):
 
 class LocationConfig(BaseSettings):
     """Location configuration for sun calculations."""
-    model_config = SettingsConfigDict(env_prefix='LOCATION_')
+    model_config = SettingsConfigDict(env_prefix='LOCATION_', env_file='.env', extra='ignore')
 
     latitude: float = 50.7374  # Bonn, Germany
     longitude: float = 7.0982
@@ -100,7 +100,7 @@ class LocationConfig(BaseSettings):
 
 class PerformanceConfig(BaseSettings):
     """Performance and resource management configuration."""
-    model_config = SettingsConfigDict(env_prefix='PERFORMANCE_')
+    model_config = SettingsConfigDict(env_prefix='PERFORMANCE_', env_file='.env', extra='ignore')
 
     cooldown_period: float = 30.0
     memory_threshold: float = 0.8
@@ -122,7 +122,7 @@ class PerformanceConfig(BaseSettings):
 
 class StorageConfig(BaseSettings):
     """Storage and file management configuration."""
-    model_config = SettingsConfigDict(env_prefix='STORAGE_')
+    model_config = SettingsConfigDict(env_prefix='STORAGE_', env_file='.env', extra='ignore')
 
     data_dir: Path = Path("data")
     database_path: str = "data/detections.db"
@@ -144,7 +144,7 @@ class StorageConfig(BaseSettings):
 
 class SpeciesConfig(BaseSettings):
     """Species identification configuration."""
-    model_config = SettingsConfigDict(env_prefix='SPECIES_')
+    model_config = SettingsConfigDict(env_prefix='SPECIES_', env_file='.env', extra='ignore')
 
     model_version: str = "v4.0.1a"
     country_code: str = "DEU"
