@@ -195,73 +195,91 @@ Asks: please label the 5 pinned borderline captures 🙏
 The summary is generated from the lab notebook + metrics, so it doubles as a
 human-readable view of the agent's memory.
 
-### Evaluation — the accumulated random-capture corpus is the evaluator
+### Evaluation — two layers, evaluated differently (not one magic corpus)
 
-Two failure modes would sink a naive eval: **selection bias** (you only have frames
-the current config triggered on, so optimizing against them just reproduces the
-current config and grows blind spots) and **environmental confounding** (one
-camera, so live before/after credits weather/season changes to your config change).
+The detector is two stages with very different evaluability. Conflating them (an
+earlier draft did) led to the false claim that one replay corpus cleanly evaluates
+everything. It doesn't. Split them:
 
-An earlier draft tried to fix confounding with live **interleaving** (per-event
-A/B) plus **stochastic boundary triggering** + IPS reweighting. **Both are dropped**
-— interleaving needs more daily volume than this garden produces (some days yield
-only a handful of captures, giving per-arm samples with no power), it only applies
-cleanly to decision-stage params (switching MOG2 history/learning-rate per event
-corrupts the background model), and it adds real complexity. The cheaper, stronger
-answer makes them unnecessary:
+**Layer A — Notification / species layer (MegaDetector + classifier on the
+captured high-res images).** This **is** faithfully offline-evaluable: every motion
+trigger saves high-res JPEGs, so we can re-run MD + the classifier with any
+thresholds and re-decide "notify / route-to-review / drop", then score against
+human labels. No MOG2 state involved — it's a pure function of the saved image.
+This is where the cheapest, highest-leverage FP win lives:
 
-**The independent random-capture corpus does the job.** Capture frames on a
-**random schedule decoupled from motion triggering** (plus near-miss frames in the
-50-100% shoulder band, plus a low-FPS timelapse), label them (human + reconciled
-machine), and keep this set **strictly separate** from the active-learning queue —
-used **only for evaluation**. Then:
+> **Notification gate (current gap).** Today the system notifies on *every* motion
+> trigger, including when MegaDetector finds no animal (`wildlife_system.py:343-347`,
+> unconditional `send_notification` at `:603`). The fix is **route no-animal
+> triggers to a separate "review" channel/album** — *not* a hard delete, because MD
+> misses real animals (FN risk). FP noise drops on the main channel; MD's mistakes
+> stay captured and labelable.
 
-- **Replay every candidate config over this fixed labeled set** and score an
-  **OEC = F-beta over verified events** (precision *and* recall, so the agent can't
-  "win" by triggering never/always). Because it's the *same frames* for every
-  config, there is **zero weather confound** — no interleaving needed. Because the
-  corpus is unbiased by construction (random, not trigger-gated), there is **no
-  propensity problem** — no stochastic triggering or IPS needed.
-- **Low daily volume is handled by accumulation**: the corpus grows across days, so
-  evaluation draws on the whole accumulated set, not one thin day. A quiet day adds
-  little but breaks nothing.
-- It is also the **only** honest estimator of false negatives (animals the live
-  config missed but that appear in random captures).
+**Layer B — Motion-capture layer (MOG2 deciding whether to grab a frame).** This is
+**not** faithfully replayable: MOG2 is stateful/path-dependent
+(`motion_detector.py:19-23,143`), triggering is multi-frame
+(`consecutive_required`), and the 640×480 motion frames aren't even saved (only
+high-res bursts are, `wildlife_system.py:219-223`). So motion-layer tuning is
+**investigated live, day by day**, not via clean offline A/B. Two distinct error
+types, measured from different sources:
+- **Motion FP (junk triggers)** — visible in the *captured* set: a trigger that MD
+  /human says has no animal. Correlate with `motion_area`, contour, time-of-day to
+  guide `motion_threshold` etc. — but adjust incrementally and watch live, since we
+  can't replay MOG2 exactly.
+- **Motion FN (missed animals)** — *by definition not in the captured set*. The
+  **only** way to see these is an **independent capture channel**: a low-FPS
+  timelapse / random-schedule grab that an audit pass (MD + human) scans for animals
+  the live config never triggered on. This is why FN tracking cannot wait.
 
-**Live data = loose multi-day sanity check, not proof.** After deploying a
-replay-validated config, watch live metrics *accumulated over many days* (never a
-single-day delta) purely to confirm the offline prediction roughly holds; treat
-divergence as a prompt to investigate, not an automatic verdict.
+**OEC tracks both sides, from Phase 1.** The objective is reported as **paired
+FP and FN** (an F-beta with β chosen per phase, *plus the raw counts*), and **any
+change that cuts FP but raises FN is vetoed**. FP reduction is half the coin; the
+review must always show the other half.
 
-> ⚠️ FN estimates from the triggered corpus alone are **lower bounds**; the random
-> corpus is what makes them trustworthy.
+**Time-of-day:** daytime-only operation is correct *scope*, not a gap. The one
+residual is intra-day light (dawn/dusk long shadows vs flat noon) — so we
+**timestamp every detection/sample** to *enable* time-of-day stratification later,
+without acting on it pre-emptively.
+
+**Statistics:** with small daily counts, decisions use **confidence intervals**
+(Wilson/bootstrap on keep/drop counts), and the gate requires the CI to clear, not
+a point estimate. A delta inside the noise band is "not proven", never a win.
 
 ### Autonomous loop — daily cycle
 
 Each `/loop` tick after sunset, if tonight's run hasn't completed:
 ```
-  1. Ingest    — pull new detections + human feedback from SQLite.
-  2. Label     — reconcile tier1/2/3; adjudicate ambiguous crops; update corpus.
-  3. Measure   — FP rate, FN estimate (random corpus), volume, by-hour/by-cause;
-                 append to metrics/daily.csv.
-  4. Check     — does the active experiment's offline prediction still hold against
-                 accumulated live data? Enough accumulated evidence to conclude?
-  5. Self-doubt— on cadence (see memory): re-verify own past labels/decisions
-                 against the immutable gold set; assume own auto-labels may err.
-  6. Decide    — keep / rollback the active experiment; if concluded, propose the
-                 next config via Bayesian optimization (noise-aware surrogate over
-                 past results, within bounds). OFAT only for a quick single-knob
-                 sanity check.
-  7. Validate  — replay candidate over the random-capture corpus (OEC = F-beta).
-                 Abort if it doesn't beat the current config offline.
-  8. Deploy    — write config within bounds; service reloads (then loose multi-day
-                 live sanity check, not a per-day verdict).
+  1. Ingest    — pull new detections + human feedback from SQLite; scan the
+                 independent timelapse/random channel for missed animals (FN audit).
+  2. Label     — reconcile tier1/2/3; adjudicate ambiguous crops; update labels.
+  3. Measure   — paired FP and FN (with CIs), volume, by-hour/by-cause; append to
+                 metrics/daily.csv.
+  4. Check     — does the active experiment's prediction still hold against
+                 accumulated evidence (CI-based)? Enough evidence to conclude?
+  5. Self-doubt— on cadence: re-verify own labels/decisions against the immutable
+                 gold + the day's fresh human labels; assume own labels may err.
+  6. Decide    — keep / rollback; if concluded, propose the next config by
+                 coarse-grid / OFAT within bounds (BO only later, if enough data).
+  7. Validate  — Layer A (notify/species): replay candidate over captured images
+                 vs labels. Layer B (motion): cannot replay MOG2 — gate on bounds +
+                 predicted live effect. VETO any FP win that worsens FN.
+  8. Deploy    — write config within enforced bounds; **restart the service** (no
+                 hot-reload exists — see below), incurring a ~5-min warmup; then a
+                 loose multi-day live check, not a per-day verdict.
   9. Record    — append JOURNAL.md, write runs/NNNN.json, update state.json.
- 10. Report    — send Telegram daily summary; commit + push the notebook to main.
+ 10. Report    — Telegram daily summary (FP *and* FN); commit + push to main.
 ```
-Token-cheap steps (1,3,4,7) are plain Python the agent invokes; token-spend
-concentrates in 2,5,6,9. If the budget runs out mid-run, the next tick resumes
+Token-cheap steps (1,3,4) are plain Python the agent invokes; token-spend
+concentrates in 2,5,6,7,9. If the budget runs out mid-run, the next tick resumes
 from the committed notebook.
+
+> **Deploy = restart, not reload (code reality).** `Config()` is built once at
+> startup (`wildlife_system.py:36`) and never re-read; there is no hot-reload path.
+> So a config change requires a **process restart**, which resets MOG2 and triggers
+> `warmup_seconds=300`. Either implement a real reload (signal → rebuild
+> `MotionDetector`) or treat "deploy = restart at next sunrise" as an explicit,
+> budgeted step. The earlier "service reloads / no new config engine needed" claim
+> was wrong.
 
 ### Durable memory — git-backed lab notebook, committed to `main`
 
@@ -294,35 +312,40 @@ own past results, only append. Only *interpretations* evolve.
 
 **Self-skepticism is mandatory (bake the chance of AI error into the loop).** The
 agent runs the labeling and the tuning, so its own errors can silently compound.
-PROTOCOL.md therefore mandates a periodic **self-audit** (e.g. weekly, or every N
-experiments):
-- Re-label a fresh random sample and compare against its *own* prior auto-labels to
-  estimate its current error rate; surface disagreements to the human.
-- Re-check that past "wins" actually held up on the now-larger corpus (catch
-  regressions to the mean / transient effects mistaken for improvements).
-- Explicitly state confidence and assumptions in `runs/`, and prefer "I might be
-  wrong because…" over false certainty. A claimed improvement inside the noise band
-  is treated as *not proven*, not as success.
+The strongest check is the **fresh daily human labels via Telegram** — because new
+gold arrives every day, *systematic* agent bias (consistently wrong the same way)
+gets caught by comparison against the human, which self-comparison alone cannot do.
+On top of that, PROTOCOL.md mandates a periodic **self-audit**:
+- Compare the agent's auto-labels against the day's human labels to estimate its
+  current error rate and detect bias, not just drift.
+- Re-check that past "wins" still hold on the larger corpus (catch regression to
+  the mean / transient effects mistaken for improvements).
+- State confidence + assumptions in `runs/`; a delta inside the CI noise band is
+  *not proven*, never a success.
 
 Garden images are **never** in this tree.
 
 ### Safety / guardrails for full autonomy
 
-- **Bounded parameters** — each tunable has a hard min/max in `state.json`.
-- **OEC + guardrails** — optimize F-beta over verified events; guardrail metrics
-  that *can't go backward*: false-negative rate must not rise, capture volume must
-  not collapse-to-~0 or explode, the camera loop must not crash.
-- **Offline gate** — never deploy a change that didn't beat current config on the
-  random-capture corpus.
-- **Auto-rollback as a paved path** — keep the previous known-good config and
-  revert atomically on a *sustained* guardrail breach (not a single bad hour).
-- **Replication before commit** — single noisy daily deltas aren't enough; require
-  accumulated agreement (and constrain the BO surrogate's hyperparameters so it
-  doesn't overfit noise at low sample counts).
-- **Self-audit cadence** — the periodic self-skepticism review above is a guardrail:
-  the agent must actively look for its own errors, not assume it's right.
-- **Human veto** — a Telegram command (e.g. `/pause`, `/rollback`) halts or
-  reverts the loop at any time, even in autonomous mode.
+- **Bounded parameters enforced in code** — bounds live in `state.json` *and* are
+  enforced at config load via `MotionConfig` field validators (today there are
+  none, `config.py:50-66`). An out-of-range value must be rejected by the system,
+  not merely discouraged — the agent voluntarily respecting a JSON file is not a
+  guardrail for a fully autonomous loop.
+- **FN veto** — any change that lowers FP but raises FN (beyond CI noise) is
+  rejected. FN must not go backward; this is the dominant guardrail given the
+  project goal.
+- **Crude fast guards** — capture volume collapsing to ~0 or exploding, or the
+  camera loop crashing, trigger immediate rollback (these catch gross failures fast;
+  FN rise is slower to detect, see risk below).
+- **Auto-rollback as a paved path** — keep the previous known-good config; revert
+  atomically on a *sustained* breach.
+- **Human-feedback-starved safe mode** — if no fresh human labels arrive for N days
+  (vacation), **freeze tuning** and hold the known-good config; do not keep editing
+  live config blind.
+- **Telegram heartbeat / deadman** — a periodic "loop alive, last tick OK" ping;
+  silence is itself an alert (covers `/loop` 7-day expiry, stuck ticks, dead session).
+- **Human veto** — `/pause`, `/rollback` halt or revert at any time.
 - **No thrashing** — at most one active experiment at a time.
 
 ---
@@ -364,94 +387,111 @@ Two best-practices reviews (camera-trap FP/FN reduction; autonomous experimentat
   + Telegram alerts), Timelapse (reference-frame technique).
 
 ### Autonomy / methodology (already reflected above)
-- Selection-bias death spiral → independent **random-capture eval corpus** (the
-  primary evaluator).
-- Daily before/after is confounded → solved by replaying every config over the
-  *same fixed corpus*. **Interleaving + stochastic-triggering + IPS were considered
-  and dropped** as unjustified complexity for this low-volume single camera (the
-  random corpus already removes the confound and the propensity problem).
-- **Bayesian optimization** (noise-aware, low-sample-constrained) as the search
-  engine; OFAT only for quick sanity checks.
-- **OEC (F-beta)** + immutable guardrails so the agent can't game a single metric.
-- **Episodic→semantic memory** with append-only, immutable gold labels, plus a
-  mandated **self-audit** cadence (avoid memory self-poisoning *and* AI-error drift).
+- Selection-bias → notify/species layer is replayed on captured images; motion-FN
+  needs an **independent timelapse/random channel** (captured set can't show misses).
+- **Interleaving + stochastic-triggering + IPS were considered and dropped** as
+  unjustified complexity for this low-volume single camera.
+- **Coarse-grid / OFAT is the primary search method** at this data volume; Bayesian
+  optimization deferred until there are enough evaluated configs for a real surrogate
+  (single-digit/low-tens of noisy observations would mostly fit noise).
+- **OEC = paired FP+FN with CIs** so the agent can't game one metric; FN-veto.
+- **Episodic→semantic memory** with append-only immutable gold; daily human labels
+  catch *systematic* bias that self-comparison can't.
 
 ---
 
 ## Required Changes (high level)
 
-1. **DB**: new `detection_feedback` table; persist `animals_detected`,
-   MegaDetector box count/confidence, and richer motion metadata (contour count,
-   largest contour, foreground pixels) that `motion_detector.py` already computes
-   but currently discards.
-2. **Telegram**: inline feedback buttons + callback handler (Pi-side); daily
-   summary sender; veto commands.
-3. **Capture**: near-miss frame logging + **random-schedule capture** + low-FPS
-   timelapse writer (local disk, size-bounded with rotation).
-4. **Replay harness**: offline runner that executes `MotionDetector` over the
-   random-capture corpus and reports OEC (F-beta) keep/drop metrics for a config;
-   plus a nightly **RDE** pass to strip recurring stationary FPs.
-5. **Loop runner**: `experiments/loop.md` + `PROTOCOL.md`; a persistent on-Pi
-   `claude` session driven by `/loop`; a small systemd unit to keep it alive and
-   re-arm the loop across reboots / 7-day expiry. State lives in the git notebook
-   on `main` (no custom resume machine).
-6. **Config**: surface new tunables + bounds; the loop edits config via the
-   existing env-var / config-file mechanism and triggers a service reload.
+1. **DB**: new `detection_feedback` table (with an **event/dedup key** so multi-
+   frame bursts + cooldown collapse to one "event" for F-beta); persist
+   `animals_detected`, MD box count/confidence, richer motion metadata
+   (contour count, largest contour, foreground pixels — computed but discarded),
+   and a **timestamp/time-of-day** stamp. **`detections.db` must be `.gitignore`d**
+   (binary churn) — export CSV/JSON snapshots to the notebook instead.
+2. **Notification gate**: route no-animal triggers (`animals_detected==False`) to a
+   separate review channel/album instead of the main channel — *not* a hard drop.
+   The single biggest, cheapest FP win; needs FN monitoring alongside.
+3. **Telegram**: inline FP/wrong-species buttons + callback handler (Pi-side); a
+   "we missed this" FN-report path; daily summary (FP *and* FN); veto + heartbeat.
+4. **Capture (FN audit)**: low-FPS timelapse / random-schedule channel + near-miss
+   logging, on **external storage (USB SSD), not the boot SD card** (wear), size-
+   bounded with rotation.
+5. **Config safety**: add `MotionConfig` bounds validators (load-time enforcement);
+   decide hot-reload vs "restart at next sunrise" for deploys.
+6. **Replay harness (Layer A)**: offline runner over captured images for the
+   notify/species decision; nightly **RDE** pass (with a guard so habitual-path
+   animals aren't suppressed as static FPs).
+7. **Loop runner**: `experiments/loop.md` + `PROTOCOL.md`; persistent on-Pi `claude`
+   session driven by `/loop`; small systemd unit for keep-alive / 7-day re-arm.
+   State lives in the git notebook on `main` (no custom resume machine).
 
 ---
 
 ## Phased Roadmap
 
 - **Phase 0 — Design (this ADR; `PROTOCOL.md`/`loop.md` written at Phase 4).** ← current
-- **Phase 1 — Ground truth**: Telegram feedback buttons, `detection_feedback`
-  table, richer logging. *Nothing downstream is trustworthy without this.*
-- **Phase 2 — Corpus capture**: random-schedule + near-miss + timelapse local
-  recording (bounded), the independent eval corpus.
-- **Phase 3 — Replay harness**: offline parameter evaluation (OEC) + RDE pass.
-- **Phase 4 — Autonomous loop**: nightly runner, git notebook, guardrails,
-  daily Telegram summary. FP-focused first.
-- **Phase 5 — False negatives**: timelapse review feedback, FN metrics, extend
-  tuning objective.
+- **Phase 1 — Ground truth (FP *and* FN from day one)**: `detection_feedback` table
+  with event key + time-of-day + camera-stability stamp; Telegram FP/wrong-species
+  buttons **and** an FN-report path; timelapse/random FN-audit channel; richer
+  logging. *Nothing downstream is trustworthy without this.* (Retrofitting the event
+  key / time-of-day / FN channel later would waste the early corpus.)
+- **Phase 2 — Static 80/20 wins, measured**: notification gate (→ review channel),
+  ROI masking, reference-frame differencing, `unknown_species_threshold` 0.5→~0.75.
+  Run each as a *measured experiment* (FP win vs FN cost) using Phase-1 labels.
+- **Phase 3 — Layer-A replay harness** + RDE: offline tuning of the notify/species
+  decision on captured images.
+- **Phase 4 — Autonomous loop**: on-Pi `/loop` runner, git notebook, guardrails,
+  daily summary; tunes Layer A offline + motion-layer live, both FP and FN.
+- **Phase 5 — Motion-layer offline eval (optional)**: only if the residual warrants
+  tuning MOG2 itself — capture ordered motion-res clips + per-clip warmup.
 
 ---
 
 ## Consequences
 
 ### Positive
-- Objective, human-grounded metrics replace guesswork.
-- Experiments become cheap and confound-resistant via offline replay.
+- Objective, human-grounded metrics (FP *and* FN) replace guesswork.
+- The notify/species layer is faithfully offline-evaluable on captured images.
+- The cheap static wins (notification gate, ROI, threshold) likely deliver most of
+  the FP reduction early, before the autonomous machinery exists.
 - Images never leave the Pi; memory (non-image) is durable and self-documenting.
 - A real test of autonomous, multi-day agentic problem-solving.
 
 ### Negative / Risks
-- Human labels are sparse → slow convergence; mitigated by active-learning sample
-  selection and the daily "please label these" ask.
-- The random-capture corpus needs time to accumulate before FN estimates are solid.
-- Autonomy risk (a bad config degrading capture) mitigated by offline gate,
-  guard metrics, auto-rollback, self-audit, and human veto.
-- On-Pi replay is CPU-bound; mitigated by nightly batch + optional desktop host.
-- `/loop` requires a live on-Pi session and recurring loops expire after 7 days →
-  mitigated by a small systemd keep-alive/re-arm unit.
-
-### Neutral
-- The loop edits config through the existing override mechanism; no new config
-  engine needed.
+- **Motion-layer (MOG2) can't be faithfully replayed** → those params are tuned
+  live/incrementally, not by clean offline A/B (Phase 5 if needed).
+- **FN-detection latency vs rollback**: FN rises are slow to observe (need the audit
+  channel to accumulate), so a bad config could under-trigger for days before
+  rollback. The FN-veto + freeze-on-starvation + fast volume guards mitigate but
+  don't eliminate this; it's the dominant residual risk.
+- **Non-stationarity**: accumulating the corpus across seasons blends distributions;
+  needs recency-weighting / seasonal re-baselining (and the gold set can age out).
+- **Camera movement** (bump/refocus/sag) invalidates ROI/RDE/region labels → needs a
+  framing-stability check (reference-frame correlation) shipped in Phase 1.
+- Human labels are sparse → slow convergence; daily Telegram labelling is the main
+  mitigation, plus a feedback-starved safe mode when you're away.
+- `/loop` needs a live on-Pi session, expires after 7 days, and the keep-alive unit
+  becomes a single point of failure → Telegram heartbeat/deadman makes silence loud.
+- Running an authenticated Claude session on an always-on Pi is a credential surface
+  (separate from image privacy) — protect the session token at rest.
 
 ---
 
 ## Open Questions
 
-1. **Corpus retention**: how many days of random/near-miss/timelapse frames to
-   keep, and rotation policy, given SD-card wear and capacity.
-2. **`/loop` cadence**: hourly fixed vs dynamic interval; and the keep-alive/re-arm
-   approach for the 7-day loop expiry and reboots (systemd unit specifics).
-3. **MegaDetector upgrade**: adopt V6-compact on-device as a better FP-filter
-   feature, or keep the bundled v5-era detector?
-4. **Host fallback**: if on-Pi replay sweeps prove too slow, move the loop to the
-   desktop-with-SSH (the design is host-agnostic).
+1. **Deploy mechanism**: implement hot config-reload (signal → rebuild
+   `MotionDetector`) vs accept "restart at next sunrise" with the warmup cost?
+2. **External storage**: USB SSD for corpus + DB — confirm available/size.
+3. **`/loop` cadence**: hourly fixed vs dynamic interval; systemd keep-alive / 7-day
+   re-arm specifics.
+4. **Seasonal re-baselining**: corpus recency-weighting policy and when the gold set
+   "ages out".
+5. **MegaDetector upgrade**: adopt V6-compact on-device, or keep the bundled detector?
 
 *Resolved:* auth = Pro/Max subscription (training opt-out done); execution = on-Pi
-`/loop`; notebook in git on `main`; single ADR (this doc).
+`/loop`; notebook in git on `main`; single ADR; eval split into Layer A (offline on
+captured images) vs Layer B (motion, live); FP and FN tracked from Phase 1; static
+80/20 wins run as measured experiments before the autonomous loop.
 
 ---
 
@@ -494,6 +534,18 @@ Two best-practices reviews (camera-trap FP/FN reduction; autonomous experimentat
 
 ---
 
-**Document Version**: 0.3
+**Document Version**: 0.4
 **Last Updated**: 2026-06-07
 **Next Review**: Phase 1 scoping.
+
+### Changelog
+- **0.4** — Opus review folded in. Eval split into Layer A (notify/species, offline
+  on captured images) vs Layer B (motion/MOG2, not faithfully replayable → live).
+  Corrected: system currently notifies on *every* trigger → add review-channel gate.
+  FP *and* FN tracked from Phase 1; FN-veto; static 80/20 wins promoted to Phase 2.
+  Code-grounded fixes: "deploy = restart not reload", bounds enforced in code,
+  gitignore the DB, corpus on external storage, coarse-grid/OFAT over BO, CIs on the
+  gate, heartbeat + feedback-starved safe mode, camera-stability check, seasonal
+  non-stationarity. Daytime-only confirmed as correct scope (+ time-of-day stamp).
+- **0.3** — `/loop` execution model; dropped interleaving/IPS; notebook on `main`;
+  self-skepticism. **0.2** — best-practices research. **0.1** — initial design.
