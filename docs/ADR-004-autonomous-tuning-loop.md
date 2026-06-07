@@ -1,6 +1,6 @@
 # ADR-004: Autonomous Detection-Tuning Loop
 
-**Status**: Proposed (design doc / v0.1)
+**Status**: Design converged (v0.6) — Phase 0 complete, Phase 1 ready to build.
 **Date**: 2026-06-07
 **Decision Makers**: Daniel Kuehlwein + Claude
 **Technical Story**: Stand up a self-improving daily loop that reviews each day's
@@ -8,6 +8,36 @@ detections, runs experiments, and tunes the motion-detection configuration to
 reduce false positives (first) and false negatives (later) — with a human
 feedback channel and a daily summary over Telegram.
 **Related**: ADR-002 (Two-Stage Detection Pipeline), ADR-003 (Multi-Frame Burst)
+
+---
+
+## ⏯️ Status & how to resume (read this first)
+
+This design was developed over several sessions with two best-practices research
+passes and two critical code-grounded reviews. It has **converged**; the next
+session should start **building Phase 1**, not re-debating the design.
+
+- **Where we are**: Phase 0 (design) done. Design verdict from review: converged,
+  implementable, all code citations verified accurate.
+- **What to build next**: Phase 1 — see **Required Changes** + **Phased Roadmap**
+  (the "smallest correct slice" is spelled out in the Phase 1 bullet). In short:
+  `detection_feedback` table + richer logging → **Telegram receive path** (the real
+  work: `telegram.ext.Application` + `CallbackQuery` handler + inline buttons) →
+  shadow-mode gate logging → lightweight timelapse FN-audit writer. **Keep sending
+  all detections** (gate stays shadow-only in Phase 1).
+- **Settled decisions** (do not re-open): Pro/Max subscription auth (training
+  opted out); execution via on-Pi Claude Code `/loop`; lab notebook in git on
+  `main`; single ADR; evaluation split into Layer A (offline on captured images) vs
+  Layer B (motion/MOG2, tuned live); FP *and* FN tracked from Phase 1; event key =
+  `detections.id`; embed `detection_id` in Telegram `callback_data`.
+- **⚠️ One decision still OPEN (needed at the start of Phase 1)**: should the
+  Telegram receive path run as a **separate sidecar process** (recommended — keeps
+  the async camera loop untouched, SQLite WAL handles two writers) or as a
+  **concurrent asyncio task** inside `wildlife_system.run()`? The user deferred this;
+  confirm before coding the receive path.
+- **Decisions deferred (not needed until later phases)**: hot config-reload vs
+  "restart at next sunrise" (Phase 4); USB SSD vs SD (monitor wear); MegaDetector
+  V6 upgrade; seasonal corpus re-baselining.
 
 ---
 
@@ -564,11 +594,14 @@ captured images) vs Layer B (motion, live); FP and FN tracked from Phase 1; stat
 
 ---
 
-**Document Version**: 0.6
+**Document Version**: 0.7
 **Last Updated**: 2026-06-07
 **Next Review**: After Phase 1 implementation.
 
 ### Changelog
+- **0.7** — Added "Status & how to resume" section for clean session handoff;
+  recorded the still-open receive-architecture decision; added a pointer from
+  CLAUDE.md. No design changes.
 - **0.6** — Second review folded in (verdict: converged, ready to build). Elevated
   the Telegram **receive path** to a first-class Phase-1 component (today's service
   is send-only); event key simplified to `detections.id`; noted motion metadata is

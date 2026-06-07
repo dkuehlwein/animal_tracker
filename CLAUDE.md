@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Raspberry Pi 5-based wildlife camera system that automatically detects motion, captures photos, identifies species using Google SpeciesNet AI, and sends notifications to a Telegram channel. The system uses OpenCV for motion detection, Picamera2 for camera control, and SpeciesNet for AI-powered species identification.
 
+### Active initiative: autonomous detection-tuning loop
+
+An in-progress effort to reduce false positives **and** false negatives via a self-improving daily loop (human feedback over Telegram + a git-backed lab notebook + on-Pi Claude Code `/loop`). The design is converged; **Phase 1 is the next thing to build**. See **`docs/ADR-004-autonomous-tuning-loop.md`** — start with its "Status & how to resume" section.
+
 ## Key Commands
 
 ### Camera preview for focus adjustment
