@@ -34,9 +34,15 @@ untouched except for threading a `detection_id` through to the send path.
   migration, guarded by `PRAGMA table_info`): `animals_detected`,
   `detection_count`, `max_detection_confidence`, `contour_count`,
   `largest_contour_area`, `foreground_pixel_count`, `hour_of_day`,
-  `gate_would_suppress`, `frame_stability`. All nullable / default — old rows stay
+  `gate_would_suppress`, `background_drift`. All nullable / default — old rows stay
   valid. These are values *already computed* and currently dropped; this is pure
   schema + plumbing.
+  - **`background_drift`** is the framing-stability stamp: the mean pixel
+    difference between two *successive empty-scene reference frames* (refreshed
+    every 10 min). Comparing background-to-background — not the detection frame to
+    the background — is deliberate: a real animal makes the *detection* frame
+    differ hugely from the background, so diffing it would just re-measure subject
+    presence; diffing two backgrounds isolates camera bumps / slow lighting drift.
 - **API**:
   - `log_detection(...)` gains optional kwargs for the new fields (back-compatible
     defaults). `hour_of_day` is derived from the insert time.

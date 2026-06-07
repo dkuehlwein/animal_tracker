@@ -91,7 +91,7 @@ def test_log_detection_persists_richer_fields(tmp_path):
         largest_contour_area=3200,
         foreground_pixel_count=4100,
         gate_would_suppress=False,
-        frame_stability=12.5,
+        background_drift=12.5,
     )
     assert det_id is not None
 
@@ -106,7 +106,7 @@ def test_log_detection_persists_richer_fields(tmp_path):
     assert row["largest_contour_area"] == 3200
     assert row["foreground_pixel_count"] == 4100
     assert row["gate_would_suppress"] == 0
-    assert row["frame_stability"] == pytest.approx(12.5)
+    assert row["background_drift"] == pytest.approx(12.5)
     assert 0 <= row["hour_of_day"] <= 23  # derived from insert time
 
 

@@ -27,7 +27,7 @@ class DatabaseManager:
         "foreground_pixel_count": "INTEGER",
         "hour_of_day": "INTEGER",
         "gate_would_suppress": "BOOLEAN",
-        "frame_stability": "REAL",
+        "background_drift": "REAL",
     }
 
     def init_database(self):
@@ -127,7 +127,7 @@ class DatabaseManager:
                      animals_detected=None, detection_count=None,
                      max_detection_confidence=None, contour_count=None,
                      largest_contour_area=None, foreground_pixel_count=None,
-                     gate_would_suppress=None, frame_stability=None) -> Optional[int]:
+                     gate_would_suppress=None, background_drift=None) -> Optional[int]:
         """Log a detection event to the database.
 
         The trailing keyword arguments are the Phase-1 richer-logging fields
@@ -138,20 +138,31 @@ class DatabaseManager:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
 
-                # Insert detection record
-                cursor.execute('''
-                    INSERT INTO detections
-                    (image_path, motion_area, species_name, confidence_score,
-                     processing_time, api_success, animals_detected, detection_count,
-                     max_detection_confidence, contour_count, largest_contour_area,
-                     foreground_pixel_count, hour_of_day, gate_would_suppress,
-                     frame_stability)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (str(image_path), motion_area, species_name,
-                      confidence_score, processing_time, api_success,
-                      animals_detected, detection_count, max_detection_confidence,
-                      contour_count, largest_contour_area, foreground_pixel_count,
-                      datetime.now().hour, gate_would_suppress, frame_stability))
+                # Column name -> value in one place so the INSERT column list and
+                # the bound values can't drift out of sync.
+                values = {
+                    "image_path": str(image_path),
+                    "motion_area": motion_area,
+                    "species_name": species_name,
+                    "confidence_score": confidence_score,
+                    "processing_time": processing_time,
+                    "api_success": api_success,
+                    "animals_detected": animals_detected,
+                    "detection_count": detection_count,
+                    "max_detection_confidence": max_detection_confidence,
+                    "contour_count": contour_count,
+                    "largest_contour_area": largest_contour_area,
+                    "foreground_pixel_count": foreground_pixel_count,
+                    "hour_of_day": datetime.now().hour,
+                    "gate_would_suppress": gate_would_suppress,
+                    "background_drift": background_drift,
+                }
+                columns = ", ".join(values)
+                placeholders = ", ".join("?" * len(values))
+                cursor.execute(
+                    f"INSERT INTO detections ({columns}) VALUES ({placeholders})",
+                    tuple(values.values()),
+                )
 
                 detection_id = cursor.lastrowid
 

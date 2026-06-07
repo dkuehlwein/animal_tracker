@@ -68,3 +68,19 @@ def test_rgb_frame_is_converted(tmp_path):
     rgb = np.zeros((480, 640, 3), dtype=np.uint8)
     assert writer.maybe_capture(rgb, now=100.0) is True
     assert len(list(out.glob("*.jpg"))) == 1
+
+
+def test_rotation_survives_restart(tmp_path):
+    """A fresh writer seeds its rotation deque from existing files, so the cap
+    is honoured across process restarts (not reset to 0)."""
+    writer, out = _make_writer(tmp_path, interval=0.0, max_files=3)
+    for i in range(3):
+        writer.maybe_capture(_frame(), now=100.0 + i)
+    assert len(list(out.glob("*.jpg"))) == 3
+
+    # Simulate a restart: new writer over the same directory.
+    writer2, _ = _make_writer(tmp_path, interval=0.0, max_files=3)
+    for i in range(3):
+        writer2.maybe_capture(_frame(), now=200.0 + i)
+    # Still capped at 3 — oldest pruned, not 6 accumulated.
+    assert len(list(out.glob("*.jpg"))) == 3

@@ -66,6 +66,10 @@ class WildlifeSystem:
         self.reference_frame = None
         self.reference_frame_time = 0
         self.reference_update_interval = 600  # Update every 10 minutes
+        # Framing-stability stamp: mean drift between successive (empty-scene)
+        # reference frames. A sudden large value flags a camera bump/refocus,
+        # independent of subject motion. Updated on each reference refresh.
+        self.reference_drift = None
 
         # Daylight state tracking for start/stop notifications
         self._was_daytime = None  # None = unknown, will be set on first check
@@ -178,7 +182,6 @@ class WildlifeSystem:
             detection_count, max_detection_confidence = self._summarize_detection(
                 species_result.detection_result
             )
-            frame_stability = self._frame_stability(image_path)
 
             # Log to database (richer Phase-1 fields included)
             detection_id = self.database.log_detection(
@@ -195,7 +198,7 @@ class WildlifeSystem:
                 largest_contour_area=motion_result.largest_contour_area if motion_result else None,
                 foreground_pixel_count=motion_result.foreground_pixel_count if motion_result else None,
                 gate_would_suppress=gate_would_suppress,
-                frame_stability=frame_stability,
+                background_drift=self.reference_drift,
             )
 
             logger.info(f"Detection {detection_id} logged: {species_result.species_name} "
@@ -239,27 +242,6 @@ class WildlifeSystem:
         boxes = detection_result.bounding_boxes or []
         max_conf = max((bb.get('confidence', 0.0) for bb in boxes), default=None)
         return detection_result.detection_count, max_conf
-
-    def _frame_stability(self, image_path: Path) -> Optional[float]:
-        """Mean-absolute difference of the captured frame from the cached
-        reference background — a camera-framing-stability stamp (ADR-004).
-
-        A sustained jump across detections flags a camera bump/refocus that
-        invalidates region labels. Returns None if no reference is available.
-        """
-        if self.reference_frame is None:
-            return None
-        try:
-            import cv2
-            image = cv2.imread(str(image_path))
-            if image is None:
-                return None
-            return SharpnessAnalyzer.calculate_difference_from_reference(
-                image, self.reference_frame
-            )
-        except Exception as e:
-            logger.warning(f"Frame-stability computation failed: {e}")
-            return None
     
     def _capture_and_select_best_frame(self) -> tuple:
         """
@@ -607,9 +589,15 @@ class WildlifeSystem:
                                     # Capture high-res reference frame
                                     ref_frame = self.camera.capture_high_res_frame()
                                     if ref_frame is not None:
+                                        # Drift between successive empty-scene
+                                        # references = framing-stability stamp.
+                                        if self.reference_frame is not None:
+                                            self.reference_drift = SharpnessAnalyzer.calculate_difference_from_reference(
+                                                ref_frame, self.reference_frame
+                                            )
                                         self.reference_frame = ref_frame.copy()
                                         self.reference_frame_time = current_time
-                                        logger.info(f"Updated reference frame for burst selection (age: {time_since_ref_update:.0f}s)")
+                                        logger.info(f"Updated reference frame for burst selection (age: {time_since_ref_update:.0f}s, drift: {self.reference_drift})")
 
                             # Log motion status periodically (every 5 seconds)
                             if current_time - self.last_status_log_time >= 5.0:

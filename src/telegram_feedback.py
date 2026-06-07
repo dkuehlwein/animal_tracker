@@ -51,11 +51,17 @@ async def _on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     try:
         message = record_feedback_callback(query.data, database)
         await query.answer(text=message)
-        # Reflect the recorded label inline so the channel shows it was handled.
-        if query.message and query.message.caption is not None:
+        # Reflect the recorded label inline so the channel shows a persistent
+        # acknowledgement (the toast above is ephemeral). Photos carry a caption;
+        # the debug media-group path attaches the keyboard to a text message.
+        if query.message is None:
+            pass
+        elif query.message.caption is not None:
             await query.edit_message_caption(
                 caption=f"{query.message.caption}\n— {message}"
             )
+        elif query.message.text is not None:
+            await query.edit_message_text(text=f"{query.message.text}\n— {message}")
     except ValueError as e:
         logger.warning(f"Ignoring bad feedback callback {query.data!r}: {e}")
         await query.answer(text="Could not record that.")
