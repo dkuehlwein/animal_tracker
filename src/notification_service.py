@@ -117,8 +117,9 @@ class NotificationService:
             return False
 
     async def send_photo_with_caption(self, image_path: Path,
-                                      caption: str = None) -> bool:
-        """Send photo to Telegram channel with optional caption."""
+                                      caption: str = None,
+                                      reply_markup=None) -> bool:
+        """Send photo to Telegram channel with optional caption and keyboard."""
         try:
             if not image_path.exists():
                 logger.warning(f"Image file not found: {image_path}")
@@ -131,7 +132,8 @@ class NotificationService:
                 await self.bot.send_photo(
                     chat_id=self.config.telegram_chat_id,
                     photo=photo,
-                    caption=caption
+                    caption=caption,
+                    reply_markup=reply_markup
                 )
 
             return True
@@ -216,12 +218,13 @@ class NotificationService:
             logger.error(f"Error sending system status: {e}")
             return False
 
-    async def send_text_message(self, message: str) -> bool:
-        """Send simple text message."""
+    async def send_text_message(self, message: str, reply_markup=None) -> bool:
+        """Send simple text message, optionally with an inline keyboard."""
         try:
             await self.bot.send_message(
                 chat_id=self.config.telegram_chat_id,
-                text=message
+                text=message,
+                reply_markup=reply_markup
             )
             return True
 
