@@ -486,11 +486,6 @@ class WildlifeSystem:
                             await asyncio.sleep(self.config.performance.idle_sleep)
                             continue
                         
-                        # Cooldown period check
-                        if current_time - self.last_detection_time < self.config.performance.cooldown_period:
-                            await asyncio.sleep(self.config.performance.cooldown_sleep)
-                            continue
-
                         # Memory check
                         if self.system_monitor.should_skip_processing():
                             self.system_monitor.memory_manager.force_cleanup()
@@ -541,6 +536,20 @@ class WildlifeSystem:
                         else:
                             motion_detected, motion_area = False, 0
                             logger.warning("Failed to capture frame")
+
+                        # Cooldown gates only the heavy capture/ID/notify path —
+                        # detect() above keeps feeding MOG2 so its background
+                        # model tracks scene drift across the cooldown window.
+                        in_cooldown = (
+                            current_time - self.last_detection_time
+                            < self.config.performance.cooldown_period
+                        )
+                        if motion_detected and in_cooldown:
+                            logger.debug(
+                                f"Motion in cooldown (area={motion_area}); skipping capture"
+                            )
+                            await asyncio.sleep(self.config.performance.cooldown_sleep)
+                            continue
 
                         if motion_detected:
                             logger.info(f"Motion detected in central region! Area: {motion_area} pixels")
