@@ -408,20 +408,32 @@ Two best-practices reviews (camera-trap FP/FN reduction; autonomous experimentat
 
 ## Required Changes (high level)
 
-1. **DB**: new `detection_feedback` table (with an **event/dedup key** so multi-
-   frame bursts + cooldown collapse to one "event" for F-beta); persist
-   `animals_detected`, MD box count/confidence, richer motion metadata
-   (contour count, largest contour, foreground pixels — computed but discarded),
-   and a **timestamp/time-of-day** stamp. **`detections.db` must be `.gitignore`d**
-   (binary churn) — export CSV/JSON snapshots to the notebook instead. The DB's
-   frequent small writes are the **main SD-wear concern** (more than the images), so
-   keep commits batched and consider WAL tuning / SSD if wear shows.
+1. **DB**: new `detection_feedback` table. **Event key = `detections.id`** — no
+   extra dedup work: a burst already collapses to one `process_detection` → one row
+   (`wildlife_system.py:554-604`), and cooldown-suppressed motion (`:543-552`) never
+   reaches the DB (it's a Layer-B FN-audit concern, not a dedup concern). Persist
+   `animals_detected` (already available, `species_identifier.py:173`), MD box
+   count/confidence, and the richer motion metadata **already computed in
+   `MotionResult`** (`contour_count`, `largest_contour_area`, `foreground_pixel_count`,
+   `motion_detector.py:279-290`) but currently dropped in `log_detection` — so this
+   is pure schema+plumbing, not new computation. Derive `time_of_day` from the
+   existing `timestamp`. (`detections.db` is *already* gitignored via `data/`; the
+   real new work is exporting CSV/JSON snapshots to `experiments/`. DB small writes
+   are the main SD-wear driver → batch commits, WAL.)
 2. **Notification gate (shadow first)**: keep sending *all* detections to the main
    channel initially; the `animals_detected==False` gate only *records* what it would
    suppress. Flip to live (→ review channel, not hard drop) once labels show the FN
    cost is acceptable.
-3. **Telegram**: inline FP/wrong-species buttons + callback handler (Pi-side); a
-   "we missed this" FN-report path; daily summary (FP *and* FN); veto + heartbeat.
+3. **Telegram — a new *receive* path (the largest Phase-1 component).**
+   `NotificationService` is **send-only** today (wraps `telegram.Bot`, no
+   `Application`/polling/callback handler). The inline FP/wrong-species buttons need a
+   long-running `telegram.ext.Application` polling for `callback_query` updates →
+   `UPDATE detection_feedback` by id. **Recommended: a separate sidecar process**
+   sharing the SQLite DB (WAL handles two writers), keeping the async detection loop
+   untouched. **Embed `detection_id` in `callback_data`** at send time — the row is
+   already written before `send_notification` (`:162` then `:603`), so just thread the
+   returned id through. Also: a "we missed this" FN-report path; daily summary (FP
+   *and* FN); veto + heartbeat.
 4. **Capture (FN audit)**: **lightweight** low-FPS (~1 frame / 10–30s) **640×480
    grayscale** timelapse + near-miss logging (~100–250 MB/day), size-bounded with
    rotation. **SD card is fine to start** (images already live there); monitor card
@@ -440,13 +452,16 @@ Two best-practices reviews (camera-trap FP/FN reduction; autonomous experimentat
 ## Phased Roadmap
 
 - **Phase 0 — Design (this ADR; `PROTOCOL.md`/`loop.md` written at Phase 4).** ← current
-- **Phase 1 — Ground truth (FP *and* FN from day one)**: `detection_feedback` table
-  with event key + time-of-day + camera-stability stamp; Telegram FP/wrong-species
-  buttons **and** an FN-report path; timelapse/random FN-audit channel; richer
-  logging. **Keep sending all detections** (gate in shadow mode) so we collect FP and
-  gate-FN-cost examples. *Nothing downstream is trustworthy without this.*
-  (Retrofitting the event key / time-of-day / FN channel later would waste the early
-  corpus.)
+- **Phase 1 — Ground truth (FP *and* FN from day one)**. Smallest correct slice, in
+  order: (1) `detection_feedback` table (key = `detections.id`, derive time-of-day,
+  reuse the existing 10-min `reference_frame` correlation for the camera-stability
+  stamp, `wildlife_system.py:62-65,520-530`, persist the discarded `MotionResult`
+  fields); (2) **the receive path** — `telegram.ext.Application` + `CallbackQuery`
+  handler + inline keyboard (the real work); (3) shadow-mode gate logs the
+  would-suppress decision, send behaviour unchanged; (4) lightweight 640×480
+  timelapse FN-audit writer (independent, lands last). **Keep sending all
+  detections.** *Nothing downstream is trustworthy without this.* (Retrofitting the
+  event key / time-of-day / FN channel later would waste the early corpus.)
 - **Phase 2 — Static 80/20 wins, measured**: flip the notification gate live once its
   FN cost is acceptable (→ review channel), ROI masking, reference-frame
   differencing, `unknown_species_threshold` 0.5→~0.75. Run each as a *measured
@@ -549,11 +564,17 @@ captured images) vs Layer B (motion, live); FP and FN tracked from Phase 1; stat
 
 ---
 
-**Document Version**: 0.5
+**Document Version**: 0.6
 **Last Updated**: 2026-06-07
-**Next Review**: Phase 1 scoping.
+**Next Review**: After Phase 1 implementation.
 
 ### Changelog
+- **0.6** — Second review folded in (verdict: converged, ready to build). Elevated
+  the Telegram **receive path** to a first-class Phase-1 component (today's service
+  is send-only); event key simplified to `detections.id`; noted motion metadata is
+  already computed (plumbing only), DB already gitignored (real work = CSV export),
+  and the camera-stability stamp can reuse the existing reference frame. Sharpened
+  the smallest-correct Phase-1 slice.
 - **0.5** — Notification gate ships in *shadow mode* first: keep sending all
   detections so we collect FP and gate-FN-cost labels before going live. SD-card
   concern downgraded from blocker to monitored-risk (audit channel kept
