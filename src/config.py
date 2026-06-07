@@ -119,6 +119,11 @@ class PerformanceConfig(BaseSettings):
     motion_aware_selection: bool = True
     send_annotated_image: bool = False  # Debug: send motion detection overlay alongside original
 
+    # Timelapse FN-audit channel (ADR-004 Phase 1): low-rate independent capture
+    enable_timelapse: bool = True
+    timelapse_interval: float = 20.0  # seconds between saved frames
+    timelapse_max_files: int = 10000  # ~2 days @ 20s; oldest pruned beyond this
+
 
 class StorageConfig(BaseSettings):
     """Storage and file management configuration."""

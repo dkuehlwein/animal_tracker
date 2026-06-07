@@ -20,6 +20,8 @@ from species_identifier import SpeciesIdentifier
 from notification_service import NotificationService
 from resource_manager import SystemMonitor, StorageManager
 from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnalyzer
+from feedback_protocol import build_feedback_keyboard
+from timelapse_writer import TimelapseWriter
 from exceptions import WildlifeSystemError
 
 logger = logging.getLogger(__name__)
@@ -44,6 +46,7 @@ class WildlifeSystem:
         self.database = DatabaseManager(self.config)
         self.species_identifier = SpeciesIdentifier(self.config)
         self.sun_checker = SunChecker(self.config)
+        self.timelapse_writer = TimelapseWriter(self.config)
 
         # Thread pool for blocking operations (camera, species ID)
         self.executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="wildlife")
@@ -63,6 +66,10 @@ class WildlifeSystem:
         self.reference_frame = None
         self.reference_frame_time = 0
         self.reference_update_interval = 600  # Update every 10 minutes
+        # Framing-stability stamp: mean drift between successive (empty-scene)
+        # reference frames. A sudden large value flags a camera bump/refocus,
+        # independent of subject motion. Updated on each reference refresh.
+        self.reference_drift = None
 
         # Daylight state tracking for start/stop notifications
         self._was_daytime = None  # None = unknown, will be set on first check
@@ -134,8 +141,13 @@ class WildlifeSystem:
         except Exception as e:
             logger.error(f"Error in cleanup: {e}", exc_info=True)
     
-    def process_detection(self, image_path: Path, motion_area: int) -> tuple:
-        """Process a detection with two-stage species identification and database logging"""
+    def process_detection(self, image_path: Path, motion_area: int,
+                          motion_result=None) -> tuple:
+        """Process a detection with two-stage species identification and database logging.
+
+        `motion_result` is the triggering MotionResult; its richer diagnostic
+        fields are persisted (ADR-004 Phase 1) instead of being dropped.
+        """
         timestamp = datetime.now()
 
         try:
@@ -158,14 +170,35 @@ class WildlifeSystem:
                 logger.info(f"Identified: {species_result.species_name} "
                             f"(confidence: {species_result.confidence:.2f})")
 
-            # Log to database
+            # Shadow-mode notification gate (ADR-004): record what the gate WOULD
+            # suppress (no animal found) without changing send behaviour. We still
+            # send everything; this only measures the gate's future FN cost.
+            gate_would_suppress = not species_result.animals_detected
+            if gate_would_suppress:
+                logger.info("[GATE-SHADOW] Would suppress (no animal detected) — "
+                            "sending anyway in shadow mode")
+
+            # Pull the richer detection metadata for ground-truth analysis.
+            detection_count, max_detection_confidence = self._summarize_detection(
+                species_result.detection_result
+            )
+
+            # Log to database (richer Phase-1 fields included)
             detection_id = self.database.log_detection(
                 image_path=image_path,
                 motion_area=motion_area,
                 species_name=species_result.species_name,
                 confidence_score=species_result.confidence,
                 processing_time=species_result.processing_time,
-                api_success=species_result.api_success
+                api_success=species_result.api_success,
+                animals_detected=species_result.animals_detected,
+                detection_count=detection_count,
+                max_detection_confidence=max_detection_confidence,
+                contour_count=motion_result.contour_count if motion_result else None,
+                largest_contour_area=motion_result.largest_contour_area if motion_result else None,
+                foreground_pixel_count=motion_result.foreground_pixel_count if motion_result else None,
+                gate_would_suppress=gate_would_suppress,
+                background_drift=self.reference_drift,
             )
 
             logger.info(f"Detection {detection_id} logged: {species_result.species_name} "
@@ -179,9 +212,10 @@ class WildlifeSystem:
                 'processing_time': species_result.processing_time,
                 'fallback_reason': species_result.fallback_reason,
                 'animals_detected': species_result.animals_detected,
-                'detection_count': species_result.detection_result.detection_count if species_result.detection_result else 0,
+                'detection_count': detection_count,
                 'detection_result': species_result.detection_result,  # Include full detection info
-                'metadata': species_result.metadata  # Include classification metadata
+                'metadata': species_result.metadata,  # Include classification metadata
+                'detection_id': detection_id,  # For feedback-button callback_data
             }
 
             return result_dict, timestamp
@@ -196,8 +230,18 @@ class WildlifeSystem:
                 'processing_time': 0.0,
                 'fallback_reason': f'Processing error: {e}',
                 'animals_detected': False,
-                'detection_count': 0
+                'detection_count': 0,
+                'detection_id': None,
             }, timestamp
+
+    @staticmethod
+    def _summarize_detection(detection_result) -> tuple:
+        """Return (detection_count, max_box_confidence) from a DetectionResult."""
+        if not detection_result:
+            return 0, None
+        boxes = detection_result.bounding_boxes or []
+        max_conf = max((bb.get('confidence', 0.0) for bb in boxes), default=None)
+        return detection_result.detection_count, max_conf
     
     def _capture_and_select_best_frame(self) -> tuple:
         """
@@ -378,22 +422,37 @@ class WildlifeSystem:
     async def send_notification(self, species_result: dict, motion_area: int,
                                timestamp: datetime, image_path: Optional[Path] = None,
                                annotated_path: Optional[Path] = None):
-        """Send notification with species identification info and motion visualization"""
+        """Send notification with species identification info and motion visualization.
+
+        Attaches the human-feedback keyboard (✅/❌/🐦) when we have a detection_id,
+        embedding it in the callback_data so a tap is recorded against this row.
+        """
         # Get system temperature
         temperature = self.system_monitor.get_cpu_temperature()
+
+        detection_id = species_result.get('detection_id')
+        keyboard = build_feedback_keyboard(detection_id) if detection_id is not None else None
 
         if image_path and image_path.exists():
             caption = self._build_caption(species_result, motion_area, timestamp, temperature)
 
-            # If we have both original and annotated images, send as media group
+            # If we have both original and annotated images, send as media group.
+            # Media groups can't carry an inline keyboard (Telegram limitation),
+            # so send the feedback buttons on a short follow-up message.
             if annotated_path and annotated_path.exists():
                 await self.telegram_service.send_media_group(
                     [image_path, annotated_path],
                     caption
                 )
+                if keyboard is not None:
+                    await self.telegram_service.send_text_message(
+                        "Was this detection correct?", reply_markup=keyboard
+                    )
             else:
                 # Fallback to single image
-                await self.telegram_service.send_photo_with_caption(image_path, caption)
+                await self.telegram_service.send_photo_with_caption(
+                    image_path, caption, reply_markup=keyboard
+                )
         else:
             await self.telegram_service.send_detection_notification(
                 species_result, motion_area, timestamp, temperature
@@ -517,6 +576,11 @@ class WildlifeSystem:
                             self.last_motion_frame = frame.copy()
                             self.last_motion_result = motion_result
 
+                            # Independent FN-audit channel: persist a low-rate
+                            # timelapse frame regardless of motion, so animals the
+                            # detector never triggered on remain auditable later.
+                            self.timelapse_writer.maybe_capture(frame, current_time)
+
                             # Cache reference frame when no motion detected (for burst frame selection)
                             # Update every 10 minutes to account for lighting changes
                             if not motion_detected and motion_area == 0:
@@ -525,9 +589,15 @@ class WildlifeSystem:
                                     # Capture high-res reference frame
                                     ref_frame = self.camera.capture_high_res_frame()
                                     if ref_frame is not None:
+                                        # Drift between successive empty-scene
+                                        # references = framing-stability stamp.
+                                        if self.reference_frame is not None:
+                                            self.reference_drift = SharpnessAnalyzer.calculate_difference_from_reference(
+                                                ref_frame, self.reference_frame
+                                            )
                                         self.reference_frame = ref_frame.copy()
                                         self.reference_frame_time = current_time
-                                        logger.info(f"Updated reference frame for burst selection (age: {time_since_ref_update:.0f}s)")
+                                        logger.info(f"Updated reference frame for burst selection (age: {time_since_ref_update:.0f}s, drift: {self.reference_drift})")
 
                             # Log motion status periodically (every 5 seconds)
                             if current_time - self.last_status_log_time >= 5.0:
@@ -578,7 +648,8 @@ class WildlifeSystem:
                                     self.executor,
                                     self.process_detection,
                                     image_path,
-                                    motion_area
+                                    motion_area,
+                                    self.last_motion_result
                                 )
                                 
                                 # Add sharpness info to species result for notification

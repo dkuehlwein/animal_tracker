@@ -35,3 +35,4 @@ data/
 
 .venv/
 raspberry5.private
+.venv-test/
