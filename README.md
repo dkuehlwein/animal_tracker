@@ -9,6 +9,8 @@ A Raspberry Pi 5-based wildlife camera system that automatically detects motion,
 - **Geographic Filtering**: Species predictions filtered for Bonn, Germany
 - **Automatic Photo Capture**: High-resolution images when motion is detected
 - **Real-time Notifications**: Telegram notifications with species information
+- **Human Feedback Loop**: One-tap ✅/❌/🐦 buttons on every notification record ground-truth labels (false positives *and* wrong species) for detection tuning
+- **FN-Audit Timelapse**: Low-rate independent capture so missed animals (that never triggered motion) stay auditable
 - **Database Logging**: SQLite database tracking all detections
 - **Configurable System**: Environment-based configuration for all parameters
 
@@ -151,6 +153,85 @@ The system will automatically:
 - Log all detections to SQLite database
 - Restart automatically on crashes (when running as service)
 
+## Human Feedback Loop (Detection Tuning)
+
+To build objective ground truth for tuning false positives and false negatives,
+every detection notification carries an inline keyboard:
+
+```
+[ ✅ Animal ]  [ ❌ False positive ]  [ 🐦 Wrong species ]
+```
+
+Tapping a button records a label against that detection in the
+`detection_feedback` table — zero extra effort beyond glancing at the
+notifications you already receive. Labels are append-only (a re-tap adds a row;
+ground truth is never overwritten). See
+[`docs/ADR-004-autonomous-tuning-loop.md`](docs/ADR-004-autonomous-tuning-loop.md)
+for the full design and [`docs/phase1-spec.md`](docs/phase1-spec.md) for this
+implementation.
+
+> **Shadow-mode gate**: the system records which detections a future
+> "no animal → suppress" gate *would* have hidden, but **still sends every
+> detection**. This lets us measure the gate's false-negative cost from your
+> labels before ever enabling it.
+
+### Running the feedback bot
+
+Receiving button taps needs a second, long-lived process — a **sidecar** that
+polls Telegram and writes feedback rows. It shares the SQLite database with the
+main system via WAL, so the detection loop is untouched.
+
+**Manual mode:**
+```bash
+uv run python src/telegram_feedback.py
+```
+
+**Auto-start on boot:** run it as its own systemd service alongside the camera
+service (same pattern as `wildlife-camera.service`). Example unit:
+
+```ini
+# /etc/systemd/system/wildlife-feedback.service
+[Unit]
+Description=Wildlife detection Telegram feedback sidecar
+After=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/animal_tracker
+Environment=PATH=/home/pi/.local/bin:/usr/bin:/bin
+ExecStart=/home/pi/.local/bin/uv run python src/telegram_feedback.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+sudo cp wildlife-feedback.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now wildlife-feedback.service
+```
+
+> **Telegram privacy mode** must be disabled for the bot (via @BotFather →
+> `/setprivacy` → Disable) so it can receive callback queries. Only the sidecar
+> polls for updates; the main system is send-only, so there is no polling
+> conflict.
+
+### False-negative audit (timelapse)
+
+The system also writes a low-rate grayscale timelapse to `data/timelapse/`
+independently of motion, so animals the detector never triggered on can be found
+later. It reuses the frame the main loop already captures (no extra camera work)
+and is bounded by count with automatic rotation. Tune via:
+
+```bash
+PERFORMANCE_ENABLE_TIMELAPSE=true     # default on
+PERFORMANCE_TIMELAPSE_INTERVAL=20.0   # seconds between saved frames
+PERFORMANCE_TIMELAPSE_MAX_FILES=10000 # ~2 days @ 20s; oldest pruned beyond this
+```
+
 ## Configuration
 
 The system is configured via environment variables in `.env` file:
@@ -196,16 +277,20 @@ animal_tracker/
 │   ├── camera_manager.py        # Camera operations
 │   ├── motion_detector.py       # Motion detection
 │   ├── species_identifier.py    # SpeciesNet integration
-│   ├── database_manager.py      # SQLite database
-│   ├── notification_service.py  # Telegram notifications
+│   ├── database_manager.py      # SQLite database (detections + feedback)
+│   ├── notification_service.py  # Telegram notifications (send path)
+│   ├── telegram_feedback.py     # Telegram feedback sidecar (receive path)
+│   ├── feedback_protocol.py     # Shared feedback button/callback protocol
+│   ├── timelapse_writer.py      # Low-rate FN-audit timelapse writer
 │   ├── resource_manager.py      # Memory, storage, system monitoring
-│   ├── models.py                # Data models (MotionResult, DetectionRecord, etc.)
+│   ├── data_models.py           # Data models (MotionResult, DetectionRecord, etc.)
 │   ├── exceptions.py            # Exception hierarchy
 │   └── utils.py                 # Utilities (PerformanceTimer, SharpnessAnalyzer, etc.)
 ├── scripts/
 │   └── camera_preview.py        # Live camera preview for focus adjustment
 ├── data/
 │   ├── images/                  # Captured photos
+│   ├── timelapse/               # FN-audit timelapse frames
 │   ├── logs/                    # System logs
 │   └── detections.db            # Detection database
 ├── tests/                       # Unit tests
