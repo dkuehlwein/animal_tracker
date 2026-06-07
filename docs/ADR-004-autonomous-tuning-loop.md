@@ -85,34 +85,46 @@ detector over saved frames.
 - The implementation reads a local data directory + SQLite DB and needs only
   **outbound** internet (Anthropic API + Telegram). No inbound access required.
 
-**Auth = Pro/Max subscription (decided).** This has two consequences baked into
-the design:
-- *Session/token limits*: the subscription enforces ~5-6h rolling reset windows,
-  so the loop must be **checkpointed and resumable** (see "Resumable execution"),
-  not a single long-running session. A systemd timer fires a fresh CLI session at
-  sunset and again at reset boundaries (~2-3× per night); each session drains the
-  next pending stages until its budget runs out, commits, and exits.
-- *Data terms*: under consumer subscription terms, conversations **may be used for
-  training unless you opt out**. Since image crops are sent for adjudication, the
-  account must have **"help improve Claude / model training" turned OFF**
-  (Settings → Privacy) as a prerequisite. (An API key under commercial terms +
-  ZDR would avoid both the reset windows and the training-data exposure, but was
-  not chosen.) Policies change — verify against Anthropic's current data-usage
-  docs before relying on this.
+**Auth = Pro/Max subscription (decided).** Two consequences:
+- *Session/token limits*: ~5-6h rolling reset windows. Handled by the `/loop`
+  execution model below — **not** a custom checkpoint/stage machine.
+- *Data terms*: under consumer subscription terms conversations may be used for
+  training unless opted out. The account owner has **opted out of model training**,
+  satisfying the prerequisite for sending image crops for adjudication. Policies
+  change — re-verify against Anthropic's current data-usage docs periodically.
 
-### Resumable execution (subscription-aware)
+### Execution model — driven by Claude Code `/loop` on the Pi
 
-Most of the loop spends **zero Claude tokens** — ingest, metric computation,
-MegaDetector relabel, replay sweeps, deploy, and rollback checks are deterministic
-local Python that run unconditionally on the systemd timer. Claude tokens are only
-spent on the *judgment* layer: image adjudication, designing the next experiment,
-and writing the journal narrative.
+The loop is driven by Claude Code's native **`/loop`** feature running in a
+**persistent session on the Pi itself** — *not* a custom systemd timer + resume
+state machine (an earlier draft over-engineered this), and *not* a cloud Routine.
 
-Tonight's run is modeled as an **idempotent stage machine** in `state.json`
-(`ingested → labeled → measured → adjudicated → decided → validated → deployed →
-reported`). Each stage marks itself done as it completes; a restarted session
-reads `PROTOCOL.md` + `state.json` and resumes at the first incomplete stage, so a
-session dying mid-run (token exhaustion) loses no work.
+Why on-Pi `/loop` and not a cloud Routine: Claude Code **Routines run in
+Anthropic's cloud with a fresh repo clone**, so they cannot see the Pi's local
+images — which breaks local-image privacy and on-device crop adjudication. A
+session running *on the Pi* keeps images local and can crop+adjudicate directly.
+
+How it works:
+- A long-lived `claude` session on the Pi runs `/loop` (hourly, or dynamic
+  interval). Each tick the agent reads the git-tracked notebook, checks *"is it
+  after sunset and has tonight's run completed?"* (via `utils.SunChecker` + the
+  notebook), and if not, performs the next chunk of work.
+- **Resumption is implicit.** Every tick reconstructs context from the git
+  notebook, so a session killed by a usage-limit reset simply continues on the next
+  tick (or via `claude --continue`, which restores loops within 7 days). No
+  bespoke stage tracking — the git notebook *is* the durable state.
+- **Token economy still matters**: the heavy deterministic work (ingest, metrics,
+  MegaDetector relabel, replay sweeps, RDE) is plain local Python the agent
+  *invokes*; Claude tokens are spent only on the judgment layer (crop adjudication,
+  designing the next experiment, writing the journal). So a tick does cheap Python
+  first, then spends tokens on decisions — and if the budget runs out mid-judgment,
+  the next tick resumes from committed state.
+- **OS glue (minimal)**: a small systemd unit keeps/restarts the looping session
+  across reboots and re-arms the loop (recurring loops auto-expire after 7 days).
+  This is the only non-native piece, and it is far smaller than the prior design.
+
+The operational prompt the loop executes lives in `experiments/loop.md` (a runtime
+artifact created during implementation — *not* a second design doc; see "one ADR").
 
 ### Privacy boundary (hard requirement)
 
@@ -183,93 +195,116 @@ Asks: please label the 5 pinned borderline captures 🙏
 The summary is generated from the lab notebook + metrics, so it doubles as a
 human-readable view of the agent's memory.
 
-### Evaluation — three layers that defeat the two big traps
+### Evaluation — the accumulated random-capture corpus is the evaluator
 
-Research flagged two failure modes that naive replay/eval would walk straight
-into: **selection bias** (you only have frames the current config triggered on, so
-optimizing against them just reproduces the current config and grows blind spots)
-and **environmental confounding** (one camera, so before/after comparisons credit
-weather/season changes to your config change). The design counters both:
+Two failure modes would sink a naive eval: **selection bias** (you only have frames
+the current config triggered on, so optimizing against them just reproduces the
+current config and grows blind spots) and **environmental confounding** (one
+camera, so live before/after credits weather/season changes to your config change).
 
-**(a) An independent random-capture corpus — the FN ground truth.** Capture frames
-on a **random schedule decoupled from motion triggering** (plus near-miss frames
-in the 50-100% shoulder band, plus a low-FPS timelapse). This is the *only* way to
-estimate false negatives and to recover the true scene distribution. It is held
-**strictly separate** from the active-learning queue and is used **only for
-evaluation** — actively-sampled (boundary-hugging) frames are unrepresentative and
-must never be the eval set.
+An earlier draft tried to fix confounding with live **interleaving** (per-event
+A/B) plus **stochastic boundary triggering** + IPS reweighting. **Both are dropped**
+— interleaving needs more daily volume than this garden produces (some days yield
+only a handful of captures, giving per-arm samples with no power), it only applies
+cleanly to decision-stage params (switching MOG2 history/learning-rate per event
+corrupts the background model), and it adds real complexity. The cheaper, stronger
+answer makes them unnecessary:
 
-**(b) Offline replay before any deploy.** Re-run `MotionDetector` over the labeled
-corpus with the candidate config and estimate keep/drop on real events vs FPs —
-*before* it touches the live camera. Because the current trigger is a hard,
-deterministic threshold, valid counterfactual replay requires injecting a little
-**stochastic triggering near the boundary** (so logged decisions have non-degenerate
-propensities); use self-normalized IPS / doubly-robust estimators to reweight
-old-config logs for the new config.
+**The independent random-capture corpus does the job.** Capture frames on a
+**random schedule decoupled from motion triggering** (plus near-miss frames in the
+50-100% shoulder band, plus a low-FPS timelapse), label them (human + reconciled
+machine), and keep this set **strictly separate** from the active-learning queue —
+used **only for evaluation**. Then:
 
-**(c) Interleaving instead of before/after — the confound killer.** Rather than
-"deploy config B for N days then compare to A," **randomly assign each motion event
-(or short time-block) to config A or B** so both experience identical weather/light.
-This converts a confounded comparison into a clean randomized one on a single
-device, and is the primary live-attribution method. Difference-in-differences
-against an environment control (e.g. SpeciesNet-confirmed event counts) is the
-fallback when interleaving isn't possible.
+- **Replay every candidate config over this fixed labeled set** and score an
+  **OEC = F-beta over verified events** (precision *and* recall, so the agent can't
+  "win" by triggering never/always). Because it's the *same frames* for every
+  config, there is **zero weather confound** — no interleaving needed. Because the
+  corpus is unbiased by construction (random, not trigger-gated), there is **no
+  propensity problem** — no stochastic triggering or IPS needed.
+- **Low daily volume is handled by accumulation**: the corpus grows across days, so
+  evaluation draws on the whole accumulated set, not one thin day. A quiet day adds
+  little but breaks nothing.
+- It is also the **only** honest estimator of false negatives (animals the live
+  config missed but that appear in random captures).
 
-**Optimize an OEC, not one metric.** The objective is an **F-beta over
-human-verified events** (precision *and* recall), guarded so the agent can't "win"
-by triggering never or always. Single noisy daily deltas are weak evidence —
-require replication, and watch for novelty/transient effects that decay.
+**Live data = loose multi-day sanity check, not proof.** After deploying a
+replay-validated config, watch live metrics *accumulated over many days* (never a
+single-day delta) purely to confirm the offline prediction roughly holds; treat
+divergence as a prompt to investigate, not an automatic verdict.
 
-> ⚠️ Offline FN estimates from the triggered corpus alone are **lower bounds**; the
-> random-capture corpus (a) is what makes them trustworthy.
+> ⚠️ FN estimates from the triggered corpus alone are **lower bounds**; the random
+> corpus is what makes them trustworthy.
 
 ### Autonomous loop — daily cycle
 
+Each `/loop` tick after sunset, if tonight's run hasn't completed:
 ```
-NIGHTLY (camera idle):
-  1. Ingest   — pull new detections + human feedback from SQLite.
-  2. Label    — reconcile tier1/2/3; update corpus labels.
-  3. Measure  — compute FP rate, FN proxy, volume, by-hour, by-cause; append
-                to metrics/daily.csv.
-  4. Check    — did the active experiment's prediction hold (interleaved A/B
-                result)? Enough verified-event replication yet?
-  5. Decide   — keep / rollback the active experiment; if concluded, propose the
-                next config via Bayesian optimization (noise-aware surrogate over
-                past results, within bounds). OFAT only for a quick single-knob
-                sanity check.
-  6. Validate — replay the candidate config over the random-capture corpus (OEC =
-                F-beta). Abort if it doesn't beat the current config offline.
-  7. Deploy   — push config as an interleaved A/B (per-event A-vs-B assignment),
-                not a wholesale switch; service reloads.
-  8. Record   — append to JOURNAL.md, write runs/NNNN.json, update state.json.
-  9. Report   — send the Telegram daily summary. Commit + push the notebook.
+  1. Ingest    — pull new detections + human feedback from SQLite.
+  2. Label     — reconcile tier1/2/3; adjudicate ambiguous crops; update corpus.
+  3. Measure   — FP rate, FN estimate (random corpus), volume, by-hour/by-cause;
+                 append to metrics/daily.csv.
+  4. Check     — does the active experiment's offline prediction still hold against
+                 accumulated live data? Enough accumulated evidence to conclude?
+  5. Self-doubt— on cadence (see memory): re-verify own past labels/decisions
+                 against the immutable gold set; assume own auto-labels may err.
+  6. Decide    — keep / rollback the active experiment; if concluded, propose the
+                 next config via Bayesian optimization (noise-aware surrogate over
+                 past results, within bounds). OFAT only for a quick single-knob
+                 sanity check.
+  7. Validate  — replay candidate over the random-capture corpus (OEC = F-beta).
+                 Abort if it doesn't beat the current config offline.
+  8. Deploy    — write config within bounds; service reloads (then loose multi-day
+                 live sanity check, not a per-day verdict).
+  9. Record    — append JOURNAL.md, write runs/NNNN.json, update state.json.
+ 10. Report    — send Telegram daily summary; commit + push the notebook to main.
 ```
+Token-cheap steps (1,3,4,7) are plain Python the agent invokes; token-spend
+concentrates in 2,5,6,9. If the budget runs out mid-run, the next tick resumes
+from the committed notebook.
 
-### Durable memory — git-backed lab notebook (non-image only)
+### Durable memory — git-backed lab notebook, committed to `main`
+
+The notebook lives **in the main repo, committed directly to `main`** — we are
+running live experiments and want the record in the canonical history, not on a
+side branch. (The `/loop` session reads and pushes it on `main`.)
 
 ```
 experiments/
   PROTOCOL.md       # the SOP. A fresh agent session reads this FIRST.
+  loop.md           # the operational prompt /loop executes (runtime artifact)
   JOURNAL.md        # append-only narrative ("Day 12: FP 31%, tried X because…")
   LEARNINGS.md      # distilled semantic memory: durable, firm conclusions only
   state.json        # deployed config, active experiment, baselines, guard limits,
                     #   best-known-good config + full history (O(1) "tried this?")
   runs/NNNN.json    # per-experiment: hypothesis, config delta, predicted effect,
                     #   replay result, live result, decision, confidence
-  metrics/daily.csv # FP rate, FN proxy, volume, by-hour time series
+  metrics/daily.csv # FP rate, FN estimate, volume, by-hour time series
   gold/             # human-verified labels + frozen eval set — IMMUTABLE
 ```
 
 Two memory tiers (per agent-memory research): **episodic** (per-day raw
-observations in `JOURNAL.md`/`runs/`) and **semantic** (firm, distilled
-conclusions consolidated into `LEARNINGS.md` once an experiment concludes — keeps
-session context small). `PROTOCOL.md` encodes the SOP so any fresh session resumes
-the program correctly.
+observations in `JOURNAL.md`/`runs/`) and **semantic** (firm, distilled conclusions
+consolidated into `LEARNINGS.md` once an experiment concludes — keeps session
+context small). `PROTOCOL.md` encodes the SOP so any fresh session resumes correctly.
 
 **Anti-self-poisoning rule**: human labels and the gold eval set are
 **append-only and immutable** — the agent may never overwrite ground truth or its
-own past results, only append. Only *interpretations* evolve. Garden images are
-**never** in this tree.
+own past results, only append. Only *interpretations* evolve.
+
+**Self-skepticism is mandatory (bake the chance of AI error into the loop).** The
+agent runs the labeling and the tuning, so its own errors can silently compound.
+PROTOCOL.md therefore mandates a periodic **self-audit** (e.g. weekly, or every N
+experiments):
+- Re-label a fresh random sample and compare against its *own* prior auto-labels to
+  estimate its current error rate; surface disagreements to the human.
+- Re-check that past "wins" actually held up on the now-larger corpus (catch
+  regressions to the mean / transient effects mistaken for improvements).
+- Explicitly state confidence and assumptions in `runs/`, and prefer "I might be
+  wrong because…" over false certainty. A claimed improvement inside the noise band
+  is treated as *not proven*, not as success.
+
+Garden images are **never** in this tree.
 
 ### Safety / guardrails for full autonomy
 
@@ -281,11 +316,11 @@ own past results, only append. Only *interpretations* evolve. Garden images are
   random-capture corpus.
 - **Auto-rollback as a paved path** — keep the previous known-good config and
   revert atomically on a *sustained* guardrail breach (not a single bad hour).
-- **Interleaved canary** — new config runs as a per-event A/B against the
-  incumbent, so a bad config only affects its share of events while it's measured.
 - **Replication before commit** — single noisy daily deltas aren't enough; require
-  repeated agreement (and constrain the BO surrogate's hyperparameters so it
+  accumulated agreement (and constrain the BO surrogate's hyperparameters so it
   doesn't overfit noise at low sample counts).
+- **Self-audit cadence** — the periodic self-skepticism review above is a guardrail:
+  the agent must actively look for its own errors, not assume it's right.
 - **Human veto** — a Telegram command (e.g. `/pause`, `/rollback`) halts or
   reverts the loop at any time, even in autonomous mode.
 - **No thrashing** — at most one active experiment at a time.
@@ -329,15 +364,17 @@ Two best-practices reviews (camera-trap FP/FN reduction; autonomous experimentat
   + Telegram alerts), Timelapse (reference-frame technique).
 
 ### Autonomy / methodology (already reflected above)
-- Selection-bias death spiral → independent **random-capture eval corpus**.
-- Daily before/after is confounded → **interleave configs per event**.
-- Deterministic threshold breaks counterfactual replay → **stochastic boundary
-  triggering** + self-normalized IPS / doubly-robust.
+- Selection-bias death spiral → independent **random-capture eval corpus** (the
+  primary evaluator).
+- Daily before/after is confounded → solved by replaying every config over the
+  *same fixed corpus*. **Interleaving + stochastic-triggering + IPS were considered
+  and dropped** as unjustified complexity for this low-volume single camera (the
+  random corpus already removes the confound and the propensity problem).
 - **Bayesian optimization** (noise-aware, low-sample-constrained) as the search
   engine; OFAT only for quick sanity checks.
 - **OEC (F-beta)** + immutable guardrails so the agent can't game a single metric.
-- **Episodic→semantic memory** with append-only, immutable gold labels (avoid
-  memory self-poisoning).
+- **Episodic→semantic memory** with append-only, immutable gold labels, plus a
+  mandated **self-audit** cadence (avoid memory self-poisoning *and* AI-error drift).
 
 ---
 
@@ -350,22 +387,22 @@ Two best-practices reviews (camera-trap FP/FN reduction; autonomous experimentat
 2. **Telegram**: inline feedback buttons + callback handler (Pi-side); daily
    summary sender; veto commands.
 3. **Capture**: near-miss frame logging + **random-schedule capture** + low-FPS
-   timelapse writer (local disk, size-bounded with rotation); optional **stochastic
-   boundary triggering** for valid counterfactual replay.
+   timelapse writer (local disk, size-bounded with rotation).
 4. **Replay harness**: offline runner that executes `MotionDetector` over the
    random-capture corpus and reports OEC (F-beta) keep/drop metrics for a config;
    plus a nightly **RDE** pass to strip recurring stationary FPs.
-5. **Interleaving**: per-event A/B config assignment in the live loop.
-6. **Loop runner**: the nightly orchestrator + git-backed notebook + PROTOCOL.md +
-   resumable stage machine.
-7. **Config**: surface new tunables + bounds; the loop edits config via the
+5. **Loop runner**: `experiments/loop.md` + `PROTOCOL.md`; a persistent on-Pi
+   `claude` session driven by `/loop`; a small systemd unit to keep it alive and
+   re-arm the loop across reboots / 7-day expiry. State lives in the git notebook
+   on `main` (no custom resume machine).
+6. **Config**: surface new tunables + bounds; the loop edits config via the
    existing env-var / config-file mechanism and triggers a service reload.
 
 ---
 
 ## Phased Roadmap
 
-- **Phase 0 — Design (this doc + PROTOCOL.md).**  ← current
+- **Phase 0 — Design (this ADR; `PROTOCOL.md`/`loop.md` written at Phase 4).** ← current
 - **Phase 1 — Ground truth**: Telegram feedback buttons, `detection_feedback`
   table, richer logging. *Nothing downstream is trustworthy without this.*
 - **Phase 2 — Corpus capture**: random-schedule + near-miss + timelapse local
@@ -389,10 +426,12 @@ Two best-practices reviews (camera-trap FP/FN reduction; autonomous experimentat
 ### Negative / Risks
 - Human labels are sparse → slow convergence; mitigated by active-learning sample
   selection and the daily "please label these" ask.
-- Corpus selection bias under-represents false negatives until Phase 5.
+- The random-capture corpus needs time to accumulate before FN estimates are solid.
 - Autonomy risk (a bad config degrading capture) mitigated by offline gate,
-  guard metrics, auto-rollback, and human veto.
+  guard metrics, auto-rollback, self-audit, and human veto.
 - On-Pi replay is CPU-bound; mitigated by nightly batch + optional desktop host.
+- `/loop` requires a live on-Pi session and recurring loops expire after 7 days →
+  mitigated by a small systemd keep-alive/re-arm unit.
 
 ### Neutral
 - The loop edits config through the existing override mechanism; no new config
@@ -402,18 +441,17 @@ Two best-practices reviews (camera-trap FP/FN reduction; autonomous experimentat
 
 ## Open Questions
 
-1. **Loop host**: Pi nightly vs desktop-with-SSH — start on Pi, revisit if replay
-   sweeps are too slow. *(Auth resolved: Pro/Max subscription, training opt-out.)*
-2. **Corpus retention**: how many days of random/near-miss/timelapse frames to
+1. **Corpus retention**: how many days of random/near-miss/timelapse frames to
    keep, and rotation policy, given SD-card wear and capacity.
-3. **Git data branch**: keep the notebook in the main repo on a docs/experiments
-   path, or a separate `experiments` branch/repo.
-4. **Scheduling cadence**: exact systemd-timer firing times after sunset and how
-   many restarts per night map to the subscription reset windows.
-5. **MegaDetector upgrade**: adopt V6-compact on-device as a better FP-filter
+2. **`/loop` cadence**: hourly fixed vs dynamic interval; and the keep-alive/re-arm
+   approach for the 7-day loop expiry and reboots (systemd unit specifics).
+3. **MegaDetector upgrade**: adopt V6-compact on-device as a better FP-filter
    feature, or keep the bundled v5-era detector?
-6. **Stochastic-trigger budget**: how much boundary randomization is acceptable
-   (it briefly trades a few live FPs/FNs for valid offline evaluation).
+4. **Host fallback**: if on-Pi replay sweeps prove too slow, move the loop to the
+   desktop-with-SSH (the design is host-agnostic).
+
+*Resolved:* auth = Pro/Max subscription (training opt-out done); execution = on-Pi
+`/loop`; notebook in git on `main`; single ADR (this doc).
 
 ---
 
@@ -448,8 +486,14 @@ Two best-practices reviews (camera-trap FP/FN reduction; autonomous experimentat
 - Agent memory / lab-notebook [Memory for Autonomous LLM Agents, arXiv:2603.07670](https://arxiv.org/html/2603.07670v1),
   governed memory / self-poisoning [arXiv:2603.11768](https://arxiv.org/html/2603.11768v1)
 
+**Claude Code execution**
+- [Run prompts on a schedule (`/loop`)](https://code.claude.com/docs/en/scheduled-tasks.md) ·
+  [Routines](https://code.claude.com/docs/en/routines.md) ·
+  [Headless mode](https://code.claude.com/docs/en/headless.md) ·
+  [Sessions / resume](https://code.claude.com/docs/en/sessions.md)
+
 ---
 
-**Document Version**: 0.2
+**Document Version**: 0.3
 **Last Updated**: 2026-06-07
-**Next Review**: After best-practices research lands and Phase 1 scoping.
+**Next Review**: Phase 1 scoping.
