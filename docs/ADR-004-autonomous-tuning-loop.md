@@ -208,12 +208,18 @@ thresholds and re-decide "notify / route-to-review / drop", then score against
 human labels. No MOG2 state involved — it's a pure function of the saved image.
 This is where the cheapest, highest-leverage FP win lives:
 
-> **Notification gate (current gap).** Today the system notifies on *every* motion
-> trigger, including when MegaDetector finds no animal (`wildlife_system.py:343-347`,
-> unconditional `send_notification` at `:603`). The fix is **route no-animal
-> triggers to a separate "review" channel/album** — *not* a hard delete, because MD
-> misses real animals (FN risk). FP noise drops on the main channel; MD's mistakes
-> stay captured and labelable.
+> **Notification gate (current gap, but ship it in *shadow mode* first).** Today the
+> system notifies on *every* motion trigger, including when MegaDetector finds no
+> animal (`wildlife_system.py:343-347`, unconditional `send_notification` at `:603`).
+> The eventual fix routes no-animal triggers to a separate "review" channel — *not* a
+> hard delete (MD misses real animals → FN risk).
+> **Initially, keep sending *all* detections to the main channel** and run the gate
+> in **shadow mode**: it records what it *would* have suppressed but suppresses
+> nothing. You label everything, including no-animal triggers, which yields both FP
+> examples *and* the exact cases the gate would wrongly hide (MD's own misses = its
+> FN cost). Flip the gate from shadow → live only once labels show its FN cost is
+> acceptable. This is the "measure before you deploy" rule applied to the biggest
+> single change.
 
 **Layer B — Motion-capture layer (MOG2 deciding whether to grab a frame).** This is
 **not** faithfully replayable: MOG2 is stateful/path-dependent
@@ -407,15 +413,19 @@ Two best-practices reviews (camera-trap FP/FN reduction; autonomous experimentat
    `animals_detected`, MD box count/confidence, richer motion metadata
    (contour count, largest contour, foreground pixels — computed but discarded),
    and a **timestamp/time-of-day** stamp. **`detections.db` must be `.gitignore`d**
-   (binary churn) — export CSV/JSON snapshots to the notebook instead.
-2. **Notification gate**: route no-animal triggers (`animals_detected==False`) to a
-   separate review channel/album instead of the main channel — *not* a hard drop.
-   The single biggest, cheapest FP win; needs FN monitoring alongside.
+   (binary churn) — export CSV/JSON snapshots to the notebook instead. The DB's
+   frequent small writes are the **main SD-wear concern** (more than the images), so
+   keep commits batched and consider WAL tuning / SSD if wear shows.
+2. **Notification gate (shadow first)**: keep sending *all* detections to the main
+   channel initially; the `animals_detected==False` gate only *records* what it would
+   suppress. Flip to live (→ review channel, not hard drop) once labels show the FN
+   cost is acceptable.
 3. **Telegram**: inline FP/wrong-species buttons + callback handler (Pi-side); a
    "we missed this" FN-report path; daily summary (FP *and* FN); veto + heartbeat.
-4. **Capture (FN audit)**: low-FPS timelapse / random-schedule channel + near-miss
-   logging, on **external storage (USB SSD), not the boot SD card** (wear), size-
-   bounded with rotation.
+4. **Capture (FN audit)**: **lightweight** low-FPS (~1 frame / 10–30s) **640×480
+   grayscale** timelapse + near-miss logging (~100–250 MB/day), size-bounded with
+   rotation. **SD card is fine to start** (images already live there); monitor card
+   wear and move the DB/corpus to USB SSD only if wear shows up.
 5. **Config safety**: add `MotionConfig` bounds validators (load-time enforcement);
    decide hot-reload vs "restart at next sunrise" for deploys.
 6. **Replay harness (Layer A)**: offline runner over captured images for the
@@ -433,11 +443,14 @@ Two best-practices reviews (camera-trap FP/FN reduction; autonomous experimentat
 - **Phase 1 — Ground truth (FP *and* FN from day one)**: `detection_feedback` table
   with event key + time-of-day + camera-stability stamp; Telegram FP/wrong-species
   buttons **and** an FN-report path; timelapse/random FN-audit channel; richer
-  logging. *Nothing downstream is trustworthy without this.* (Retrofitting the event
-  key / time-of-day / FN channel later would waste the early corpus.)
-- **Phase 2 — Static 80/20 wins, measured**: notification gate (→ review channel),
-  ROI masking, reference-frame differencing, `unknown_species_threshold` 0.5→~0.75.
-  Run each as a *measured experiment* (FP win vs FN cost) using Phase-1 labels.
+  logging. **Keep sending all detections** (gate in shadow mode) so we collect FP and
+  gate-FN-cost examples. *Nothing downstream is trustworthy without this.*
+  (Retrofitting the event key / time-of-day / FN channel later would waste the early
+  corpus.)
+- **Phase 2 — Static 80/20 wins, measured**: flip the notification gate live once its
+  FN cost is acceptable (→ review channel), ROI masking, reference-frame
+  differencing, `unknown_species_threshold` 0.5→~0.75. Run each as a *measured
+  experiment* (FP win vs FN cost) using Phase-1 labels.
 - **Phase 3 — Layer-A replay harness** + RDE: offline tuning of the notify/species
   decision on captured images.
 - **Phase 4 — Autonomous loop**: on-Pi `/loop` runner, git notebook, guardrails,
@@ -481,7 +494,9 @@ Two best-practices reviews (camera-trap FP/FN reduction; autonomous experimentat
 
 1. **Deploy mechanism**: implement hot config-reload (signal → rebuild
    `MotionDetector`) vs accept "restart at next sunrise" with the warmup cost?
-2. **External storage**: USB SSD for corpus + DB — confirm available/size.
+2. **SD wear (monitored, not blocking)**: start on the SD card (images already there);
+   log card lifetime/health and alert on Telegram; move DB/corpus to USB SSD only if
+   wear climbs. Keep the audit channel low-res/low-rate and DB commits batched.
 3. **`/loop` cadence**: hourly fixed vs dynamic interval; systemd keep-alive / 7-day
    re-arm specifics.
 4. **Seasonal re-baselining**: corpus recency-weighting policy and when the gold set
@@ -534,11 +549,15 @@ captured images) vs Layer B (motion, live); FP and FN tracked from Phase 1; stat
 
 ---
 
-**Document Version**: 0.4
+**Document Version**: 0.5
 **Last Updated**: 2026-06-07
 **Next Review**: Phase 1 scoping.
 
 ### Changelog
+- **0.5** — Notification gate ships in *shadow mode* first: keep sending all
+  detections so we collect FP and gate-FN-cost labels before going live. SD-card
+  concern downgraded from blocker to monitored-risk (audit channel kept
+  lightweight; DB writes are the real wear driver; SSD only if wear shows).
 - **0.4** — Opus review folded in. Eval split into Layer A (notify/species, offline
   on captured images) vs Layer B (motion/MOG2, not faithfully replayable → live).
   Corrected: system currently notifies on *every* trigger → add review-channel gate.
