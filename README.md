@@ -187,26 +187,8 @@ uv run python src/telegram_feedback.py
 ```
 
 **Auto-start on boot:** run it as its own systemd service alongside the camera
-service (same pattern as `wildlife-camera.service`). Example unit:
-
-```ini
-# /etc/systemd/system/wildlife-feedback.service
-[Unit]
-Description=Wildlife detection Telegram feedback sidecar
-After=network-online.target
-
-[Service]
-Type=simple
-User=pi
-WorkingDirectory=/home/pi/animal_tracker
-Environment=PATH=/home/pi/.local/bin:/usr/bin:/bin
-ExecStart=/home/pi/.local/bin/uv run python src/telegram_feedback.py
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
+service (the committed `wildlife-feedback.service` follows the same pattern as
+`wildlife-camera.service`):
 
 ```bash
 sudo cp wildlife-feedback.service /etc/systemd/system/
