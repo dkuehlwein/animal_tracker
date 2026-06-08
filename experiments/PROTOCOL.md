@@ -1,0 +1,48 @@
+# PROTOCOL — Autonomous Tuning Loop SOP
+
+Read this FIRST every `/loop` tick. You (the judgment layer) reconstruct all
+state from this git notebook; there is no hidden stage machine.
+
+## When to spend tokens vs invoke Python
+- Deterministic work (SQL reads, metric math, config writes, env render, restarts,
+  Telegram sends) is done by `src/loop/*.py`. INVOKE them, read their JSON.
+- Spend tokens only on: tier-2 adjudication of ambiguous crops, experiment design,
+  self-audit, journaling.
+
+## Daily cycle (one nightly run, resumable)
+1. **Gate** — `SunChecker` says night? `state.json` says tonight's run already done?
+   If not night or already done → stop (cheap no-op; send heartbeat only if asked).
+2. **Ingest** — `python -m loop.ingest --since-id <watermark>`; reconcile labels.
+3. **Label** — adjudicate ambiguous crops (tier-2); append to `gold/`. Never
+   UPDATE/DELETE existing labels.
+4. **Measure** — `python -m loop.metrics`; paired FP/FN + CIs → `metrics/daily.csv`.
+5. **Check** — does the active experiment's prediction still hold (CI-based)? done?
+6. **Self-audit (cadence)** — auto-labels vs the day's human labels; re-check past
+   wins on the larger corpus; note confidence in `runs/`.
+7. **Decide** — keep / rollback; if concluded, pick next from backlog / OFAT within
+   bounds. Respect freeze + one-experiment-at-a-time + `paused`.
+8. **Validate** — Layer A = `python -m loop.replay` (STUB → "skipped"). Layer B =
+   bounds + predicted live effect. FN-veto: reject FP wins that worsen (or risk, if
+   FN unmeasured) FN.
+9. **Deploy** — `python -m loop.deploy --delta '{...}' --restart-at <pre-sunrise>`;
+   writes state.json + renders env + stamps the restart.
+10. **Record** — update `runs/NNNN-<slug>.md` (front matter + observations), append
+    a `JOURNAL.md` line, update `state.json` pointers.
+11. **Report** — `python -m loop.report --mode summary`; commit + push.
+
+Budget exhausted mid-run → the next 2h tick resumes from committed state.
+
+## Guardrail contract (hard rules)
+- BOUNDS in `src/loop/guardrails.py` are enforced by the system (config validators
+  + deploy). Never propose out-of-range values.
+- FN-veto: an FP win with an FN rise beyond CI is rejected; if FN is unmeasured and
+  the change could raise FN, HOLD.
+- Volume collapse/explosion vs baseline → rollback.
+- Feedback-starved freeze: no human labels for 3 days → freeze, hold best_known_good.
+- One active experiment at a time. Respect `state.json.paused`.
+
+## Anti-self-poisoning & self-skepticism
+- Ground truth is append-only; never rewrite `detection_feedback`, `gold/`, or prior
+  `runs/` observations.
+- Treat your own auto-labels with suspicion; reconcile against human labels in the
+  self-audit step before trusting a "win."

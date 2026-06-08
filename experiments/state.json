@@ -1,0 +1,36 @@
+{
+  "watermark": 0,
+  "paused": false,
+  "deployed": {},
+  "best_known_good": {},
+  "history": [],
+  "pending_restart_at": null,
+  "active_experiment_id": null,
+  "last_metrics": null,
+  "baselines": {
+    "volume_per_night": 0.0
+  },
+  "backlog": [
+    {
+      "id": 1,
+      "slug": "notification-gate-live",
+      "validation": "live",
+      "status": "proposed",
+      "hypothesis": "Flip the shadow gate to route no-animal triggers to a review channel; cuts FP without raising FN."
+    },
+    {
+      "id": 2,
+      "slug": "unknown-species-threshold",
+      "validation": "parked",
+      "status": "parked",
+      "hypothesis": "Raise SPECIES_UNKNOWN_SPECIES_THRESHOLD 0.5 -> 0.75. Replay-gated; parked until replay.py is real."
+    },
+    {
+      "id": 3,
+      "slug": "roi-masking",
+      "validation": "live",
+      "status": "proposed",
+      "hypothesis": "Restrict motion ROI to suppress edge vegetation; incremental FP reduction."
+    }
+  ]
+}

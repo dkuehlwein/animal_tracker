@@ -36,3 +36,6 @@ data/
 .venv/
 raspberry5.private
 .venv-test/
+
+# Loop overlay is rendered from experiments/state.json (the committed source of truth)
+experiments/deployed_config.env
