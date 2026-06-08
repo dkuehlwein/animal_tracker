@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Raspberry Pi wildlife camera with AI species identification"
 requires-python = ">=3.13"
 dependencies = [
-    "python-telegram-bot==20.7",
+    "python-telegram-bot==22.7",
     "picamera2==0.3.16",
     "opencv-python>=4.10.0",
     "numpy>=2.1.0",
