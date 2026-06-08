@@ -1,0 +1,2 @@
+date,total_triggers,labeled_triggers,fp_count,fp_rate,fp_ci_low,fp_ci_high,fn_rate,fn_ci_low,fn_ci_high
+2026-06-08,84,84,67,0.7976190476190477,0.6995818724114075,0.8696254321036759,unmeasured,,
