@@ -14,13 +14,21 @@ there is no getUpdates conflict.
 """
 
 import logging
+import sys as _sys
+from pathlib import Path as _Path
 
 from telegram import Update
-from telegram.ext import Application, CallbackQueryHandler, ContextTypes
+from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes
 
 from config import Config
 from database_manager import DatabaseManager
 from feedback_protocol import CALLBACK_PREFIX, parse_callback_data
+
+_SRC = _Path(__file__).resolve().parent
+if str(_SRC) not in _sys.path:
+    _sys.path.insert(0, str(_SRC))
+from loop import state as _state_mod
+from loop import deploy as _deploy
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +50,49 @@ def record_feedback_callback(data: str, database: DatabaseManager) -> str:
     database.add_feedback(detection_id, label, source="human")
     logger.info(f"Recorded human feedback: detection={detection_id}, label={label}")
     return _LABEL_CONFIRMATION.get(label, f"Recorded: {label}")
+
+
+DEFAULT_STATE_PATH = "experiments/state.json"
+DEFAULT_ENV_PATH = "experiments/deployed_config.env"
+
+
+def handle_pause(state_path: str = DEFAULT_STATE_PATH) -> str:
+    """Set paused=true in state.json. Pure of Telegram I/O for testability."""
+    st = _state_mod.load_state(state_path)
+    st["paused"] = True
+    _state_mod.save_state(state_path, st)
+    logger.info("Loop paused via /pause command")
+    return "Tuning paused. The loop will hold best_known_good until resumed."
+
+
+def handle_rollback(
+    state_path: str = DEFAULT_STATE_PATH,
+    env_path: str = DEFAULT_ENV_PATH,
+    restart_at: str = None,
+) -> str:
+    """Roll back to best_known_good via deploy.rollback()."""
+    from datetime import datetime, timedelta
+
+    if restart_at is None:
+        # Default: ASAP (next minute) — the deploy timer applies it pre-sunrise,
+        # but a manual rollback should restart at the next opportunity.
+        restart_at = (datetime.now().astimezone() + timedelta(minutes=1)).isoformat()
+    result = _deploy.rollback(state_path, env_path, restart_at)
+    logger.info(f"Rollback requested via /rollback: {result}")
+    return (
+        "Rollback queued: restored best_known_good "
+        f"({result['deployed']}); camera restart stamped."
+    )
+
+
+async def _on_pause(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    msg = handle_pause()
+    await update.message.reply_text(msg)
+
+
+async def _on_rollback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    msg = handle_rollback()
+    await update.message.reply_text(msg)
 
 
 async def _on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -77,6 +128,8 @@ def build_application(config: Config, database: DatabaseManager) -> Application:
     application.add_handler(
         CallbackQueryHandler(_on_callback, pattern=f"^{CALLBACK_PREFIX}:")
     )
+    application.add_handler(CommandHandler("pause", _on_pause))
+    application.add_handler(CommandHandler("rollback", _on_rollback))
     return application
 
 
@@ -93,7 +146,7 @@ def main() -> None:
     application = build_application(config, database)
 
     logger.info("Telegram feedback sidecar starting (polling for button taps)...")
-    application.run_polling(allowed_updates=["callback_query"])
+    application.run_polling(allowed_updates=["callback_query", "message"])
 
 
 if __name__ == "__main__":
