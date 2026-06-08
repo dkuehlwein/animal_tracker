@@ -209,10 +209,10 @@ class SpeciesConfig(BaseSettings):
     @field_validator('unknown_species_threshold')
     @classmethod
     def validate_unknown_threshold_bounds(cls, v):
-        low, high = _BOUNDS["SPECIES_UNKNOWN_THRESHOLD"]
+        low, high = _BOUNDS["SPECIES_UNKNOWN_SPECIES_THRESHOLD"]
         if not (low <= v <= high):
             raise ValueError(
-                f"SPECIES_UNKNOWN_THRESHOLD={v} out of allowed bounds [{low}, {high}]"
+                f"SPECIES_UNKNOWN_SPECIES_THRESHOLD={v} out of allowed bounds [{low}, {high}]"
             )
         return v
 
