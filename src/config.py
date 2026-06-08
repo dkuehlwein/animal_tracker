@@ -11,6 +11,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Sentinel marking "caller did not specify _env_file" so Config.__init__ can
+# defer to model_config['env_file'] (which tests patch to None). Module-level so
+# it is unaffected by pydantic's class-attribute handling.
+_ENV_FILE_UNSET = object()
+
 
 class CameraConfig(BaseSettings):
     """Camera-specific configuration settings."""
@@ -177,8 +182,17 @@ class Config(BaseSettings):
         extra='ignore'
     )
 
-    def __init__(self, _env_file='.env', **kwargs):
-        """Initialize config, optionally disabling .env file loading."""
+    def __init__(self, _env_file=_ENV_FILE_UNSET, **kwargs):
+        """Initialize config, optionally disabling .env file loading.
+
+        When ``_env_file`` is not given explicitly we defer to the class's
+        ``model_config['env_file']`` (normally ``.env``). Tests patch that to
+        ``None`` to keep the production ``.env`` from leaking into assertions, so
+        the default must honour the patched value rather than hard-coding
+        ``'.env'``.
+        """
+        if _env_file is _ENV_FILE_UNSET:
+            _env_file = type(self).model_config.get('env_file', '.env')
         super().__init__(_env_file=_env_file, **kwargs)
 
     telegram_bot_token: str
@@ -253,7 +267,17 @@ class Config(BaseSettings):
 
     @classmethod
     def create_test_config(cls) -> 'Config':
-        """Create configuration for testing."""
+        """Create configuration for testing.
+
+        Isolation note: tests must never read the production ``.env`` (it leaks
+        operational overrides such as ``MOTION_THRESHOLD`` into assertions) nor
+        resolve storage to the real ``data/`` directory (a test that writes or
+        unlinks would corrupt production data). Both invariants are enforced by
+        ``tests/conftest.py``, which disables ``.env`` loading and redirects
+        ``STORAGE_DATA_DIR`` / ``STORAGE_DATABASE_PATH`` to a temp directory for
+        the whole session before any config is built. This factory only supplies
+        the required telegram credentials and a zero warmup window.
+        """
         import os
         os.environ.setdefault('TELEGRAM_BOT_TOKEN', 'test_token')
         os.environ.setdefault('TELEGRAM_CHAT_ID', 'test_chat')

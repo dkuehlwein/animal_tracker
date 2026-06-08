@@ -72,8 +72,14 @@ class TestPerformanceConfig:
 class TestStorageConfig:
     """Test storage configuration validation."""
 
+    @patch.dict(os.environ, {}, clear=True)
     def test_valid_storage_config(self):
-        """Test valid storage configuration."""
+        """Test valid storage configuration.
+
+        Cleared environment so the genuine class default is observed (the test
+        harness in conftest.py redirects STORAGE_DATA_DIR to a temp directory for
+        isolation; here we assert the documented production default instead).
+        """
         config = StorageConfig()
         assert config.data_dir == Path("data")
         assert config.image_prefix == "capture_"
