@@ -10,7 +10,7 @@ created: 2026-06-08
 started: null
 concluded: null
 decision: null            # keep | rollback | inconclusive
-baseline: { fp_rate: null, fp_ci: null, fn: unmeasured }
+baseline: { fp_rate: 0.798, fp_ci: [0.700, 0.870], fn: unmeasured }
 result:   { fp_rate: null, fp_ci: null, fn: null }
 confidence: null
 ---
@@ -30,6 +30,39 @@ HELD rather than auto-deployed.
 
 (Append-only. The agent records each night's FP/FN deltas and CI overlap here.
 Never rewrite prior observations — anti-self-poisoning.)
+
+### 2026-06-08 — baseline established; deploy HELD on infra gap
+
+First real loop tick. Ingested 84 detections (watermark 0 → 84). Baseline:
+
+- **FP rate 0.798** (67/84), 95% CI [0.700, 0.870].
+- **FN unmeasured** (no FN-eliciting ground truth yet).
+- **Volume 84 triggers/night** → set `baselines.volume_per_night = 84`.
+
+Shadow-gate signal (cross-tab of `reconciled_label` × `gate_would_suppress`),
+strongly in favour of this experiment's hypothesis:
+
+| reconciled_label | gate suppresses | gate keeps | gate=null |
+|---|---|---|---|
+| animal (12) | 0 | 11 | 1 |
+| false_positive (66) | 65 | 1 | 1 (id 2, human-labelled) |
+| wrong_species (5) | 5 | 0 | 0 |
+
+→ Gate would suppress **70/72 FP+wrong_species (97%)** and **0/12 true animals**
+(zero FN on the labelled corpus). This is the clearest available FP lever.
+
+**Decision: HOLD (cannot deploy).** The live notification gate does not exist
+yet — `gate_would_suppress` is computed only inside `loop.ingest` as a shadow
+metric. There is no gate in `notification_service.py`, no config field/env var,
+and no `guardrails.BOUNDS` entry, so `loop.deploy --delta` would reject any gate
+key (`validate_param`: "not a tunable parameter"). This is a **mechanical /
+infra blocker, not an FN-veto** — the shadow data shows zero FN risk. Wiring the
+gate live (notification_service gate + review-channel route + config/env +
+BOUNDS + deploy path) is a code change for a normal dev session, not an
+autonomous 2 h tick. Flagged to Daniel in tonight's summary. Experiment stays
+`proposed`; `active_experiment_id` remains null. No numeric OFAT was launched —
+`motion_area` does not separate animals (800–2185) from FPs (800–2000+), so a
+`MOTION_THRESHOLD` bump would risk FN with no support.
 
 ## Decision & rationale
 
