@@ -22,7 +22,7 @@ from loop import state as state_mod
 
 def _restart_camera() -> None:
     subprocess.run(
-        ["systemctl", "restart", "wildlife-camera.service"], check=True
+        ["sudo", "-n", "systemctl", "restart", "wildlife-camera.service"], check=True
     )
 
 

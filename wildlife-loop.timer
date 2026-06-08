@@ -1,0 +1,14 @@
+[Unit]
+Description=Fire the wildlife autonomous tuning loop every 2 hours
+
+[Timer]
+# Tick every 2 hours on the even hour (00:00, 02:00, 04:00, ...).
+# The loop.md prompt self-gates on night window and state.json, so daytime
+# ticks are cheap no-ops (the agent reads state and stops within seconds).
+OnCalendar=*-*-* 00/2:00:00
+# Persistent=true: if the Pi was off at a scheduled time, fire once on next boot
+# rather than silently missing the tick (important for the nightly run window).
+Persistent=true
+
+[Install]
+WantedBy=timers.target
