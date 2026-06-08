@@ -385,6 +385,54 @@ Edit `scripts/network_watchdog.sh` to adjust:
 
 Telegram notifications are automatically enabled if `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are set in your `.env` file.
 
+## Autonomous tuning loop (ADR-004 Phase 4)
+
+A nightly self-improving loop reduces false positives and false negatives. It is
+two layers: deterministic tools in `src/loop/` (invoked as `python -m loop.<name>`,
+JSON to stdout) and a judgment layer (`experiments/loop.md` + `PROTOCOL.md`) run
+by an on-Pi Claude Code `/loop` session.
+
+### Components
+- `loop.ingest` — read new detections + feedback past the watermark; reconcile
+  labels (human > tier-2 > tier-1).
+- `loop.metrics` — paired FP/FN with Wilson 95% CIs → `experiments/metrics/daily.csv`.
+- `loop.replay` — Layer-A offline replay seam (STUB: returns "skipped" this build).
+- `loop.report` — Telegram daily summary (FP+FN) + heartbeat (send-only).
+- `loop.deploy` — validate against bounds, update `experiments/state.json`, render
+  `experiments/deployed_config.env`, stamp a pre-sunrise restart; `rollback()`.
+- `loop.guardrails` — bounds dict (shared with config validators), volume guards,
+  FN-veto, feedback-starved freeze (N=3 days).
+
+### Config overlay
+Tunable sub-configs load `('.env', 'experiments/deployed_config.env')`. Precedence:
+real OS env > `deployed_config.env` > `.env` > defaults. `deployed_config.env` is
+gitignored and regenerated from `experiments/state.json` (the committed source of
+truth). Out-of-bounds deployed values raise at `Config()` construction, so the
+camera refuses to start on a bad config.
+
+### Deploy mechanism
+The loop never hot-reloads. `loop.deploy` stamps `pending_restart_at` ~60 min
+before sunrise; `wildlife-deploy.timer` fires `wildlife-deploy.service`
+(`loop.apply_pending_deploy`), which restarts `wildlife-camera.service` when the
+stamp is due so MOG2 warmup finishes while still dark.
+
+### Veto commands
+`/pause` (freeze tuning, hold best_known_good) and `/rollback` (restore
+best_known_good) are sent to the Telegram bot and handled by the feedback sidecar
+(`wildlife-feedback.service`).
+
+### Installing the services
+```bash
+sudo cp wildlife-loop.service /etc/systemd/system/
+sudo cp wildlife-deploy.service /etc/systemd/system/
+sudo cp wildlife-deploy.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now wildlife-loop.service
+sudo systemctl enable --now wildlife-deploy.timer
+```
+`wildlife-deploy.service` runs `systemctl restart wildlife-camera.service`; grant
+user `daniel` permission via a polkit rule or run the camera as a user unit.
+
 ## Power Consumption
 
 Running 24/7 on a Raspberry Pi 5 (8GB):
