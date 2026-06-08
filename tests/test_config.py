@@ -169,5 +169,68 @@ class TestConfig:
         assert summary['motion']['threshold'] == 2000
 
 
+class TestOverlayAndBounds:
+    """ADR-004 Phase 4: deployed_config.env overlay + bounds validators."""
+
+    def _write_overlay(self, tmp_path, body: str) -> str:
+        overlay = tmp_path / "deployed_config.env"
+        overlay.write_text(body)
+        return str(overlay)
+
+    def _empty_env(self, tmp_path) -> str:
+        """Return path to an empty .env file (stands in for None in the tuple)."""
+        p = tmp_path / "empty.env"
+        p.write_text("")
+        return str(p)
+
+    def test_overlay_overrides_defaults(self, tmp_path, monkeypatch):
+        # No real OS env for the key; overlay file sets it → overlay wins over default.
+        # Adaptation: pydantic-settings rejects None in a tuple; use an empty temp
+        # .env as the first element instead. Behaviour under test is identical.
+        monkeypatch.delenv("MOTION_THRESHOLD", raising=False)
+        overlay = self._write_overlay(tmp_path, "MOTION_THRESHOLD=2500\n")
+        from config import MotionConfig
+        cfg = MotionConfig(_env_file=(self._empty_env(tmp_path), overlay))
+        assert cfg.threshold == 2500
+
+    def test_os_env_overrides_overlay(self, tmp_path, monkeypatch):
+        # Real OS env beats the overlay file (manual override preserved).
+        monkeypatch.setenv("MOTION_THRESHOLD", "3000")
+        overlay = self._write_overlay(tmp_path, "MOTION_THRESHOLD=2500\n")
+        from config import MotionConfig
+        cfg = MotionConfig(_env_file=(self._empty_env(tmp_path), overlay))
+        assert cfg.threshold == 3000
+
+    def test_missing_overlay_is_safe(self, tmp_path, monkeypatch):
+        monkeypatch.delenv("MOTION_THRESHOLD", raising=False)
+        missing = str(tmp_path / "does_not_exist.env")
+        from config import MotionConfig
+        cfg = MotionConfig(_env_file=(self._empty_env(tmp_path), missing))
+        assert cfg.threshold == 2000  # documented default
+
+    def test_out_of_range_motion_threshold_raises(self, monkeypatch):
+        from pydantic import ValidationError
+        from config import MotionConfig
+        # 100000 is outside guardrails.BOUNDS["MOTION_THRESHOLD"] = (200, 8000).
+        monkeypatch.setenv("MOTION_THRESHOLD", "100000")
+        with pytest.raises(ValidationError):
+            MotionConfig(_env_file=None)
+
+    def test_in_range_motion_threshold_ok(self, monkeypatch):
+        from config import MotionConfig
+        monkeypatch.setenv("MOTION_THRESHOLD", "2500")
+        cfg = MotionConfig(_env_file=None)
+        assert cfg.threshold == 2500
+
+    def test_out_of_range_unknown_threshold_raises(self, monkeypatch):
+        from pydantic import ValidationError
+        from config import SpeciesConfig
+        # 1.5 is outside (0.3, 0.95).
+        # field 'unknown_species_threshold' + prefix 'SPECIES_' → env var name:
+        monkeypatch.setenv("SPECIES_UNKNOWN_SPECIES_THRESHOLD", "1.5")
+        with pytest.raises(ValidationError):
+            SpeciesConfig(_env_file=None)
+
+
 if __name__ == '__main__':
     pytest.main([__file__])

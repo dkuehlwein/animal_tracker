@@ -8,6 +8,14 @@ from typing import Tuple, Optional
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 import logging
+import sys as _sys
+from pathlib import Path as _Path
+# guardrails lives in src/loop; ensure src is importable when config is imported
+# standalone (production runs with src on the path; this is belt-and-braces).
+_SRC = _Path(__file__).resolve().parent
+if str(_SRC) not in _sys.path:
+    _sys.path.insert(0, str(_SRC))
+from loop.guardrails import BOUNDS as _BOUNDS
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +62,14 @@ class CameraConfig(BaseSettings):
 
 class MotionConfig(BaseSettings):
     """Motion detection configuration settings."""
-    model_config = SettingsConfigDict(env_prefix='MOTION_', env_file='.env', extra='ignore')
+    # Overlay precedence (pydantic-settings): real OS env > deployed_config.env
+    # > .env > field defaults. The loop's deploy step renders deployed_config.env;
+    # a human OS env var still wins. A missing overlay file is ignored.
+    model_config = SettingsConfigDict(
+        env_prefix='MOTION_',
+        env_file=('.env', 'experiments/deployed_config.env'),
+        extra='ignore',
+    )
 
     threshold: int = 2000
     min_contour_area: int = 50
@@ -78,6 +93,16 @@ class MotionConfig(BaseSettings):
     @property
     def consecutive_detections_required(self) -> int:
         return self.consecutive_required
+
+    @field_validator('threshold')
+    @classmethod
+    def validate_threshold_bounds(cls, v):
+        low, high = _BOUNDS["MOTION_THRESHOLD"]
+        if not (low <= v <= high):
+            raise ValueError(
+                f"MOTION_THRESHOLD={v} out of allowed bounds [{low}, {high}]"
+            )
+        return v
 
 
 class LocationConfig(BaseSettings):
@@ -105,7 +130,11 @@ class LocationConfig(BaseSettings):
 
 class PerformanceConfig(BaseSettings):
     """Performance and resource management configuration."""
-    model_config = SettingsConfigDict(env_prefix='PERFORMANCE_', env_file='.env', extra='ignore')
+    model_config = SettingsConfigDict(
+        env_prefix='PERFORMANCE_',
+        env_file=('.env', 'experiments/deployed_config.env'),
+        extra='ignore',
+    )
 
     cooldown_period: float = 30.0
     memory_threshold: float = 0.8
@@ -154,7 +183,11 @@ class StorageConfig(BaseSettings):
 
 class SpeciesConfig(BaseSettings):
     """Species identification configuration."""
-    model_config = SettingsConfigDict(env_prefix='SPECIES_', env_file='.env', extra='ignore')
+    model_config = SettingsConfigDict(
+        env_prefix='SPECIES_',
+        env_file=('.env', 'experiments/deployed_config.env'),
+        extra='ignore',
+    )
 
     model_version: str = "v4.0.1a"
     country_code: str = "DEU"
@@ -171,6 +204,16 @@ class SpeciesConfig(BaseSettings):
     def validate_model(cls, v):
         if v not in ["v4.0.1a", "v4.0.1b"]:
             raise ValueError(f"Invalid model version: {v}")
+        return v
+
+    @field_validator('unknown_species_threshold')
+    @classmethod
+    def validate_unknown_threshold_bounds(cls, v):
+        low, high = _BOUNDS["SPECIES_UNKNOWN_THRESHOLD"]
+        if not (low <= v <= high):
+            raise ValueError(
+                f"SPECIES_UNKNOWN_THRESHOLD={v} out of allowed bounds [{low}, {high}]"
+            )
         return v
 
 
