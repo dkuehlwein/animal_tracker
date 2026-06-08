@@ -158,7 +158,7 @@ class MotionDetector:
                 )
 
             # DIAGNOSTIC: Count raw foreground pixels (excluding MOG2 shadow markers at 127)
-            raw_fg_pixels = np.sum(fgmask == 255)
+            raw_fg_pixels = int(np.sum(fgmask == 255))
 
             # Drop MOG2 shadow-marked pixels (value 127), keep true foreground (value 255)
             _, thresh = cv2.threshold(
@@ -169,7 +169,7 @@ class MotionDetector:
             )
 
             # DIAGNOSTIC: Count foreground pixels after threshold
-            thresh_fg_pixels = np.sum(thresh > 0)
+            thresh_fg_pixels = int(np.sum(thresh > 0))
 
             # Apply morphological operations to remove noise
             kernel = np.ones((3,3), np.uint8)
@@ -177,7 +177,7 @@ class MotionDetector:
             thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)  # Fill small holes
 
             # DIAGNOSTIC: Count foreground pixels after morphology
-            morph_fg_pixels = np.sum(thresh > 0)
+            morph_fg_pixels = int(np.sum(thresh > 0))
 
             # Apply central region weighting
             weighted_thresh = cv2.multiply(

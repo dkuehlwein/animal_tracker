@@ -26,6 +26,20 @@ from config import Config
 from database_manager import DatabaseManager
 
 
+def _coerce_int(value):
+    """Return value as a Python int, decoding little-endian BLOB if needed.
+
+    SQLite stores numpy.int64 scalars as raw 8-byte little-endian BLOBs when
+    no sqlite3 adapter is registered for the NumPy type.  This function undoes
+    that serialisation so already-corrupted rows remain readable.
+    """
+    if isinstance(value, (bytes, bytearray)):
+        return int.from_bytes(value, "little")
+    if value is None:
+        return None
+    return int(value)
+
+
 def _tier1_label(animals_detected) -> str | None:
     if animals_detected is None:
         return None
@@ -86,11 +100,11 @@ def reconcile(db: DatabaseManager, since_id: int) -> list[dict]:
                     "tier1": tier1,
                     "tier2": tier2,
                     "human": human,
-                    "motion_area": d["motion_area"],
-                    "contour_count": d["contour_count"],
-                    "largest_contour_area": d["largest_contour_area"],
-                    "foreground_pixel_count": d["foreground_pixel_count"],
-                    "hour_of_day": d["hour_of_day"],
+                    "motion_area": _coerce_int(d["motion_area"]),
+                    "contour_count": _coerce_int(d["contour_count"]),
+                    "largest_contour_area": _coerce_int(d["largest_contour_area"]),
+                    "foreground_pixel_count": _coerce_int(d["foreground_pixel_count"]),
+                    "hour_of_day": _coerce_int(d["hour_of_day"]),
                     "gate_would_suppress": bool(d["gate_would_suppress"])
                     if d["gate_would_suppress"] is not None
                     else None,

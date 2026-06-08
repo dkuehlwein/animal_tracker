@@ -281,5 +281,80 @@ class TestMotionDetectorWarmup:
         assert result.motion_area == 0
 
 
+class TestForegroundPixelCountType:
+    """foreground_pixel_count must be a native Python int, not a NumPy scalar.
+
+    numpy.int64 is not handled by sqlite3's default adapter and would be stored
+    as a raw 8-byte BLOB instead of an INTEGER column, breaking JSON serialisation
+    and the loop.ingest pipeline.
+    """
+
+    def setup_method(self):
+        self.config = Config.create_test_config()
+        self.detector = MotionDetector(self.config)
+
+    def test_foreground_pixel_count_is_native_int_on_confirmed_detection(self):
+        """A confirmed motion detection must carry a native int, not numpy.int64."""
+        background = np.zeros((480, 640), dtype=np.uint8)
+        for _ in range(10):
+            self.detector.detect(background)
+
+        # Force a large, centred motion region
+        motion_frame = background.copy()
+        motion_frame[100:380, 150:490] = 255
+
+        result = None
+        for _ in range(5):
+            result = self.detector.detect(motion_frame)
+            if result.motion_detected:
+                break
+
+        assert result is not None and result.motion_detected, "precondition: detection must fire"
+        assert type(result.foreground_pixel_count) is int, (
+            f"expected plain int, got {type(result.foreground_pixel_count)}"
+        )
+
+    def test_foreground_pixel_count_roundtrips_as_integer_in_db(self):
+        """log_detection with a native-int foreground_pixel_count must store INTEGER, not BLOB."""
+        import sqlite3
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
+        import tempfile, os
+        from config import Config
+        from database_manager import DatabaseManager
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db_file = os.path.join(tmp, "test.db")
+            os.environ["STORAGE_DATABASE_PATH"] = db_file
+            os.environ["STORAGE_DATA_DIR"] = tmp
+            cfg = Config.create_test_config()
+            db = DatabaseManager(cfg)
+
+            # Simulate what motion_detector now produces: a plain int
+            native_count = int(np.sum(np.ones((10, 10), dtype=np.uint8) > 0))  # 100, type int
+            assert type(native_count) is int
+
+            did = db.log_detection(
+                image_path="/fake.jpg",
+                motion_area=1000,
+                foreground_pixel_count=native_count,
+            )
+
+            conn = sqlite3.connect(db_file)
+            row = conn.execute(
+                "SELECT foreground_pixel_count, typeof(foreground_pixel_count) FROM detections WHERE id = ?",
+                (did,),
+            ).fetchone()
+            conn.close()
+
+            stored_value, stored_type = row
+            assert stored_type == "integer", (
+                f"expected sqlite type 'integer', got '{stored_type}' (value={stored_value!r})"
+            )
+            assert stored_value == native_count
+
+
 if __name__ == '__main__':
     pytest.main([__file__])
