@@ -1,0 +1,26 @@
+[Unit]
+Description=Wildlife Autonomous Tuning Loop (on-Pi Claude /loop session)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=daniel
+WorkingDirectory=/home/daniel/animal_tracker
+Environment="PATH=/home/daniel/.local/bin:/usr/bin:/bin"
+# PROVISIONAL: The ExecStart line below is UNVERIFIED. How Claude Code's /loop
+# command is armed headlessly on the Pi has not been confirmed. The invocation
+# syntax (--continue, --dangerously-skip-permissions, and the "/loop" argument)
+# must be validated against the actual `claude` CLI behavior on this Pi before
+# enabling this service. Do NOT enable until verified.
+ExecStart=/home/daniel/.local/bin/claude --continue --dangerously-skip-permissions "/loop"
+Restart=always
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+# Resource limits
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

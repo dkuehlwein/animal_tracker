@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the pre-sunrise wildlife deploy check daily
+
+[Timer]
+# Fire well before the earliest plausible sunrise; the service is a no-op unless
+# state.json has a pending deploy whose restart time has arrived.
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

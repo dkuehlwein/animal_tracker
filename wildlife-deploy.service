@@ -1,0 +1,15 @@
+[Unit]
+Description=Wildlife pre-sunrise deploy (apply pending config + restart camera)
+After=network.target
+
+[Service]
+Type=oneshot
+User=daniel
+WorkingDirectory=/home/daniel/animal_tracker
+Environment="PATH=/home/daniel/.local/bin:/usr/bin:/bin"
+# Apply any pending deploy stamped in experiments/state.json, then restart the
+# camera so it reloads experiments/deployed_config.env on startup. The wrapper
+# exits 0 with no-op if no deploy is due.
+ExecStart=/home/daniel/.local/bin/uv run python -m loop.apply_pending_deploy
+StandardOutput=journal
+StandardError=journal
