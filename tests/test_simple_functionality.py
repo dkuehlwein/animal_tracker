@@ -221,9 +221,182 @@ class TestWildlifeSystemCaptionBuilder:
             temperature=20.0
         )
 
-        # Should show motion detected, not species
+        # Should show motion detected
         assert 'Motion detected' in caption
         assert '800 px' in caption
+        # Should also surface the classifier verdict
+        assert 'Classifier' in caption
+        assert 'Unknown species' in caption
+
+    def test_build_caption_no_animals_includes_classifier_verdict(self):
+        """No-animal caption must include a classifier line so 'Wrong species' is judgeable."""
+        from wildlife_system import WildlifeSystem
+        from data_models import DetectionResult
+        from datetime import datetime
+
+        system = WildlifeSystem()
+
+        detection_result = DetectionResult(
+            animals_detected=False,
+            detection_count=0,
+            bounding_boxes=[],
+            detections=[],
+            processing_time=1.0,
+        )
+        species_result = {
+            'species_name': 'Unknown species',
+            'confidence': 0.0,
+            'animals_detected': False,
+            'detection_result': detection_result,
+            'metadata': {},
+        }
+
+        caption = system._build_caption(
+            species_result,
+            motion_area=600,
+            timestamp=datetime(2026, 3, 1, 8, 0, 0),
+        )
+
+        assert 'Motion detected' in caption
+        assert 'Classifier' in caption
+
+    def test_build_caption_blank_taxonomy_renders_cleanly(self):
+        """Raw taxonomy '...;;;;;;blank' should appear as 'Blank', not the UUID string."""
+        from wildlife_system import WildlifeSystem
+        from data_models import DetectionResult
+        from datetime import datetime
+
+        system = WildlifeSystem()
+
+        # Typical "blank" result from SpeciesNet ensemble when animals_detected=True
+        detection_result = DetectionResult(
+            animals_detected=True,
+            detection_count=1,
+            bounding_boxes=[{'confidence': 0.6, 'bbox': [0, 0, 1, 1]}],
+            detections=[],
+            processing_time=1.0,
+        )
+        raw_blank = 'aba05f1e-dead-beef-0000-000000000000;;;;;;blank'
+        species_result = {
+            'species_name': raw_blank,
+            'confidence': 0.72,
+            'animals_detected': True,
+            'detection_result': detection_result,
+            'metadata': {},
+        }
+
+        caption = system._build_caption(
+            species_result,
+            motion_area=900,
+            timestamp=datetime(2026, 3, 1, 8, 0, 0),
+        )
+
+        assert 'Blank' in caption
+        assert 'aba05f1e' not in caption  # raw UUID must never appear
+
+    def test_build_caption_human_taxonomy_renders_cleanly(self):
+        """Raw 'human' taxonomy string should surface as 'Human' in the caption."""
+        from wildlife_system import WildlifeSystem
+        from data_models import DetectionResult
+        from datetime import datetime
+
+        system = WildlifeSystem()
+
+        detection_result = DetectionResult(
+            animals_detected=True,
+            detection_count=1,
+            bounding_boxes=[{'confidence': 0.88, 'bbox': [0, 0, 1, 1]}],
+            detections=[],
+            processing_time=1.0,
+        )
+        raw_human = 'deadbeef-0000-0000-0000-000000000000;mammalia;primates;hominidae;homo;sapiens;human'
+        species_result = {
+            'species_name': raw_human,
+            'confidence': 0.88,
+            'animals_detected': True,
+            'detection_result': detection_result,
+            'metadata': {},
+        }
+
+        caption = system._build_caption(
+            species_result,
+            motion_area=1200,
+            timestamp=datetime(2026, 3, 1, 8, 0, 0),
+        )
+
+        assert 'Human' in caption
+        assert 'deadbeef' not in caption
+
+    def test_build_caption_animal_still_shows_species_line(self):
+        """Animal-detected branch must still show the species line (regression guard)."""
+        from wildlife_system import WildlifeSystem
+        from data_models import DetectionResult
+        from datetime import datetime
+
+        system = WildlifeSystem()
+
+        detection_result = DetectionResult(
+            animals_detected=True,
+            detection_count=1,
+            bounding_boxes=[{'confidence': 0.80, 'bbox': [0.1, 0.1, 0.5, 0.5]}],
+            detections=[],
+            processing_time=1.0,
+        )
+        species_result = {
+            'species_name': 'Fox',
+            'confidence': 0.91,
+            'animals_detected': True,
+            'detection_result': detection_result,
+            'metadata': {},
+        }
+
+        caption = system._build_caption(
+            species_result,
+            motion_area=3000,
+            timestamp=datetime(2026, 3, 1, 20, 15, 0),
+            temperature=18.0,
+        )
+
+        assert 'Fox' in caption
+        assert '91%' in caption
+        assert 'Motion detected' not in caption
+
+    def test_extract_species_name_empty_common_name_falls_back_to_scientific(self):
+        """When common_name token is absent, fall back to genus+species."""
+        from wildlife_system import WildlifeSystem
+
+        system = WildlifeSystem()
+
+        # Taxonomy with empty common_name but valid genus+species
+        raw = 'uuid;mammalia;rodentia;sciuridae;sciurus;vulgaris;'
+        result = system._extract_species_name(raw)
+        assert result == 'Sciurus Vulgaris'
+
+    def test_extract_species_name_none_input(self):
+        """None/empty input must not raise and should return 'Unknown species'."""
+        from wildlife_system import WildlifeSystem
+
+        system = WildlifeSystem()
+
+        assert system._extract_species_name('') == 'Unknown species'
+
+    def test_extract_species_name_blank_token(self):
+        """';;;;;;blank' should return 'Blank'."""
+        from wildlife_system import WildlifeSystem
+
+        system = WildlifeSystem()
+
+        raw = 'some-uuid;;;;;;blank'
+        assert system._extract_species_name(raw) == 'Blank'
+
+    def test_extract_species_name_no_cv_result(self):
+        """'no cv result' token should be returned readable (title-cased)."""
+        from wildlife_system import WildlifeSystem
+
+        system = WildlifeSystem()
+
+        raw = 'some-uuid;;;;;;no cv result'
+        assert system._extract_species_name(raw) == 'No Cv Result'
 
 
 if __name__ == '__main__':

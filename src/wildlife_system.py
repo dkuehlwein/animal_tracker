@@ -316,12 +316,32 @@ class WildlifeSystem:
             return None, None
     
     def _extract_species_name(self, species_name_raw: str) -> str:
-        """Extract human-readable name from taxonomic path."""
-        # Format: UUID;class;order;family;genus;species;common_name
+        """Extract human-readable name from taxonomic path.
+
+        Handles the full SpeciesNet taxonomy format:
+          UUID;class;order;family;genus;species;common_name
+        Special sentinel values returned by the ensemble (e.g. ``blank``,
+        ``no cv result``) appear as the common_name token and are returned
+        as-is (title-cased).  When the common_name token is empty the method
+        falls back to "genus species" (scientific name) if those fields are
+        present, and finally to ``'Unknown species'``.
+        """
+        if not species_name_raw:
+            return 'Unknown species'
         if ';' in species_name_raw:
             parts = species_name_raw.split(';')
-            species_name = parts[-1].strip() if parts[-1].strip() else 'Unknown species'
-            return species_name.title()
+            # parts: [uuid, class, order, family, genus, species, common_name]
+            common_name = parts[-1].strip() if len(parts) >= 1 else ''
+            if common_name:
+                return common_name.title()
+            # Fall back to scientific name (genus + species), indices 4 & 5
+            if len(parts) >= 6:
+                genus = parts[4].strip()
+                species = parts[5].strip()
+                scientific = f"{genus} {species}".strip()
+                if scientific.strip():
+                    return scientific.title()
+            return 'Unknown species'
         return species_name_raw
     
     def _build_caption(self, species_result: dict, motion_area: int, timestamp: datetime,
@@ -385,10 +405,25 @@ class WildlifeSystem:
             caption += f"\n📍 {' | '.join(stats)}"
 
         else:
-            # No animals - show what was detected
-            caption = f"📅 {timestamp.strftime('%Y-%m-%d %H:%M:%S')}\n👁️ Motion detected | {motion_area} px"
+            # No animal detected by MegaDetector — still show the classifier's verdict
+            # so the user can judge the feedback buttons (especially "Wrong species").
+            caption = f"📅 {timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
+
+            # Show MegaDetector verdict
+            no_animal_line = f"👁️ Motion detected | {motion_area} px"
             if temperature is not None:
-                caption += f" | {temperature:.0f}°C"
+                no_animal_line += f" | {temperature:.0f}°C"
+            caption += f"\n{no_animal_line}"
+
+            # Show classifier verdict so "Wrong species" is judgeable.
+            # species_name is 'Unknown species' when nothing was classified,
+            # or a real label (blank, no cv result, human, …) from the ensemble.
+            classifier_label = species_name  # already run through _extract_species_name
+            if confidence > 0:
+                classifier_line = f"🔍 Classifier: {classifier_label} ({confidence:.0%})"
+            else:
+                classifier_line = f"🔍 Classifier: {classifier_label}"
+            caption += f"\n{classifier_line}"
 
         # Line 3: Sharpness info (compact)
         sharpness_info = species_result.get('sharpness_info')
