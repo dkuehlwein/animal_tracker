@@ -138,9 +138,15 @@ class DatabaseManager:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
 
+                # Use local wall-clock time explicitly. SQLite's
+                # CURRENT_TIMESTAMP default is UTC; since image filenames are
+                # also stamped with local time (datetime.now()), we must keep
+                # them in sync by always writing the timestamp ourselves.
+                now = datetime.now()
                 # Column name -> value in one place so the INSERT column list and
                 # the bound values can't drift out of sync.
                 values = {
+                    "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
                     "image_path": str(image_path),
                     "motion_area": motion_area,
                     "species_name": species_name,
@@ -153,7 +159,7 @@ class DatabaseManager:
                     "contour_count": contour_count,
                     "largest_contour_area": largest_contour_area,
                     "foreground_pixel_count": foreground_pixel_count,
-                    "hour_of_day": datetime.now().hour,
+                    "hour_of_day": now.hour,
                     "gate_would_suppress": gate_would_suppress,
                     "background_drift": background_drift,
                 }
@@ -171,7 +177,7 @@ class DatabaseManager:
                     cursor.execute('''
                         INSERT OR IGNORE INTO species (name, first_detected, detection_count)
                         VALUES (?, ?, 0)
-                    ''', (species_name, datetime.now()))
+                    ''', (species_name, now.strftime("%Y-%m-%d %H:%M:%S")))
 
                     cursor.execute(
                         'UPDATE species SET detection_count = detection_count + 1 WHERE name = ?',
@@ -203,10 +209,13 @@ class DatabaseManager:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
+                # Explicitly pass local time so we don't rely on SQLite's
+                # CURRENT_TIMESTAMP default (which is always UTC).
+                created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 cursor.execute('''
-                    INSERT INTO detection_feedback (detection_id, label, source)
-                    VALUES (?, ?, ?)
-                ''', (detection_id, label, source))
+                    INSERT INTO detection_feedback (detection_id, label, source, created_at)
+                    VALUES (?, ?, ?, ?)
+                ''', (detection_id, label, source, created_at))
                 conn.commit()
                 return cursor.lastrowid
         except sqlite3.Error as e:

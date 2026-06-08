@@ -5,6 +5,7 @@ WAL, schema migration, richer detection logging, and the feedback table.
 
 import sqlite3
 import sys
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
@@ -150,3 +151,63 @@ def test_invalid_feedback_label_rejected(tmp_path):
     with pytest.raises(DatabaseOperationError):
         db.add_feedback(det_id, "totally_bogus")
     assert db.get_feedback(det_id) == []
+
+
+# ---------------------------------------------------------------------------
+# Timezone correctness: timestamps must be local wall-clock time, not UTC.
+# SQLite's CURRENT_TIMESTAMP is always UTC; we must NOT rely on it.
+# The system runs in CEST (UTC+2 in summer) and image filenames already use
+# local time; DB timestamps must agree with them.
+# ---------------------------------------------------------------------------
+
+def test_log_detection_timestamp_is_local_time(tmp_path):
+    """detections.timestamp must be stored as local wall-clock time.
+
+    We record the local time just before and after the insert; the stored
+    value must fall within that window.  On a UTC system the default
+    CURRENT_TIMESTAMP would be ~2 hours behind, so this test would fail
+    there — which is exactly the bug we're fixing.
+    """
+    db, db_path = _make_db(tmp_path)
+
+    before = datetime.now().replace(microsecond=0)
+    det_id = db.log_detection(image_path="capture_20260608_191715_frame1.jpg", motion_area=500)
+    after = datetime.now()
+
+    with sqlite3.connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT timestamp FROM detections WHERE id = ?", (det_id,)
+        ).fetchone()
+
+    stored = datetime.fromisoformat(row[0])
+    assert before <= stored <= after, (
+        f"Expected local time in [{before}, {after}] but got {stored}. "
+        "Is the timestamp being written in UTC instead of local time?"
+    )
+
+
+def test_add_feedback_created_at_is_local_time(tmp_path):
+    """detection_feedback.created_at must be stored as local wall-clock time.
+
+    Same reasoning as test_log_detection_timestamp_is_local_time: the
+    SQLite DEFAULT CURRENT_TIMESTAMP is UTC; we must write local time
+    explicitly.
+    """
+    db, db_path = _make_db(tmp_path)
+
+    det_id = db.log_detection(image_path="c.jpg", motion_area=10)
+
+    before = datetime.now().replace(microsecond=0)
+    fb_id = db.add_feedback(det_id, "animal")
+    after = datetime.now()
+
+    with sqlite3.connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT created_at FROM detection_feedback WHERE id = ?", (fb_id,)
+        ).fetchone()
+
+    stored = datetime.fromisoformat(row[0])
+    assert before <= stored <= after, (
+        f"Expected local time in [{before}, {after}] but got {stored}. "
+        "Is created_at being written in UTC instead of local time?"
+    )
