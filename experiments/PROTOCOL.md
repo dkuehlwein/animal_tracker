@@ -9,6 +9,22 @@ state from this git notebook; there is no hidden stage machine.
 - Spend tokens only on: tier-2 adjudication of ambiguous crops, experiment design,
   self-audit, journaling.
 
+## CLI invocation contract (MUST follow — wrong CWD breaks Config)
+All `python -m loop.*` commands MUST be run from the **repo root**
+(`/home/daniel/animal_tracker`) with `PYTHONPATH=src` so that `.env` is found by
+`Config()`. Running from inside `src/` fails with a missing-token validation error.
+
+```
+PYTHONPATH=src uv run python -m loop.ingest --since-id <watermark>
+PYTHONPATH=src uv run python -m loop.metrics [--state <path>] [--date <YYYY-MM-DD>]
+PYTHONPATH=src uv run python -m loop.report --mode summary [--state <path>] [--no-send]
+```
+
+`loop.metrics` writes `last_metrics` into `state.json` automatically (flat shape
+with top-level `date` + metric fields including `fp_ci` as a list). `loop.report`
+reads it directly — no manual reshaping required between stages. Use `--no-send`
+on `loop.report` to render without calling Telegram (safe for dry runs and testing).
+
 ## Daily cycle (one nightly run, resumable)
 1. **Gate** — `SunChecker` says night? `state.json` says tonight's run already done?
    If not night or already done → stop (cheap no-op; send heartbeat only if asked).

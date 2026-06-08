@@ -146,7 +146,14 @@ def main() -> None:
         ing = ingest.ingest(db, watermark)
         m = compute_metrics(ing["rows"], fn_audit=None)
         append_daily(args.csv, args.date, m)
-        print(json.dumps({"date": args.date, "metrics": _jsonable(m)}))
+        # Build the flat last_metrics dict that report.render_summary consumes.
+        # Shape: date + all metric fields, fp_ci/fn_ci as JSON lists.
+        flat = _jsonable(m)
+        flat["date"] = args.date
+        # Persist into state.json so report.main() can read it without manual glue.
+        st["last_metrics"] = flat
+        state_mod.save_state(args.state, st)
+        print(json.dumps({"date": args.date, "metrics": flat}))
     except Exception as e:  # noqa: BLE001
         print(json.dumps({"error": str(e)}))
         raise SystemExit(1)

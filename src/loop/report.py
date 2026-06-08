@@ -80,6 +80,13 @@ def main() -> None:
     parser.add_argument("--mode", choices=["summary", "heartbeat"], default="summary")
     parser.add_argument("--state", default="experiments/state.json")
     parser.add_argument("--last-tick", default="")
+    parser.add_argument(
+        "--no-send", "--dry-run",
+        dest="no_send",
+        action="store_true",
+        default=False,
+        help="Render the report text and print it to stdout; do NOT call Telegram.",
+    )
     args = parser.parse_args()
     try:
         st = state_mod.load_state(args.state)
@@ -98,8 +105,11 @@ def main() -> None:
                 (e for e in st.get("backlog", []) if e.get("id") == active_id), {}
             )
             text = render_summary(metrics, st, active)
-        ok = asyncio.run(send(text))
-        print(json.dumps({"sent": ok, "mode": args.mode}))
+        if args.no_send:
+            print(json.dumps({"sent": False, "mode": args.mode, "rendered": text}))
+        else:
+            ok = asyncio.run(send(text))
+            print(json.dumps({"sent": ok, "mode": args.mode}))
     except Exception as e:  # noqa: BLE001
         print(json.dumps({"error": str(e)}))
         raise SystemExit(1)
