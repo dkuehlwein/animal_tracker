@@ -1,0 +1,127 @@
+"""Ingest detections + feedback past a watermark and reconcile labels.
+
+Pure READ over the SQLite DB (WAL). Never writes labels — ground truth is
+append-only and owned by the feedback sidecar (anti-self-poisoning). Output is a
+list of per-detection records the judgment layer consumes; the watermark is the
+max detections.id seen so the next tick only processes new rows.
+
+Reconciliation precedence: human > tier-2 > tier-1.
+  tier-1 = detections.animals_detected (MegaDetector).
+  tier-2 = detection_feedback row with source='tier2'.
+  human  = detection_feedback row with source='human' (latest wins).
+"""
+
+from __future__ import annotations
+
+import json
+import sqlite3
+import sys
+from pathlib import Path
+
+_SRC = Path(__file__).resolve().parent.parent
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
+
+from config import Config
+from database_manager import DatabaseManager
+
+
+def _tier1_label(animals_detected) -> str | None:
+    if animals_detected is None:
+        return None
+    return "animal" if animals_detected else "false_positive"
+
+
+def _read_connection(db: DatabaseManager) -> sqlite3.Connection:
+    """Open a read-only connection (URI mode) to the WAL DB."""
+    uri = f"file:{db.db_path}?mode=ro"
+    conn = sqlite3.connect(uri, uri=True)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def reconcile(db: DatabaseManager, since_id: int) -> list[dict]:
+    """Return reconciled per-detection records for detections.id > since_id."""
+    conn = _read_connection(db)
+    try:
+        det_rows = conn.execute(
+            """
+            SELECT id, animals_detected, motion_area, contour_count,
+                   largest_contour_area, foreground_pixel_count, hour_of_day,
+                   gate_would_suppress
+            FROM detections
+            WHERE id > ?
+            ORDER BY id ASC
+            """,
+            (since_id,),
+        ).fetchall()
+
+        results: list[dict] = []
+        for d in det_rows:
+            det_id = d["id"]
+            fb = conn.execute(
+                """
+                SELECT label, source, created_at, id
+                FROM detection_feedback
+                WHERE detection_id = ?
+                ORDER BY created_at ASC, id ASC
+                """,
+                (det_id,),
+            ).fetchall()
+
+            tier1 = _tier1_label(d["animals_detected"])
+            tier2 = None
+            human = None
+            for row in fb:  # ascending; last assignment of each source wins
+                if row["source"] == "tier2":
+                    tier2 = row["label"]
+                elif row["source"] == "human":
+                    human = row["label"]
+
+            reconciled = human or tier2 or tier1
+            results.append(
+                {
+                    "detection_id": det_id,
+                    "reconciled_label": reconciled,
+                    "tier1": tier1,
+                    "tier2": tier2,
+                    "human": human,
+                    "motion_area": d["motion_area"],
+                    "contour_count": d["contour_count"],
+                    "largest_contour_area": d["largest_contour_area"],
+                    "foreground_pixel_count": d["foreground_pixel_count"],
+                    "hour_of_day": d["hour_of_day"],
+                    "gate_would_suppress": bool(d["gate_would_suppress"])
+                    if d["gate_would_suppress"] is not None
+                    else None,
+                }
+            )
+        return results
+    finally:
+        conn.close()
+
+
+def ingest(db: DatabaseManager, since_id: int) -> dict:
+    """Reconcile and report the advanced watermark (max detections.id seen)."""
+    rows = reconcile(db, since_id)
+    new_watermark = max((r["detection_id"] for r in rows), default=since_id)
+    return {"rows": rows, "new_watermark": new_watermark, "count": len(rows)}
+
+
+def main() -> None:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Ingest detections past a watermark")
+    parser.add_argument("--since-id", type=int, default=0)
+    args = parser.parse_args()
+    try:
+        db = DatabaseManager(Config())
+        result = ingest(db, args.since_id)
+        print(json.dumps(result))
+    except Exception as e:  # noqa: BLE001
+        print(json.dumps({"error": str(e)}))
+        raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()
