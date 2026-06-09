@@ -64,7 +64,8 @@ class MotionVisualizer:
     """Create annotated images showing motion detection regions."""
 
     @staticmethod
-    def create_annotated_image(image_path: Path, motion_frame, config, motion_result) -> Optional[Path]:
+    def create_annotated_image(image_path: Path, motion_frame, config, motion_result,
+                               bounding_boxes=None) -> Optional[Path]:
         """
         Create annotated version of image showing motion detection regions.
 
@@ -73,6 +74,7 @@ class MotionVisualizer:
             motion_frame: The low-res grayscale frame used for motion detection
             config: System configuration
             motion_result: MotionResult object with detection details
+            bounding_boxes: Optional list of MegaDetector bounding boxes to draw
 
         Returns:
             Path to the annotated image file
@@ -86,72 +88,95 @@ class MotionVisualizer:
 
             img_height, img_width = img.shape[:2]
 
-            # Get motion detection parameters
-            motion_width, motion_height = config.camera.motion_detection_resolution
+            if motion_result is None and not bounding_boxes:
+                return None
 
-            # Calculate scaling factors from motion frame to high-res image
-            scale_x = img_width / motion_width
-            scale_y = img_height / motion_height
+            if motion_result is not None:
+                # Get motion detection parameters
+                motion_width, motion_height = config.camera.motion_detection_resolution
 
-            # Draw central region boundary (where motion is prioritized)
-            bounds = config.motion.central_region_bounds
-            center_x1 = int(img_width * bounds[0])
-            center_x2 = int(img_width * bounds[1])
-            center_y1 = int(img_height * bounds[0])
-            center_y2 = int(img_height * bounds[1])
+                # Calculate scaling factors from motion frame to high-res image
+                scale_x = img_width / motion_width
+                scale_y = img_height / motion_height
 
-            # Draw semi-transparent overlay for central region
-            overlay = img.copy()
-            cv2.rectangle(overlay, (center_x1, center_y1), (center_x2, center_y2),
-                         (0, 255, 0), 2)
-            cv2.addWeighted(overlay, 0.3, img, 0.7, 0, img)
+                # Draw central region boundary (where motion is prioritized)
+                bounds = config.motion.central_region_bounds
+                center_x1 = int(img_width * bounds[0])
+                center_x2 = int(img_width * bounds[1])
+                center_y1 = int(img_height * bounds[0])
+                center_y2 = int(img_height * bounds[1])
 
-            # Draw the actual motion detection point if available
-            if motion_result.center_x is not None and motion_result.center_y is not None:
-                # Scale the detection point to high-res coordinates
-                det_x = int(motion_result.center_x * scale_x)
-                det_y = int(motion_result.center_y * scale_y)
+                # Draw semi-transparent overlay for central region
+                overlay = img.copy()
+                cv2.rectangle(overlay, (center_x1, center_y1), (center_x2, center_y2),
+                             (0, 255, 0), 2)
+                cv2.addWeighted(overlay, 0.3, img, 0.7, 0, img)
 
-                # Draw crosshair at detection point
-                cv2.drawMarker(img, (det_x, det_y), (0, 0, 255),
-                              markerType=cv2.MARKER_CROSS, markerSize=50, thickness=3)
+                # Draw the actual motion detection point if available
+                if motion_result.center_x is not None and motion_result.center_y is not None:
+                    # Scale the detection point to high-res coordinates
+                    det_x = int(motion_result.center_x * scale_x)
+                    det_y = int(motion_result.center_y * scale_y)
 
-                # Draw circle around detection point
-                cv2.circle(img, (det_x, det_y), 30, (0, 0, 255), 3)
+                    # Draw crosshair at detection point
+                    cv2.drawMarker(img, (det_x, det_y), (0, 0, 255),
+                                  markerType=cv2.MARKER_CROSS, markerSize=50, thickness=3)
 
-            # Add text annotations
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale = 0.7
-            thickness = 2
+                    # Draw circle around detection point
+                    cv2.circle(img, (det_x, det_y), 30, (0, 0, 255), 3)
 
-            # Motion info text
-            text_lines = [
-                f"Motion Area: {motion_result.motion_area} px",
-                f"Threshold: {config.motion.motion_threshold} px",
-                f"Contours: {motion_result.contour_count}",
-                f"Confidence: {motion_result.detection_confidence:.1%}"
-            ]
+                # Add text annotations
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale = 0.7
+                thickness = 2
 
-            # Add text with background for readability
-            y_offset = 30
-            for line in text_lines:
-                text_size = cv2.getTextSize(line, font, font_scale, thickness)[0]
-                # Draw black background rectangle
-                cv2.rectangle(img, (5, y_offset - 25),
-                            (text_size[0] + 15, y_offset + 5),
-                            (0, 0, 0), -1)
-                # Draw white text
-                cv2.putText(img, line, (10, y_offset), font, font_scale,
-                           (255, 255, 255), thickness)
-                y_offset += 35
+                # Motion info text
+                text_lines = [
+                    f"Motion Area: {motion_result.motion_area} px",
+                    f"Threshold: {config.motion.motion_threshold} px",
+                    f"Contours: {motion_result.contour_count}",
+                    f"Confidence: {motion_result.detection_confidence:.1%}"
+                ]
 
-            # Add legend
-            legend_y = img_height - 70
-            cv2.rectangle(img, (5, legend_y - 25), (270, img_height - 10), (0, 0, 0), -1)
-            cv2.putText(img, "Green: Central Region", (10, legend_y),
-                       font, 0.5, (0, 255, 0), 1)
-            cv2.putText(img, "Red: Motion Detection Point", (10, legend_y + 25),
-                       font, 0.5, (0, 0, 255), 1)
+                # Add text with background for readability
+                y_offset = 30
+                for line in text_lines:
+                    text_size = cv2.getTextSize(line, font, font_scale, thickness)[0]
+                    # Draw black background rectangle
+                    cv2.rectangle(img, (5, y_offset - 25),
+                                (text_size[0] + 15, y_offset + 5),
+                                (0, 0, 0), -1)
+                    # Draw white text
+                    cv2.putText(img, line, (10, y_offset), font, font_scale,
+                               (255, 255, 255), thickness)
+                    y_offset += 35
+
+                # Add legend
+                legend_y = img_height - 70
+                cv2.rectangle(img, (5, legend_y - 25), (270, img_height - 10), (0, 0, 0), -1)
+                cv2.putText(img, "Green: Central Region", (10, legend_y),
+                           font, 0.5, (0, 255, 0), 1)
+                cv2.putText(img, "Red: Motion Detection Point", (10, legend_y + 25),
+                           font, 0.5, (0, 0, 255), 1)
+
+            # Draw MegaDetector species boxes (normalized bbox -> pixels), cyan.
+            if bounding_boxes:
+                box_color = (255, 255, 0)  # cyan in BGR
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                for box in bounding_boxes:
+                    bbox = box.get("bbox")
+                    if not bbox or len(bbox) < 4:
+                        continue
+                    x_min, y_min, w, h = bbox[0], bbox[1], bbox[2], bbox[3]
+                    x1 = int(x_min * img_width)
+                    y1 = int(y_min * img_height)
+                    x2 = int((x_min + w) * img_width)
+                    y2 = int((y_min + h) * img_height)
+                    cv2.rectangle(img, (x1, y1), (x2, y2), box_color, 3)
+                    conf = box.get("confidence", 0.0)
+                    label = f"Box: {conf:.0%}"
+                    ly = max(y1 - 8, 20)
+                    cv2.putText(img, label, (x1, ly), font, 0.7, box_color, 2)
 
             # Save annotated image with _annotated suffix
             annotated_path = image_path.parent / f"{image_path.stem}_annotated{image_path.suffix}"
