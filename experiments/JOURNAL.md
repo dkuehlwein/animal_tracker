@@ -16,3 +16,9 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   06-09 row from daily.csv (a 0-vs-84 row would falsely read as volume-collapse /
   FP→0 to future ticks). No decision, no deploy (#1 still infra-blocked; FN
   unmeasured). Sent heartbeat. Baseline unchanged.
+- 2026-06-09 02:00 — No-op tick (night). Still no new detections since watermark 84
+  (ingest --since-id 84 → 0 rows; DB max id == 84). Skipped metrics per the
+  watermark-noop rule (it re-ingests from the watermark and would clobber the 06-08
+  baseline). state.last_metrics holds 06-08 FP 0.798 (67/84); daily.csv unchanged
+  (single 06-08 row). No decision, no deploy (#1 still infra-blocked; FN unmeasured;
+  not paused). Sent heartbeat.
