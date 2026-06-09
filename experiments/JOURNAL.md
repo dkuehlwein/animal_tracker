@@ -54,3 +54,15 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   Gate #1 re-confirmed (92 suppress: 88 FP + 4 wrong_species, 0 animal = 100% prec)
   but still infra-blocked. Decision: HOLD, no deploy. Not paused, not frozen
   (47 human labels today). See runs/0002-mog2-recurrent-frames.md.
+- 2026-06-09 (late, human-directed) — CORRECTION to the tick above. Scene recurrence
+  WAS testable on existing data (no instrumentation needed): aHash over the saved
+  frames showed 80% of adjacent triggers near-identical and 100 triggers collapsing
+  into ~15 visual scenes (one 62-trigger scene over ~6h). Viewing the frames: a fixed
+  sunlit garden with a swinging bird-feeder + wind-blown vegetation + moving sun-dapple
+  — recurring REAL motion, NOT static scenes MOG2 "failed to absorb." MOG2 detects
+  inter-frame change, not scene novelty; wind motion is non-periodic and the ~45s
+  no-sampling gap after each trigger (cooldown + species-ID) keeps it from being
+  learned. Levers: scene-recurrence dedup gate (aHash, live, no schema), SpeciesNet
+  no-animal gate (#1), or vegetation-motion suppression — not "fix MOG2." Loop prompt
+  updated (79ccd37) to check existing data before proposing instrumentation. See
+  runs/0002 correction section.

@@ -88,3 +88,48 @@ shadow-gate (#1) remains the cleanest lever — re-confirmed tonight: of 92
 
 (Filled when concluded. Current: running/diagnosis, HOLD on deploy; next action
 is observability instrumentation for recurrence, pending design review.)
+
+## 2026-06-09 (late, human-directed) — CORRECTION: recurrence WAS testable on existing data; CONFIRMED
+
+Correction to the diagnosis above. The claim that scene recurrence "needs new
+instrumentation (ROI centroid / aHash column), flagged for design review" was wrong —
+it was answered immediately on **existing data**, no schema change, no new logging.
+
+**Method.** For each `detections` row whose `image_path` file still exists, load the
+saved JPG → grayscale → resize 8×8 → threshold at the frame mean → 64-bit average-hash
+(aHash) fingerprint. Order by `timestamp`; greedy-cluster members within Hamming
+distance ≤ 6 of a cluster representative.
+
+**Result** (100 of 269 triggers still had frames on disk — cleanup had pruned the
+older ~169): **80% of time-adjacent trigger pairs were near-identical**, and the 100
+triggers collapsed into **~15 visual scenes**. Two dominate: **62 triggers over ~6 h**
+(11:48–17:38) and **23 triggers** (13:51–18:53). Daniel's "all pretty much the same
+images" is confirmed.
+
+**Corrected mechanism — these are NOT static scenes MOG2 failed to absorb.** The
+cluster frames show a fixed, bright sunlit garden (bird-feeder on a shepherd's hook,
+lavender, flowers, wooden bench). The *framing* recurs; each trigger is driven by
+genuine small motion — the hanging feeder swinging, vegetation swaying in wind, moving
+sun-dapple. MOG2 is an inter-frame **change** detector, not a scene-**novelty**
+detector, so it correctly fires. It does not absorb the motion into background because
+(a) wind motion is wide-amplitude / non-periodic, so the per-pixel Gaussian mixture
+never settles into a stable mode, and (b) after every trigger the motion loop stops
+sampling for ~45 s (30 s cooldown + ~17 s burst+species-ID), so the model goes stale
+and re-reads the moved vegetation as fresh foreground rather than learning it.
+intra-cluster 8×8 Hamming ≤ 7 confirms the moving region is small enough to be
+invisible at hash resolution yet still clears the 500 px motion gate. This also
+explains the earlier "motion features don't separate FP from animal" finding —
+vegetation/feeder motion has animal-scale `motion_area` (cluster medians ~1090).
+
+**Implication (supersedes the "add instrumentation" next step).** "Fix MOG2 to absorb
+static scenes" is the wrong frame; the scenes aren't static. Real levers:
+1. **Scene-recurrence / dedup gate** — suppress repeat triggers matching a known-FP
+   scene fingerprint (the aHash above; computable live on the motion frame at ~no cost,
+   no schema change). Most direct answer to the observation. FN risk: a real animal
+   entering a previously-FP scene must not be deduped — gate on motion-region change,
+   not whole-frame identity.
+2. **SpeciesNet no-animal gate (#1)** — these triggers have 0 confirmed animals; the
+   gate was 100 % precision on the labelled set but remains infra-blocked.
+3. **Vegetation/feeder-motion suppression** — ROI masking is awkward here (the feeder
+   is also where real birds land); color/texture or animal-shape contour filters are
+   safer. Any sensitivity change is FN-gated.
