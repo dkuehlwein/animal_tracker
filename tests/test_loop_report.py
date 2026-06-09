@@ -105,6 +105,66 @@ def test_report_main_no_send_renders_without_telegram(tmp_path, monkeypatch):
     assert "FP" in parsed["rendered"]
 
 
+# ---------------------------------------------------------------------------
+# Fix #2: untrustworthy FP alert in summary
+# ---------------------------------------------------------------------------
+
+def _metrics_with_trust(fp_trustworthy: bool, error_count: int = 3, total: int = 10):
+    return {
+        "date": "2026-06-10",
+        "total_triggers": total,
+        "labeled_triggers": total - error_count,
+        "fp_count": 2,
+        "fp_rate": 0.2,
+        "fp_ci": (0.05, 0.45),
+        "fn_rate": "unmeasured",
+        "fn_ci": None,
+        "error_count": error_count,
+        "error_rate": error_count / total if total else 0.0,
+        "fp_trustworthy": fp_trustworthy,
+    }
+
+
+def test_summary_includes_untrustworthy_alert_when_fp_not_trustworthy():
+    """When fp_trustworthy is False, summary must include a clear alert line."""
+    text = report.render_summary(
+        metrics=_metrics_with_trust(fp_trustworthy=False, error_count=3, total=10),
+        state={"paused": False},
+        active_experiment={},
+    )
+    assert "UNTRUSTWORTHY" in text or "untrustworthy" in text.lower()
+    assert "error_rate" in text or "30%" in text or "3/10" in text
+
+
+def test_summary_does_not_include_untrustworthy_alert_when_trustworthy():
+    """When fp_trustworthy is True, no alert line must appear."""
+    text = report.render_summary(
+        metrics=_metrics_with_trust(fp_trustworthy=True, error_count=0, total=10),
+        state={"paused": False},
+        active_experiment={},
+    )
+    assert "UNTRUSTWORTHY" not in text
+    # "untrustworthy" must not appear in the normal good-case output
+    assert "untrustworthy" not in text.lower()
+
+
+def test_summary_backward_compat_without_fp_trustworthy():
+    """render_summary must not crash when fp_trustworthy is absent (old state)."""
+    m = {
+        "date": "2026-06-10",
+        "total_triggers": 5,
+        "labeled_triggers": 5,
+        "fp_count": 1,
+        "fp_rate": 0.2,
+        "fp_ci": (0.05, 0.5),
+        "fn_rate": "unmeasured",
+        "fn_ci": None,
+        # No fp_trustworthy, no error_rate, no error_count — old shape
+    }
+    text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
+    assert "FP" in text
+
+
 def test_report_main_no_send_does_not_require_telegram_credentials(tmp_path, monkeypatch):
     """--no-send must not import or instantiate Config with Telegram tokens."""
     import json, sys

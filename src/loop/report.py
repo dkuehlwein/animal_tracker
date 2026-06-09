@@ -31,6 +31,19 @@ def render_summary(metrics: dict, state: dict, active_experiment: dict) -> str:
     if paused:
         lines.append("⏸️ PAUSED — tuning frozen until resumed")
 
+    # Fix #2: alert when FP rate is untrustworthy due to high error rate.
+    # fp_trustworthy may be absent in old state.json shapes — default to True
+    # (backward-compatible: no alert for legacy metrics that lack the field).
+    fp_trustworthy = metrics.get("fp_trustworthy", True)
+    if not fp_trustworthy:
+        error_rate = metrics.get("error_rate", 0.0)
+        error_count = metrics.get("error_count", "?")
+        total = metrics.get("total_triggers", "?")
+        lines.append(
+            f"⚠️ FP rate UNTRUSTWORTHY this period — "
+            f"error_rate {error_rate:.0%} ({error_count}/{total})"
+        )
+
     fp_ci = metrics["fp_ci"]
     lines.append(
         f"FP rate: {_fmt_pct(metrics['fp_rate'])} "

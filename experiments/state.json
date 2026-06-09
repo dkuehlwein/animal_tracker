@@ -29,6 +29,7 @@
   "best_known_good": {},
   "deployed": {},
   "history": [],
+  "last_heartbeat_loopday": "2026-06-08",
   "last_metrics": {
     "date": "2026-06-08",
     "fn_ci": null,

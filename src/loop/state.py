@@ -12,8 +12,29 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
+
+
+def loop_day(now: datetime | None = None) -> str:
+    """Return the stable "loop day" label for the current overnight tick window.
+
+    Maps the entire 18:00→06:00 night window to a single YYYY-MM-DD string so
+    that 23:00 Jun 8, 02:00 Jun 9, and 06:00 Jun 9 all produce "2026-06-08".
+
+    The mapping is: (now_local - 12h).date().isoformat()
+
+    Args:
+        now: A timezone-aware datetime to use instead of the current wall clock.
+             When None, uses datetime.now().astimezone() (local time).
+
+    Returns:
+        YYYY-MM-DD string for the loop day.
+    """
+    if now is None:
+        now = datetime.now().astimezone()
+    return (now - timedelta(hours=12)).date().isoformat()
 
 
 def load_state(path: str | Path) -> dict[str, Any]:

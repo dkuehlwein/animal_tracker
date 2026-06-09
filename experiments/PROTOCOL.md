@@ -26,14 +26,21 @@ reads it directly — no manual reshaping required between stages. Use `--no-sen
 on `loop.report` to render without calling Telegram (safe for dry runs and testing).
 
 ## Daily cycle (one nightly run, resumable)
-1. **Gate** — `SunChecker` says night? `state.json` says tonight's run already done?
-   If not night or already done → stop (cheap no-op; send heartbeat only if asked).
+1. **Gate** — handled deterministically by `loop.nightgate` (runs before the LLM
+   session). Checks: is it night? Is `state.json["last_tick_completed_day"]` !=
+   `loop_day()`? If gated out → sends a heartbeat (once per loop-day) and stops.
+   The LLM never sees a gated-out tick.
 2. **Ingest** — `python -m loop.ingest --since-id <watermark>`; reconcile labels.
+   Note: `loop.metrics` (step 4) now advances the watermark in `state.json`
+   automatically — you do NOT hand-write the watermark.
 3. **Label** — adjudicate ambiguous crops (tier-2); append to `gold/`. Never
-   UPDATE/DELETE existing labels. **Commit `gold/` immediately after adjudicating** —
-   tier-2 is the only token-expensive step, so committing it now means an interrupted
-   tick never re-pays for it.
+   UPDATE/DELETE existing labels. **Checkpoint immediately after adjudicating**:
+   `python -m loop.checkpoint --message "tick: tier-2 adjudication done"` — tier-2
+   is the only token-expensive step; checkpointing means an interrupted tick never
+   re-pays for it.
 4. **Measure** — `python -m loop.metrics`; paired FP/FN + CIs → `metrics/daily.csv`.
+   This also advances `state.json["watermark"]` to the new watermark automatically.
+   Checkpoint after: `python -m loop.checkpoint --message "tick: metrics written"`.
 5. **Check** — does the active experiment's prediction still hold (CI-based)? done?
 6. **Self-audit (cadence)** — auto-labels vs the day's human labels; re-check past
    wins on the larger corpus; note confidence in `runs/`.
@@ -47,13 +54,22 @@ on `loop.report` to render without calling Telegram (safe for dry runs and testi
 10. **Record** — update `runs/NNNN-<slug>.md` (front matter + observations), append
     a `JOURNAL.md` line, update `state.json` pointers.
 11. **Report** — `python -m loop.report --mode summary`; commit + push.
+12. **Mark complete** — `python -m loop.endtick` stamps
+    `state.json["last_tick_completed_day"] = loop_day()` so the rest of tonight's 2h
+    ticks skip (one Opus session/night). Run this ONLY after a fully successful tick.
+    It is the LLM's final explicit action, deliberately NOT a systemd `&& endtick`: if
+    the tick is interrupted (usage limit, crash, hang) or any step failed, `endtick`
+    never runs, the day stays unmarked, and the next tick RESUMES from committed state.
+    The failure direction is benign (re-run), never "skip needed work".
 
-**Checkpoint as you go** — commit after each expensive or irreversible step (`gold/`
-labels after step 3; `state.json` after `loop.metrics` writes it in step 4), not only
-at step 11. The loop has **no conversation memory** across ticks: committed git state +
-`state.json` ARE the resume point. Budget exhausted or interrupted mid-run → the next
-tick reloads committed state and continues, never repeating tier-2 adjudication already
-in `gold/` or re-ingesting below the stored watermark.
+**Checkpoint as you go** using `python -m loop.checkpoint --message <msg>` — this
+stages `experiments/` and commits (never pushes). Use it after each expensive or
+irreversible step (tier-2 labels after step 3; state.json after `loop.metrics` in
+step 4), not only at step 11. The loop has **no conversation memory** across ticks:
+committed git state + `state.json` ARE the resume point. Budget exhausted or
+interrupted mid-run → the next tick reloads committed state and continues, never
+repeating tier-2 adjudication already in `gold/` or re-ingesting below the stored
+watermark (which `loop.metrics` now persists automatically).
 
 ## Guardrail contract (hard rules)
 - BOUNDS in `src/loop/guardrails.py` are enforced by the system (config validators

@@ -18,6 +18,11 @@ from typing import Optional
 # z for 95% two-sided.
 _Z = 1.959963984540054
 
+# When error_rate exceeds this fraction, the FP rate is flagged as untrustworthy
+# (because error rows are excluded from the FP denominator, so a high error rate
+# means the FP denominator is badly undersampled).
+ERROR_RATE_UNTRUSTWORTHY_THRESHOLD = 0.2
+
 
 def wilson_ci(successes: int, trials: int) -> tuple[float, float]:
     """Wilson score interval (95%). trials==0 → (0.0, 1.0) (no information)."""
@@ -60,6 +65,10 @@ def compute_metrics(rows: list[dict], fn_audit: Optional[dict]) -> dict:
         if r.get("detection_status") == "error"
     )
 
+    total_triggers = len(rows)
+    error_rate = (error_count / total_triggers) if total_triggers > 0 else 0.0
+    fp_trustworthy = error_rate <= ERROR_RATE_UNTRUSTWORTHY_THRESHOLD
+
     if fn_audit and fn_audit.get("animal_frames", 0) > 0:
         missed = fn_audit["missed"]
         frames = fn_audit["animal_frames"]
@@ -71,19 +80,22 @@ def compute_metrics(rows: list[dict], fn_audit: Optional[dict]) -> dict:
 
     return {
         "labeled_triggers": len(labeled),
-        "total_triggers": len(rows),
+        "total_triggers": total_triggers,
         "fp_count": fp_count,
         "fp_rate": fp_rate,
         "fp_ci": fp_ci,
         "fn_rate": fn_rate,
         "fn_ci": fn_ci,
         "error_count": error_count,
+        "error_rate": error_rate,
+        "fp_trustworthy": fp_trustworthy,
     }
 
 
 _CSV_FIELDS = [
     "date", "total_triggers", "labeled_triggers", "fp_count", "fp_rate",
     "fp_ci_low", "fp_ci_high", "fn_rate", "fn_ci_low", "fn_ci_high",
+    "error_count",
 ]
 
 
@@ -101,6 +113,7 @@ def _row_for_csv(date: str, m: dict) -> dict:
         "fn_rate": m["fn_rate"],
         "fn_ci_low": fn_ci[0] if fn_ci else "",
         "fn_ci_high": fn_ci[1] if fn_ci else "",
+        "error_count": m.get("error_count", ""),
     }
 
 
@@ -153,12 +166,18 @@ def main() -> None:
         db = DatabaseManager(Config())
         ing = ingest.ingest(db, watermark)
 
+        # Fix #5: always persist the watermark (harmless no-op on no-data ticks
+        # where new_watermark == watermark, but explicit so resumption is
+        # deterministic regardless of LLM behaviour).
+        st["watermark"] = ing["new_watermark"]
+
         # No-data tick: watermark has already caught up to the latest detection;
         # no new rows have arrived.  Do NOT overwrite last_metrics or append to
         # daily.csv — either action would clobber the standing baseline with a
         # degenerate 0-trigger row (the camera is daytime-only; every overnight
         # tick is a no-data tick).
         if ing["count"] == 0:
+            state_mod.save_state(args.state, st)
             print(json.dumps({
                 "status": "no_data",
                 "measured": 0,

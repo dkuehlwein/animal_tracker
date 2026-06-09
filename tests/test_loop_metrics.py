@@ -345,3 +345,165 @@ def test_data_tick_writes_metrics_and_csv(tmp_path, monkeypatch):
     assert len(rows) == 1
     assert rows[0]["date"] == "2026-06-09"
     assert rows[0]["total_triggers"] == "3"
+
+
+# ---------------------------------------------------------------------------
+# Fix #2: error_count in daily.csv + fp_trustworthy
+# ---------------------------------------------------------------------------
+
+def test_compute_metrics_includes_error_count():
+    """compute_metrics must return error_count for rows with detection_status='error'."""
+    rows = [
+        {"reconciled_label": "false_positive", "detection_status": "no_animal"},
+        {"reconciled_label": None, "detection_status": "error"},
+        {"reconciled_label": None, "detection_status": "error"},
+        {"reconciled_label": "animal", "detection_status": "identified"},
+    ]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["error_count"] == 2
+
+
+def test_compute_metrics_fp_trustworthy_true_when_low_error_rate():
+    """fp_trustworthy is True when error_rate <= ERROR_RATE_UNTRUSTWORTHY_THRESHOLD."""
+    # 0 errors out of 10 → trustworthy
+    rows = [{"reconciled_label": "animal", "detection_status": "identified"}] * 10
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["fp_trustworthy"] is True
+    assert m["error_rate"] == 0.0
+
+
+def test_compute_metrics_fp_trustworthy_false_when_high_error_rate():
+    """fp_trustworthy is False when error_rate > ERROR_RATE_UNTRUSTWORTHY_THRESHOLD (0.2)."""
+    # 3 errors out of 10 → 30% > 20% threshold → untrustworthy
+    rows = (
+        [{"reconciled_label": "animal", "detection_status": "identified"}] * 7
+        + [{"reconciled_label": None, "detection_status": "error"}] * 3
+    )
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["fp_trustworthy"] is False
+    assert abs(m["error_rate"] - 0.3) < 1e-9
+
+
+def test_compute_metrics_fp_trustworthy_boundary_exactly_at_threshold():
+    """error_rate == threshold (0.2 exactly) is trustworthy (<=)."""
+    # 2 errors out of 10 → exactly 20%
+    rows = (
+        [{"reconciled_label": "animal", "detection_status": "identified"}] * 8
+        + [{"reconciled_label": None, "detection_status": "error"}] * 2
+    )
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["fp_trustworthy"] is True
+
+
+def test_compute_metrics_zero_triggers_trustworthy():
+    """Zero total_triggers → error_rate 0.0, fp_trustworthy True (guard divide-by-zero)."""
+    m = metrics.compute_metrics([], fn_audit=None)
+    assert m["error_rate"] == 0.0
+    assert m["fp_trustworthy"] is True
+
+
+def test_daily_csv_contains_error_count_column(tmp_path):
+    """error_count must appear as a column in daily.csv."""
+    import csv as csv_mod
+    csv_path = tmp_path / "daily.csv"
+    m = {
+        "labeled_triggers": 5, "total_triggers": 6, "fp_count": 3,
+        "fp_rate": 0.6, "fp_ci": (0.3, 0.8), "fn_rate": "unmeasured", "fn_ci": None,
+        "error_count": 1,
+    }
+    metrics.append_daily(csv_path, "2026-06-10", m)
+    with open(csv_path) as f:
+        reader = csv_mod.DictReader(f)
+        fieldnames = reader.fieldnames
+        rows = list(reader)
+    assert "error_count" in fieldnames, f"error_count not in CSV fields: {fieldnames}"
+    assert rows[0]["error_count"] == "1"
+
+
+def test_daily_csv_old_rows_parseable_without_error_count(tmp_path):
+    """Old rows missing error_count column are still parseable after migration."""
+    import csv as csv_mod
+    csv_path = tmp_path / "daily.csv"
+    # Write a legacy CSV without error_count.
+    old_fields = [
+        "date", "total_triggers", "labeled_triggers", "fp_count", "fp_rate",
+        "fp_ci_low", "fp_ci_high", "fn_rate", "fn_ci_low", "fn_ci_high",
+    ]
+    with open(csv_path, "w", newline="") as f:
+        writer = csv_mod.DictWriter(f, fieldnames=old_fields)
+        writer.writeheader()
+        writer.writerow({
+            "date": "2026-06-01", "total_triggers": "10", "labeled_triggers": "8",
+            "fp_count": "3", "fp_rate": "0.375", "fp_ci_low": "0.1", "fp_ci_high": "0.7",
+            "fn_rate": "unmeasured", "fn_ci_low": "", "fn_ci_high": "",
+        })
+    # Appending a new row with error_count should not crash.
+    m = {
+        "labeled_triggers": 5, "total_triggers": 6, "fp_count": 2,
+        "fp_rate": 0.4, "fp_ci": (0.1, 0.7), "fn_rate": "unmeasured", "fn_ci": None,
+        "error_count": 0,
+    }
+    metrics.append_daily(csv_path, "2026-06-10", m)
+    # Both rows must be readable.
+    with open(csv_path) as f:
+        rows = list(csv_mod.DictReader(f))
+    assert len(rows) == 2
+    dates = {r["date"] for r in rows}
+    assert dates == {"2026-06-01", "2026-06-10"}
+
+
+# ---------------------------------------------------------------------------
+# Fix #5: metrics.main() persists watermark to state.json
+# ---------------------------------------------------------------------------
+
+def test_metrics_main_advances_watermark_on_data_tick(tmp_path, monkeypatch):
+    """On a data tick, main() must advance state['watermark'] to new_watermark."""
+    import sys
+    db, db_file = _make_db_with_detections(tmp_path, monkeypatch, count=2)
+
+    state_path = tmp_path / "state.json"
+    csv_path = tmp_path / "daily.csv"
+    from loop import state as state_mod
+    state_mod.save_state(state_path, {"watermark": 0, "paused": False})
+
+    monkeypatch.setattr(
+        sys, "argv",
+        ["loop.metrics", "--state", str(state_path),
+         "--csv", str(csv_path), "--date", "2026-06-09"],
+    )
+    from loop import metrics as metrics_mod
+    metrics_mod.main()
+
+    updated = state_mod.load_state(state_path)
+    # Watermark must have advanced beyond 0 (to the max detection id).
+    assert updated["watermark"] > 0, (
+        f"watermark must be advanced after data tick, got {updated['watermark']}"
+    )
+
+
+def test_metrics_main_watermark_no_op_on_no_data_tick(tmp_path, monkeypatch):
+    """On a no-data tick, watermark write is a harmless no-op (same value)."""
+    import sys, sqlite3
+    db, db_file = _make_db_with_detections(tmp_path, monkeypatch, count=1)
+
+    # Set watermark to max id so there's no new data.
+    conn = sqlite3.connect(str(db_file))
+    max_id = conn.execute("SELECT MAX(id) FROM detections").fetchone()[0]
+    conn.close()
+
+    state_path = tmp_path / "state.json"
+    csv_path = tmp_path / "daily.csv"
+    from loop import state as state_mod
+    state_mod.save_state(state_path, {"watermark": max_id, "paused": False})
+
+    monkeypatch.setattr(
+        sys, "argv",
+        ["loop.metrics", "--state", str(state_path),
+         "--csv", str(csv_path), "--date", "2026-06-09"],
+    )
+    from loop import metrics as metrics_mod
+    metrics_mod.main()
+
+    updated = state_mod.load_state(state_path)
+    # Watermark is unchanged (same as max_id, no new data).
+    assert updated["watermark"] == max_id

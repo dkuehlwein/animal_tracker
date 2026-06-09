@@ -7,19 +7,33 @@ Wants=network-online.target
 # Type=oneshot: each tick is a single invocation that exits when done.
 # Paired with wildlife-loop.timer (narrowed to rough night hours as defence-in-depth).
 #
-# DETERMINISTIC PRE-GATE (loop.nightgate):
-#   Before launching the expensive Opus session, a cheap Python module checks two
-#   conditions without any LLM call (~0.5s, zero tokens):
-#     1. Is it currently night? (SunChecker.is_daytime() == False, same logic as
-#        the camera main loop — both use astral with Bonn coordinates from Config)
-#     2. Has tonight's run already completed? (state.json last_metrics.date != today)
-#   exit 0 = loop should run; exit 1 = skip this tick.
-#   The `|| exit 0` ensures a skip (exit 1 from the gate) makes the unit exit 0,
-#   so skipped ticks never show as failed units in `systemctl status`.
+# TICK FLOW (three stages):
+#
+# 1. GATE (loop.nightgate) — ~0.5s, zero tokens:
+#    Checks two conditions deterministically (no LLM):
+#      a. Is it currently night? (SunChecker.is_daytime() == False — astral, Bonn)
+#      b. Has this loop-day already completed?
+#         (state.json["last_tick_completed_day"] == loop_day() — stable across midnight)
+#    On SKIP: sends a heartbeat Telegram ping once per loop-day (deadman guard), then
+#    exits 1. The `|| exit 0` turns this into a clean unit exit (no failed-unit noise).
+#    On PROCEED: exits 0, allowing the shell && chain to continue to stage 2.
+#
+# 2. JUDGMENT (claude -p) — Opus session, consumes the loop.md prompt:
+#    Runs the full nightly analysis: ingest → adjudicate → metrics → decide → deploy
+#    → report. Runs only when nightgate exits 0.
+#
+# 3. COMPLETION STAMP (loop.endtick) — stamped by the LLM as its FINAL step
+#    (see experiments/loop.md), NOT by systemd. Rationale: tying "tonight is done"
+#    to claude's exit code is unsafe — claude -p can exit 0 on a clean-but-incomplete
+#    run (early stop, or a usage-limit truncation), which would falsely mark the night
+#    done and skip the remaining work. Instead the LLM runs `python -m loop.endtick`
+#    only after it actually finishes the workflow, stamping
+#    state.json["last_tick_completed_day"] = loop_day(). Any interruption before that
+#    point (limit, crash, hang) leaves it unstamped, so the next tick RESUMES from
+#    committed state. Failure mode is benign (re-run), never "skip needed work".
 #
 # PYTHONPATH/uv note: uv run resolves the venv correctly; PYTHONPATH=src is set
-# via Environment= (same pattern as wildlife-deploy.service) so `-m loop.nightgate`
-# finds the src/loop package without a pip install step.
+# via Environment= so `-m loop.*` finds the src/loop package without a pip install.
 #
 # Validated headless invocation (no TTY required):
 #   systemd-run --user --pipe --wait \
@@ -33,8 +47,11 @@ User=daniel
 WorkingDirectory=/home/daniel/animal_tracker
 Environment="PATH=/home/daniel/.local/bin:/usr/bin:/bin"
 Environment="PYTHONPATH=/home/daniel/animal_tracker/src"
-# Gate first: if nightgate exits 1 (skip), the `|| exit 0` short-circuits and the
-# unit exits 0 cleanly. Only if the gate exits 0 (proceed) does claude run.
+# nightgate: skip → `|| exit 0` (unit succeeds; heartbeat already handled inside nightgate)
+#            proceed → claude runs the full tick and stamps its own completion via
+#            `loop.endtick` as its final step (see stage 3 above — deliberately NOT a
+#            systemd `&& endtick`, so a clean-but-incomplete claude exit can't false-mark
+#            the night done).
 # --dangerously-skip-permissions: required for unattended operation.
 # --model opus: the judgment layer requires the stronger model (as specified in loop.md).
 ExecStart=/bin/bash -c 'cd /home/daniel/animal_tracker && PYTHONPATH=src /home/daniel/.local/bin/uv run python -m loop.nightgate || exit 0; /home/daniel/.local/bin/claude -p --dangerously-skip-permissions --model opus < /home/daniel/animal_tracker/experiments/loop.md'
