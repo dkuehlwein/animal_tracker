@@ -1,11 +1,15 @@
 [Unit]
-Description=Fire the wildlife autonomous tuning loop every 2 hours
+Description=Fire the wildlife autonomous tuning loop on night hours
 
 [Timer]
-# Tick every 2 hours on the even hour (00:00, 02:00, 04:00, ...).
-# The loop.md prompt self-gates on night window and state.json, so daytime
-# ticks are cheap no-ops (the agent reads state and stops within seconds).
-OnCalendar=*-*-* 00/2:00:00
+# Ticks at 18:00, 20:00, 22:00, 00:00, 02:00, 04:00, 06:00 local time.
+# This is a GENEROUS NIGHT WINDOW covering the full year (Bonn: earliest sunset
+# ~20:00 CEST in winter, latest sunrise ~05:20 CEST in summer). The window is
+# deliberately wider than needed — the authoritative day/night guard is the
+# deterministic pre-gate (loop.nightgate) which uses SunChecker.is_daytime()
+# with real astral-computed sunrise/sunset. The timer window only exists to
+# avoid waking the Pi for obvious midday ticks (10:00, 12:00, 14:00, 16:00).
+OnCalendar=*-*-* 18,20,22,00,02,04,06:00:00
 # Persistent=true: if the Pi was off at a scheduled time, fire once on next boot
 # rather than silently missing the tick (important for the nightly run window).
 Persistent=true

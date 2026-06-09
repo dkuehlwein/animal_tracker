@@ -153,9 +153,10 @@ def test_metrics_main_writes_last_metrics_into_state(tmp_path, monkeypatch):
 
 
 def test_metrics_main_last_metrics_readable_by_report_without_flatten(tmp_path, monkeypatch):
-    """End-to-end: after metrics writes state, report reads state WITHOUT the
-    caller manually flattening metrics.  render_summary must succeed on the raw
-    state value (after the JSON list→tuple coercion report already does)."""
+    """End-to-end: after metrics writes state (with real data), report reads
+    state WITHOUT the caller manually flattening metrics.  render_summary must
+    succeed on the raw state value (after the JSON list→tuple coercion report
+    already does)."""
     import json, sys
     state_path = tmp_path / "state.json"
     db_file = tmp_path / "detections.db"
@@ -168,7 +169,13 @@ def test_metrics_main_last_metrics_readable_by_report_without_flatten(tmp_path, 
     from config import Config
     from database_manager import DatabaseManager
     cfg = Config.create_test_config()
-    DatabaseManager(cfg)  # creates schema
+    db = DatabaseManager(cfg)
+    # Insert a real detection so this is a data-tick, not a no-data tick.
+    db.log_detection(
+        image_path="/x.jpg", motion_area=500,
+        animals_detected=True, detection_count=1,
+        gate_would_suppress=False,
+    )
 
     monkeypatch.setattr(
         sys, "argv",
@@ -188,3 +195,153 @@ def test_metrics_main_last_metrics_readable_by_report_without_flatten(tmp_path, 
     # Must not raise KeyError.
     text = report_mod.render_summary(lm_copy, state=st, active_experiment={})
     assert "Wildlife loop" in text
+
+
+# ---------------------------------------------------------------------------
+# Bug fix: no-data tick must not clobber baseline or write degenerate CSV row
+# ---------------------------------------------------------------------------
+
+def _make_db_with_detections(tmp_path, monkeypatch, count=1):
+    """Helper: create a temp DB, insert `count` detections, return (db, db_file)."""
+    import sys
+    db_file = tmp_path / "detections.db"
+    monkeypatch.setenv("STORAGE_DATABASE_PATH", str(db_file))
+    monkeypatch.setenv("STORAGE_DATA_DIR", str(tmp_path))
+    from config import Config
+    from database_manager import DatabaseManager
+    cfg = Config.create_test_config()
+    db = DatabaseManager(cfg)
+    for _ in range(count):
+        db.log_detection(
+            image_path="/x.jpg", motion_area=500,
+            animals_detected=False, detection_count=0,
+            gate_would_suppress=True,
+        )
+    return db, db_file
+
+
+def test_no_data_tick_preserves_baseline(tmp_path, monkeypatch):
+    """When the watermark has already caught up to the latest detection id and
+    no new detections have arrived, main() must:
+      - NOT overwrite state.json["last_metrics"] (baseline preserved), and
+      - NOT append a row to daily.csv, and
+      - print JSON with status=="no_data".
+    """
+    import json
+    import sys
+
+    # First, build a DB with one detection and a state that has already
+    # ingested it (watermark == max(id)).
+    db, db_file = _make_db_with_detections(tmp_path, monkeypatch, count=1)
+
+    # Determine the id that was assigned.
+    import sqlite3
+    conn = sqlite3.connect(str(db_file))
+    max_id = conn.execute("SELECT MAX(id) FROM detections").fetchone()[0]
+    conn.close()
+
+    # Fake a real baseline already in state.json — this is the value that must survive.
+    baseline_metrics = {
+        "date": "2026-06-08",
+        "total_triggers": 84,
+        "labeled_triggers": 67,
+        "fp_count": 53,
+        "fp_rate": 0.7910447761194029,
+        "fp_ci": [0.674, 0.877],
+        "fn_rate": "unmeasured",
+        "fn_ci": None,
+    }
+    state_path = tmp_path / "state.json"
+    csv_path = tmp_path / "daily.csv"
+    from loop import state as state_mod
+    state_mod.save_state(state_path, {
+        "watermark": max_id,   # already at max — no new data
+        "paused": False,
+        "last_metrics": baseline_metrics,
+    })
+
+    # Capture stdout to inspect the no_data signal.
+    captured = []
+    original_print = __builtins__["print"] if isinstance(__builtins__, dict) else print
+    import builtins
+    original_print = builtins.print
+    printed_lines = []
+    def capturing_print(*args, **kwargs):
+        line = " ".join(str(a) for a in args)
+        printed_lines.append(line)
+        original_print(*args, **kwargs)
+    monkeypatch.setattr(builtins, "print", capturing_print)
+
+    monkeypatch.setattr(
+        sys, "argv",
+        ["loop.metrics",
+         "--state", str(state_path),
+         "--csv", str(csv_path),
+         "--date", "2026-06-09"],
+    )
+    from loop import metrics as metrics_mod
+    metrics_mod.main()
+
+    # 1. last_metrics must be unchanged (baseline preserved).
+    updated = state_mod.load_state(state_path)
+    assert updated.get("last_metrics") == baseline_metrics, (
+        "no-data tick must NOT overwrite last_metrics"
+    )
+
+    # 2. daily.csv must not have been created / must have no rows.
+    if csv_path.exists():
+        import csv as csv_mod
+        with open(csv_path) as f:
+            rows = list(csv_mod.DictReader(f))
+        assert len(rows) == 0, (
+            f"no-data tick must NOT append to daily.csv, found rows: {rows}"
+        )
+
+    # 3. Printed output must carry the no_data signal.
+    assert printed_lines, "main() must print something on a no-data tick"
+    output = json.loads(printed_lines[-1])
+    assert output.get("status") == "no_data", (
+        f"expected status=no_data, got: {output}"
+    )
+    assert output.get("baseline_preserved") is True
+
+
+def test_data_tick_writes_metrics_and_csv(tmp_path, monkeypatch):
+    """When new detections exist beyond the watermark, main() must write
+    last_metrics and append a row to daily.csv (existing behavior preserved).
+    """
+    import json
+    import sys
+
+    db, db_file = _make_db_with_detections(tmp_path, monkeypatch, count=3)
+
+    state_path = tmp_path / "state.json"
+    csv_path = tmp_path / "daily.csv"
+    from loop import state as state_mod
+    # Watermark at 0 means all 3 detections are new.
+    state_mod.save_state(state_path, {"watermark": 0, "paused": False})
+
+    monkeypatch.setattr(
+        sys, "argv",
+        ["loop.metrics",
+         "--state", str(state_path),
+         "--csv", str(csv_path),
+         "--date", "2026-06-09"],
+    )
+    from loop import metrics as metrics_mod
+    metrics_mod.main()
+
+    updated = state_mod.load_state(state_path)
+    lm = updated.get("last_metrics")
+    assert lm is not None, "data tick must write last_metrics"
+    assert lm["total_triggers"] == 3, (
+        f"expected 3 triggers, got {lm['total_triggers']}"
+    )
+
+    assert csv_path.exists(), "data tick must create daily.csv"
+    import csv as csv_mod
+    with open(csv_path) as f:
+        rows = list(csv_mod.DictReader(f))
+    assert len(rows) == 1
+    assert rows[0]["date"] == "2026-06-09"
+    assert rows[0]["total_triggers"] == "3"

@@ -8,7 +8,7 @@ import logging
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 from config import Config
-from data_models import DetectionResult, IdentificationResult
+from data_models import DetectionResult, IdentificationResult, DetectionStatus
 from exceptions import SpeciesIdentificationError, IdentificationTimeout
 
 logger = logging.getLogger(__name__)
@@ -148,7 +148,8 @@ class SpeciesIdentifier:
                 processing_time=processing_time,
                 fallback_reason='No predictions returned',
                 detection_result=None,
-                animals_detected=False
+                animals_detected=False,
+                status=DetectionStatus.ERROR,
             )
 
         pred = predictions['predictions'][0]
@@ -190,7 +191,8 @@ class SpeciesIdentifier:
                 processing_time=processing_time,
                 fallback_reason='No animals detected by MegaDetector',
                 detection_result=detection_result,
-                animals_detected=False
+                animals_detected=False,
+                status=DetectionStatus.NO_ANIMAL,
             )
 
         # Extract classification (ensemble result)
@@ -241,6 +243,22 @@ class SpeciesIdentifier:
             'best_geofenced_species': best_geofenced_species
         }
 
+        # Detect the "no cv result" sentinel (case-insensitive) — the image crop
+        # was unreadable by the classifier.  This takes precedence over the
+        # confidence-threshold check because the score is always ~0 here.
+        if final_species and 'no cv result' in final_species.lower():
+            return IdentificationResult(
+                species_name=final_species,
+                confidence=final_confidence,
+                api_success=True,
+                processing_time=processing_time,
+                fallback_reason='SpeciesNet returned no cv result sentinel',
+                metadata=metadata,
+                detection_result=detection_result,
+                animals_detected=True,
+                status=DetectionStatus.UNCLASSIFIABLE,
+            )
+
         # Apply confidence threshold
         if final_confidence < self.config.species.unknown_species_threshold:
             return IdentificationResult(
@@ -255,7 +273,8 @@ class SpeciesIdentifier:
                     'raw_confidence': final_confidence,
                 },
                 detection_result=detection_result,
-                animals_detected=True
+                animals_detected=True,
+                status=DetectionStatus.ANIMAL_UNCERTAIN,
             )
 
         # Success case
@@ -266,7 +285,8 @@ class SpeciesIdentifier:
             processing_time=processing_time,
             metadata=metadata,
             detection_result=detection_result,
-            animals_detected=True
+            animals_detected=True,
+            status=DetectionStatus.IDENTIFIED,
         )
 
     def _create_error_response(self, start_time, reason, detection_result=None):
@@ -278,7 +298,8 @@ class SpeciesIdentifier:
             processing_time=time.time() - start_time,
             fallback_reason=reason,
             detection_result=detection_result,
-            animals_detected=detection_result.animals_detected if detection_result else False
+            animals_detected=detection_result.animals_detected if detection_result else False,
+            status=DetectionStatus.ERROR,
         )
 
     def _find_best_geofenced_species(self, top_predictions: list, country: str, admin1_region: str) -> dict:

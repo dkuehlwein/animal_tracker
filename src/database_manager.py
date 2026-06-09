@@ -28,6 +28,7 @@ class DatabaseManager:
         "hour_of_day": "INTEGER",
         "gate_would_suppress": "BOOLEAN",
         "background_drift": "REAL",
+        "detection_status": "TEXT",
     }
 
     def init_database(self):
@@ -127,7 +128,8 @@ class DatabaseManager:
                      animals_detected=None, detection_count=None,
                      max_detection_confidence=None, contour_count=None,
                      largest_contour_area=None, foreground_pixel_count=None,
-                     gate_would_suppress=None, background_drift=None) -> Optional[int]:
+                     gate_would_suppress=None, background_drift=None,
+                     detection_status=None) -> Optional[int]:
         """Log a detection event to the database.
 
         The trailing keyword arguments are the Phase-1 richer-logging fields
@@ -162,6 +164,7 @@ class DatabaseManager:
                     "hour_of_day": now.hour,
                     "gate_would_suppress": gate_would_suppress,
                     "background_drift": background_drift,
+                    "detection_status": detection_status,
                 }
                 columns = ", ".join(values)
                 placeholders = ", ".join("?" * len(values))

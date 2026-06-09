@@ -16,6 +16,10 @@ every 2h, gated to the night window.
    pending_restart_at).
 5. `python -m loop.report --mode summary`, then commit + push the notebook.
 
+**Checkpoint as you go** (see `PROTOCOL.md`): commit `gold/` right after adjudication and
+`state.json` right after `loop.metrics` — a fresh tick has no memory and resumes from
+committed state, so never re-spend tokens on work already on disk.
+
 ## Exact CLI invocations (run from repo root with PYTHONPATH=src)
 
 All CLIs must be run from `/home/daniel/animal_tracker` (repo root) so that `.env`

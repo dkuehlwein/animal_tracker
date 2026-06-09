@@ -46,6 +46,28 @@ def _tier1_label(animals_detected) -> str | None:
     return "animal" if animals_detected else "false_positive"
 
 
+# Status → tier-1 label mapping.  ERROR rows get None so they are excluded
+# from the FP/FN denominator (a pipeline crash is not a labelled event).
+_STATUS_TO_TIER1: dict[str, str | None] = {
+    "identified": "animal",
+    "animal_uncertain": "animal",
+    "unclassifiable": "animal",
+    "no_animal": "false_positive",
+    "error": None,
+}
+
+
+def _tier1_label_from_status(detection_status, animals_detected) -> str | None:
+    """Return tier-1 label, preferring detection_status over legacy animals_detected.
+
+    - If detection_status is set (new rows): use _STATUS_TO_TIER1 mapping.
+    - If detection_status is NULL/None (legacy rows): fall back to animals_detected.
+    """
+    if detection_status is not None:
+        return _STATUS_TO_TIER1.get(str(detection_status).lower())
+    return _tier1_label(animals_detected)
+
+
 def _read_connection(db: DatabaseManager) -> sqlite3.Connection:
     """Open a read-only connection (URI mode) to the WAL DB."""
     uri = f"file:{db.db_path}?mode=ro"
@@ -60,7 +82,7 @@ def reconcile(db: DatabaseManager, since_id: int) -> list[dict]:
     try:
         det_rows = conn.execute(
             """
-            SELECT id, animals_detected, motion_area, contour_count,
+            SELECT id, animals_detected, detection_status, motion_area, contour_count,
                    largest_contour_area, foreground_pixel_count, hour_of_day,
                    gate_would_suppress
             FROM detections
@@ -83,7 +105,7 @@ def reconcile(db: DatabaseManager, since_id: int) -> list[dict]:
                 (det_id,),
             ).fetchall()
 
-            tier1 = _tier1_label(d["animals_detected"])
+            tier1 = _tier1_label_from_status(d["detection_status"], d["animals_detected"])
             tier2 = None
             human = None
             for row in fb:  # ascending; last assignment of each source wins
@@ -100,6 +122,7 @@ def reconcile(db: DatabaseManager, since_id: int) -> list[dict]:
                     "tier1": tier1,
                     "tier2": tier2,
                     "human": human,
+                    "detection_status": d["detection_status"],
                     "motion_area": _coerce_int(d["motion_area"]),
                     "contour_count": _coerce_int(d["contour_count"]),
                     "largest_contour_area": _coerce_int(d["largest_contour_area"]),

@@ -23,6 +23,7 @@ from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnaly
 from feedback_protocol import build_feedback_keyboard
 from timelapse_writer import TimelapseWriter
 from exceptions import WildlifeSystemError
+from data_models import DetectionStatus
 
 logger = logging.getLogger(__name__)
 
@@ -199,6 +200,7 @@ class WildlifeSystem:
                 foreground_pixel_count=motion_result.foreground_pixel_count if motion_result else None,
                 gate_would_suppress=gate_would_suppress,
                 background_drift=self.reference_drift,
+                detection_status=species_result.status,
             )
 
             logger.info(f"Detection {detection_id} logged: {species_result.species_name} "
@@ -216,6 +218,7 @@ class WildlifeSystem:
                 'detection_result': species_result.detection_result,  # Include full detection info
                 'metadata': species_result.metadata,  # Include classification metadata
                 'detection_id': detection_id,  # For feedback-button callback_data
+                'detection_status': species_result.status,
             }
 
             return result_dict, timestamp
@@ -232,6 +235,7 @@ class WildlifeSystem:
                 'animals_detected': False,
                 'detection_count': 0,
                 'detection_id': None,
+                'detection_status': DetectionStatus.ERROR,
             }, timestamp
 
     @staticmethod
@@ -346,20 +350,20 @@ class WildlifeSystem:
     
     def _build_caption(self, species_result: dict, motion_area: int, timestamp: datetime,
                         temperature: Optional[float] = None) -> str:
-        """Build compact notification caption based on detection results."""
+        """Build compact notification caption based on detection status.
+
+        The species/verdict line is driven by detection_status so each outcome
+        is distinct and human-readable.  Timestamp / stats / sharpness lines are
+        unchanged from before.
+        """
+        status = species_result.get('detection_status', DetectionStatus.IDENTIFIED)
         species_name = self._extract_species_name(species_result.get('species_name', 'Unknown species'))
         confidence = species_result.get('confidence', 0.0)
-        time_str = timestamp.strftime('%H:%M')
+        fallback_reason = species_result.get('fallback_reason') or ''
 
-        # Check what MegaDetector found - use the pre-computed flag from species_identifier
+        # Get max detection confidence from bounding boxes (used by IDENTIFIED /
+        # ANIMAL_UNCERTAIN / UNCLASSIFIABLE to show "| Box N%" line).
         detection_result = species_result.get('detection_result')
-        animals_detected = species_result.get('animals_detected', False)
-
-        # Get max detection confidence from bounding boxes
-        # Note: This is MegaDetector's confidence in detecting an ANIMAL (bounding box),
-        # which is different from the species classifier confidence.
-        # We use the maximum confidence across all detected animal bounding boxes
-        # from the SELECTED BEST FRAME (not all 5 burst frames).
         max_detection_conf = 0.0
         if detection_result and detection_result.bounding_boxes:
             max_detection_conf = max(
@@ -367,24 +371,19 @@ class WildlifeSystem:
             )
             logger.info(f"Detection bounding boxes: {len(detection_result.bounding_boxes)} boxes, "
                        f"max confidence: {max_detection_conf:.2f}")
-        else:
+        elif status not in (DetectionStatus.NO_ANIMAL, DetectionStatus.ERROR):
             logger.warning("No bounding boxes found - detection_result: %s, bounding_boxes: %s",
                           detection_result is not None,
                           detection_result.bounding_boxes if detection_result else None)
 
-        # Build caption
-        if animals_detected:
-            # Line 1: Timestamp (prominent)
-            caption = f"📅 {timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
+        # Line 1: timestamp (always present)
+        caption = f"📅 {timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
 
-            # Line 2: Species identification with confidences
+        if status == DetectionStatus.IDENTIFIED:
             emoji = self._get_species_emoji(species_name)
             species_line = f"{emoji} {species_name} ({confidence:.0%})"
-
-            # Add bounding box confidence if available
             if max_detection_conf > 0:
                 species_line += f" | Box: {max_detection_conf:.0%}"
-
             caption += f"\n{species_line}"
 
             # Add best geofenced species if rolled up
@@ -398,34 +397,47 @@ class WildlifeSystem:
                     if top_species_name and top_species_name.lower() != 'unknown species':
                         caption += f" → {top_species_name} ({top_score:.0%})"
 
-            # Line 3: Stats (motion, temp)
+            # Stats line
+            stats = [f"{motion_area} px"]
+            if temperature is not None:
+                stats.append(f"{temperature:.0f}°C")
+            caption += f"\n📍 {' | '.join(stats)}"
+
+        elif status == DetectionStatus.ANIMAL_UNCERTAIN:
+            uncertain_line = f"🐾 Animal · species uncertain (best guess {species_name} {confidence:.0%})"
+            if max_detection_conf > 0:
+                uncertain_line += f" | Box: {max_detection_conf:.0%}"
+            caption += f"\n{uncertain_line}"
+
+            stats = [f"{motion_area} px"]
+            if temperature is not None:
+                stats.append(f"{temperature:.0f}°C")
+            caption += f"\n📍 {' | '.join(stats)}"
+
+        elif status == DetectionStatus.NO_ANIMAL:
+            caption += f"\n👁️ No animal — motion only (likely false positive)"
+            stats = [f"{motion_area} px"]
+            if temperature is not None:
+                stats.append(f"{temperature:.0f}°C")
+            caption += f"\n📍 {' | '.join(stats)}"
+
+        elif status == DetectionStatus.UNCLASSIFIABLE:
+            unclassif_line = "🐾 Animal · couldn't classify (poor image quality)"
+            if max_detection_conf > 0:
+                unclassif_line += f" | Box: {max_detection_conf:.0%}"
+            caption += f"\n{unclassif_line}"
+
             stats = [f"{motion_area} px"]
             if temperature is not None:
                 stats.append(f"{temperature:.0f}°C")
             caption += f"\n📍 {' | '.join(stats)}"
 
         else:
-            # No animal detected by MegaDetector — still show the classifier's verdict
-            # so the user can judge the feedback buttons (especially "Wrong species").
-            caption = f"📅 {timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
+            # ERROR (and unknown statuses default to same safe rendering)
+            short_reason = self._short_error_reason(fallback_reason)
+            caption += f"\n⚠️ Species ID failed — {short_reason}"
 
-            # Show MegaDetector verdict
-            no_animal_line = f"👁️ Motion detected | {motion_area} px"
-            if temperature is not None:
-                no_animal_line += f" | {temperature:.0f}°C"
-            caption += f"\n{no_animal_line}"
-
-            # Show classifier verdict so "Wrong species" is judgeable.
-            # species_name is 'Unknown species' when nothing was classified,
-            # or a real label (blank, no cv result, human, …) from the ensemble.
-            classifier_label = species_name  # already run through _extract_species_name
-            if confidence > 0:
-                classifier_line = f"🔍 Classifier: {classifier_label} ({confidence:.0%})"
-            else:
-                classifier_line = f"🔍 Classifier: {classifier_label}"
-            caption += f"\n{classifier_line}"
-
-        # Line 3: Sharpness info (compact)
+        # Sharpness info (compact, appended to all statuses)
         sharpness_info = species_result.get('sharpness_info')
         if sharpness_info:
             frame_info = f"Frame {sharpness_info['selected_frame_index'] + 1}/{sharpness_info['frame_count']}"
@@ -434,6 +446,19 @@ class WildlifeSystem:
             caption += f"\n📸 {frame_info}, {sharpness_val}{warning}"
 
         return caption
+
+    @staticmethod
+    def _short_error_reason(reason: str) -> str:
+        """Trim a fallback_reason string to a short, single-line human description."""
+        if not reason:
+            return "unknown error"
+        # Take only the first sentence / clause (up to the first period, colon or newline).
+        for sep in ('\n', '.', ':'):
+            idx = reason.find(sep)
+            if 0 < idx < 80:
+                reason = reason[:idx]
+                break
+        return reason.strip()[:80] or "processing error"
 
     def _get_species_emoji(self, species_name: str) -> str:
         """Get appropriate emoji for species."""

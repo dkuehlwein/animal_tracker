@@ -13,6 +13,36 @@ from typing import Optional, List, Dict, Any
 
 
 # =============================================================================
+# Detection Status taxonomy
+# =============================================================================
+
+class DetectionStatus:
+    """Canonical status strings for IdentificationResult.status.
+
+    String constants (not Enum) so they serialise trivially to/from SQLite TEXT
+    and JSON without an adapter, matching the codebase's existing plain-string
+    label convention (e.g. "animal", "false_positive").
+    """
+
+    #: Animal detected AND classifier confidence ≥ threshold.
+    IDENTIFIED = "identified"
+
+    #: Animal detected but classifier confidence < threshold.
+    ANIMAL_UNCERTAIN = "animal_uncertain"
+
+    #: MegaDetector found no animal (the likely-false-positive case).
+    NO_ANIMAL = "no_animal"
+
+    #: Animal-ish present but SpeciesNet returned the "no cv result" sentinel
+    #: (crop unreadable / poor image quality).
+    UNCLASSIFIABLE = "unclassifiable"
+
+    #: Pipeline failure: no predictions returned, classifier exception, or a
+    #: process_detection exception.  Human-readable detail in fallback_reason.
+    ERROR = "error"
+
+
+# =============================================================================
 # Motion Detection Models
 # =============================================================================
 
@@ -58,6 +88,10 @@ class IdentificationResult:
     # Two-stage pipeline info
     detection_result: Optional[DetectionResult] = None
     animals_detected: bool = True  # For backward compatibility
+    # Explicit status — replaces the overloaded "Unknown species" string.
+    # Default IDENTIFIED keeps existing callers (e.g. MockSpeciesIdentifier)
+    # working without modification.
+    status: str = DetectionStatus.IDENTIFIED
 
 
 # =============================================================================

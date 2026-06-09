@@ -1,14 +1,25 @@
 [Unit]
-Description=Wildlife Autonomous Tuning Loop — per-tick Claude judgment session
+Description=Wildlife Autonomous Tuning Loop — deterministic pre-gate + Claude judgment session
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-# Type=oneshot: each tick is a single claude -p invocation that exits when done.
-# Paired with wildlife-loop.timer (OnCalendar=every 2h, Persistent=true).
-# The loop.md prompt is self-gating: it checks state.json and stops if it is not
-# night or tonight's run is already complete, so a fresh session per tick is both
-# correct and safe.
+# Type=oneshot: each tick is a single invocation that exits when done.
+# Paired with wildlife-loop.timer (narrowed to rough night hours as defence-in-depth).
+#
+# DETERMINISTIC PRE-GATE (loop.nightgate):
+#   Before launching the expensive Opus session, a cheap Python module checks two
+#   conditions without any LLM call (~0.5s, zero tokens):
+#     1. Is it currently night? (SunChecker.is_daytime() == False, same logic as
+#        the camera main loop — both use astral with Bonn coordinates from Config)
+#     2. Has tonight's run already completed? (state.json last_metrics.date != today)
+#   exit 0 = loop should run; exit 1 = skip this tick.
+#   The `|| exit 0` ensures a skip (exit 1 from the gate) makes the unit exit 0,
+#   so skipped ticks never show as failed units in `systemctl status`.
+#
+# PYTHONPATH/uv note: uv run resolves the venv correctly; PYTHONPATH=src is set
+# via Environment= (same pattern as wildlife-deploy.service) so `-m loop.nightgate`
+# finds the src/loop package without a pip install step.
 #
 # Validated headless invocation (no TTY required):
 #   systemd-run --user --pipe --wait \
@@ -21,13 +32,12 @@ Type=oneshot
 User=daniel
 WorkingDirectory=/home/daniel/animal_tracker
 Environment="PATH=/home/daniel/.local/bin:/usr/bin:/bin"
-# --dangerously-skip-permissions: required for unattended operation (no human to approve tool calls).
+Environment="PYTHONPATH=/home/daniel/animal_tracker/src"
+# Gate first: if nightgate exits 1 (skip), the `|| exit 0` short-circuits and the
+# unit exits 0 cleanly. Only if the gate exits 0 (proceed) does claude run.
+# --dangerously-skip-permissions: required for unattended operation.
 # --model opus: the judgment layer requires the stronger model (as specified in loop.md).
-# The prompt is fed over stdin via the `< experiments/loop.md` redirect (not as a shell
-# argument), so edits take effect on the next tick AND the prompt content can never break
-# the unit's shell quoting (e.g. an apostrophe in loop.md). Only the fixed command and
-# file path live in the bash -c string.
-ExecStart=/bin/bash -c '/home/daniel/.local/bin/claude -p --dangerously-skip-permissions --model opus < /home/daniel/animal_tracker/experiments/loop.md'
+ExecStart=/bin/bash -c 'cd /home/daniel/animal_tracker && PYTHONPATH=src /home/daniel/.local/bin/uv run python -m loop.nightgate || exit 0; /home/daniel/.local/bin/claude -p --dangerously-skip-permissions --model opus < /home/daniel/animal_tracker/experiments/loop.md'
 StandardOutput=journal
 StandardError=journal
 

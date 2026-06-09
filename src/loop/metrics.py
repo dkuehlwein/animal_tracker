@@ -53,6 +53,13 @@ def compute_metrics(rows: list[dict], fn_audit: Optional[dict]) -> dict:
     fp_rate = (fp_count / len(labeled)) if labeled else 0.0
     fp_ci = wilson_ci(fp_count, len(labeled))
 
+    # Count ERROR-status rows.  They have reconciled_label=None (excluded from
+    # the FP denominator above) but we surface them so errors are visible.
+    error_count = sum(
+        1 for r in rows
+        if r.get("detection_status") == "error"
+    )
+
     if fn_audit and fn_audit.get("animal_frames", 0) > 0:
         missed = fn_audit["missed"]
         frames = fn_audit["animal_frames"]
@@ -70,6 +77,7 @@ def compute_metrics(rows: list[dict], fn_audit: Optional[dict]) -> dict:
         "fp_ci": fp_ci,
         "fn_rate": fn_rate,
         "fn_ci": fn_ci,
+        "error_count": error_count,
     }
 
 
@@ -144,6 +152,20 @@ def main() -> None:
         watermark = int(st.get("watermark", 0))
         db = DatabaseManager(Config())
         ing = ingest.ingest(db, watermark)
+
+        # No-data tick: watermark has already caught up to the latest detection;
+        # no new rows have arrived.  Do NOT overwrite last_metrics or append to
+        # daily.csv — either action would clobber the standing baseline with a
+        # degenerate 0-trigger row (the camera is daytime-only; every overnight
+        # tick is a no-data tick).
+        if ing["count"] == 0:
+            print(json.dumps({
+                "status": "no_data",
+                "measured": 0,
+                "baseline_preserved": True,
+            }))
+            return
+
         m = compute_metrics(ing["rows"], fn_audit=None)
         append_daily(args.csv, args.date, m)
         # Build the flat last_metrics dict that report.render_summary consumes.

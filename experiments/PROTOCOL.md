@@ -30,7 +30,9 @@ on `loop.report` to render without calling Telegram (safe for dry runs and testi
    If not night or already done → stop (cheap no-op; send heartbeat only if asked).
 2. **Ingest** — `python -m loop.ingest --since-id <watermark>`; reconcile labels.
 3. **Label** — adjudicate ambiguous crops (tier-2); append to `gold/`. Never
-   UPDATE/DELETE existing labels.
+   UPDATE/DELETE existing labels. **Commit `gold/` immediately after adjudicating** —
+   tier-2 is the only token-expensive step, so committing it now means an interrupted
+   tick never re-pays for it.
 4. **Measure** — `python -m loop.metrics`; paired FP/FN + CIs → `metrics/daily.csv`.
 5. **Check** — does the active experiment's prediction still hold (CI-based)? done?
 6. **Self-audit (cadence)** — auto-labels vs the day's human labels; re-check past
@@ -46,7 +48,12 @@ on `loop.report` to render without calling Telegram (safe for dry runs and testi
     a `JOURNAL.md` line, update `state.json` pointers.
 11. **Report** — `python -m loop.report --mode summary`; commit + push.
 
-Budget exhausted mid-run → the next 2h tick resumes from committed state.
+**Checkpoint as you go** — commit after each expensive or irreversible step (`gold/`
+labels after step 3; `state.json` after `loop.metrics` writes it in step 4), not only
+at step 11. The loop has **no conversation memory** across ticks: committed git state +
+`state.json` ARE the resume point. Budget exhausted or interrupted mid-run → the next
+tick reloads committed state and continues, never repeating tier-2 adjudication already
+in `gold/` or re-ingesting below the stored watermark.
 
 ## Guardrail contract (hard rules)
 - BOUNDS in `src/loop/guardrails.py` are enforced by the system (config validators

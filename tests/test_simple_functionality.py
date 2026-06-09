@@ -190,14 +190,13 @@ class TestWildlifeSystemCaptionBuilder:
         assert 'Motion detected' not in caption
 
     def test_build_caption_no_animals_detected(self):
-        """Test caption shows motion only when animals_detected is False."""
+        """Test caption shows 'no animal / false positive' line when status is NO_ANIMAL."""
         from wildlife_system import WildlifeSystem
-        from data_models import DetectionResult
+        from data_models import DetectionResult, DetectionStatus
         from datetime import datetime
 
         system = WildlifeSystem()
 
-        # Simulate result with no animals detected
         detection_result = DetectionResult(
             animals_detected=False,
             detection_count=0,
@@ -212,6 +211,7 @@ class TestWildlifeSystemCaptionBuilder:
             'animals_detected': False,
             'detection_result': detection_result,
             'metadata': {},
+            'detection_status': DetectionStatus.NO_ANIMAL,
         }
 
         caption = system._build_caption(
@@ -221,17 +221,20 @@ class TestWildlifeSystemCaptionBuilder:
             temperature=20.0
         )
 
-        # Should show motion detected
-        assert 'Motion detected' in caption
+        # Should show no-animal / false positive line and stats
+        assert 'No animal' in caption
+        assert 'false positive' in caption.lower()
         assert '800 px' in caption
-        # Should also surface the classifier verdict
-        assert 'Classifier' in caption
-        assert 'Unknown species' in caption
+        assert '👁️' in caption
 
-    def test_build_caption_no_animals_includes_classifier_verdict(self):
-        """No-animal caption must include a classifier line so 'Wrong species' is judgeable."""
+    def test_build_caption_no_animals_shows_false_positive_label(self):
+        """No-animal caption (NO_ANIMAL status) must show the 'likely false positive' line.
+
+        The old 'Classifier: ...' verdict line is replaced by the clearer
+        status-based 'No animal — motion only (likely false positive)' line.
+        """
         from wildlife_system import WildlifeSystem
-        from data_models import DetectionResult
+        from data_models import DetectionResult, DetectionStatus
         from datetime import datetime
 
         system = WildlifeSystem()
@@ -249,6 +252,7 @@ class TestWildlifeSystemCaptionBuilder:
             'animals_detected': False,
             'detection_result': detection_result,
             'metadata': {},
+            'detection_status': DetectionStatus.NO_ANIMAL,
         }
 
         caption = system._build_caption(
@@ -257,8 +261,9 @@ class TestWildlifeSystemCaptionBuilder:
             timestamp=datetime(2026, 3, 1, 8, 0, 0),
         )
 
-        assert 'Motion detected' in caption
-        assert 'Classifier' in caption
+        assert 'No animal' in caption
+        assert 'false positive' in caption.lower()
+        assert '👁️' in caption
 
     def test_build_caption_blank_taxonomy_renders_cleanly(self):
         """Raw taxonomy '...;;;;;;blank' should appear as 'Blank', not the UUID string."""
