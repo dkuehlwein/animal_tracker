@@ -22,3 +22,9 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   baseline). state.last_metrics holds 06-08 FP 0.798 (67/84); daily.csv unchanged
   (single 06-08 row). No decision, no deploy (#1 still infra-blocked; FN unmeasured;
   not paused). Sent heartbeat.
+- 2026-06-09 04:00 — No-op tick (night, ~04:00 CEST). Still no new detections since
+  watermark 84 (DB max id == 84; detection_feedback == 17). Skipped metrics per the
+  watermark-noop rule (re-ingests from watermark; would clobber the 06-08 baseline
+  with a 0-trigger row). state.last_metrics holds 06-08 FP 0.798 (67/84); daily.csv
+  unchanged (single 06-08 row). No decision, no deploy (#1 still infra-blocked; FN
+  unmeasured; not paused). Sent heartbeat.
