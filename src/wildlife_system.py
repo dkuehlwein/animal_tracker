@@ -5,6 +5,7 @@ Combines motion detection, species identification, database logging, and Telegra
 """
 
 import asyncio
+import functools
 import logging
 import time
 from datetime import datetime
@@ -719,18 +720,34 @@ class WildlifeSystem:
                                 if sharpness_info:
                                     species_result['sharpness_info'] = sharpness_info
 
-                                # Create annotated image showing motion detection regions (debug only)
+                                # Annotated image: combined motion overlay + MegaDetector
+                                # species box. Sent whenever a detection box exists (default-on);
+                                # otherwise the motion-only overlay is built only when the
+                                # send_annotated_image debug flag is set.
                                 annotated_path = None
-                                if (self.config.performance.send_annotated_image
-                                        and self.last_motion_frame is not None
-                                        and self.last_motion_result is not None):
+                                detection_result = species_result.get('detection_result')
+                                species_boxes = (
+                                    detection_result.bounding_boxes if detection_result else None
+                                )
+                                motion_result_for_overlay = (
+                                    self.last_motion_result
+                                    if self.last_motion_frame is not None else None
+                                )
+                                want_annotation = bool(species_boxes) or (
+                                    self.config.performance.send_annotated_image
+                                    and motion_result_for_overlay is not None
+                                )
+                                if want_annotation:
                                     annotated_path = await loop.run_in_executor(
                                         self.executor,
-                                        MotionVisualizer.create_annotated_image,
-                                        image_path,
-                                        self.last_motion_frame,
-                                        self.config,
-                                        self.last_motion_result
+                                        functools.partial(
+                                            MotionVisualizer.create_annotated_image,
+                                            image_path,
+                                            self.last_motion_frame,
+                                            self.config,
+                                            motion_result_for_overlay,
+                                            bounding_boxes=species_boxes,
+                                        )
                                     )
 
                                 # Send notification with image (and annotated image if debug enabled)

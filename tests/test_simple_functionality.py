@@ -266,7 +266,7 @@ class TestWildlifeSystemCaptionBuilder:
         assert '👁️' in caption
 
     def test_build_caption_blank_taxonomy_renders_cleanly(self):
-        """Raw taxonomy '...;;;;;;blank' should appear as 'Blank', not the UUID string."""
+        """Raw taxonomy '...;;;;;;blank' should appear as '🚫 No animal', not the UUID string."""
         from wildlife_system import WildlifeSystem
         from data_models import DetectionResult
         from datetime import datetime
@@ -296,7 +296,7 @@ class TestWildlifeSystemCaptionBuilder:
             timestamp=datetime(2026, 3, 1, 8, 0, 0),
         )
 
-        assert 'Blank' in caption
+        assert '🚫 No animal' in caption
         assert 'aba05f1e' not in caption  # raw UUID must never appear
 
     def test_build_caption_human_taxonomy_renders_cleanly(self):
