@@ -38,19 +38,22 @@
   "history": [],
   "last_heartbeat_loopday": "2026-06-09",
   "last_metrics": {
-    "date": "2026-06-08",
+    "date": "2026-06-09",
+    "error_count": 0,
+    "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.6995818724114075,
-      0.8696254321036759
+      0.5444518072082913,
+      0.6832524282309653
     ],
-    "fp_count": 67,
-    "fp_rate": 0.7976190476190477,
-    "labeled_triggers": 84,
-    "total_triggers": 84
+    "fp_count": 114,
+    "fp_rate": 0.6162162162162163,
+    "fp_trustworthy": true,
+    "labeled_triggers": 185,
+    "total_triggers": 185
   },
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 84
+  "watermark": 269
 }

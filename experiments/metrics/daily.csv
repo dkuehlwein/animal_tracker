@@ -1,2 +1,3 @@
-date,total_triggers,labeled_triggers,fp_count,fp_rate,fp_ci_low,fp_ci_high,fn_rate,fn_ci_low,fn_ci_high
-2026-06-08,84,84,67,0.7976190476190477,0.6995818724114075,0.8696254321036759,unmeasured,,
+date,total_triggers,labeled_triggers,fp_count,fp_rate,fp_ci_low,fp_ci_high,fn_rate,fn_ci_low,fn_ci_high,error_count
+2026-06-08,84,84,67,0.7976190476190477,0.6995818724114075,0.8696254321036759,unmeasured,,,
+2026-06-09,185,185,114,0.6162162162162163,0.5444518072082913,0.6832524282309653,unmeasured,,,0
