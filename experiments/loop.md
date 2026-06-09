@@ -31,6 +31,26 @@ step. Specifically:
 A fresh tick has no memory and resumes from committed state, so never re-spend
 tokens on work already on disk.
 
+## Change levers — env first, code changes allowed with cause
+
+- **Default to an env-var delta** via `loop.deploy` (bounded by `guardrails.BOUNDS`,
+  rollback = restore `best_known_good`). Reach for it first whenever a tunable
+  parameter can plausibly achieve the goal.
+- **Code changes are allowed** when no env knob can address the root cause — e.g. a
+  motion-detection algorithm fix like the MOG2 recurrent-frame issue (backlog #4).
+  Only do so with a clear, recorded justification in the active `runs/NNNN-<slug>.md`.
+  Keep the change minimal and reversible; we roll back via `git revert`.
+- **Commit code changes separately**, with the experiment id in the message, e.g.
+  `fix(motion): exp #4 (mog2-recurrent-frames) — reset MOG2 learning rate; <why>`.
+  Record the resulting commit SHA in the run file so the change is auditable and
+  revertible.
+- A code change only goes live on a **camera restart**. Stamp `pending_restart_at`
+  in `state.json` (same ~60-min-pre-sunrise window as an env deploy) so
+  `apply_pending_deploy` reloads it; if you also ship an env delta, `loop.deploy`
+  already stamps the restart for you.
+- **Same gates still apply** to code changes: FN-veto, `paused`, feedback-starved
+  freeze, one experiment at a time, and the volume collapse/explosion guardrail.
+
 ## Exact CLI invocations (run from repo root with PYTHONPATH=src)
 
 All CLIs must be run from `/home/daniel/animal_tracker` (repo root) so that `.env`

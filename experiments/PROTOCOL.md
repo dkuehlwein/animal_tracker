@@ -71,6 +71,19 @@ interrupted mid-run → the next tick reloads committed state and continues, nev
 repeating tier-2 adjudication already in `gold/` or re-ingesting below the stored
 watermark (which `loop.metrics` now persists automatically).
 
+## Change levers (env first, code allowed with cause)
+- **Env-var delta via `loop.deploy` is the default lever** (bounded, rollback =
+  restore `best_known_good`). Prefer it whenever a tunable parameter can plausibly
+  achieve the goal.
+- **Code changes ARE permitted** when no env knob reaches the root cause (e.g. a
+  motion-detection algorithm fix). Record the justification in the active
+  `runs/NNNN-<slug>.md`, keep it minimal/reversible (rollback = `git revert`), and
+  **commit it separately with the experiment id in the message** (e.g.
+  `fix(motion): exp #4 (mog2-recurrent-frames) — <what/why>`); note the SHA in the
+  run file. A code change only takes effect on a **camera restart**, so stamp
+  `pending_restart_at` (pre-sunrise window) just like an env deploy.
+- All decision gates below apply equally to code and env changes.
+
 ## Guardrail contract (hard rules)
 - BOUNDS in `src/loop/guardrails.py` are enforced by the system (config validators
   + deploy). Never propose out-of-range values.
