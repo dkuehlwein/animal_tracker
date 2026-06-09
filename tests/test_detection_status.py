@@ -629,3 +629,15 @@ def test_process_detection_exception_returns_error_status(monkeypatch, tmp_path)
 
     result, _ = sys_obj.process_detection(tmp_path / "test.jpg", 1000)
     assert result.get("detection_status") == DetectionStatus.ERROR
+
+
+def test_caption_blank_shows_no_animal(monkeypatch, tmp_path):
+    from data_models import DetectionStatus
+    sys_obj = _make_system(monkeypatch, tmp_path)
+    sr = _species_result_for_status(DetectionStatus.IDENTIFIED, "blank", 1.0)
+    caption = sys_obj._build_caption(sr, 5000, datetime(2026, 6, 9, 14, 30, 0))
+    assert "🚫 No animal" in caption
+    # Must NOT fall back to a species emoji like the default 🦌
+    assert "🦌" not in caption
+    # Detector box confidence still surfaced
+    assert "Box:" in caption

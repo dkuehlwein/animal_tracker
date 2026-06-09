@@ -380,8 +380,11 @@ class WildlifeSystem:
         caption = f"📅 {timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
 
         if status == DetectionStatus.IDENTIFIED:
-            emoji = self._get_species_emoji(species_name)
-            species_line = f"{emoji} {species_name} ({confidence:.0%})"
+            if species_name.strip().lower() == "blank":
+                species_line = f"🚫 No animal ({confidence:.0%})"
+            else:
+                emoji = self._get_species_emoji(species_name)
+                species_line = f"{emoji} {species_name} ({confidence:.0%})"
             if max_detection_conf > 0:
                 species_line += f" | Box: {max_detection_conf:.0%}"
             caption += f"\n{species_line}"
