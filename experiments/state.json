@@ -21,6 +21,13 @@
       "slug": "roi-masking",
       "status": "proposed",
       "validation": "live"
+    },
+    {
+      "hypothesis": "USER-FLAGGED (Daniel, 2026-06-09): many FP are recurrent near-identical static scenes that MOG2 background subtraction should have absorbed. Diagnose why repeated/static frames aren't suppressed (central-region weighting re-amplifying same edge motion, motion_threshold 500px too low vs MOG2 residual noise, learning rate / history=500 vs trigger cadence, shadow/lighting drift) before tuning. Potentially high-impact FP reduction. See JOURNAL 2026-06-09 user note.",
+      "id": 4,
+      "slug": "mog2-recurrent-frames",
+      "status": "proposed",
+      "validation": "live"
     }
   ],
   "baselines": {
@@ -29,7 +36,7 @@
   "best_known_good": {},
   "deployed": {},
   "history": [],
-  "last_heartbeat_loopday": "2026-06-08",
+  "last_heartbeat_loopday": "2026-06-09",
   "last_metrics": {
     "date": "2026-06-08",
     "fn_ci": null,

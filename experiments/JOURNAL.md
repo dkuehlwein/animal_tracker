@@ -28,3 +28,13 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   with a 0-trigger row). state.last_metrics holds 06-08 FP 0.798 (67/84); daily.csv
   unchanged (single 06-08 row). No decision, no deploy (#1 still infra-blocked; FN
   unmeasured; not paused). Sent heartbeat.
+- 2026-06-09 — USER NOTE (Daniel, reviewing the 06-08 baseline FP triggers): "I am
+  very surprised by the alarms — these are all pretty much the same images. Why
+  didn't they get filtered out by the background comparison?" Observation: a large
+  share of the 67 FP appear to be recurrent, near-identical static scenes that MOG2
+  background subtraction should have absorbed into the background model. Open
+  question for a future tick: why aren't repeated/static frames suppressed? Candidate
+  causes to investigate — central-region weighting re-amplifying the same edge motion,
+  motion_threshold (500px) low enough that residual MOG2 noise clears it, MOG2 learning
+  rate / history=500 vs trigger cadence, or shadow/lighting drift. Filed as backlog #4
+  (mog2-recurrent-frames). Potentially high-impact FP reduction if confirmed.
