@@ -38,3 +38,19 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   motion_threshold (500px) low enough that residual MOG2 noise clears it, MOG2 learning
   rate / history=500 vs trigger cadence, or shadow/lighting drift. Filed as backlog #4
   (mog2-recurrent-frames). Potentially high-impact FP reduction if confirmed.
+- 2026-06-09 (night tick) — First new-data day. Ingested 185 detections (watermark
+  84→269, all 06-09 daytime h7–18; 47 human-labeled). Measured FP 0.616 (114/185,
+  CI [0.544,0.683]) vs 06-08 0.798 — but NOT a validated win (see self-audit).
+  SELF-AUDIT (critical): tier-1 auto-labels agree with humans only 17/47 (36%),
+  biased toward calling FP "animal" (24/30 disagreements); human dist 43 FP /
+  4 wrong_species / 0 confirmed animals. → reconciled FP rate is an UNDERESTIMATE;
+  no auto-label-based FP "win" is trustworthy. This label-trust gap gates every FP
+  experiment. Promoted #4 (mog2-recurrent-frames) to running/diagnosis. #4 finding:
+  motion features do NOT separate FP from animal (motion_area med 1143 vs 1142; 0/114
+  FP near the 500px threshold) → threshold tuning is FN-vetoed & futile. Recurrence
+  hypothesis needs scene-recurrence instrumentation (ROI centroid or ROI aHash) not
+  currently logged — observability-only, zero FN risk, but multi-file + schema
+  migration → flagged to Daniel for design review rather than shipped blind tonight.
+  Gate #1 re-confirmed (92 suppress: 88 FP + 4 wrong_species, 0 animal = 100% prec)
+  but still infra-blocked. Decision: HOLD, no deploy. Not paused, not frozen
+  (47 human labels today). See runs/0002-mog2-recurrent-frames.md.
