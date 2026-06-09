@@ -51,6 +51,29 @@ tokens on work already on disk.
 - **Same gates still apply** to code changes: FN-veto, `paused`, feedback-starved
   freeze, one experiment at a time, and the volume collapse/explosion guardrail.
 
+## Analyze existing data before proposing new instrumentation
+
+If your hypothesis could be tested from data already on disk, test it — do not
+propose new columns, schema migrations, or additional logging instead.
+
+**What already exists:**
+- `detections` DB — `timestamp`, `image_path`, `motion_area`, `contour_count`,
+  `largest_contour_area`, `foreground_pixel_count`, `hour_of_day`,
+  `gate_would_suppress`, `background_drift`, `detection_status`, and the
+  append-only `detection_feedback` labels.
+- **Real captured frames at `detections.image_path` under `data/images/`.**
+  OpenCV/numpy are installed; write and run a throwaway script in-tick
+  (`uv run python <script>` from repo root, `PYTHONPATH=src`). For example,
+  scene-recurrence / near-duplicate detection: aHash each frame, order by
+  timestamp, Hamming-distance cluster — answered in ~30 lines, no new schema.
+
+**Retention caveat:** storage cleanup keeps only the most recent ~100 bursts.
+Image-based retro-analysis is time-boxed — run it this tick, not next tick.
+Do not assume DB rows older than the retention window still have frames on disk.
+
+Only propose new instrumentation when the needed signal genuinely cannot be
+recovered from DB rows + saved frames + feedback labels.
+
 ## Exact CLI invocations (run from repo root with PYTHONPATH=src)
 
 All CLIs must be run from `/home/daniel/animal_tracker` (repo root) so that `.env`

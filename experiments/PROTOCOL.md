@@ -9,6 +9,32 @@ state from this git notebook; there is no hidden stage machine.
 - Spend tokens only on: tier-2 adjudication of ambiguous crops, experiment design,
   self-audit, journaling.
 
+## Use existing data before proposing new instrumentation
+
+Before concluding that a question requires new logging, columns, or schema changes,
+verify it cannot be answered from already-captured artifacts:
+
+- **`detections` DB rows** — `id`, `timestamp`, `image_path`, `motion_area`,
+  `contour_count`, `largest_contour_area`, `foreground_pixel_count`, `hour_of_day`,
+  `gate_would_suppress`, `background_drift`, `detection_status`.
+- **Saved frames on disk** — `detections.image_path` points to the actual captured
+  JPGs under `data/images/`. These are analyzable offline with OpenCV (perceptual /
+  average hashing, frame similarity, clustering, centroid tracking, etc.).
+  Scene-recurrence and near-duplicate-frame questions in particular ARE answerable
+  now: aHash each saved frame, order by timestamp, compute Hamming distances, and
+  cluster — no new columns needed. Write and run the script in-tick
+  (`uv run python ...` from repo root, `PYTHONPATH=src`; OpenCV/numpy installed).
+- **`detection_feedback` labels** — append-only human/tier-2 ground truth.
+
+**Retention caveat**: storage cleanup retains only the most recent bursts (~100 of
+however many triggers exist in the DB). Image-based retro-analysis is time-boxed —
+run it promptly rather than deferring, and do not assume older DB rows still have
+frames on disk.
+
+Only propose new logging/instrumentation when the needed signal is genuinely not
+recoverable from the above. A throwaway offline script over existing data is cheaper
+and faster than a schema migration.
+
 ## CLI invocation contract (MUST follow — wrong CWD breaks Config)
 All `python -m loop.*` commands MUST be run from the **repo root**
 (`/home/daniel/animal_tracker`) with `PYTHONPATH=src` so that `.env` is found by
