@@ -53,6 +53,7 @@
     "labeled_triggers": 185,
     "total_triggers": 185
   },
+  "last_tick_completed_day": "2026-06-09",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 269
