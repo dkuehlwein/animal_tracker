@@ -48,10 +48,22 @@ def _tier1_label(animals_detected) -> str | None:
 
 # Status → tier-1 label mapping.  ERROR rows get None so they are excluded
 # from the FP/FN denominator (a pipeline crash is not a labelled event).
+#
+# `unclassifiable` → false_positive (exp #4, 2026-06-10): MegaDetector boxes a
+# region but the classifier cannot ID a species.  Empirically this is the camera
+# boxing wind-blown vegetation / the swinging bird-feeder, NOT a real animal:
+# across all human-labelled history, unclassifiable rows are 27/27 false_positive
+# (0 animal, 0 wrong_species).  Mapping these to "animal" was the dominant source
+# of the tier-1 label-trust gap (auto-labels only ~29-36% concordant with humans,
+# biased toward calling FPs "animal"), which made the reconciled FP rate a
+# systematic UNDER-estimate on unlabelled rows.  This is a metrics-reconciliation
+# change only — it does not touch the live detection/notification pipeline, so it
+# carries zero FN risk to wildlife capture.  Revert if a real animal ever lands an
+# `unclassifiable` human label.
 _STATUS_TO_TIER1: dict[str, str | None] = {
     "identified": "animal",
     "animal_uncertain": "animal",
-    "unclassifiable": "animal",
+    "unclassifiable": "false_positive",
     "no_animal": "false_positive",
     "error": None,
 }

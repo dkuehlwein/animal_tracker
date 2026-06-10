@@ -473,13 +473,19 @@ def test_ingest_animal_uncertain_status_yields_animal(ingest_db):
     assert row["tier1"] == "animal"
 
 
-def test_ingest_unclassifiable_status_yields_animal(ingest_db):
-    """UNCLASSIFIABLE → tier1=animal."""
+def test_ingest_unclassifiable_status_yields_false_positive(ingest_db):
+    """UNCLASSIFIABLE → tier1=false_positive (exp #4, 2026-06-10).
+
+    MegaDetector boxes a region the classifier cannot ID; empirically these are
+    wind-blown vegetation / the swinging bird-feeder (27/27 human labels = FP, 0
+    animal), not real wildlife.  Mapping them to "animal" was the dominant
+    label-trust bias that under-counted FP on unlabelled rows.
+    """
     from loop import ingest
     did = _add_detection_with_status(ingest_db, True, detection_status="unclassifiable")
     rows = ingest.reconcile(ingest_db, since_id=0)
     row = next(r for r in rows if r["detection_id"] == did)
-    assert row["tier1"] == "animal"
+    assert row["tier1"] == "false_positive"
 
 
 def test_ingest_legacy_null_status_uses_animals_detected(ingest_db):
