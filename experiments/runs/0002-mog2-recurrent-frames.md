@@ -133,3 +133,62 @@ static scenes" is the wrong frame; the scenes aren't static. Real levers:
 3. **Vegetation/feeder-motion suppression** — ROI masking is awkward here (the feeder
    is also where real birds land); color/texture or animal-shape contour filters are
    safer. Any sensitivity change is FN-gated.
+
+## 2026-06-10 (night tick) — label-trust meta-blocker FIXED; corrected FP trend is UP, not down
+
+Second new-data day. Ingested 87 new triggers (watermark 269 → 356; 06-10 hours
+6–20). 31 carry human labels (NOT feedback-starved). All 87 frames still on disk.
+
+**Root-caused and fixed the label-trust gap (the meta-blocker on every FP
+experiment).** Cross-tabbing `detection_status` against human labels over all
+labelled history isolated a single, unidirectional error:
+
+| detection_status | human labels |
+|---|---|
+| `identified`     | 2 animal, 5 FP, 2 wrong_species (noisy, bidirectional) |
+| `no_animal`      | 8 FP, 6 wrong_species, 0 animal |
+| `unclassifiable` | **27 false_positive, 0 animal, 0 wrong_species** |
+
+`unclassifiable` (MegaDetector boxes a region, classifier can't ID a species) was
+mapped to tier-1 **"animal"** — but it is 27/27 FP: the camera boxing wind-blown
+vegetation / the swinging feeder. This single mapping was the dominant bias
+(tier-1 only 29% concordant with humans today, 36% on 06-09, skewed toward calling
+FPs "animal"). **Fix:** `_STATUS_TO_TIER1["unclassifiable"] = "false_positive"`
+in `src/loop/ingest.py` (commit **8f3ff01**). Metrics-reconciliation only — does
+NOT touch the live detection/notification pipeline, so **zero FN risk** to capture
+and **no camera restart** required (the loop re-reads ingest.py each tick).
+
+**Effect of the fix:**
+- tier-1↔human concordance **29% → 74%** (06-10), **36% → 64%** (06-09). Residual
+  disagreement is mostly `wrong_species` (a 3rd human category tier-1 can't express).
+- De-biased reconciled FP: **06-09 0.724, 06-10 0.874** (was the masked 0.616 /
+  0.678). The earlier "0.798→0.616 improvement" was a **labelling artifact**; the
+  true FP rate is higher and **trending UP** (0.724 → 0.874), not improving.
+- `last_metrics` recomputed under the corrected labeler: **FP 0.874** (76/87,
+  CI [0.788, 0.928]), trustworthy.
+
+**Recurrence re-confirmed on today's frames** (retention-safe, all 87 present):
+aHash → 87 frames collapse to ~32 scenes, 49% adjacent near-identical; top scenes
+are FP-dominated with **0 'animal' labels**. The largest recurrent scene (12
+triggers, 5 labelled FP) is mostly MISSED by the no-animal gate (2/12 suppressed)
+— so a scene-dedup gate is **complementary** to the no-animal gate, not redundant.
+
+**Gate (#1) re-measured today:** `gate_would_suppress=True` on 51 triggers; among
+human-labelled, 7 FP + 6 wrong_species, **0 animal** (precision holds, 0 FN). But
+FP **recall is only ~33%** today (7 of 21 labelled FP) — the gate misses the
+`unclassifiable` FP class entirely. Strongest FP lever is therefore broader than
+#1 as written: **route triggers with detection_status ∈ {no_animal,
+unclassifiable} to a review channel**, notifying fully only on `identified`/
+`animal_uncertain`. Across all history that routes ~all FP while keeping the 2
+animals + 4 wrong_species visible. Must be **routing, not suppression** (the 6
+no_animal `wrong_species` are real animals → suppression = FN; review-channel
+routing = 0 FN). Still **infra-blocked**: needs a 2nd Telegram channel Daniel must
+provision — cannot be shipped autonomously.
+
+**Decision: HOLD on camera/notification deploy** (the FP lever is FN-safe only as
+review-routing, which needs Daniel's review-channel infra; entire-suppression is
+FN-vetoed with FN unmeasured). Tonight's shipped change is the **labeler fix**
+(metrics integrity), which unblocks trustworthy FP validation going forward. Not
+paused, not frozen (31 human labels today). **For Daniel:** provision a review
+Telegram channel to unblock the no_animal+unclassifiable routing gate — now the
+clearest, best-evidenced FP lever (cuts ~all FP, 0 measured FN).

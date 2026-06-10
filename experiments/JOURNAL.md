@@ -66,3 +66,23 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   no-animal gate (#1), or vegetation-motion suppression — not "fix MOG2." Loop prompt
   updated (79ccd37) to check existing data before proposing instrumentation. See
   runs/0002 correction section.
+- 2026-06-10 (night tick) — Second new-data day; 87 triggers (watermark 269→356,
+  06-10 h6–20; 31 human-labeled). FIXED the label-trust meta-blocker: cross-tabbing
+  detection_status vs human labels isolated a single unidirectional error —
+  `unclassifiable` (MegaDetector boxes a region, classifier can't ID) was mapped to
+  tier-1 "animal" but is 27/27 false_positive across all history (the camera boxing
+  wind-blown vegetation / the swinging feeder). Changed _STATUS_TO_TIER1
+  ["unclassifiable"]="false_positive" in src/loop/ingest.py (commit 8f3ff01) — a
+  metrics-reconciliation change only, zero FN risk, no camera restart. Effect:
+  tier-1↔human concordance 29%→74% (06-10), 36%→64% (06-09); de-biased FP 0.724
+  (06-09) / 0.874 (06-10) vs the masked 0.616/0.678 — the earlier "improvement" was a
+  labelling artifact, true FP is HIGH and trending UP. last_metrics recomputed: FP
+  0.874 (76/87, CI [0.788,0.928]), trustworthy. Recurrence re-confirmed on today's
+  frames (87→~32 scenes, 49% adjacent near-identical, top scenes 0 'animal'); largest
+  12-trigger scene mostly missed by the no-animal gate (2/12) → scene-dedup is
+  complementary. Gate #1 today: 51 suppress, 0 animal (precision holds) but only ~33%
+  FP recall (misses the unclassifiable FP class). Strongest lever = route
+  detection_status∈{no_animal,unclassifiable} to a REVIEW channel (routing not
+  suppression: the 6 no_animal wrong_species are real animals); still infra-blocked on
+  a 2nd Telegram channel Daniel must provision. Decision: HOLD on camera deploy, no
+  pending_restart. Not paused, not frozen. See runs/0002-mog2-recurrent-frames.md.
