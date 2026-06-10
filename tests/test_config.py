@@ -23,7 +23,7 @@ class TestCameraConfig:
     def test_valid_camera_config(self):
         """Test valid camera configuration."""
         config = CameraConfig()
-        assert config.main_resolution == (1920, 1080)
+        assert config.main_resolution == (2028, 1520)
         assert config.motion_detection_format == "YUV420"
 
     def test_invalid_format(self):
@@ -165,7 +165,7 @@ class TestConfig:
         assert 'motion' in summary
         assert 'species' in summary
 
-        assert summary['camera']['main_resolution'] == (1920, 1080)
+        assert summary['camera']['main_resolution'] == (2028, 1520)
         assert summary['motion']['threshold'] == 2000
 
 

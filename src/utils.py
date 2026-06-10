@@ -65,7 +65,7 @@ class MotionVisualizer:
 
     @staticmethod
     def create_annotated_image(image_path: Path, motion_frame, config, motion_result,
-                               bounding_boxes=None) -> Optional[Path]:
+                               bounding_boxes=None, species_label=None) -> Optional[Path]:
         """
         Create annotated version of image showing motion detection regions.
 
@@ -75,6 +75,8 @@ class MotionVisualizer:
             config: System configuration
             motion_result: MotionResult object with detection details
             bounding_boxes: Optional list of MegaDetector bounding boxes to draw
+            species_label: Optional species name to use as the box title (falls
+                back to "Box" when not provided)
 
         Returns:
             Path to the annotated image file
@@ -174,9 +176,14 @@ class MotionVisualizer:
                     y2 = int((y_min + h) * img_height)
                     cv2.rectangle(img, (x1, y1), (x2, y2), box_color, 3)
                     conf = box.get("confidence", 0.0)
-                    label = f"Box: {conf:.0%}"
+                    title = species_label if species_label else "Box"
+                    label = f"{title}: {conf:.0%}"
                     ly = max(y1 - 8, 20)
-                    cv2.putText(img, label, (x1, ly), font, 0.7, box_color, 2)
+                    # Draw a filled background so the title stays legible over fur/foliage.
+                    text_size = cv2.getTextSize(label, font, 0.7, 2)[0]
+                    cv2.rectangle(img, (x1, ly - text_size[1] - 6),
+                                  (x1 + text_size[0] + 6, ly + 4), (0, 0, 0), -1)
+                    cv2.putText(img, label, (x1 + 3, ly), font, 0.7, box_color, 2)
 
             # Save annotated image with _annotated suffix
             annotated_path = image_path.parent / f"{image_path.stem}_annotated{image_path.suffix}"

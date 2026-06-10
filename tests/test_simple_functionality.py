@@ -23,7 +23,7 @@ class TestBasicFunctionality:
         
         assert config.telegram_token == 'test_token'
         assert config.telegram_chat_id == 'test_chat'
-        assert config.camera.main_resolution == (1920, 1080)
+        assert config.camera.main_resolution == (2028, 1520)
         assert config.motion.motion_threshold == 2000
     
     def test_species_identifier_basic(self):

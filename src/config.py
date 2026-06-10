@@ -29,7 +29,7 @@ class CameraConfig(BaseSettings):
     """Camera-specific configuration settings."""
     model_config = SettingsConfigDict(env_prefix='CAMERA_', env_file='.env', extra='ignore')
 
-    main_resolution: Tuple[int, int] = (1920, 1080)
+    main_resolution: Tuple[int, int] = (2028, 1520)  # IMX477 native 4:3 binned mode
     motion_detection_resolution: Tuple[int, int] = (640, 480)
     motion_detection_format: str = "YUV420"
     frame_format: str = "RGB888"  # Main stream format for capture

@@ -485,7 +485,8 @@ class WildlifeSystem:
     
     async def send_notification(self, species_result: dict, motion_area: int,
                                timestamp: datetime, image_path: Optional[Path] = None,
-                               annotated_path: Optional[Path] = None):
+                               annotated_path: Optional[Path] = None,
+                               document_path: Optional[Path] = None):
         """Send notification with species identification info and motion visualization.
 
         Attaches the human-feedback keyboard (✅/❌/🐦) when we have a detection_id,
@@ -516,6 +517,14 @@ class WildlifeSystem:
                 # Fallback to single image
                 await self.telegram_service.send_photo_with_caption(
                     image_path, caption, reply_markup=keyboard
+                )
+
+            # Full-resolution document (only for box detections): Telegram photos
+            # are downscaled to ~1280px, so attach the uncompressed original so the
+            # full sensor detail is available for inspection.
+            if document_path and document_path.exists():
+                await self.telegram_service.send_document(
+                    document_path, caption="🔍 Full-resolution capture"
                 )
         else:
             await self.telegram_service.send_detection_notification(
@@ -738,6 +747,20 @@ class WildlifeSystem:
                                     and motion_result_for_overlay is not None
                                 )
                                 if want_annotation:
+                                    # Title the detection box with the identified
+                                    # species (fall back to "Animal" when SpeciesNet
+                                    # detected something but couldn't name it).
+                                    species_label = None
+                                    if species_boxes:
+                                        sp = self._extract_species_name(
+                                            species_result.get('species_name', '')
+                                        )
+                                        if sp and sp.strip().lower() not in (
+                                            'unknown species', 'blank', ''
+                                        ):
+                                            species_label = sp
+                                        else:
+                                            species_label = "Animal"
                                     annotated_path = await loop.run_in_executor(
                                         self.executor,
                                         functools.partial(
@@ -747,12 +770,17 @@ class WildlifeSystem:
                                             self.config,
                                             motion_result_for_overlay,
                                             bounding_boxes=species_boxes,
+                                            species_label=species_label,
                                         )
                                     )
 
-                                # Send notification with image (and annotated image if debug enabled)
+                                # Send notification with image (and annotated image if debug enabled).
+                                # Attach the full-res original as a document only when a detection
+                                # box exists (i.e. an actual animal detection), not for FP motion.
+                                document_path = image_path if species_boxes else None
                                 await self.send_notification(species_result, motion_area, timestamp,
-                                                            image_path, annotated_path)
+                                                            image_path, annotated_path,
+                                                            document_path=document_path)
 
                                 # Cleanup old images (now only when needed, not in hot path)
                                 # Only cleanup after successful detection to avoid overhead

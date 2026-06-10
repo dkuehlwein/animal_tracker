@@ -63,7 +63,7 @@ class TestMockCameraManager:
         frame = camera.capture_high_res_frame()
         assert frame is not None
         assert isinstance(frame, np.ndarray)
-        assert frame.shape == (1080, 1920, 3)  # height, width, channels
+        assert frame.shape == (1520, 2028, 3)  # height, width, channels
         assert frame.dtype == np.uint8
     
     def test_mock_save_frame_to_file(self, tmp_path):
@@ -148,7 +148,7 @@ class TestCameraManager:
         assert 'storage' in system_info
         
         assert system_info['camera_type'] == 'MockCameraManager'
-        assert system_info['configuration']['main_resolution'] == (1920, 1080)
+        assert system_info['configuration']['main_resolution'] == (2028, 1520)
     
     def test_camera_manager_session_context(self):
         """Test camera session context manager."""

@@ -142,6 +142,35 @@ class NotificationService:
             logger.error(f"Error sending Telegram photo: {e}")
             return False
 
+    async def send_document(self, file_path: Path, caption: str = None) -> bool:
+        """Send a file as an uncompressed document (Telegram does not resize/recompress).
+
+        Used to deliver the full-resolution capture so the original sensor detail
+        survives Telegram's ~1280px photo downscaling.
+        """
+        try:
+            if not file_path.exists():
+                logger.warning(f"Document file not found: {file_path}")
+                return False
+
+            with open(file_path, 'rb') as doc:
+                await self.bot.send_document(
+                    chat_id=self.config.telegram_chat_id,
+                    document=doc,
+                    caption=caption,
+                    read_timeout=30,
+                    write_timeout=30,
+                    connect_timeout=30,
+                )
+            return True
+
+        except telegram.error.TimedOut as e:
+            logger.warning(f"Telegram document timeout (may still have sent): {e}")
+            return True
+        except Exception as e:
+            logger.error(f"Error sending Telegram document: {e}")
+            return False
+
     async def send_media_group(self, image_paths: List[Path], caption: str = None) -> bool:
         """Send multiple photos as a media group to Telegram channel."""
         files = []
