@@ -24,7 +24,7 @@ from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnaly
 from feedback_protocol import build_feedback_keyboard
 from timelapse_writer import TimelapseWriter
 from exceptions import WildlifeSystemError
-from data_models import DetectionStatus
+from data_models import DetectionStatus, is_review_detection
 
 logger = logging.getLogger(__name__)
 
@@ -448,6 +448,12 @@ class WildlifeSystem:
             sharpness_val = f"sharpness {sharpness_info['sharpness_score']:.0f}"
             warning = "" if sharpness_info['meets_threshold'] else " ⚠️"
             caption += f"\n📸 {frame_info}, {sharpness_val}{warning}"
+
+        # REVIEW prefix (ADR-004 exp #1, labeling variant): flag likely-FP
+        # detections with a scannable header in the same channel. FN-safe —
+        # nothing is dropped, only labeled.
+        if self.config.performance.review_prefix_enabled and is_review_detection(status):
+            caption = f"🔍 REVIEW — likely false positive\n{caption}"
 
         return caption
 

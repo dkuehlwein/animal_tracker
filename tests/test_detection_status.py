@@ -670,3 +670,42 @@ def test_caption_blank_shows_no_animal(monkeypatch, tmp_path):
     assert "🦌" not in caption
     # Detector box confidence still surfaced
     assert "Box:" in caption
+
+
+def test_caption_review_prefix_on_no_animal(monkeypatch, tmp_path):
+    from data_models import DetectionStatus
+    sys_obj = _make_system(monkeypatch, tmp_path)
+    sys_obj.config.performance.review_prefix_enabled = True
+    sr = _species_result_for_status(DetectionStatus.NO_ANIMAL)
+    caption = sys_obj._build_caption(sr, 5000, datetime(2026, 6, 9, 14, 30, 0))
+    assert caption.startswith("🔍 REVIEW")
+    # Original body still present after the header
+    assert "false positive" in caption.lower()
+
+
+def test_caption_review_prefix_on_unclassifiable(monkeypatch, tmp_path):
+    from data_models import DetectionStatus
+    sys_obj = _make_system(monkeypatch, tmp_path)
+    sys_obj.config.performance.review_prefix_enabled = True
+    sr = _species_result_for_status(DetectionStatus.UNCLASSIFIABLE)
+    caption = sys_obj._build_caption(sr, 5000, datetime(2026, 6, 9, 14, 30, 0))
+    assert caption.startswith("🔍 REVIEW")
+
+
+def test_caption_no_review_prefix_when_disabled(monkeypatch, tmp_path):
+    from data_models import DetectionStatus
+    sys_obj = _make_system(monkeypatch, tmp_path)
+    sys_obj.config.performance.review_prefix_enabled = False
+    sr = _species_result_for_status(DetectionStatus.NO_ANIMAL)
+    caption = sys_obj._build_caption(sr, 5000, datetime(2026, 6, 9, 14, 30, 0))
+    assert "🔍 REVIEW" not in caption
+
+
+def test_caption_no_review_prefix_for_identified(monkeypatch, tmp_path):
+    from data_models import DetectionStatus
+    sys_obj = _make_system(monkeypatch, tmp_path)
+    sys_obj.config.performance.review_prefix_enabled = True
+    sr = _species_result_for_status(DetectionStatus.IDENTIFIED, "Red Fox", 0.85)
+    caption = sys_obj._build_caption(sr, 5000, datetime(2026, 6, 9, 14, 30, 0))
+    assert "🔍 REVIEW" not in caption
+    assert "Red Fox" in caption
