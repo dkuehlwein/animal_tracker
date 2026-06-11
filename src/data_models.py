@@ -42,6 +42,17 @@ class DetectionStatus:
     ERROR = "error"
 
 
+#: Detection statuses that are routed to human "review" (likely false
+#: positives). Used by the notification layer to prepend a 🔍 REVIEW header.
+#: Kept independent of the DB `gate_would_suppress` shadow column.
+_REVIEW_STATUSES = frozenset({DetectionStatus.NO_ANIMAL, DetectionStatus.UNCLASSIFIABLE})
+
+
+def is_review_detection(status) -> bool:
+    """True if `status` is a review-class (likely false-positive) detection."""
+    return status in _REVIEW_STATUSES
+
+
 # =============================================================================
 # Motion Detection Models
 # =============================================================================

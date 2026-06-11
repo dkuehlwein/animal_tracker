@@ -61,6 +61,29 @@ def test_identification_result_status_defaults_to_identified():
 
 
 # ===========================================================================
+# 1b. is_review_detection predicate
+# ===========================================================================
+
+def test_is_review_detection_true_for_no_animal_and_unclassifiable():
+    from data_models import DetectionStatus, is_review_detection
+    assert is_review_detection(DetectionStatus.NO_ANIMAL) is True
+    assert is_review_detection(DetectionStatus.UNCLASSIFIABLE) is True
+
+
+def test_is_review_detection_false_for_non_review_statuses():
+    from data_models import DetectionStatus, is_review_detection
+    assert is_review_detection(DetectionStatus.IDENTIFIED) is False
+    assert is_review_detection(DetectionStatus.ANIMAL_UNCERTAIN) is False
+    assert is_review_detection(DetectionStatus.ERROR) is False
+
+
+def test_is_review_detection_false_for_unknown_value():
+    from data_models import is_review_detection
+    assert is_review_detection(None) is False
+    assert is_review_detection("something_else") is False
+
+
+# ===========================================================================
 # 2. species_identifier branch → status mapping
 # ===========================================================================
 
