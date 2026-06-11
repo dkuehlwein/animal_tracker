@@ -15,7 +15,7 @@ every 2h, gated to the night window.
    `JOURNAL.md`, update `state.json` (active_experiment_id, last_metrics,
    pending_restart_at). Do NOT hand-write the watermark — `loop.metrics` persists
    it automatically.
-5. `python -m loop.report --mode summary`. Then, as your FINAL actions, run
+5. `python -m loop.report --mode summary` (sends two Telegram messages: metrics summary + latest JOURNAL.md entry). Then, as your FINAL actions, run
    `python -m loop.endtick` to mark tonight complete (stamps `last_tick_completed_day`
    so the remaining 2h ticks skip — one Opus session/night), then commit + push the
    notebook. Run `loop.endtick` ONLY after the whole workflow above succeeded — if you
@@ -92,11 +92,14 @@ PYTHONPATH=src uv run python -m loop.ingest --since-id 0
 #    Respects --state <path> for testing with a temp copy of state.json.
 PYTHONPATH=src uv run python -m loop.metrics --state experiments/state.json
 
-# 3. Report: read last_metrics from state.json, render summary.
-#    --no-send renders and prints the text WITHOUT calling Telegram (safe to test).
-#    Omit --no-send for the real nightly send.
+# 3. Report: read last_metrics from state.json, render summary, and SEND it to
+#    Telegram. This is the real nightly send — note: NO --no-send here.
+#    Sends TWO messages: (1) metrics summary, (2) latest JOURNAL.md entry.
+#    (Add --no-send ONLY for a dry run: it renders + prints the text WITHOUT
+#    calling Telegram. Never leave --no-send on the actual nightly tick or the
+#    summary is silently not delivered.)
 PYTHONPATH=src uv run python -m loop.report --mode summary \
-    --state experiments/state.json --no-send
+    --state experiments/state.json
 
 # 4. Checkpoint (after any expensive/irreversible step — stages experiments/ only):
 PYTHONPATH=src uv run python -m loop.checkpoint --message "tick: metrics written"

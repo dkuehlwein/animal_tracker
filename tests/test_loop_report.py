@@ -210,3 +210,249 @@ def test_report_main_no_send_does_not_require_telegram_credentials(tmp_path, mon
     parsed = json.loads(output.strip())
     assert parsed["sent"] is False
     assert "FP" in parsed["rendered"]
+
+
+# ---------------------------------------------------------------------------
+# latest_journal_entry: unit tests
+# ---------------------------------------------------------------------------
+
+def _write_journal(path, content: str) -> None:
+    path.write_text(content, encoding="utf-8")
+
+
+def test_latest_journal_entry_returns_last_bullet(tmp_path):
+    """Returns the last top-level bullet, not the first."""
+    j = tmp_path / "JOURNAL.md"
+    _write_journal(j, """\
+# Loop Journal
+
+Some prose header.
+
+- 2026-06-08 — First entry, single line.
+- 2026-06-09 — Second entry
+  with a continuation line.
+- 2026-06-10 — Third entry
+  spanning two
+  continuation lines.
+""")
+    result = report.latest_journal_entry(j)
+    assert result is not None
+    assert "Third entry" in result
+    assert "spanning two" in result
+    # Must NOT include earlier entries.
+    assert "First entry" not in result
+    assert "Second entry" not in result
+
+
+def test_latest_journal_entry_missing_file_returns_none(tmp_path):
+    result = report.latest_journal_entry(tmp_path / "nonexistent.md")
+    assert result is None
+
+
+def test_latest_journal_entry_no_bullets_returns_none(tmp_path):
+    """A header-only file with no top-level bullets returns None."""
+    j = tmp_path / "JOURNAL.md"
+    _write_journal(j, """\
+# Loop Journal
+
+Just some prose, no bullet entries yet.
+""")
+    result = report.latest_journal_entry(j)
+    assert result is None
+
+
+def test_latest_journal_entry_truncates_long_entry(tmp_path):
+    """An entry exceeding _JOURNAL_TELEGRAM_LIMIT is truncated with a marker."""
+    j = tmp_path / "JOURNAL.md"
+    long_body = "x" * 5000
+    _write_journal(j, f"- 2026-06-10 — {long_body}\n")
+    result = report.latest_journal_entry(j)
+    assert result is not None
+    # The function itself does NOT truncate — truncation happens in main().
+    # Verify raw result is long, then test main()'s truncation separately.
+    assert len(result) > 4000
+
+
+def test_latest_journal_entry_single_entry(tmp_path):
+    """Works correctly when there is exactly one bullet entry."""
+    j = tmp_path / "JOURNAL.md"
+    _write_journal(j, """\
+# Loop Journal
+
+- 2026-06-10 — Only entry here.
+""")
+    result = report.latest_journal_entry(j)
+    assert result is not None
+    assert "Only entry here" in result
+
+
+# ---------------------------------------------------------------------------
+# main() summary + journal: --no-send includes journal_entry in JSON
+# ---------------------------------------------------------------------------
+
+def _make_state(tmp_path):
+    """Helper: write a minimal state.json and return its path."""
+    from loop import state as state_mod
+    state_path = tmp_path / "state.json"
+    lm = {
+        "date": "2026-06-10",
+        "total_triggers": 10,
+        "labeled_triggers": 8,
+        "fp_count": 3,
+        "fp_rate": 0.375,
+        "fp_ci": [0.1, 0.65],
+        "fn_rate": "unmeasured",
+        "fn_ci": None,
+    }
+    state_mod.save_state(state_path, {
+        "paused": False,
+        "active_experiment_id": None,
+        "backlog": [],
+        "last_metrics": lm,
+    })
+    return state_path
+
+
+def _capture_main(monkeypatch, argv):
+    """Run report.main() with the given argv, capturing stdout."""
+    import io, sys
+    monkeypatch.setattr(sys, "argv", argv)
+    buf = io.StringIO()
+    original = sys.stdout
+    sys.stdout = buf
+    try:
+        report.main()
+    finally:
+        sys.stdout = original
+    return buf.getvalue()
+
+
+def test_no_send_summary_includes_journal_entry(tmp_path, monkeypatch):
+    """--no-send JSON must include 'journal_entry' key with the latest bullet."""
+    import json
+    state_path = _make_state(tmp_path)
+    journal_path = tmp_path / "JOURNAL.md"
+    _write_journal(journal_path, """\
+# Loop Journal
+
+- 2026-06-09 — Older entry.
+- 2026-06-10 — Latest entry for the report.
+""")
+
+    monkeypatch.setattr(report, "send", lambda t: (_ for _ in ()).throw(AssertionError("send() must not be called")))
+
+    output = _capture_main(monkeypatch, [
+        "loop.report", "--mode", "summary",
+        "--state", str(state_path),
+        "--journal", str(journal_path),
+        "--no-send",
+    ])
+    parsed = json.loads(output.strip())
+    assert parsed["sent"] is False
+    assert "rendered" in parsed
+    assert "journal_entry" in parsed
+    assert parsed["journal_entry"] is not None
+    assert "Latest entry for the report" in parsed["journal_entry"]
+    assert "Older entry" not in parsed["journal_entry"]
+
+
+def test_no_send_summary_journal_entry_null_when_missing(tmp_path, monkeypatch):
+    """--no-send JSON has journal_entry=null when journal file doesn't exist."""
+    import json
+    state_path = _make_state(tmp_path)
+
+    monkeypatch.setattr(report, "send", lambda t: (_ for _ in ()).throw(AssertionError("send() must not be called")))
+
+    output = _capture_main(monkeypatch, [
+        "loop.report", "--mode", "summary",
+        "--state", str(state_path),
+        "--journal", str(tmp_path / "no_such_journal.md"),
+        "--no-send",
+    ])
+    parsed = json.loads(output.strip())
+    assert parsed["journal_entry"] is None
+
+
+def test_no_send_summary_truncates_long_journal_entry(tmp_path, monkeypatch):
+    """--no-send truncates entries > _JOURNAL_TELEGRAM_LIMIT with a marker."""
+    import json
+    state_path = _make_state(tmp_path)
+    journal_path = tmp_path / "JOURNAL.md"
+    _write_journal(journal_path, "- 2026-06-10 — " + "y" * 5000 + "\n")
+
+    monkeypatch.setattr(report, "send", lambda t: (_ for _ in ()).throw(AssertionError("send() must not be called")))
+
+    output = _capture_main(monkeypatch, [
+        "loop.report", "--mode", "summary",
+        "--state", str(state_path),
+        "--journal", str(journal_path),
+        "--no-send",
+    ])
+    parsed = json.loads(output.strip())
+    entry = parsed["journal_entry"]
+    assert entry is not None
+    assert entry.endswith("… (truncated)")
+    assert len(entry) <= 4100  # well within Telegram limit
+
+
+# ---------------------------------------------------------------------------
+# main() summary real-send: two send() calls (metrics + journal)
+# ---------------------------------------------------------------------------
+
+def test_real_send_summary_calls_send_twice_with_journal(tmp_path, monkeypatch):
+    """In real-send mode, send() is called once for metrics and once for journal."""
+    import json, asyncio
+    state_path = _make_state(tmp_path)
+    journal_path = tmp_path / "JOURNAL.md"
+    _write_journal(journal_path, """\
+# Loop Journal
+
+- 2026-06-10 — Entry to send as second message.
+""")
+
+    send_calls = []
+
+    async def fake_send(text):
+        send_calls.append(text)
+        return True
+
+    monkeypatch.setattr(report, "send", fake_send)
+
+    output = _capture_main(monkeypatch, [
+        "loop.report", "--mode", "summary",
+        "--state", str(state_path),
+        "--journal", str(journal_path),
+    ])
+    parsed = json.loads(output.strip())
+    assert parsed["sent"] is True
+    assert parsed["journal_sent"] is True
+    assert len(send_calls) == 2
+    # First call: metrics summary
+    assert "Wildlife loop" in send_calls[0]
+    # Second call: journal entry
+    assert "Entry to send as second message" in send_calls[1]
+
+
+def test_real_send_summary_journal_sent_null_when_no_entry(tmp_path, monkeypatch):
+    """journal_sent is null (None) when there is no journal entry."""
+    import json
+    state_path = _make_state(tmp_path)
+
+    send_calls = []
+
+    async def fake_send(text):
+        send_calls.append(text)
+        return True
+
+    monkeypatch.setattr(report, "send", fake_send)
+
+    output = _capture_main(monkeypatch, [
+        "loop.report", "--mode", "summary",
+        "--state", str(state_path),
+        "--journal", str(tmp_path / "missing.md"),
+    ])
+    parsed = json.loads(output.strip())
+    assert parsed["sent"] is True
+    assert parsed["journal_sent"] is None
+    # Only the metrics message was sent
+    assert len(send_calls) == 1

@@ -17,6 +17,46 @@ _SRC = Path(__file__).resolve().parent.parent
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
+_JOURNAL_TELEGRAM_LIMIT = 4000  # Telegram max is 4096; leave a small margin
+
+
+def latest_journal_entry(journal_path: str | Path) -> str | None:
+    """Return the last top-level bullet entry from JOURNAL.md, or None.
+
+    A top-level entry line starts with ``- `` at column 0.  Continuation
+    lines (indented or blank within a block) are collected until the next
+    top-level bullet or EOF.  Returns the raw block text, trimmed of leading/
+    trailing whitespace, or ``None`` if the file is missing or has no bullets.
+    """
+    path = Path(journal_path)
+    if not path.exists():
+        return None
+
+    lines = path.read_text(encoding="utf-8").splitlines()
+
+    last_entry_lines: list[str] = []
+    current: list[str] = []
+
+    for line in lines:
+        if line.startswith("- "):
+            # Start of a new top-level entry — save previous block, open new one.
+            last_entry_lines = current
+            current = [line]
+        elif current:
+            # Continuation of the current top-level entry.
+            current.append(line)
+        # Lines before the first bullet (header prose) are ignored.
+
+    # After the loop `current` holds the last started entry (or [] if none).
+    if current:
+        last_entry_lines = current
+
+    if not last_entry_lines:
+        return None
+
+    text = "\n".join(last_entry_lines).strip()
+    return text if text else None
+
 
 def _fmt_pct(x) -> str:
     if isinstance(x, (int, float)):
@@ -100,29 +140,58 @@ def main() -> None:
         default=False,
         help="Render the report text and print it to stdout; do NOT call Telegram.",
     )
+    parser.add_argument(
+        "--journal",
+        default="experiments/JOURNAL.md",
+        help="Path to JOURNAL.md for the second summary message (default: experiments/JOURNAL.md).",
+    )
     args = parser.parse_args()
     try:
         st = state_mod.load_state(args.state)
         if args.mode == "heartbeat":
             text = render_heartbeat(args.last_tick)
-        else:
-            metrics = st.get("last_metrics")
-            if metrics is None:
-                raise RuntimeError("state.json has no last_metrics to report")
-            # Tuples were serialised to lists in state.json; restore CI shape.
-            metrics = dict(metrics)
-            metrics["fp_ci"] = tuple(metrics["fp_ci"])
-            metrics["fn_ci"] = tuple(metrics["fn_ci"]) if metrics["fn_ci"] else None
-            active_id = st.get("active_experiment_id")
-            active = next(
-                (e for e in st.get("backlog", []) if e.get("id") == active_id), {}
-            )
-            text = render_summary(metrics, st, active)
+            if args.no_send:
+                print(json.dumps({"sent": False, "mode": args.mode, "rendered": text}))
+            else:
+                ok = asyncio.run(send(text))
+                print(json.dumps({"sent": ok, "mode": args.mode}))
+            return
+
+        # --- summary mode ---
+        metrics = st.get("last_metrics")
+        if metrics is None:
+            raise RuntimeError("state.json has no last_metrics to report")
+        # Tuples were serialised to lists in state.json; restore CI shape.
+        metrics = dict(metrics)
+        metrics["fp_ci"] = tuple(metrics["fp_ci"])
+        metrics["fn_ci"] = tuple(metrics["fn_ci"]) if metrics["fn_ci"] else None
+        active_id = st.get("active_experiment_id")
+        active = next(
+            (e for e in st.get("backlog", []) if e.get("id") == active_id), {}
+        )
+        text = render_summary(metrics, st, active)
+
+        # Fetch the latest journal entry (may be None if file missing / no bullets).
+        entry = latest_journal_entry(args.journal)
+        if entry and len(entry) > _JOURNAL_TELEGRAM_LIMIT:
+            entry = entry[:_JOURNAL_TELEGRAM_LIMIT] + "… (truncated)"
+
         if args.no_send:
-            print(json.dumps({"sent": False, "mode": args.mode, "rendered": text}))
+            print(json.dumps({
+                "sent": False,
+                "mode": args.mode,
+                "rendered": text,
+                "journal_entry": entry,
+            }))
         else:
             ok = asyncio.run(send(text))
-            print(json.dumps({"sent": ok, "mode": args.mode}))
+            journal_sent: bool | None = None
+            if entry is not None:
+                try:
+                    journal_sent = asyncio.run(send(entry))
+                except Exception:  # noqa: BLE001
+                    journal_sent = False
+            print(json.dumps({"sent": ok, "mode": args.mode, "journal_sent": journal_sent}))
     except Exception as e:  # noqa: BLE001
         print(json.dumps({"error": str(e)}))
         raise SystemExit(1)
