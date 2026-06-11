@@ -66,6 +66,12 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   no-animal gate (#1), or vegetation-motion suppression — not "fix MOG2." Loop prompt
   updated (79ccd37) to check existing data before proposing instrumentation. See
   runs/0002 correction section.
+- 2026-06-11 (human-directed) — Shipped exp #1 (notification-gate-live) as
+  SAME-CHANNEL LABELING: 🔍 REVIEW header on NO_ANIMAL/UNCLASSIFIABLE captions
+  (`is_review_detection` in data_models; `PERFORMANCE_REVIEW_PREFIX_ENABLED`
+  default on). FN-safe (labels, doesn't drop/route) → no 2nd channel, no FN-veto.
+  gate_would_suppress column untouched. Live on next camera restart. See
+  runs/0001-notification-gate-live.md.
 - 2026-06-10 (night tick) — Second new-data day; 87 triggers (watermark 269→356,
   06-10 h6–20; 31 human-labeled). FIXED the label-trust meta-blocker: cross-tabbing
   detection_status vs human labels isolated a single unidirectional error —

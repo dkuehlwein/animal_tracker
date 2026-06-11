@@ -64,6 +64,26 @@ autonomous 2 h tick. Flagged to Daniel in tonight's summary. Experiment stays
 `motion_area` does not separate animals (800–2185) from FPs (800–2000+), so a
 `MOTION_THRESHOLD` bump would risk FN with no support.
 
+### 2026-06-11 — shipped as SAME-CHANNEL LABELING (not routing)
+
+Deployed the gate as **labeling, not routing**: review-class detections
+(`NO_ANIMAL`, `UNCLASSIFIABLE`) now get a `🔍 REVIEW — likely false positive`
+header prepended to their Telegram caption in the existing channel. Nothing is
+dropped or moved → **FN-safe** (a misclassified real animal is still fully
+visible with its feedback buttons, merely labeled "review"). This sidesteps the
+two blockers that held the routing variant: no second Telegram channel needed,
+and no FN-veto (suppression was the vetoed part; labeling is not suppression).
+
+- Predicate: `is_review_detection(status)` in `data_models.py`
+  (`{NO_ANIMAL, UNCLASSIFIABLE}`). The DB `gate_would_suppress` shadow column is
+  unchanged (still `not animals_detected`) — deliberately independent.
+- Toggle: `PERFORMANCE_REVIEW_PREFIX_ENABLED` (default true); instant off-switch.
+- Commit: `31d3bc6`. Reversal: `git revert` + env flag.
+- Spec: `docs/superpowers/specs/2026-06-11-review-prefix-notification-design.md`.
+
+Goes live on the next camera restart (code change). Experiment #1 is realized as
+this labeling variant; a future real channel split remains optional follow-up.
+
 ## Decision & rationale
 
 (Filled in when the experiment concludes: keep / rollback / inconclusive, with
