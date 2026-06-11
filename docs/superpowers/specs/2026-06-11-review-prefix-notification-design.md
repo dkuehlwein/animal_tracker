@@ -29,32 +29,32 @@ real channel split.
 
 ## Decisions locked (from brainstorming)
 
-- **Review set / gate predicate:** `review = detection_status ∈ {NO_ANIMAL, UNCLASSIFIABLE}`.
+- **Review set / prefix predicate:** `review = detection_status ∈ {NO_ANIMAL, UNCLASSIFIABLE}`.
 - **Control:** env toggle `REVIEW_PREFIX_ENABLED`, default `true`.
 - **Prefix style:** a distinct header line, `🔍 REVIEW — likely false positive`,
   above the normal status caption.
+- **No DB or labelling changes.** The feature is purely a caption render keyed off
+  the in-memory `detection_status`. The `detection_feedback` table, the feedback
+  buttons, and the existing `gate_would_suppress` column are all untouched.
 
 ## Components
 
-### 1. Single review predicate (one source of truth)
+### 1. Review predicate (for the prefix only)
 
 A helper `is_review_detection(status) -> bool` returning
-`status in {NO_ANIMAL, UNCLASSIFIABLE}`. Both the existing shadow-gate line and
-the new caption prefix call it, so the two can never drift.
+`status in {NO_ANIMAL, UNCLASSIFIABLE}`, used by the caption builder to decide
+whether to prepend the header.
 
 Placed so `wildlife_system.py` can import it (e.g. in `data_models.py` next to
 `DetectionStatus`, or a small helper in that module). Operates on
 `DetectionStatus` values.
 
-**Consequence — `gate_would_suppress` semantics change going forward.** Today
-`wildlife_system.py:178` computes `gate_would_suppress = not species_result.animals_detected`,
-which is `NO_ANIMAL` only. It will instead be `is_review_detection(species_result.status)`,
-so it becomes `True` for `UNCLASSIFIABLE` too. This is a deliberate correction
-that aligns the DB gate signal with the `8f3ff01` ingest fix (which already maps
-`unclassifiable → false_positive`). Historical DB rows keep their old values;
-only detections logged after deploy use the new predicate. The loop's
-ingest/metrics that read `gate_would_suppress` will see the improved signal on
-new data — consistent with the loop's own analysis.
+**`gate_would_suppress` is NOT touched.** The existing shadow-gate column keeps
+its current definition (`not animals_detected`). It and the new prefix predicate
+answer different questions and are deliberately kept independent — no DB-semantics
+change, nothing for the loop's metrics to reinterpret. (The loop already handles
+`unclassifiable` correctly via the `8f3ff01` ingest fix, so there is no reason to
+disturb the column.)
 
 ### 2. Config toggle
 
@@ -83,8 +83,7 @@ essential, since this is the loop's measurement channel.
 ## Data flow
 
 1. Motion → capture → SpeciesNet → `detection_status` (unchanged).
-2. `gate_would_suppress = is_review_detection(status)` (changed predicate),
-   logged to DB (unchanged column).
+2. DB logging unchanged — including `gate_would_suppress` (still `not animals_detected`).
 3. `_build_caption`: if `REVIEW_PREFIX_ENABLED` and `is_review_detection(status)`
    → prepend `🔍 REVIEW` header; else caption as today.
 4. Send photo + caption + feedback buttons to the single configured channel
@@ -103,13 +102,17 @@ essential, since this is the loop's measurement channel.
 
 - `CLAUDE.md`: document `REVIEW_PREFIX_ENABLED` in the config/env section.
 - `experiments/runs/0001-notification-gate-live.md`: record the shipped
-  same-channel-prefix variant, the gate-predicate change, the commit SHA, and
-  flip experiment #1's status to reflect it (concluded as labeling variant).
+  same-channel-prefix variant, the commit SHA, and flip experiment #1's status
+  to reflect it (concluded as labeling variant).
 - `experiments/JOURNAL.md`: one-line entry.
 
 ## Out of scope (YAGNI)
 
 - Second Telegram channel / message routing.
-- A `guardrails.BOUNDS` entry or `loop.deploy` gating — the toggle is boolean and
-  FN-safe, so it needs neither numeric bounds nor an FN-veto deploy gate.
+- A `guardrails.BOUNDS` entry or `loop.deploy` gating. `BOUNDS` governs *numeric
+  parameter* auto-tuning the loop sweeps within safe ranges; this is a **code
+  change**, not a tunable number, so it doesn't belong there. Reversal is
+  `git revert` of the code commit (the loop's mechanism for code changes), with
+  the `REVIEW_PREFIX_ENABLED=false` env flag as an extra instant off-switch.
+- Any change to the DB schema, the `gate_would_suppress` column, or labelling.
 - Any change to suppression behavior (still send everything).
