@@ -10,9 +10,7 @@ Tests verify that checkpoint:
 import sys
 import subprocess
 from pathlib import Path
-from unittest.mock import patch, call
 
-import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
@@ -83,8 +81,6 @@ def test_checkpoint_does_not_push(monkeypatch):
 
 def test_checkpoint_nothing_to_commit_exits_cleanly(monkeypatch):
     """If git commit returns exit code 1 (nothing to commit), run() handles it gracefully."""
-    call_idx = [0]
-
     def fake_run(cmd, **kwargs):
         import subprocess
         if cmd[:2] == ["git", "commit"]:

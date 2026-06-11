@@ -15,7 +15,7 @@ from contextlib import contextmanager
 import logging
 
 from config import Config
-from exceptions import CameraError, CameraInitializationError, CameraOperationError
+from exceptions import CameraInitializationError, CameraOperationError
 
 logger = logging.getLogger(__name__)
 

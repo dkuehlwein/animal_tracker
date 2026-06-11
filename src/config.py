@@ -15,7 +15,7 @@ from pathlib import Path as _Path
 _SRC = _Path(__file__).resolve().parent
 if str(_SRC) not in _sys.path:
     _sys.path.insert(0, str(_SRC))
-from loop.guardrails import BOUNDS as _BOUNDS
+from loop.guardrails import BOUNDS as _BOUNDS  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -49,14 +49,14 @@ class CameraConfig(BaseSettings):
     @classmethod
     def validate_exposure(cls, v):
         if v is not None and (v < 100 or v > 1000000):
-            raise ValueError(f"Exposure time must be between 100-1000000 μs")
+            raise ValueError("Exposure time must be between 100-1000000 μs")
         return v
 
     @field_validator('analogue_gain')
     @classmethod
     def validate_gain(cls, v):
         if v is not None and (v < 1.0 or v > 8.0):
-            raise ValueError(f"Analogue gain must be between 1.0-8.0")
+            raise ValueError("Analogue gain must be between 1.0-8.0")
         return v
 
 

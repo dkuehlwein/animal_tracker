@@ -9,7 +9,6 @@ import gc
 import logging
 import psutil
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
 from config import Config

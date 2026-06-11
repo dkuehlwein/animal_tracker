@@ -25,8 +25,8 @@ _SRC = Path(__file__).resolve().parent.parent
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from loop import guardrails
-from loop import state as state_mod
+from loop import guardrails  # noqa: E402
+from loop import state as state_mod  # noqa: E402
 
 
 def _render_env(deployed: dict, env_path) -> None:

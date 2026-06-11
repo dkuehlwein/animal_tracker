@@ -122,7 +122,7 @@ async def test_notification_service():
         print("-" * 40)
         try:
             bot_info = await notification_service.bot.get_me()
-            print(f"✓ Bot connected successfully!")
+            print("✓ Bot connected successfully!")
             print(f"  Bot name: @{bot_info.username}")
             print(f"  Bot ID: {bot_info.id}")
             print(f"  First name: {bot_info.first_name}")

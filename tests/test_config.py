@@ -12,7 +12,7 @@ import sys
 sys.path.append('src')
 
 from config import (
-    Config, ConfigurationError, CameraConfig, MotionConfig,
+    Config, CameraConfig, MotionConfig,
     PerformanceConfig, StorageConfig, SpeciesConfig
 )
 

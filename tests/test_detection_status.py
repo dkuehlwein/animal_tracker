@@ -104,8 +104,6 @@ def _make_identifier():
 def test_no_predictions_returned_sets_error_status(tmp_path):
     """When SpeciesNet returns empty predictions, status must be ERROR."""
     from data_models import DetectionStatus
-    from species_identifier import SpeciesIdentifier
-    from config import Config
 
     identifier, cfg = _make_identifier()
     identifier._model_loaded = True
@@ -121,7 +119,6 @@ def test_no_predictions_returned_sets_error_status(tmp_path):
 def test_no_animal_detected_sets_no_animal_status(tmp_path):
     """When MegaDetector finds no animals, status must be NO_ANIMAL."""
     from data_models import DetectionStatus
-    from species_identifier import SpeciesIdentifier
 
     identifier, cfg = _make_identifier()
     identifier._model_loaded = True
@@ -147,7 +144,6 @@ def test_no_animal_detected_sets_no_animal_status(tmp_path):
 def test_low_confidence_sets_animal_uncertain_status(tmp_path):
     """Animal detected but confidence < threshold → ANIMAL_UNCERTAIN."""
     from data_models import DetectionStatus
-    from species_identifier import SpeciesIdentifier
 
     identifier, cfg = _make_identifier()
     # unknown_species_threshold default is 0.5
@@ -177,7 +173,6 @@ def test_low_confidence_sets_animal_uncertain_status(tmp_path):
 def test_high_confidence_sets_identified_status(tmp_path):
     """Animal detected and confidence ≥ threshold → IDENTIFIED."""
     from data_models import DetectionStatus
-    from species_identifier import SpeciesIdentifier
 
     identifier, cfg = _make_identifier()
     identifier._model_loaded = True
@@ -206,7 +201,6 @@ def test_high_confidence_sets_identified_status(tmp_path):
 def test_no_cv_result_sentinel_sets_unclassifiable_status(tmp_path):
     """When SpeciesNet returns 'no cv result' as species name, status = UNCLASSIFIABLE."""
     from data_models import DetectionStatus
-    from species_identifier import SpeciesIdentifier
 
     identifier, cfg = _make_identifier()
     identifier._model_loaded = True
@@ -232,7 +226,6 @@ def test_no_cv_result_sentinel_sets_unclassifiable_status(tmp_path):
 def test_exception_in_identifier_sets_error_status(tmp_path):
     """A pipeline exception in identify_species must yield status=ERROR."""
     from data_models import DetectionStatus
-    from species_identifier import SpeciesIdentifier
 
     identifier, cfg = _make_identifier()
     identifier._model_loaded = True
@@ -248,7 +241,6 @@ def test_exception_in_identifier_sets_error_status(tmp_path):
 def test_image_not_found_sets_error_status(tmp_path):
     """Missing image file → status=ERROR."""
     from data_models import DetectionStatus
-    from species_identifier import SpeciesIdentifier
 
     identifier, cfg = _make_identifier()
     result = identifier.identify_species(tmp_path / "nonexistent.jpg")
@@ -265,7 +257,6 @@ def _make_system(monkeypatch, tmp_path):
     for mod in ("wildlife_system", "config"):
         sys.modules.pop(mod, None)
     from wildlife_system import WildlifeSystem
-    from database_manager import DatabaseManager
     sys_obj = WildlifeSystem.__new__(WildlifeSystem)
     sys_obj.config = __import__("config").Config.create_test_config()
     return sys_obj
@@ -590,7 +581,6 @@ def test_compute_metrics_error_count_zero_when_no_errors():
 
 def test_compute_metrics_error_count_in_last_metrics(tmp_path, monkeypatch):
     """metrics main() must include error_count in last_metrics written to state.json."""
-    import json
     import sys
 
     state_path = tmp_path / "state.json"

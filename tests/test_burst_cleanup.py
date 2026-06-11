@@ -3,7 +3,6 @@ Test burst frame cleanup functionality.
 """
 
 import pytest
-from pathlib import Path
 import os
 import sys
 sys.path.append('src')

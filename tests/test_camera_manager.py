@@ -4,15 +4,12 @@ Unit tests for camera management system.
 
 import pytest
 import numpy as np
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
-import time
+from unittest.mock import Mock
 
 import sys
 sys.path.append('src')
 
-from camera_manager import CameraManager, MockCameraManager, PiCameraManager
-from exceptions import CameraError, CameraInitializationError, CameraOperationError
+from camera_manager import CameraManager, MockCameraManager
 from config import Config
 
 

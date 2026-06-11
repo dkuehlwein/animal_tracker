@@ -22,8 +22,8 @@ _SRC = Path(__file__).resolve().parent.parent
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from config import Config
-from database_manager import DatabaseManager
+from config import Config  # noqa: E402
+from database_manager import DatabaseManager  # noqa: E402
 
 
 def _coerce_int(value):

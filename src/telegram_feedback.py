@@ -27,8 +27,8 @@ from feedback_protocol import CALLBACK_PREFIX, parse_callback_data
 _SRC = _Path(__file__).resolve().parent
 if str(_SRC) not in _sys.path:
     _sys.path.insert(0, str(_SRC))
-from loop import state as _state_mod
-from loop import deploy as _deploy
+from loop import state as _state_mod  # noqa: E402
+from loop import deploy as _deploy  # noqa: E402
 
 logger = logging.getLogger(__name__)
 

@@ -1,6 +1,5 @@
 """Tests for src/loop/state.py — atomic state.json read/write."""
 
-import json
 import sys
 from pathlib import Path
 

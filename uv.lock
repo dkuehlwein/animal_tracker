@@ -33,12 +33,16 @@ dependencies = [
     { name = "picamera2" },
     { name = "psutil" },
     { name = "pydantic-settings" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
     { name = "python-dotenv" },
     { name = "python-telegram-bot" },
     { name = "speciesnet", version = "1.0", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine == 'x86_64' and sys_platform == 'darwin'" },
     { name = "speciesnet", version = "5.0.2", source = { registry = "https://pypi.org/simple" }, marker = "platform_machine != 'x86_64' or sys_platform != 'darwin'" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
 ]
 
 [package.metadata]
@@ -50,11 +54,15 @@ requires-dist = [
     { name = "picamera2", specifier = "==0.3.16" },
     { name = "psutil", specifier = "==5.9.5" },
     { name = "pydantic-settings", specifier = ">=2.12.0" },
-    { name = "pytest", specifier = "==7.4.3" },
-    { name = "pytest-asyncio", specifier = "==0.21.1" },
     { name = "python-dotenv", specifier = "==1.0.0" },
     { name = "python-telegram-bot", specifier = "==22.7" },
     { name = "speciesnet", specifier = ">=0.1.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = "==7.4.3" },
+    { name = "pytest-asyncio", specifier = "==0.21.1" },
 ]
 
 [[package]]

@@ -23,7 +23,7 @@ _SRC = Path(__file__).resolve().parent.parent
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from loop import state as state_mod
+from loop import state as state_mod  # noqa: E402
 
 
 def stamp(state_path: str | Path, now: datetime | None = None) -> None:

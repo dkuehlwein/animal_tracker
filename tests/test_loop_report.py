@@ -55,7 +55,8 @@ def test_heartbeat_text_mentions_alive_and_timestamp():
 
 def test_report_main_no_send_renders_without_telegram(tmp_path, monkeypatch):
     """--no-send must print the rendered text and NOT call send()."""
-    import json, sys
+    import json
+    import sys
 
     state_path = tmp_path / "state.json"
     lm = {
@@ -80,8 +81,6 @@ def test_report_main_no_send_renders_without_telegram(tmp_path, monkeypatch):
     send_called = []
     monkeypatch.setattr(report, "send", lambda text: send_called.append(text) or (_ for _ in ()).throw(AssertionError("send() called with --no-send")))
 
-    # Capture stdout.
-    captured = []
     monkeypatch.setattr(sys, "argv", [
         "loop.report", "--mode", "summary",
         "--state", str(state_path),
@@ -167,7 +166,8 @@ def test_summary_backward_compat_without_fp_trustworthy():
 
 def test_report_main_no_send_does_not_require_telegram_credentials(tmp_path, monkeypatch):
     """--no-send must not import or instantiate Config with Telegram tokens."""
-    import json, sys
+    import json
+    import sys
 
     state_path = tmp_path / "state.json"
     lm = {
@@ -315,7 +315,8 @@ def _make_state(tmp_path):
 
 def _capture_main(monkeypatch, argv):
     """Run report.main() with the given argv, capturing stdout."""
-    import io, sys
+    import io
+    import sys
     monkeypatch.setattr(sys, "argv", argv)
     buf = io.StringIO()
     original = sys.stdout
@@ -401,7 +402,7 @@ def test_no_send_summary_truncates_long_journal_entry(tmp_path, monkeypatch):
 
 def test_real_send_summary_calls_send_twice_with_journal(tmp_path, monkeypatch):
     """In real-send mode, send() is called once for metrics and once for journal."""
-    import json, asyncio
+    import json
     state_path = _make_state(tmp_path)
     journal_path = tmp_path / "JOURNAL.md"
     _write_journal(journal_path, """\

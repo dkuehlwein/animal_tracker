@@ -21,7 +21,6 @@ from config import Config
 from species_identifier import SpeciesIdentifier
 from notification_service import NotificationService
 from database_manager import DatabaseManager
-from data_models import IdentificationResult, DetectionRecord
 from utils import PerformanceTimer
 
 
@@ -33,7 +32,7 @@ async def test_pipeline(image_path: Path) -> None:
         sys.exit(1)
 
     print(f"\n{'='*60}")
-    print(f"Wildlife Detection Pipeline Test")
+    print("Wildlife Detection Pipeline Test")
     print(f"{'='*60}")
     print(f"Image: {image_path}")
     print(f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -41,7 +40,7 @@ async def test_pipeline(image_path: Path) -> None:
 
     # Load configuration
     config = Config()
-    print(f"✓ Configuration loaded")
+    print("✓ Configuration loaded")
     print(f"  - Species model: {config.species.model_version}")
     print(f"  - Region: {config.species.country_code}/{config.species.admin1_region}")
     print(f"  - Unknown threshold: {config.species.unknown_species_threshold}")
@@ -51,11 +50,11 @@ async def test_pipeline(image_path: Path) -> None:
     notification_service = NotificationService(config)
     db_manager = DatabaseManager(config)
 
-    print(f"\n✓ Components initialized")
+    print("\n✓ Components initialized")
 
     # Run species identification
     print(f"\n{'─'*60}")
-    print(f"Running species identification...")
+    print("Running species identification...")
     print(f"{'─'*60}")
 
     timer = PerformanceTimer("species_identification")
@@ -66,7 +65,7 @@ async def test_pipeline(image_path: Path) -> None:
     elapsed = timer.stop()
 
     print(f"\n{'─'*60}")
-    print(f"Identification Results")
+    print("Identification Results")
     print(f"{'─'*60}")
     print(f"Species: {result.species_name}")
     print(f"Confidence: {result.confidence:.2%}")
@@ -78,13 +77,13 @@ async def test_pipeline(image_path: Path) -> None:
         print(f"Fallback reason: {result.fallback_reason}")
 
     if result.detection_result:
-        print(f"\nDetection details:")
+        print("\nDetection details:")
         print(f"  - Detection count: {result.detection_result.detection_count}")
         print(f"  - Detection time: {result.detection_result.processing_time:.2f}s")
 
     # Save to database
     print(f"\n{'─'*60}")
-    print(f"Saving to database...")
+    print("Saving to database...")
     print(f"{'─'*60}")
 
     db_manager.log_detection(
@@ -96,22 +95,11 @@ async def test_pipeline(image_path: Path) -> None:
         api_success=result.api_success
     )
 
-    # Create detection record for display purposes
-    detection_record = DetectionRecord(
-        id=None,
-        timestamp=datetime.now(),
-        image_path=str(image_path),
-        motion_area=0,
-        species_name=result.species_name,
-        confidence_score=result.confidence,
-        processing_time=elapsed,
-        api_success=result.api_success
-    )
-    print(f"✓ Detection logged to database")
+    print("✓ Detection logged to database")
 
     # Send notification
     print(f"\n{'─'*60}")
-    print(f"Sending Telegram notification...")
+    print("Sending Telegram notification...")
     print(f"{'─'*60}")
 
     try:
@@ -125,24 +113,24 @@ async def test_pipeline(image_path: Path) -> None:
             image_path=image_path,
             caption=caption
         )
-        print(f"✓ Notification sent successfully")
+        print("✓ Notification sent successfully")
     except Exception as e:
         print(f"✗ Notification failed: {e}")
 
     # Display summary
     print(f"\n{'='*60}")
-    print(f"Pipeline Test Complete")
+    print("Pipeline Test Complete")
     print(f"{'='*60}")
-    print(f"Summary:")
+    print("Summary:")
     print(f"  - Species: {result.species_name}")
     print(f"  - Confidence: {result.confidence:.2%}")
     print(f"  - Processing time: {elapsed:.2f}s")
-    print(f"  - Database: ✓ Logged")
-    print(f"  - Notification: ✓ Sent")
+    print("  - Database: ✓ Logged")
+    print("  - Notification: ✓ Sent")
     print(f"{'='*60}\n")
 
     # Query recent detections
-    print(f"Recent detections from database:")
+    print("Recent detections from database:")
     print(f"{'─'*60}")
     recent = db_manager.get_recent_detections(limit=5)
     for i, det in enumerate(recent, 1):

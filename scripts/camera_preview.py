@@ -120,7 +120,7 @@ try:
     print("=" * 60)
     print("Wildlife Camera Preview Server Starting")
     print("=" * 60)
-    print(f"Access the preview at: http://192.168.2.141:8000")
+    print("Access the preview at: http://192.168.2.141:8000")
     print("Press Ctrl+C to stop the server")
     print("=" * 60)
     server.serve_forever()

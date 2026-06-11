@@ -93,7 +93,6 @@ def test_daily_csv_rerun_same_date_overwrites(tmp_path):
 def test_metrics_main_writes_last_metrics_into_state(tmp_path, monkeypatch):
     """metrics CLI must write a flat last_metrics dict into state.json so that
     report.main() can consume it without any manual reshaping."""
-    import json
     import sys
 
     # Build a temp state file and a temp DB with one detection.
@@ -157,7 +156,7 @@ def test_metrics_main_last_metrics_readable_by_report_without_flatten(tmp_path, 
     state WITHOUT the caller manually flattening metrics.  render_summary must
     succeed on the raw state value (after the JSON list→tuple coercion report
     already does)."""
-    import json, sys
+    import sys
     state_path = tmp_path / "state.json"
     db_file = tmp_path / "detections.db"
     csv_path = tmp_path / "daily.csv"
@@ -203,7 +202,6 @@ def test_metrics_main_last_metrics_readable_by_report_without_flatten(tmp_path, 
 
 def _make_db_with_detections(tmp_path, monkeypatch, count=1):
     """Helper: create a temp DB, insert `count` detections, return (db, db_file)."""
-    import sys
     db_file = tmp_path / "detections.db"
     monkeypatch.setenv("STORAGE_DATABASE_PATH", str(db_file))
     monkeypatch.setenv("STORAGE_DATA_DIR", str(tmp_path))
@@ -261,8 +259,6 @@ def test_no_data_tick_preserves_baseline(tmp_path, monkeypatch):
     })
 
     # Capture stdout to inspect the no_data signal.
-    captured = []
-    original_print = __builtins__["print"] if isinstance(__builtins__, dict) else print
     import builtins
     original_print = builtins.print
     printed_lines = []
@@ -310,7 +306,6 @@ def test_data_tick_writes_metrics_and_csv(tmp_path, monkeypatch):
     """When new detections exist beyond the watermark, main() must write
     last_metrics and append a row to daily.csv (existing behavior preserved).
     """
-    import json
     import sys
 
     db, db_file = _make_db_with_detections(tmp_path, monkeypatch, count=3)
@@ -483,7 +478,8 @@ def test_metrics_main_advances_watermark_on_data_tick(tmp_path, monkeypatch):
 
 def test_metrics_main_watermark_no_op_on_no_data_tick(tmp_path, monkeypatch):
     """On a no-data tick, watermark write is a harmless no-op (same value)."""
-    import sys, sqlite3
+    import sys
+    import sqlite3
     db, db_file = _make_db_with_detections(tmp_path, monkeypatch, count=1)
 
     # Set watermark to max id so there's no new data.

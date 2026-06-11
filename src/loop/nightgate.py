@@ -36,9 +36,9 @@ _SRC = Path(__file__).resolve().parent.parent
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-from config import Config
-from utils import SunChecker
-from loop import state as state_mod
+from config import Config  # noqa: E402
+from utils import SunChecker  # noqa: E402
+from loop import state as state_mod  # noqa: E402
 
 log = logging.getLogger(__name__)
 

@@ -5,7 +5,7 @@ WAL, schema migration, richer detection logging, and the feedback table.
 
 import sqlite3
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 from types import SimpleNamespace
 
 import pytest

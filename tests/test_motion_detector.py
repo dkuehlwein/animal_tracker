@@ -4,7 +4,6 @@ Unit tests for motion detection system.
 
 import pytest
 import numpy as np
-import cv2
 
 import sys
 sys.path.append('src')
@@ -321,7 +320,8 @@ class TestForegroundPixelCountType:
         from pathlib import Path
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-        import tempfile, os
+        import tempfile
+        import os
         from config import Config
         from database_manager import DatabaseManager
 

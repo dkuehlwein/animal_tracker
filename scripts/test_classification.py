@@ -64,13 +64,13 @@ def main():
 
             # Detection stage info
             if result.detection_result:
-                logger.info(f"\n=== DETECTION STAGE ===")
+                logger.info("\n=== DETECTION STAGE ===")
                 logger.info(f"Animals Detected: {result.detection_result.animals_detected}")
                 logger.info(f"Detection Count: {result.detection_result.detection_count}")
                 logger.info(f"Detection Time: {result.detection_result.processing_time:.2f}s")
 
                 if result.detection_result.bounding_boxes:
-                    logger.info(f"\nBounding Boxes:")
+                    logger.info("\nBounding Boxes:")
                     for i, bbox in enumerate(result.detection_result.bounding_boxes, 1):
                         logger.info(f"  {i}. Category: {bbox['category']}, "
                                   f"Confidence: {bbox['confidence']:.2%}, "
@@ -78,7 +78,7 @@ def main():
 
             # Metadata
             if result.metadata:
-                logger.info(f"\n=== METADATA ===")
+                logger.info("\n=== METADATA ===")
                 if 'top_predictions' in result.metadata:
                     logger.info("Top predictions:")
                     for pred in result.metadata['top_predictions'][:5]:

@@ -24,7 +24,6 @@ from resource_manager import SystemMonitor, StorageManager
 from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnalyzer, get_species_emoji
 from feedback_protocol import build_feedback_keyboard
 from timelapse_writer import TimelapseWriter
-from exceptions import WildlifeSystemError
 from data_models import DetectionStatus, is_review_detection
 
 logger = logging.getLogger(__name__)
@@ -418,7 +417,7 @@ class WildlifeSystem:
             caption += stats_line
 
         elif status == DetectionStatus.NO_ANIMAL:
-            caption += f"\n👁️ No animal — motion only (likely false positive)"
+            caption += "\n👁️ No animal — motion only (likely false positive)"
             caption += stats_line
 
         elif status == DetectionStatus.UNCLASSIFIABLE:
@@ -535,19 +534,19 @@ class WildlifeSystem:
         # Log multi-frame capture settings
         logger.info("Image capture:")
         if self.config.performance.enable_multi_frame:
-            logger.info(f"- Multi-frame burst capture: ENABLED")
+            logger.info("- Multi-frame burst capture: ENABLED")
             logger.info(f"  • Frames per burst: {self.config.performance.multi_frame_count}")
             logger.info(f"  • Interval: {self.config.performance.multi_frame_interval}s")
             logger.info(f"  • Total burst time: ~{self.config.performance.multi_frame_count * self.config.performance.multi_frame_interval:.1f}s")
             logger.info(f"  • Sharpness threshold: {self.config.performance.min_sharpness_threshold}")
-            logger.info(f"  • Selection: Best frame by Laplacian variance")
+            logger.info("  • Selection: Best frame by Laplacian variance")
         else:
-            logger.info(f"- Multi-frame burst capture: DISABLED (single frame mode)")
+            logger.info("- Multi-frame burst capture: DISABLED (single frame mode)")
 
         # Log daylight settings
         if self.config.performance.daylight_only:
             sun_info = self.sun_checker.get_sun_info()
-            logger.info(f"Daylight tracking enabled:")
+            logger.info("Daylight tracking enabled:")
             logger.info(f"- Sunrise: {sun_info['sunrise']}, Sunset: {sun_info['sunset']}")
             logger.info(f"- Currently: {'Daytime' if sun_info['is_daytime'] else 'Nighttime'}")
         else:
