@@ -1,15 +1,15 @@
 ---
 id: 4
 slug: mog2-recurrent-frames
-status: running           # proposed | running | concluded | rolled_back | parked
+status: concluded         # proposed | running | concluded | rolled_back | parked
 validation: live          # live | replay | parked
 hypothesis: "Many FP are recurrent near-identical static scenes MOG2 should have absorbed; diagnose why before tuning"
-param_delta: null         # none yet — diagnosis phase, no deploy
+param_delta: null         # none — diagnosis-only experiment, never warranted a deploy
 predicted_effect: { fp_rate: "potentially large -", fn_risk: "unknown (motion-sensitivity changes risk FN)" }
 created: 2026-06-09
 started: 2026-06-09
-concluded: null
-decision: null            # keep | rollback | inconclusive
+concluded: 2026-06-11
+decision: inconclusive    # keep | rollback | inconclusive (diagnosis succeeded; no env lever warranted)
 baseline: { fp_rate: 0.798, fp_ci: [0.700, 0.870], fn: unmeasured }   # 06-08; see trust caveat below
 result:   { fp_rate: null, fp_ci: null, fn: null }
 confidence: null
@@ -192,3 +192,34 @@ FN-vetoed with FN unmeasured). Tonight's shipped change is the **labeler fix**
 paused, not frozen (31 human labels today). **For Daniel:** provision a review
 Telegram channel to unblock the no_animal+unclassifiable routing gate — now the
 clearest, best-evidenced FP lever (cuts ~all FP, 0 measured FN).
+
+## 2026-06-11 (night tick) — CONCLUDED (diagnosis complete; findings shipped via #1)
+
+Third new-data day re-confirms the converged picture, so this diagnosis experiment
+is closed. Ingested 109 new triggers (watermark 356→465, 06-11 h6–18; 40 human
+labels). **FP 90/109 = 0.826, CI [0.744, 0.885], trustworthy** — statistically
+indistinguishable from 06-10's 0.874 (overlapping CIs). FP is stably HIGH; FN
+remains structurally unmeasured (the camera only logs triggers, so a missed animal
+leaves no row — no new instrumentation changes that).
+
+**Why concluded, not continued:** #4 was a *diagnosis* (param_delta always null).
+Its three questions are answered and stable across 06-09/06-10/06-11:
+1. Recurrence is REAL motion (swinging feeder, wind vegetation, moving sun-dapple),
+   NOT static scenes MOG2 "failed to absorb" — MOG2 is a change detector, fires
+   correctly; the ~45 s post-trigger sampling gap keeps it from learning the
+   wind-moved vegetation. (aHash clustering, 3 nights.)
+2. Motion features do NOT separate FP from animal (motion_area, contour_count,
+   foreground_pixel_count all overlap; 0 FP near the 500 px gate) → any
+   MOTION_THRESHOLD/ROI sensitivity change is FN-vetoed and futile. **No env lever
+   in BOUNDS reaches the root cause** → correctly never deployed.
+3. The actionable lever it surfaced — gate/label triggers with no confident animal
+   — was implemented as **exp #1's same-channel REVIEW labeling** (FN-safe variant
+   of the routing idea), validated tonight at **99% FP recall / 0 FN** and brought
+   live this tick. So #4's value was realized downstream, not as its own deploy.
+
+**Decision: inconclusive-as-deploy, diagnosis-successful.** Closed. Residual FP
+lever NOT covered by #1's labeling = the `identified`-but-FP class (1/109 tonight,
+SpeciesNet naming a species in vegetation) — small, parked for a future
+classifier-confidence experiment if it grows. The scene-recurrence dedup *gate*
+(suppression) remains backlog-able but is FN-gated and lower-priority now that
+labeling captures 99% of FP without any FN risk. Not paused, not frozen.

@@ -92,3 +92,24 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   suppression: the 6 no_animal wrong_species are real animals); still infra-blocked on
   a 2nd Telegram channel Daniel must provision. Decision: HOLD on camera deploy, no
   pending_restart. Not paused, not frozen. See runs/0002-mog2-recurrent-frames.md.
+- 2026-06-11 (night tick) — Third new-data day; 109 triggers (watermark 356→465,
+  06-11 h6–18; 40 human labels — not feedback-starved). **FP 90/109 = 0.826, CI
+  [0.744, 0.885], trustworthy** — indistinguishable from 06-10's 0.874 (overlapping
+  CIs); FP stably HIGH, FN structurally unmeasured. Two decisions this tick:
+  (1) **CONCLUDED exp #4 (mog2-recurrent-frames)** — a diagnosis-only experiment
+  (param_delta always null). Its three findings are stable across 3 nights:
+  recurrence = REAL motion (swinging feeder/wind/sun-dapple), NOT static scenes MOG2
+  failed to absorb; motion features don't separate FP from animal → all MOTION/ROI
+  sensitivity tuning FN-vetoed & futile (no env lever in BOUNDS reaches the root
+  cause); the actionable lever it surfaced was shipped as exp #1's labeling. Decision:
+  inconclusive-as-deploy, diagnosis-successful, closed. (2) **PROMOTED exp #1
+  (notification-gate-live) to running and brought it LIVE.** The committed REVIEW-
+  labeling code (31d3bc6) was DORMANT — the camera only reloads code when
+  wildlife-deploy.timer (03:30 CEST) finds a due pending_restart_at, which was null,
+  so the shipped feature had never run. Stamped pending_restart_at=2026-06-12T03:00
+  → camera restarts at the 03:30 timer, REVIEW labeling live for 06-12. Validated on
+  tonight's 109 triggers: is_review_detection (status∈{NO_ANIMAL,UNCLASSIFIABLE})
+  flags **89/90 FP = 99% recall** (1 FP slips through, an identified-misclassification);
+  unprefixed stream is **15/16 = 94% true animals**; **0 FN** (3/18 animals get a
+  cosmetic REVIEW prefix but are still fully shown). active_experiment_id 4→1. Not
+  paused, not frozen, no env delta, no volume change. See runs/0001 & runs/0002.

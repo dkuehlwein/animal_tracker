@@ -1,13 +1,13 @@
 ---
 id: 1
 slug: notification-gate-live
-status: proposed          # proposed | running | concluded | rolled_back | parked
+status: running          # proposed | running | concluded | rolled_back | parked
 validation: live          # live | replay | parked
 hypothesis: "Route no-animal triggers to a review channel; cuts FP w/o raising FN"
-param_delta: { notification_gate: "shadow -> live" }
+param_delta: { notification_gate: "shadow -> live", realized_as: "same-channel REVIEW labeling (NO_ANIMAL+UNCLASSIFIABLE)" }
 predicted_effect: { fp_rate: "-15pp", fn_risk: "low" }
 created: 2026-06-08
-started: null
+started: 2026-06-11
 concluded: null
 decision: null            # keep | rollback | inconclusive
 baseline: { fp_rate: 0.798, fp_ci: [0.700, 0.870], fn: unmeasured }
@@ -83,6 +83,47 @@ and no FN-veto (suppression was the vetoed part; labeling is not suppression).
 
 Goes live on the next camera restart (code change). Experiment #1 is realized as
 this labeling variant; a future real channel split remains optional follow-up.
+
+### 2026-06-11 (night tick) — VALIDATED on new data; promoted to running + brought LIVE
+
+Promoted #1 from `proposed` to `running` and stamped the restart that actually
+activates it. **The committed labeling code (commit 31d3bc6) was dormant** — the
+camera only reloads code when `wildlife-deploy.timer` (daily 03:30 CEST) finds a
+due `pending_restart_at`, and that stamp was `null`. So the shipped feature had
+never run. Stamped `pending_restart_at = 2026-06-12T03:00:00+02:00` → the 03:30
+deploy timer restarts `wildlife-camera.service`, REVIEW labeling live for 06-12
+daytime captures. `active_experiment_id` → 1.
+
+**Validation on tonight's 109 triggers (06-11, watermark 356→465; 40 human
+labels — not feedback-starved).** Applied the live predicate
+`is_review_detection(status)` = status ∈ {NO_ANIMAL, UNCLASSIFIABLE} to the
+reconciled corpus:
+
+| detection_status | FP | animal | wrong_species |
+|---|---|---|---|
+| no_animal       | 57 | 3 | 1 |
+| unclassifiable  | 32 | 0 | 0 |
+| identified      | 1  | 15 | 0 |
+
+- **FP recall of the REVIEW prefix: 89/90 = 99%.** Only ONE FP slips through
+  unlabeled — an `identified` misclassification (SpeciesNet named a species in
+  vegetation). The prior no-animal-gate-only design (06-10) had ~33% FP recall;
+  adding the `unclassifiable` class is what closes the gap.
+- **Unprefixed ("clean") stream is 15/16 = 94% true animals** — the residual FP is
+  the single `identified` one above.
+- **Zero FN.** 3/18 true animals (the `no_animal` animals — MegaDetector misses)
+  receive a REVIEW prefix but are STILL fully shown with feedback buttons. Cosmetic
+  cost, not suppression. FN-veto satisfied by construction (labeling ≠ dropping).
+
+Note: this labeling does NOT change `detection_status` or the FP-rate metric — it
+is a notification-UX change. Its "result" is the recall/precision of the predicate
+(above), measured offline; going live adds the operator benefit (Daniel sees which
+notifications to scrutinise) without any metrics movement to wait on. Off-switch:
+`PERFORMANCE_REVIEW_PREFIX_ENABLED=false`. Reversal: `git revert 31d3bc6`.
+
+Gates: not paused, not frozen (40 human labels). No env delta, no volume change
+(labeling doesn't suppress). One-experiment-at-a-time preserved — #4 concluded
+this tick (see runs/0002).
 
 ## Decision & rationale
 
