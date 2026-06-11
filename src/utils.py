@@ -25,6 +25,27 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 
+SPECIES_EMOJI_MAP = {
+    'squirrel': '🐿️', 'sciuridae': '🐿️',
+    'hedgehog': '🦔',
+    'fox': '🦊',
+    'cat': '🐱',
+    'bird': '🐦', 'robin': '🐦', 'blackbird': '🐦', 'pigeon': '🐦',
+    'rabbit': '🐰', 'hare': '🐰',
+    'deer': '🦌',
+    'badger': '🦡',
+    'mouse': '🐭', 'rat': '🐭', 'rodent': '🐭',
+}
+
+
+def get_species_emoji(species_name: str, default: str = '🦌') -> str:
+    """Return the emoji for a species name using substring matching."""
+    name_lower = species_name.lower()
+    for key, emoji in SPECIES_EMOJI_MAP.items():
+        if key in name_lower:
+            return emoji
+    return default
+
 
 class PerformanceTimer:
     """Performance timing utility."""

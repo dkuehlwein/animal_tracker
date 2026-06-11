@@ -7,6 +7,7 @@ Combines motion detection, species identification, database logging, and Telegra
 import asyncio
 import functools
 import logging
+import os
 import time
 from datetime import datetime
 from pathlib import Path
@@ -20,7 +21,7 @@ from database_manager import DatabaseManager
 from species_identifier import SpeciesIdentifier
 from notification_service import NotificationService
 from resource_manager import SystemMonitor, StorageManager
-from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnalyzer
+from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnalyzer, get_species_emoji
 from feedback_protocol import build_feedback_keyboard
 from timelapse_writer import TimelapseWriter
 from exceptions import WildlifeSystemError
@@ -336,7 +337,7 @@ class WildlifeSystem:
         if ';' in species_name_raw:
             parts = species_name_raw.split(';')
             # parts: [uuid, class, order, family, genus, species, common_name]
-            common_name = parts[-1].strip() if len(parts) >= 1 else ''
+            common_name = parts[-1].strip()
             if common_name:
                 return common_name.title()
             # Fall back to scientific name (genus + species), indices 4 & 5
@@ -344,7 +345,7 @@ class WildlifeSystem:
                 genus = parts[4].strip()
                 species = parts[5].strip()
                 scientific = f"{genus} {species}".strip()
-                if scientific.strip():
+                if scientific:
                     return scientific.title()
             return 'Unknown species'
         return species_name_raw
@@ -380,6 +381,12 @@ class WildlifeSystem:
         # Line 1: timestamp (always present)
         caption = f"📅 {timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
 
+        # Stats line shared by all statuses except ERROR
+        stats = [f"{motion_area} px"]
+        if temperature is not None:
+            stats.append(f"{temperature:.0f}°C")
+        stats_line = f"\n📍 {' | '.join(stats)}"
+
         if status == DetectionStatus.IDENTIFIED:
             if species_name.strip().lower() == "blank":
                 species_line = f"🚫 No animal ({confidence:.0%})"
@@ -401,40 +408,25 @@ class WildlifeSystem:
                     if top_species_name and top_species_name.lower() != 'unknown species':
                         caption += f" → {top_species_name} ({top_score:.0%})"
 
-            # Stats line
-            stats = [f"{motion_area} px"]
-            if temperature is not None:
-                stats.append(f"{temperature:.0f}°C")
-            caption += f"\n📍 {' | '.join(stats)}"
+            caption += stats_line
 
         elif status == DetectionStatus.ANIMAL_UNCERTAIN:
             uncertain_line = f"🐾 Animal · species uncertain (best guess {species_name} {confidence:.0%})"
             if max_detection_conf > 0:
                 uncertain_line += f" | Box: {max_detection_conf:.0%}"
             caption += f"\n{uncertain_line}"
-
-            stats = [f"{motion_area} px"]
-            if temperature is not None:
-                stats.append(f"{temperature:.0f}°C")
-            caption += f"\n📍 {' | '.join(stats)}"
+            caption += stats_line
 
         elif status == DetectionStatus.NO_ANIMAL:
             caption += f"\n👁️ No animal — motion only (likely false positive)"
-            stats = [f"{motion_area} px"]
-            if temperature is not None:
-                stats.append(f"{temperature:.0f}°C")
-            caption += f"\n📍 {' | '.join(stats)}"
+            caption += stats_line
 
         elif status == DetectionStatus.UNCLASSIFIABLE:
             unclassif_line = "🐾 Animal · couldn't classify (poor image quality)"
             if max_detection_conf > 0:
                 unclassif_line += f" | Box: {max_detection_conf:.0%}"
             caption += f"\n{unclassif_line}"
-
-            stats = [f"{motion_area} px"]
-            if temperature is not None:
-                stats.append(f"{temperature:.0f}°C")
-            caption += f"\n📍 {' | '.join(stats)}"
+            caption += stats_line
 
         else:
             # ERROR (and unknown statuses default to same safe rendering)
@@ -472,22 +464,7 @@ class WildlifeSystem:
 
     def _get_species_emoji(self, species_name: str) -> str:
         """Get appropriate emoji for species."""
-        name_lower = species_name.lower()
-        emoji_map = {
-            'squirrel': '🐿️', 'sciuridae': '🐿️',
-            'hedgehog': '🦔',
-            'fox': '🦊',
-            'cat': '🐱',
-            'bird': '🐦', 'robin': '🐦', 'blackbird': '🐦', 'pigeon': '🐦',
-            'rabbit': '🐰', 'hare': '🐰',
-            'deer': '🦌',
-            'badger': '🦡',
-            'mouse': '🐭', 'rat': '🐭', 'rodent': '🐭',
-        }
-        for key, emoji in emoji_map.items():
-            if key in name_lower:
-                return emoji
-        return '🦌'  # Default
+        return get_species_emoji(species_name, default='🦌')
     
     async def send_notification(self, species_result: dict, motion_area: int,
                                timestamp: datetime, image_path: Optional[Path] = None,
@@ -633,7 +610,7 @@ class WildlifeSystem:
                         self.last_frame_time = current_time
 
                         # Capture and process frame (run in executor to avoid blocking)
-                        loop = asyncio.get_event_loop()
+                        loop = asyncio.get_running_loop()
                         frame = await loop.run_in_executor(self.executor, self.camera.capture_motion_frame)
 
                         # If the camera auto-restarted, the scene may have shifted
@@ -817,10 +794,7 @@ class WildlifeSystem:
                 self.executor.shutdown(wait=True, cancel_futures=True)
 
 
-
-
 if __name__ == "__main__":
-    import os
     log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
     logging.basicConfig(
         level=getattr(logging, log_level, logging.INFO),

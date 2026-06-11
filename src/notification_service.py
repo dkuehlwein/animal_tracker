@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Optional, List
 
 from config import Config
+from utils import get_species_emoji
 
 logger = logging.getLogger(__name__)
 
@@ -29,25 +30,7 @@ class NotificationFormatter:
         if species_name == "Unknown species":
             return f"🔍 Unknown species detected at {time_str}\nMotion area: {motion_area:,} pixels"
 
-        # Emoji mapping (consolidated, lowercase matching)
-        emoji_map = {
-            'squirrel': '🐿️', 'sciuridae': '🐿️',
-            'hedgehog': '🦔',
-            'fox': '🦊',
-            'cat': '🐱',
-            'bird': '🐦', 'robin': '🐦', 'blackbird': '🐦', 'pigeon': '🐦',
-            'rabbit': '🐰', 'hare': '🐰',
-            'deer': '🦌',
-            'badger': '🦡',
-            'mouse': '🐭', 'rat': '🐭', 'rodent': '🐭',
-        }
-
-        emoji = "🔍"
-        name_lower = species_name.lower()
-        for key, symbol in emoji_map.items():
-            if key in name_lower:
-                emoji = symbol
-                break
+        emoji = get_species_emoji(species_name, default='🔍')
 
         if confidence > 0.8:
             message = f"{emoji} {species_name} detected at {time_str}\nConfidence: {confidence*100:.0f}%"
@@ -88,7 +71,7 @@ class NotificationService:
 
     async def send_detection_notification(self, species_result: dict,
                                           motion_area: int, timestamp: datetime,
-                                          temperature: float = None) -> bool:
+                                          temperature: Optional[float] = None) -> bool:
         """Send species detection notification to Telegram."""
         try:
             species_name = species_result.get('species_name', 'Unknown species')
