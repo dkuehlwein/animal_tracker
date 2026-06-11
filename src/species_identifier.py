@@ -3,6 +3,7 @@ Species identification using Google SpeciesNet.
 Replaces mock implementation with real AI-powered wildlife identification.
 """
 
+import random
 import time
 import logging
 from pathlib import Path
@@ -388,8 +389,6 @@ class MockSpeciesIdentifier(SpeciesIdentifier):
 
     def identify_species(self, image_path, timeout=None) -> IdentificationResult:
         """Mock species identification - simulates single predict() call."""
-        import random
-
         self.call_count += 1
         start_time = time.time()
 
@@ -422,14 +421,14 @@ class MockSpeciesIdentifier(SpeciesIdentifier):
             height = random.uniform(0.2, 0.4)
             conf = random.uniform(0.7, 0.95)
             bounding_boxes.append({
-                'bbox': [x1, y1, min(x1 + width, 0.9), min(y1 + height, 0.9)],
+                'bbox': [x1, y1, min(width, 1.0 - x1), min(height, 1.0 - y1)],
                 'confidence': conf,
                 'category': 'animal'
             })
             detections.append({
                 'category': 'animal',
                 'conf': conf,
-                'bbox': [x1, y1, min(x1 + width, 0.9), min(y1 + height, 0.9)]
+                'bbox': [x1, y1, min(width, 1.0 - x1), min(height, 1.0 - y1)]
             })
 
         detection_result = DetectionResult(

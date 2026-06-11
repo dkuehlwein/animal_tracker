@@ -228,7 +228,16 @@ class MotionDetector:
                             center_x, center_y = cx, cy
                             break
 
+            motion_area = int(motion_area)
             processing_time_ms = (time.time() - detect_start) * 1000
+
+            diag_kwargs = dict(
+                contour_count=len(contours),
+                largest_contour_area=largest_contour,
+                contour_areas=contour_areas_sorted[:10],
+                foreground_pixel_count=morph_fg_pixels,
+                processing_time_ms=processing_time_ms
+            )
 
             # Check if total motion area exceeds threshold
             if significant_motion_detected and motion_area >= self.config.motion.motion_threshold:
@@ -254,11 +263,7 @@ class MotionDetector:
                         detection_confidence=0.3,  # Low confidence - filtered
                         center_x=center_x,
                         center_y=center_y,
-                        contour_count=len(contours),
-                        largest_contour_area=largest_contour,
-                        contour_areas=contour_areas_sorted[:10],
-                        foreground_pixel_count=morph_fg_pixels,
-                        processing_time_ms=processing_time_ms
+                        **diag_kwargs
                     )
 
                 self.consecutive_detections += 1
@@ -282,11 +287,7 @@ class MotionDetector:
                         detection_confidence=1.0,
                         center_x=center_x,
                         center_y=center_y,
-                        contour_count=len(contours),
-                        largest_contour_area=largest_contour,
-                        contour_areas=contour_areas_sorted[:10],
-                        foreground_pixel_count=morph_fg_pixels,
-                        processing_time_ms=processing_time_ms
+                        **diag_kwargs
                     )
                 return MotionResult(
                     motion_detected=False,
@@ -294,11 +295,7 @@ class MotionDetector:
                     detection_confidence=0.5,
                     center_x=center_x,
                     center_y=center_y,
-                    contour_count=len(contours),
-                    largest_contour_area=largest_contour,
-                    contour_areas=contour_areas_sorted[:10],
-                    foreground_pixel_count=morph_fg_pixels,
-                    processing_time_ms=processing_time_ms
+                    **diag_kwargs
                 )
 
             # DIAGNOSTIC: Periodic logging of why motion wasn't detected (every ~100 frames to avoid spam)
@@ -317,11 +314,7 @@ class MotionDetector:
             return MotionResult(
                 motion_detected=False,
                 motion_area=0,
-                contour_count=len(contours),
-                largest_contour_area=largest_contour,
-                contour_areas=contour_areas_sorted[:10],
-                foreground_pixel_count=morph_fg_pixels,
-                processing_time_ms=processing_time_ms
+                **diag_kwargs
             )
 
         except Exception as e:
