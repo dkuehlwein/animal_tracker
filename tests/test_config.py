@@ -232,5 +232,17 @@ class TestOverlayAndBounds:
             SpeciesConfig(_env_file=None)
 
 
+def test_review_prefix_enabled_defaults_true():
+    from config import Config
+    cfg = Config.create_test_config()
+    assert cfg.performance.review_prefix_enabled is True
+
+
+def test_review_prefix_enabled_env_override(monkeypatch):
+    monkeypatch.setenv("PERFORMANCE_REVIEW_PREFIX_ENABLED", "false")
+    from config import PerformanceConfig
+    assert PerformanceConfig().review_prefix_enabled is False
+
+
 if __name__ == '__main__':
     pytest.main([__file__])

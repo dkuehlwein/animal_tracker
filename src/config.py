@@ -152,6 +152,7 @@ class PerformanceConfig(BaseSettings):
     min_sharpness_threshold: float = 11.0
     motion_aware_selection: bool = True
     send_annotated_image: bool = False  # Debug: send motion detection overlay alongside original
+    review_prefix_enabled: bool = True  # Prefix likely-FP (NO_ANIMAL/UNCLASSIFIABLE) captions with 🔍 REVIEW header
 
     # Timelapse FN-audit channel (ADR-004 Phase 1): low-rate independent capture
     enable_timelapse: bool = True
