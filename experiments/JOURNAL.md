@@ -113,3 +113,23 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   unprefixed stream is **15/16 = 94% true animals**; **0 FN** (3/18 animals get a
   cosmetic REVIEW prefix but are still fully shown). active_experiment_id 4→1. Not
   paused, not frozen, no env delta, no volume change. See runs/0001 & runs/0002.
+- 2026-06-13 16:25 CEST — **LOCATION CHANGE / RE-BASELINE (human-driven, /remote-control).**
+  Daniel physically moved the camera to a NEW location. wildlife-camera was stopped
+  09:21 for the move (status=143 = SIGTERM, not a crash) and is now restarted clean
+  (camera init OK, warmup armed). All old empirical state is OLD-SCENE and invalid for
+  the new field of view, so the loop was paused and re-baselined rather than allowed to
+  diff new data against stale baselines:
+  - `paused: true` AND `wildlife-loop.timer` disabled+stopped (hard pause — nightgate
+    does not honor `paused`, only the report banner does, so the timer is the real gate).
+  - `baselines.volume_per_night: 84 → 0` (= "no baseline yet" per guardrails.check_volume;
+    avoids false volume-collapse/explosion vs the old 84/night).
+  - `last_metrics: {06-11 FP 0.826, 90/109} → null` (old-scene FP rate retired; first
+    new-scene data tick will repopulate it).
+  - `watermark: 465 → 470` (= current max detections.id) so the last old-location triggers
+    are NOT ingested into the new baseline. New-scene triggers (id > 470) start fresh.
+  - exp #3 roi-masking hypothesis annotated: old ROI geometry no longer applies; re-derive
+    from new-scene FP patterns before proposing live. #1 REVIEW-labeling stays live
+    (location-agnostic). Old DB (469 dets, 177 labels) + 1.4G images KEPT as archive.
+  TO RESUME: let the new scene accumulate ~2-3 nights of triggers + Telegram labels, set
+  a fresh volume_per_night baseline, then `paused: false` + `sudo systemctl enable --now
+  wildlife-loop.timer`.
