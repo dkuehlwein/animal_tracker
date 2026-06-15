@@ -16,7 +16,7 @@
       "validation": "parked"
     },
     {
-      "hypothesis": "Restrict motion ROI to suppress edge vegetation; incremental FP reduction. NOTE (2026-06-13): camera moved to a NEW location — the old ROI geometry no longer applies. Re-derive the ROI from new-scene FP patterns before proposing live.",
+      "hypothesis": "Restrict motion ROI to suppress edge vegetation; incremental FP reduction. NOTE (2026-06-13): camera moved to a NEW location \u2014 the old ROI geometry no longer applies. Re-derive the ROI from new-scene FP patterns before proposing live.",
       "id": 3,
       "slug": "roi-masking",
       "status": "proposed",
@@ -31,15 +31,30 @@
     }
   ],
   "baselines": {
-    "volume_per_night": 0
+    "volume_per_night": 42
   },
   "best_known_good": {},
   "deployed": {},
   "history": [],
   "last_heartbeat_loopday": "2026-06-12",
-  "last_metrics": null,
+  "last_metrics": {
+    "date": "2026-06-15",
+    "error_count": 0,
+    "error_rate": 0.0,
+    "fn_ci": null,
+    "fn_rate": "unmeasured",
+    "fp_ci": [
+      0.784650962802083,
+      0.9391650739766866
+    ],
+    "fp_count": 60,
+    "fp_rate": 0.8823529411764706,
+    "fp_trustworthy": true,
+    "labeled_triggers": 68,
+    "total_triggers": 68
+  },
   "last_tick_completed_day": "2026-06-11",
-  "paused": true,
+  "paused": false,
   "pending_restart_at": null,
-  "watermark": 470
+  "watermark": 538
 }
