@@ -151,5 +151,9 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   is now unblocked — 2 nights of new-scene FP frames exist on disk to re-derive the ROI
   geometry from; still `proposed`, to be designed on a future tick (or on request).
   Note: metrics dates this backfill row 2026-06-15 (run-day) though the data is 06-13/06-14.
-  Manual tick stamped via loop.endtick → tonight's timer fires but skips (loop-day 06-15
-  already done); first autonomous tick is 06-16 night. See runs/0001-notification-gate-live.md.
+  Manual tick stamped via loop.endtick as loop-day **2026-06-14** (loop_day = (now−12h).date,
+  run at 06:50 UTC) — so this catches up the never-completed 06-12/13/14 paused window.
+  **Tonight's timer fire is loop-day 06-15 ≠ 06-14 → it RUNS** the first post-resume
+  autonomous tick (ingests 06-15 daytime triggers, id>538; will overwrite the cosmetic
+  06-15 CSV row — the durable new-scene resume number 60/68 lives here in JOURNAL).
+  See runs/0001-notification-gate-live.md.
