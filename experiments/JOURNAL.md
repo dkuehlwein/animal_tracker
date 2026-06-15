@@ -166,3 +166,21 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   agnostic. No code/restart (already live). active_experiment_id 1→null (slot free). First
   LEARNINGS.md entries written (gate + exp #4 motion-feature findings). Next candidate
   remains exp #3 (roi-masking), proposed/unblocked. See runs/0001 + LEARNINGS.md.
+- 2026-06-15 (autonomous tick, loop-day 06-15 — FIRST post-resume timer fire). Healthy,
+  no-action tick. Ingested id 539–557 (watermark 538→557): **19 daytime triggers (hours
+  10–17), all 19 human-labeled (NOT feedback-starved), FP 17/19 = 0.895, CI [0.686,0.971],
+  trustworthy; FN unmeasured.** On-baseline (new-scene resume was 0.882; old scene 0.826 —
+  all CIs overlap). No volume anomaly (partial-day daytime window; baseline 42 is full-night).
+  Status mix: no_animal 16, unclassifiable 2, identified 1 → live REVIEW prefix (#1) flags
+  18/19, clean stream = the 1 identified. No tier-2 needed (all crops human-labeled).
+  **Decision: KEEP — no deploy, no env delta, no restart, active_experiment_id stays null.**
+  Rationale: (a) no active experiment; (b) metrics on-baseline, no anomaly; (c) candidate
+  exp #3 (roi-masking) is double-gated — ROI is NOT an env lever (guardrails.BOUNDS has only
+  MOTION_{THRESHOLD,MIN_CONTOUR_AREA,CONSECUTIVE_REQUIRED,MIN_COLOR_VARIANCE} + SPECIES_
+  UNKNOWN_THRESHOLD), so it's a code change, AND it inherently risks raising FN (edge animals
+  masked) while FN is structurally unmeasured → FN-veto = HOLD on deploy; (d) exp #4 already
+  concluded motion-threshold-family env knobs don't separate FP from animal, so no in-BOUNDS
+  env delta has an expected FP win without FN risk. Next: exp #3 needs an FN-safety story
+  (measure/bound FN, or a conservative center-preserving ROI) before it can deploy; new-scene
+  FP frames keep accumulating nightly so the spatial ROI diagnostic isn't time-boxed away.
+  See runs/0001 + LEARNINGS.md.
