@@ -157,3 +157,12 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   autonomous tick (ingests 06-15 daytime triggers, id>538; will overwrite the cosmetic
   06-15 CSV row — the durable new-scene resume number 60/68 lives here in JOURNAL).
   See runs/0001-notification-gate-live.md.
+- 2026-06-15 (manual, /remote-control) — **CONCLUDED exp #1 (notification-gate-live),
+  decision=keep.** Daniel's call: "consider the second fp channel as solved. routing it
+  to the same channel with the pr fix is good enough... I am not clicking on two channels."
+  The same-channel 🔍 REVIEW-prefix variant (31d3bc6, live since 06-12) is the ACCEPTED
+  FINAL design; the future-channel-split follow-up is DROPPED, not deferred. Re-confirmed
+  on new-scene data: prefix flags 99% FP, ~94% clean-stream animal purity, 0 FN, location-
+  agnostic. No code/restart (already live). active_experiment_id 1→null (slot free). First
+  LEARNINGS.md entries written (gate + exp #4 motion-feature findings). Next candidate
+  remains exp #3 (roi-masking), proposed/unblocked. See runs/0001 + LEARNINGS.md.

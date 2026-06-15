@@ -1,11 +1,11 @@
 {
-  "active_experiment_id": 1,
+  "active_experiment_id": null,
   "backlog": [
     {
-      "hypothesis": "Flip the shadow gate to route no-animal triggers to a review channel; cuts FP without raising FN.",
+      "hypothesis": "CONCLUDED 2026-06-15 (keep). Same-channel 🔍 REVIEW prefix on status∈{NO_ANIMAL,UNCLASSIFIABLE} flags 99% of FP at 0 FN; live since 06-12, location-agnostic. Second-channel routing is OUT per Daniel (no 2nd channel — adds overhead, won't click two). See runs/0001 + LEARNINGS.",
       "id": 1,
       "slug": "notification-gate-live",
-      "status": "running",
+      "status": "concluded",
       "validation": "live"
     },
     {

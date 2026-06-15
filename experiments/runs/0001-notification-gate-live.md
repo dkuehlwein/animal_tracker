@@ -1,18 +1,18 @@
 ---
 id: 1
 slug: notification-gate-live
-status: running          # proposed | running | concluded | rolled_back | parked
+status: concluded          # proposed | running | concluded | rolled_back | parked
 validation: live          # live | replay | parked
-hypothesis: "Route no-animal triggers to a review channel; cuts FP w/o raising FN"
+hypothesis: "Flag no_animal+unclassifiable triggers as likely-FP; cuts FP-review burden w/o raising FN"
 param_delta: { notification_gate: "shadow -> live", realized_as: "same-channel REVIEW labeling (NO_ANIMAL+UNCLASSIFIABLE)" }
 predicted_effect: { fp_rate: "-15pp", fn_risk: "low" }
 created: 2026-06-08
 started: 2026-06-11
-concluded: null
-decision: null            # keep | rollback | inconclusive
+concluded: 2026-06-15
+decision: keep            # keep | rollback | inconclusive
 baseline: { fp_rate: 0.798, fp_ci: [0.700, 0.870], fn: unmeasured }
-result:   { fp_rate: null, fp_ci: null, fn: null }
-confidence: null
+result:   { fp_recall_of_prefix: 0.99, clean_stream_animal_purity: 0.94, fn: 0 }
+confidence: high
 ---
 
 ## Hypothesis & method
@@ -125,7 +125,27 @@ Gates: not paused, not frozen (40 human labels). No env delta, no volume change
 (labeling doesn't suppress). One-experiment-at-a-time preserved — #4 concluded
 this tick (see runs/0002).
 
+### 2026-06-15 — CONCLUDED (keep). Daniel: same channel is the final design.
+
+Daniel (via /remote-control): **"consider the second fp channel as solved.
+routing it to the same channel with the pr fix is good enough. an actual second
+channel just adds overhead. I am not clicking on two channels."**
+
+This resolves the only remaining open thread on #1. The same-channel REVIEW-prefix
+variant (commit 31d3bc6, live since 06-12) is the **accepted final design** — the
+"future real channel split" noted on 06-11 is **dropped, not deferred**. Re-confirmed
+location-agnostic on the 06-13/06-14 new-scene corpus (status mix no_animal 62,
+unclassifiable 1, identified 5 → prefix still isolates the FP mass; see JOURNAL
+2026-06-15). No code change, no restart — the feature is already live.
+
 ## Decision & rationale
 
-(Filled in when the experiment concludes: keep / rollback / inconclusive, with
-the CI-based reasoning and the FN-veto outcome.)
+**KEEP — concluded as a success (high confidence).** The notification-gate goal is
+met in its accepted form: a same-channel 🔍 REVIEW prefix on `status ∈ {NO_ANIMAL,
+UNCLASSIFIABLE}` flags **99% of FP (89/90)** while the unprefixed stream stays **~94%
+true animals**, at **0 FN** (the 3 animals MegaDetector misses still arrive fully with
+feedback buttons — labeling ≠ suppression, so the FN-veto is satisfied by construction).
+Validated live across two camera locations. The second-channel routing variant is
+explicitly out of scope per Daniel — a second channel adds operator overhead with no
+benefit he wants. Off-switch remains `PERFORMANCE_REVIEW_PREFIX_ENABLED=false`;
+reversal `git revert 31d3bc6`. Distilled into LEARNINGS.md.
