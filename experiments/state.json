@@ -2,7 +2,7 @@
   "active_experiment_id": null,
   "backlog": [
     {
-      "hypothesis": "CONCLUDED 2026-06-15 (keep). Same-channel 🔍 REVIEW prefix on status∈{NO_ANIMAL,UNCLASSIFIABLE} flags 99% of FP at 0 FN; live since 06-12, location-agnostic. Second-channel routing is OUT per Daniel (no 2nd channel — adds overhead, won't click two). See runs/0001 + LEARNINGS.",
+      "hypothesis": "CONCLUDED 2026-06-15 (keep). Same-channel \ud83d\udd0d REVIEW prefix on status\u2208{NO_ANIMAL,UNCLASSIFIABLE} flags 99% of FP at 0 FN; live since 06-12, location-agnostic. Second-channel routing is OUT per Daniel (no 2nd channel \u2014 adds overhead, won't click two). See runs/0001 + LEARNINGS.",
       "id": 1,
       "slug": "notification-gate-live",
       "status": "concluded",
@@ -36,7 +36,7 @@
   "best_known_good": {},
   "deployed": {},
   "history": [],
-  "last_heartbeat_loopday": "2026-06-14",
+  "last_heartbeat_loopday": "2026-06-15",
   "last_metrics": {
     "date": "2026-06-15",
     "error_count": 0,
@@ -44,17 +44,17 @@
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.784650962802083,
-      0.9391650739766866
+      0.6860591728889099,
+      0.9706414397011299
     ],
-    "fp_count": 60,
-    "fp_rate": 0.8823529411764706,
+    "fp_count": 17,
+    "fp_rate": 0.8947368421052632,
     "fp_trustworthy": true,
-    "labeled_triggers": 68,
-    "total_triggers": 68
+    "labeled_triggers": 19,
+    "total_triggers": 19
   },
   "last_tick_completed_day": "2026-06-14",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 538
+  "watermark": 557
 }
