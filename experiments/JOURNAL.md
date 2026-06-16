@@ -184,3 +184,31 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   (measure/bound FN, or a conservative center-preserving ROI) before it can deploy; new-scene
   FP frames keep accumulating nightly so the spatial ROI diagnostic isn't time-boxed away.
   See runs/0001 + LEARNINGS.md.
+- 2026-06-16 (autonomous tick, loop-day 06-16). Healthy, no-action KEEP tick.
+  Ingested id 558–599 (watermark 557→599): **42 daytime triggers (hours 12–19), 42/42
+  labeled (40 human + 2 confident auto, NOT feedback-starved). FP 32/42 = 0.762,
+  CI [0.615,0.865], trustworthy; FN unmeasured.** On-baseline (06-15 was 17/19=0.895
+  small-sample; CIs overlap), **volume 42 == baseline 42** → no collapse/explosion.
+  Label split: 32 false_positive / 6 wrong_species / 4 animal → **10/42 triggers had a
+  real animal present** (~24% true-motion rate). No tier-2 needed (2 auto-labeled rows
+  had decisive tier1 status; nothing genuinely ambiguous).
+  **New observation (reaffirms exp #1 same-channel):** all 6 `wrong_species` rows have
+  detection_status=`no_animal` but human=`wrong_species` → these are REAL ANIMALS that
+  SpeciesNet returned no_animal on. Under the live REVIEW prefix, status=no_animal gets
+  the 🔍 REVIEW prefix, so 6 real animals landed in the prefixed (likely-FP) stream — but
+  because the prefix is SAME-CHANNEL, Daniel still saw + labeled them (zero info loss). A
+  2nd-channel split would have HIDDEN these 6 in an FP channel; same-channel + prefix kept
+  them visible. Concrete vindication of Daniel's 06-15 same-channel decision (exp #1, keep).
+  These 6 are a sliver of *classification*-FN signal (triggered animal → no_animal), a
+  different axis from motion-FN (animals that never triggered, still structurally unmeasured).
+  **Decision: KEEP — no deploy, no env delta, no restart, active_experiment_id stays null.**
+  Rationale: (a) no active experiment; (b) metrics on-baseline, no anomaly; (c) BOUNDS env
+  levers are MOTION_{THRESHOLD,MIN_CONTOUR_AREA,CONSECUTIVE_REQUIRED,MIN_COLOR_VARIANCE} +
+  SPECIES_UNKNOWN_THRESHOLD — none has an expected FP win without FN risk (exp #4 settled the
+  motion knobs; the no_animal-on-real-animal miss is MegaDetector's detection threshold, which
+  is NOT in BOUNDS, and SPECIES_UNKNOWN_THRESHOLD governs unknown-vs-named, not animal-vs-none);
+  (d) exp #3 (roi-masking) still double-gated — code change + raises FN while FN unmeasured →
+  FN-veto = HOLD. Next candidate unchanged: exp #3 needs an FN-safety story (bounded/center-
+  preserving ROI) before deploy; new-scene FP frames keep accumulating so the spatial ROI
+  diagnostic isn't time-boxed. Plateau is genuine: REVIEW prefix handles FP UX, no clean env
+  lever, motion-FN unmeasurable from trigger data. See runs/0001-notification-gate-live.md.
