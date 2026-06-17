@@ -212,3 +212,25 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   preserving ROI) before deploy; new-scene FP frames keep accumulating so the spatial ROI
   diagnostic isn't time-boxed. Plateau is genuine: REVIEW prefix handles FP UX, no clean env
   lever, motion-FN unmeasurable from trigger data. See runs/0001-notification-gate-live.md.
+- 2026-06-17 (autonomous tick, loop-day 06-17). **Productive tick — concluded exp #3
+  (roi-masking) with a data-backed FN-safety diagnostic, ending a 3-tick deferral.**
+  Ingested id 600–608 (watermark 599→608): 9 daytime triggers (hours 8–16), 9/9 labeled
+  (8 human + 1 confident auto), NOT feedback-starved. FP 5/9 = 0.556, CI [0.27,0.81]
+  (wide, small-sample), trustworthy; FN unmeasured. Volume 9 < baseline 42 but partial
+  daytime window + nothing deployed → no collapse guardrail (no deploy to roll back).
+  **Spatial ROI diagnostic (in-tick throwaway script over saved burst frames):** diffed
+  consecutive frames → motion centroid for 70 labeled detections with frames on disk
+  (18 real-animal incl wrong_species, 52 FP; 204 rows aged out by retention or no blob).
+  FP and animal centroids are spatially ENTANGLED, both center-weighted (median ~0.5/0.5).
+  **No edge band removes FP without removing comparable-or-more animals:** left15%
+  8%FP/17%animals (hurts animals more), right15% 12%/11% (wash), top15% 10%/11% (wash),
+  bottom15% 0 animals but only 1/52 FP (negligible). → No zero-observed-FN ROI exists;
+  the FN-veto that held exp #3 for 3 ticks is now backed by measurement, not assumption.
+  **Decision: KEEP (no deploy/delta/restart, active_experiment_id stays null) AND
+  conclude exp #3 → not viable in current scene.** Significance: third axis on which
+  FP and animals refuse to separate at the trigger (exp #4 = motion magnitude, exp #3 =
+  motion location) → trigger-side FP suppression is a genuine plateau; the live
+  notification-layer REVIEW prefix (exp #1) is vindicated as the right mitigation (sorts
+  FP post-trigger via SpeciesNet at zero motion-FN cost). Backlog now: #1 concluded(live),
+  #2 parked(replay), #3 concluded(not-viable), #4 concluded. Remaining lever is
+  post-trigger (exp #2, parked on real replay.py). See runs/0003-roi-masking.md.

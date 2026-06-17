@@ -16,10 +16,10 @@
       "validation": "parked"
     },
     {
-      "hypothesis": "Restrict motion ROI to suppress edge vegetation; incremental FP reduction. NOTE (2026-06-13): camera moved to a NEW location \u2014 the old ROI geometry no longer applies. Re-derive the ROI from new-scene FP patterns before proposing live.",
+      "hypothesis": "CONCLUDED 2026-06-17 (not viable in current scene). In-tick spatial diagnostic (diff burst frames \u2192 motion centroid, 70 labeled detections w/ frames on disk: 18 real-animal incl wrong_species, 52 FP). FP and animal motion centroids are spatially ENTANGLED \u2014 both center-weighted (median ~0.5/0.5). NO edge band removes FP without removing a comparable-or-greater share of animals: left15% catches 8%FP vs 17%animals (hurts animals MORE), right15% 12%FP vs 11%animals (wash), top15% 10%FP vs 11%animals (wash), bottom15% 0 animals but only 1/52 FP (negligible). No zero-observed-FN ROI exists \u2192 FN-veto stands on data, not assumption. Reinforces exp #4 (motion knobs don't separate FP from animal) + exp #1 (notification-layer REVIEW prefix is the right architecture, not trigger-side suppression). See JOURNAL 2026-06-17.",
       "id": 3,
       "slug": "roi-masking",
-      "status": "proposed",
+      "status": "concluded",
       "validation": "live"
     },
     {
@@ -53,7 +53,7 @@
     "labeled_triggers": 9,
     "total_triggers": 9
   },
-  "last_tick_completed_day": "2026-06-16",
+  "last_tick_completed_day": "2026-06-17",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 608
