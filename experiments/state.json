@@ -36,25 +36,25 @@
   "best_known_good": {},
   "deployed": {},
   "history": [],
-  "last_heartbeat_loopday": "2026-06-17",
+  "last_heartbeat_loopday": "2026-06-18",
   "last_metrics": {
-    "date": "2026-06-17",
+    "date": "2026-06-18",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.26665129349549305,
-      0.8112214789023355
+      0.6579530307016159,
+      0.9052002126968799
     ],
-    "fp_count": 5,
-    "fp_rate": 0.5555555555555556,
+    "fp_count": 30,
+    "fp_rate": 0.8108108108108109,
     "fp_trustworthy": true,
-    "labeled_triggers": 9,
-    "total_triggers": 9
+    "labeled_triggers": 37,
+    "total_triggers": 37
   },
   "last_tick_completed_day": "2026-06-17",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 608
+  "watermark": 645
 }
