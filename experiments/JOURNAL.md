@@ -234,3 +234,18 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   FP post-trigger via SpeciesNet at zero motion-FN cost). Backlog now: #1 concluded(live),
   #2 parked(replay), #3 concluded(not-viable), #4 concluded. Remaining lever is
   post-trigger (exp #2, parked on real replay.py). See runs/0003-roi-masking.md.
+- 2026-06-18 (autonomous tick, loop-day 06-18). **No-action KEEP — genuine plateau, no
+  deployable lever.** Ingested through id 645 (watermark 608→645): 37 triggers, 37/37
+  labeled → feedback-rich, NOT starved (no freeze). FP 30/37 = 0.811, CI [0.66,0.91],
+  trustworthy; FN unmeasured. Volume 37 ≈ baseline 42 (within normal range; no
+  collapse/explosion guardrail). active_experiment_id stays null; nothing deployed →
+  nothing to roll back. **Decision rationale:** backlog is fully settled on trigger-side
+  levers — #1 concluded/live (REVIEW prefix), #3 concluded/not-viable (ROI entangled,
+  06-17), #4 concluded (motion knobs don't separate FP from animal); the only open item
+  is #2 (raise SPECIES_UNKNOWN_THRESHOLD 0.5→0.75), which is post-trigger and parked on a
+  real `replay.py` (Layer-A validation is still a STUB→"skipped"). With no env knob whose
+  expected FP win lacks FN risk, and the live REVIEW prefix already sorting the 0.81
+  trigger-FP post-hoc at zero motion-FN cost, the disciplined output is KEEP. **Next
+  substantive step is engineering, not a per-tick delta:** build `replay.py` so exp #2 can
+  be replay-gated and the loop regains a validation lever — flagged for a dedicated build,
+  not half-done in a 2h tick. See runs/0001-notification-gate-live.md.
