@@ -249,3 +249,36 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   substantive step is engineering, not a per-tick delta:** build `replay.py` so exp #2 can
   be replay-gated and the loop regains a validation lever — flagged for a dedicated build,
   not half-done in a 2h tick. See runs/0001-notification-gate-live.md.
+- 2026-06-19 (autonomous tick, loop-day 06-19). **No-action KEEP — a human-dominated
+  day; the headline "FP dropped" is a metric artifact, not a real improvement.** Ingested
+  id 646–719 (watermark 645→719): 74 daytime triggers (hrs 7–18), 74/74 labeled →
+  feedback-rich, NOT starved (no freeze). `loop.metrics` reports FP **24/74 = 0.324**,
+  CI [0.23,0.44], trustworthy; FN unmeasured. Taken at face value that's a big drop from
+  06-18's 0.81 — but it is **not** a genuine FP reduction. Reconciled labels:
+  24 false_positive, **47 wrong_species** (44 of them detection_status=no_animal,
+  gate_would_suppress=true), 3 animal. `wrong_species` is excluded from `fp_count`, so a
+  large cohort of unwanted triggers is hidden from the headline metric.
+  **In-tick frame check (6 saved frames spanning 08:33 / 12:16 / 13:06 / 13:23 / 17:28 /
+  18:34, all within retention):** every `wrong_species` frame shows a **person** working
+  at the garden pond (net over the pond, blue pump/tool, bare legs/shorts). 06-19 was an
+  **all-day human pond-maintenance/gardening session** (dense burst hrs 12–13, ~38
+  triggers), not wildlife. So the day's true unwanted-trigger rate is ≈ **96% (71/74:
+  24 FP + 47 human)**, with only **3 genuine wildlife IDs** all day.
+  **Decision: KEEP (no deploy/delta/restart; active_experiment_id stays null; nothing
+  deployed → nothing to roll back).** Rationale: (a) no lever — a human and an animal are
+  indistinguishable at the motion trigger (the exact FP/animal entanglement concluded in
+  exp #3 ROI 06-17 and exp #4), and a one-off gardening session is transient and
+  non-recurring, so no env knob or code change is warranted; (b) volume 74 > baseline 42
+  is fully explained by the human session (extra triggers), not a deploy/regression — no
+  collapse/explosion guardrail applies; (c) the live REVIEW prefix (exp #1) already routed
+  the 44 no_animal human triggers to the 🔍 REVIEW lane, behaving as designed.
+  **Two honesty/measurement flags for Daniel (NOT acted on unilaterally):** (1) the
+  `wrong_species` label is **heterogeneous** — the 06-17 diagnostic treated it as "real
+  animal," but today's 47 are unambiguously **human**. Because `wrong_species` is dropped
+  from both `fp_count` and the animal bucket, the headline FP rate can swing widely on how
+  this cohort is bucketed; a metric-policy decision (separate "human/non-target" bucket?)
+  would make the rate trustworthy on mixed days. (2) Today carries **no tuning signal** —
+  a human-dominated day tells us nothing new about FP/animal separation, which remains the
+  established plateau. Backlog unchanged: #1 concluded/live, #2 parked (replay.py), #3
+  concluded/not-viable, #4 concluded. Next substantive step is still engineering
+  (build replay.py to unpark exp #2), not a per-tick delta. See runs/0001-notification-gate-live.md.
