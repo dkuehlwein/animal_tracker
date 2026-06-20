@@ -282,3 +282,33 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   established plateau. Backlog unchanged: #1 concluded/live, #2 parked (replay.py), #3
   concluded/not-viable, #4 concluded. Next substantive step is still engineering
   (build replay.py to unpark exp #2), not a per-tick delta. See runs/0001-notification-gate-live.md.
+- 2026-06-20 (autonomous tick, loop-day 06-20). **No-action KEEP — second consecutive
+  human-dominated garden day; FP 0.78 is on the established plateau, no new signal.**
+  Ingested id 720–770 (watermark 719→770): 51 daytime triggers (hrs 8–20), 51/51 labeled.
+  `loop.metrics` reports FP **40/51 = 0.784**, CI [0.65, 0.88], trustworthy; FN unmeasured.
+  That is squarely on-baseline (06-18 was 0.81), NOT a regression — volume 51 vs baseline
+  42 is mildly elevated and fully explained by human activity, no collapse/explosion
+  guardrail applies. Status mix: no_animal 36, unclassifiable 5, identified 10. Only 1
+  human label today (id 741 = wrong_species), so the FP count is driven by reliable tier-1
+  auto-labels (no_animal/unclassifiable → false_positive).
+  **In-tick frame check (all 51 frames on disk, within retention):** sampled no_animal FP
+  frames show **people working in the garden** — id 728 (10:00) a person's body/leg at
+  frame-right, id 738 (10:31) a person carrying a coil/basket across frame, id 741 (10:35,
+  the lone human label) the same. The **net-over-pond setup from 06-19 is still present**,
+  so this reads as a continuation of the same pond/garden-maintenance activity, not
+  wildlife. A few real birds were captured (the 10 `identified`, e.g. id 720/722/723/735/736).
+  **aHash recurrence test (exp #4 re-check): 26 visual clusters from 51 frames — no single
+  dominant recurrent static scene.** Crucially the largest clusters (0,1,2) each MIX
+  `identified` (animal) with `no_animal`/`unclassifiable` frames — animals and FP share the
+  same garden background, the exact spatial/visual entanglement concluded in exp #3 (ROI,
+  06-17) and exp #4. So MOG2 recurrent-frame suppression still offers no clean separation.
+  **Decision: KEEP (no deploy/delta/restart; active_experiment_id stays null; nothing
+  deployed → nothing to roll back).** Rationale: (a) no lever — a human and an animal are
+  indistinguishable at the motion trigger; transient garden activity is non-recurring, so
+  no env knob or code change is warranted; (b) volume within normal range, no guardrail
+  breach; (c) the live REVIEW prefix (exp #1) already routes the 41 no_animal/unclassifiable
+  triggers to the 🔍 REVIEW lane, behaving as designed. Not feedback-starved (heavy human
+  labeling 06-19 + 1 today; <3 days, no freeze). Backlog unchanged: #1 concluded/live,
+  #2 parked (replay.py), #3 concluded/not-viable, #4 concluded. Next substantive step
+  remains engineering — build replay.py to unpark exp #2 — not a per-tick delta.
+  See runs/0001-notification-gate-live.md.
