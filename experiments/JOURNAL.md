@@ -312,3 +312,37 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   #2 parked (replay.py), #3 concluded/not-viable, #4 concluded. Next substantive step
   remains engineering — build replay.py to unpark exp #2 — not a per-tick delta.
   See runs/0001-notification-gate-live.md.
+- 2026-06-21 (autonomous tick, loop-day 06-21). **No-action KEEP — third consecutive
+  human/garden day; FP 0.96 is elevated but explained by sustained pond-maintenance
+  activity + wind-blown foreground grass, no new tuning signal, no safe lever.**
+  Ingested id 771–847 (watermark 770→847): 77 daytime triggers (hrs 7–19), 77/77
+  labeled, **zero human labels today**, no tier-2 crops to adjudicate (all tier-1
+  auto-labels). `loop.metrics`: FP **74/77 = 0.961**, CI [0.89, 0.99], trustworthy;
+  FN unmeasured. Higher than the 06-18/06-20 ~0.78–0.81 plateau, driven by only 3
+  `identified` animals (id 776, 805, 845) against 74 no_animal/unclassifiable. Volume
+  77 vs baseline 42 is ~1.8× — elevated but well under the 5× explosion guardrail
+  (210), no collapse/explosion breach.
+  **In-tick aHash recurrence test (exp #4 re-check, all 77 frames on disk):** 35
+  clusters from 77 frames. Unlike 06-19/06-20, the three largest clusters are
+  large, time-localized and **pure-FP** (cluster 0 n=10 all no_animal hrs 14–15;
+  cluster 1 n=10 9×no_animal+1×unclassifiable hr 15; cluster 2 n=8 all no_animal
+  hrs 16–17). Visual inspection of representatives: **cluster 1 shows a person's
+  arm/body at frame-left** (human garden activity); clusters 0 and 2 show the same
+  garden scene with the net-over-pond grid (present since 06-19) and tall foreground
+  grass. The aHash "recurrence" is just the **shared static background** — the
+  triggering motion inside each frame differs (wind-blown grass, people passing),
+  i.e. genuine pixel change MOG2 correctly fires on, NOT an identical recurrent
+  frame it failed to absorb. So exp #4's recurrent-frame suppression still has no
+  purchase here.
+  **Decision: KEEP (no deploy/delta/restart; active_experiment_id stays null;
+  nothing deployed → nothing to roll back).** Rationale: (a) no safe lever — the
+  FP mass is human + wind-grass motion, both entangled with the 3 real animals;
+  raising motion_threshold would risk the small birds and FN is unmeasured, so the
+  FN-veto/HOLD applies on data; transient garden activity is non-recurring so no env
+  knob or code change is warranted; (b) volume within range, no guardrail breach;
+  (c) the live REVIEW prefix (exp #1) routes the 74 no_animal/unclassifiable triggers
+  to the 🔍 REVIEW lane as designed. Not feedback-starved (last human labels 06-20;
+  1 day, <3, no freeze). Backlog unchanged: #1 concluded/live, #2 parked (replay.py),
+  #3 concluded/not-viable, #4 concluded. Next substantive step remains engineering —
+  build replay.py to unpark exp #2 — not a per-tick delta. See
+  runs/0001-notification-gate-live.md.
