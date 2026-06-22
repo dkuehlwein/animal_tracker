@@ -346,3 +346,33 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   #3 concluded/not-viable, #4 concluded. Next substantive step remains engineering —
   build replay.py to unpark exp #2 — not a per-tick delta. See
   runs/0001-notification-gate-live.md.
+- 2026-06-22 (autonomous tick, loop-day 06-22). **No-action KEEP — 4th consecutive
+  human/garden day; FP 0.61 (well below yesterday's 0.96, on the ~0.6–0.8 plateau),
+  strong human feedback, no new tuning signal, no safe lever.**
+  Ingested id 848–909 (watermark 847→909): 62 daytime triggers (hrs 9–19), 62/62
+  labeled, **44 human labels today** (22 wrong_species, 20 false_positive, 2 animal) —
+  NOT feedback-starved. No tier-2 crops to adjudicate (tier2 empty; all tier-1 auto or
+  human-labeled). `loop.metrics`: FP **38/62 = 0.613**, CI [0.49, 0.72], trustworthy;
+  FN unmeasured. Status mix: 47 no_animal, 10 unclassifiable, 5 identified. The 22
+  human wrong_species (heterogeneous, excluded from fp_count) absorbed much of what
+  yesterday's pure auto-labels counted as FP — explaining the drop from 0.96 to 0.61.
+  Volume 62 vs baseline 42 ≈ 1.5× — elevated but far under the 5× explosion guardrail
+  (210); no collapse/explosion breach.
+  **In-tick aHash recurrence test (exp #4 re-check, all 62 frames on disk):** 35
+  clusters from 62 frames — fragmented, no dominant recurrent scene. Largest cluster
+  (n=7, all no_animal, hrs 15–16) is the shared static garden background, not identical
+  recurrent frames MOG2 failed to absorb. Cluster 3 (hr 11) mixes an `identified`
+  animal with no_animal+unclassifiable on the same scene, re-confirming the FP/animal
+  spatial entanglement (exp #3) and that exp #4 recurrent-frame suppression has no
+  purchase here.
+  **Decision: KEEP (no deploy/delta/restart; active_experiment_id stays null;
+  nothing deployed → nothing to roll back).** Rationale: (a) no safe lever — FP mass
+  is human garden activity + wind-grass motion, entangled with the few real animals;
+  raising motion_threshold risks the small birds and FN is unmeasured, so FN-veto/HOLD
+  applies on data, not assumption; transient garden activity is non-recurring so no env
+  knob or code change is warranted; (b) volume within range, no guardrail breach;
+  (c) the live REVIEW prefix (exp #1) routes the 57 no_animal/unclassifiable triggers
+  to the 🔍 REVIEW lane as designed. Not feedback-starved (44 human labels today).
+  Backlog unchanged: #1 concluded/live, #2 parked (replay.py), #3 concluded/not-viable,
+  #4 concluded. Next substantive step remains engineering — build replay.py to unpark
+  exp #2 — not a per-tick delta. See runs/0001-notification-gate-live.md.

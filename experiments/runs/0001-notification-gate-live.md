@@ -149,3 +149,13 @@ Validated live across two camera locations. The second-channel routing variant i
 explicitly out of scope per Daniel — a second channel adds operator overhead with no
 benefit he wants. Off-switch remains `PERFORMANCE_REVIEW_PREFIX_ENABLED=false`;
 reversal `git revert 31d3bc6`. Distilled into LEARNINGS.md.
+
+## Ongoing-validation log (per-tick re-confirmations)
+
+- 2026-06-22 (loop-day 06-22): FP 38/62 = 0.613 (CI [0.49, 0.72], trustworthy), FN
+  unmeasured, vol 62. 4th consecutive human/garden day; 44 human labels (22
+  wrong_species, 20 false_positive, 2 animal) — not feedback-starved. Status mix 47
+  no_animal / 10 unclassifiable / 5 identified → the 57 no_animal+unclassifiable
+  triggers route to the 🔍 REVIEW lane as designed. aHash re-check (62/62 frames):
+  35 fragmented clusters, no recurrent scene; FP/animal spatial entanglement persists
+  (exp #3/#4 still without a trigger-side lever). No-action KEEP; nothing deployed.
