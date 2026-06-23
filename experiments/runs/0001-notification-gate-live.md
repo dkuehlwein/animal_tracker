@@ -159,3 +159,12 @@ reversal `git revert 31d3bc6`. Distilled into LEARNINGS.md.
   triggers route to the 🔍 REVIEW lane as designed. aHash re-check (62/62 frames):
   35 fragmented clusters, no recurrent scene; FP/animal spatial entanglement persists
   (exp #3/#4 still without a trigger-side lever). No-action KEEP; nothing deployed.
+- 2026-06-23 (loop-day 06-23): FP 19/42 = 0.452 (CI [0.31, 0.60], trustworthy), FN
+  unmeasured, vol 42 (= exactly baseline). 5th consecutive human/garden day; 41 human
+  labels (23 wrong_species, 18 false_positive) — not feedback-starved. Status mix 36
+  no_animal / 5 unclassifiable / 1 identified → the 41 no_animal+unclassifiable
+  triggers route to the 🔍 REVIEW lane as designed. The FP decline 0.96→0.61→0.45 over
+  three days is a labeling artifact (human wrong_species reclassification), not a
+  detector improvement — same garden/human scene. aHash re-check (42/42 frames): 35
+  fragmented clusters, largest only n=4, no recurrent scene; exp #4 still without a
+  trigger-side lever. No-action KEEP; nothing deployed.
