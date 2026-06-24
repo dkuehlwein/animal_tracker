@@ -168,3 +168,15 @@ reversal `git revert 31d3bc6`. Distilled into LEARNINGS.md.
   detector improvement — same garden/human scene. aHash re-check (42/42 frames): 35
   fragmented clusters, largest only n=4, no recurrent scene; exp #4 still without a
   trigger-side lever. No-action KEEP; nothing deployed.
+- 2026-06-24 (loop-day 06-24): FP 12/14 = 0.857 (CI [0.60, 0.96], trustworthy), FN
+  unmeasured, vol 14 (low but within historical range 9–109; nothing deployed → no
+  collapse-rollback). Only 2 human labels today (1 animal, 1 wrong_species) vs 41–44
+  the prior days — so today's auto-labels dominate and the high FP rate is the *same*
+  garden scene seen without human wrong_species reclassification (mirror-image of the
+  06-21→06-23 artifact, confirming that decline was labeling, not detector gain). Not
+  feedback-starved (2 labels today; the 3-day-zero rule does not trigger). Status mix
+  11 no_animal / 1 unclassifiable / 2 identified → the 12 no_animal+unclassifiable
+  triggers route to the 🔍 REVIEW lane as designed. Notable hr-20 burst of 8 FP
+  (ids 958–965); aHash on all 14/14 frames: 11 fragmented clusters, largest only n=2
+  (even within the hr-20 burst), no recurrent static scene MOG2 should have absorbed —
+  exp #4 still without a trigger-side lever. No-action KEEP; nothing deployed.

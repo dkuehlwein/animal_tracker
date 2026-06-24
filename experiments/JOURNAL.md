@@ -406,3 +406,31 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   parked (replay.py), #3 concluded/not-viable, #4 concluded. Next substantive step
   remains engineering — build replay.py to unpark exp #2 — not a per-tick delta. See
   runs/0001-notification-gate-live.md.
+
+## 2026-06-24 (loop-day 06-24) — no-action KEEP
+- `loop.ingest`/`loop.metrics`: 14 new triggers since watermark 951 (ids 952–965).
+  FP **12/14 = 0.857**, CI [0.60, 0.96], trustworthy; FN unmeasured. Status mix: 11
+  no_animal, 1 unclassifiable, 2 identified. Volume **14** — below baseline 42 but
+  within historical range (9–109; cf. 06-15=19, 06-17=9); nothing deployed so no
+  collapse-rollback applies.
+- Only **2 human labels** today (1 animal id 952, 1 wrong_species id 953) vs 41–44 the
+  prior days, so today's auto-labels dominate. The high FP rate is the *same* garden
+  scene seen *without* human wrong_species reclassification — the mirror-image of the
+  06-21→06-23 FP decline (0.96→0.61→0.45), confirming that swing was a labeling
+  artifact, not a detector change. **Not feedback-starved** (2 labels today; the
+  3-consecutive-zero-days rule does not trigger). No tier-2 crops to adjudicate (12 FP
+  are tier-1 auto, 2 are human ground truth).
+- **In-tick aHash recurrence test (exp #4 re-check, all 14/14 frames on disk):** 11
+  fragmented clusters, largest only n=2. Notable hr-20 burst of 8 FP (ids 958–965) does
+  NOT form one recurrent static scene — it splits into n=2 pairs + singletons. No
+  dominant recurrent frame MOG2 should have absorbed → exp #4 recurrent-frame
+  suppression still has no purchase here.
+- **Decision: KEEP** (no deploy/delta/restart; active_experiment_id stays null;
+  nothing deployed → nothing to roll back). No safe trigger lever — FP mass is garden
+  activity entangled with the rare real animals (1 identified, 1 wrong_species today);
+  raising motion_threshold risks small birds and FN is unmeasured, so FN-veto/HOLD
+  stands on data. The live REVIEW prefix (exp #1) routes the 12 no_animal/unclassifiable
+  triggers to the 🔍 REVIEW lane as designed. Backlog unchanged: #1 concluded/live, #2
+  parked (replay.py), #3 concluded/not-viable, #4 concluded. Next substantive step
+  remains engineering (build replay.py to unpark exp #2), not a per-tick delta. See
+  runs/0001-notification-gate-live.md.
