@@ -434,3 +434,31 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   parked (replay.py), #3 concluded/not-viable, #4 concluded. Next substantive step
   remains engineering (build replay.py to unpark exp #2), not a per-tick delta. See
   runs/0001-notification-gate-live.md.
+
+## 2026-06-25 (loop-day 06-25) — no-action KEEP
+- `loop.ingest`/`loop.metrics`: 8 new triggers since watermark 965 (ids 966–973).
+  FP **5/8 = 0.625**, CI [0.31, 0.86], trustworthy; FN unmeasured. Status mix: 3
+  no_animal at hr14/16/16 + 1 no_animal hr19 + 1 unclassifiable hr13 (the 5 FP),
+  3 identified. Volume **8** — below baseline 42 but within historical range (9–109;
+  cf. 06-17=9, 06-24=14); nothing deployed so no collapse-rollback applies.
+- **3 human labels** today (id 966 animal/TP, ids 967+968 wrong_species) → **not
+  feedback-starved** (3-consecutive-zero-days rule does not trigger). No tier-2 crops
+  to adjudicate: the 5 FP are tier-1 auto (no_animal/unclassifiable), the 3 identified
+  are human ground truth.
+- **In-tick aHash recurrence test (exp #4 re-check, all 8/8 frames on disk):** 5
+  clusters (Hamming ≤10), largest n=3 = `[967, 968, 969]` — the two human-labeled
+  wrong_species crops + the hr-13 unclassifiable FP. That co-clustering suggests 969 is
+  the *same animal* the classifier couldn't pin down (an animal present, not a recurrent
+  static scene MOG2 should have absorbed). `[971, 972]` pair at hr16; 970 and 973
+  singletons. The hr-19 outlier det 973 has `motion_area=16307` (vs ~800–1100 for the
+  rest) but is a lone event, not recurrent. No dominant recurrent frame → exp #4
+  recurrent-frame suppression still has no purchase here.
+- **Decision: KEEP** (no deploy/delta/restart; active_experiment_id stays null; nothing
+  deployed → nothing to roll back). No safe trigger lever — FP mass is garden activity
+  entangled with the rare real animals (1 identified id 966, 2 wrong_species today);
+  raising motion_threshold risks small birds and FN is unmeasured, so FN-veto/HOLD
+  stands on data. The live REVIEW prefix (exp #1) routes the 5 no_animal/unclassifiable
+  triggers to the 🔍 REVIEW lane as designed. Backlog unchanged: #1 concluded/live, #2
+  parked (replay.py), #3 concluded/not-viable, #4 concluded. Next substantive step
+  remains engineering (build replay.py to unpark exp #2), not a per-tick delta. See
+  runs/0001-notification-gate-live.md.

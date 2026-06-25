@@ -180,3 +180,14 @@ reversal `git revert 31d3bc6`. Distilled into LEARNINGS.md.
   (ids 958–965); aHash on all 14/14 frames: 11 fragmented clusters, largest only n=2
   (even within the hr-20 burst), no recurrent static scene MOG2 should have absorbed —
   exp #4 still without a trigger-side lever. No-action KEEP; nothing deployed.
+- 2026-06-25 (loop-day 06-25): FP 5/8 = 0.625 (CI [0.31, 0.86], trustworthy), FN
+  unmeasured, vol 8 (low but within historical range 9–109; nothing deployed → no
+  collapse-rollback). 3 human labels today (id 966 animal/TP, ids 967+968
+  wrong_species) → not feedback-starved. Status mix 4 no_animal / 1 unclassifiable / 3
+  identified → the 5 no_animal+unclassifiable triggers route to the 🔍 REVIEW lane as
+  designed. aHash on all 8/8 frames: 5 clusters (Hamming ≤10), largest n=3 =
+  [967,968,969] — the two wrong_species crops + the hr-13 unclassifiable, i.e. 969 is
+  likely the same animal the classifier couldn't ID (animal present, not a recurrent
+  static scene). [971,972] pair at hr16; 970 and the hr-19 motion_area=16307 outlier
+  (det 973) are singletons. No dominant recurrent frame → exp #4 still without a
+  trigger-side lever. No-action KEEP; nothing deployed.
