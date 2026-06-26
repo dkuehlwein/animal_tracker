@@ -38,23 +38,23 @@
   "history": [],
   "last_heartbeat_loopday": "2026-06-25",
   "last_metrics": {
-    "date": "2026-06-25",
+    "date": "2026-06-26",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.30574239460262737,
-      0.8631557141764026
+      0.8421014760304114,
+      0.9868424750910944
     ],
-    "fp_count": 5,
-    "fp_rate": 0.625,
+    "fp_count": 40,
+    "fp_rate": 0.9523809523809523,
     "fp_trustworthy": true,
-    "labeled_triggers": 8,
-    "total_triggers": 8
+    "labeled_triggers": 42,
+    "total_triggers": 42
   },
   "last_tick_completed_day": "2026-06-25",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 973
+  "watermark": 1015
 }
