@@ -462,3 +462,30 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   parked (replay.py), #3 concluded/not-viable, #4 concluded. Next substantive step
   remains engineering (build replay.py to unpark exp #2), not a per-tick delta. See
   runs/0001-notification-gate-live.md.
+
+## 2026-06-26 (loop-day 06-26) — no-action KEEP
+- `loop.ingest`/`loop.metrics`: 42 new triggers since watermark 973 (ids 974–1015).
+  FP **40/42 = 0.952**, CI [0.84, 0.99], trustworthy; FN unmeasured. Volume **42 =
+  baseline** exactly (no collapse/explosion; nothing deployed regardless). Status mix:
+  35 no_animal + 4 unclassifiable + 3 identified. Hours concentrated 15–17 (28 triggers)
+  and 8–10 (12) — daytime garden activity.
+- **5 human labels** today (979 FP, 980 animal, 981 FP, 982 animal, 986 FP) → **not
+  feedback-starved**. The 40 FP = 39 tier-1 auto (no_animal/unclassifiable) + det 981
+  (classifier-identified but human-labeled FP); 2 TP (980, 982 identified+human-animal).
+  As on 06-21→25, the high FP rate is auto-label-dominated, not a detector regression.
+  No tier-2 crops to adjudicate (5 are human ground truth; rest are tier-1 auto).
+- **In-tick aHash recurrence test (exp #4 re-check, 41/42 frames on disk):** 18
+  fragmented clusters, largest **n=6 = [997,998,1003,1004,1005,1006]** at hr16–17 (the
+  closest thing to a recurrent scene, but still a minority of 42). Crucially the
+  human-labeled animals co-cluster with FPs: `[975,977,981,982]` mixes FP 981 + animal
+  982, and `[976,979,980]` mixes FP 979 + animal 980. An aHash-keyed recurrent-scene
+  suppressor would therefore drop real animals too — same entanglement exp #3 found
+  spatially. Exp #4 recurrent-frame suppression still has no clean purchase here.
+- **Decision: KEEP** (no deploy/delta/restart; active_experiment_id stays null; nothing
+  deployed → nothing to roll back). No safe trigger lever: FP mass is daytime garden
+  activity visually entangled with the rare real animals; raising motion_threshold risks
+  small birds and FN is unmeasured, so FN-veto/HOLD stands on data. The live REVIEW
+  prefix (exp #1) routes the 39 no_animal/unclassifiable triggers to the 🔍 REVIEW lane
+  as designed. Backlog unchanged: #1 concluded/live, #2 parked (replay.py), #3
+  concluded/not-viable, #4 concluded. Next substantive step remains engineering (build
+  replay.py to unpark exp #2), not a per-tick delta. See runs/0001-notification-gate-live.md.

@@ -36,7 +36,7 @@
   "best_known_good": {},
   "deployed": {},
   "history": [],
-  "last_heartbeat_loopday": "2026-06-25",
+  "last_heartbeat_loopday": "2026-06-26",
   "last_metrics": {
     "date": "2026-06-26",
     "error_count": 0,
@@ -53,7 +53,7 @@
     "labeled_triggers": 42,
     "total_triggers": 42
   },
-  "last_tick_completed_day": "2026-06-25",
+  "last_tick_completed_day": "2026-06-26",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 1015
