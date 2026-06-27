@@ -159,6 +159,9 @@ _CSV_FIELDS = [
     "date", "total_triggers", "labeled_triggers", "fp_count", "fp_rate",
     "fp_ci_low", "fp_ci_high", "fn_rate", "fn_ci_low", "fn_ci_high",
     "error_count",
+    "n_human", "fp_human_count", "fp_human_rate",
+    "n_claude", "fp_claude_count", "fp_claude_rate",
+    "n_md", "fp_md_count", "fp_md_rate",
 ]
 
 
@@ -177,6 +180,15 @@ def _row_for_csv(date: str, m: dict) -> dict:
         "fn_ci_low": fn_ci[0] if fn_ci else "",
         "fn_ci_high": fn_ci[1] if fn_ci else "",
         "error_count": m.get("error_count", ""),
+        "n_human": m.get("n_human", ""),
+        "fp_human_count": m.get("fp_human_count", ""),
+        "fp_human_rate": m.get("fp_human_rate", ""),
+        "n_claude": m.get("n_claude", ""),
+        "fp_claude_count": m.get("fp_claude_count", ""),
+        "fp_claude_rate": m.get("fp_claude_rate", ""),
+        "n_md": m.get("n_md", ""),
+        "fp_md_count": m.get("fp_md_count", ""),
+        "fp_md_rate": m.get("fp_md_rate", ""),
     }
 
 
@@ -191,7 +203,7 @@ def append_daily(csv_path, date: str, m: dict) -> None:
     existing.append(_row_for_csv(date, m))
     existing.sort(key=lambda r: r["date"])
     with open(path, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=_CSV_FIELDS)
+        writer = csv.DictWriter(f, fieldnames=_CSV_FIELDS, restval="")
         writer.writeheader()
         writer.writerows(existing)
 
@@ -200,6 +212,9 @@ def _jsonable(m: dict) -> dict:
     out = dict(m)
     out["fp_ci"] = list(m["fp_ci"])
     out["fn_ci"] = list(m["fn_ci"]) if m["fn_ci"] else None
+    out["fp_human_ci"] = list(m["fp_human_ci"])
+    out["fp_claude_ci"] = list(m["fp_claude_ci"])
+    out["fp_md_ci"] = list(m["fp_md_ci"])
     return out
 
 

@@ -588,3 +588,94 @@ def test_per_tier_artifact_regression():
 
     # Headline blended rate is ~0.857 — very different from fp_human_rate 0.2.
     assert abs(m["fp_rate"] - 36 / 42) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# Task 2: persist per-tier fields to state.json + daily.csv
+# ---------------------------------------------------------------------------
+
+def test_jsonable_serializes_per_tier_ci_to_lists():
+    """_jsonable must listify fp_human_ci, fp_claude_ci, fp_md_ci into JSON-serializable 2-element lists."""
+    import json as _json
+    rows = [
+        _row(human="false_positive"),
+        _row(tier2="animal"),
+        _row(tier1="false_positive"),
+    ]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    j = metrics._jsonable(m)
+    for key in ("fp_human_ci", "fp_claude_ci", "fp_md_ci"):
+        assert isinstance(j[key], list), f"{key} must be a list, got {type(j[key])}"
+        assert len(j[key]) == 2, f"{key} must have 2 elements"
+    # Must round-trip through JSON without error.
+    _json.dumps(j)
+
+
+def test_csv_has_per_tier_columns(tmp_path):
+    """append_daily must write n_human, fp_human_count, fp_human_rate,
+    n_claude, fp_claude_count, fp_claude_rate, n_md, fp_md_count, fp_md_rate."""
+    csv_path = tmp_path / "daily.csv"
+    rows = [
+        _row(human="false_positive"),
+        _row(human="animal"),
+        _row(tier2="false_positive"),
+        _row(tier1="animal"),
+    ]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    metrics.append_daily(csv_path, "2026-06-10", m)
+    with open(csv_path) as f:
+        reader = csv.DictReader(f)
+        fieldnames = reader.fieldnames
+        data_rows = list(reader)
+    expected_cols = [
+        "n_human", "fp_human_count", "fp_human_rate",
+        "n_claude", "fp_claude_count", "fp_claude_rate",
+        "n_md", "fp_md_count", "fp_md_rate",
+    ]
+    for col in expected_cols:
+        assert col in fieldnames, f"column {col!r} missing from CSV header: {fieldnames}"
+    row = data_rows[0]
+    assert row["n_human"] == "2"
+    assert row["fp_human_count"] == "1"
+    assert row["n_claude"] == "1"
+    assert row["fp_claude_count"] == "1"
+    assert row["n_md"] == "1"
+    assert row["fp_md_count"] == "0"
+
+
+def test_csv_append_backward_compat(tmp_path):
+    """An old CSV (only original columns, no per-tier columns) survives append_daily:
+    old rows get blank new columns, no crash."""
+    csv_path = tmp_path / "daily.csv"
+    # Write an old-style CSV with only the original 11 columns (no per-tier).
+    old_fields = [
+        "date", "total_triggers", "labeled_triggers", "fp_count", "fp_rate",
+        "fp_ci_low", "fp_ci_high", "fn_rate", "fn_ci_low", "fn_ci_high",
+        "error_count",
+    ]
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=old_fields)
+        writer.writeheader()
+        writer.writerow({
+            "date": "2026-06-01", "total_triggers": "10", "labeled_triggers": "8",
+            "fp_count": "3", "fp_rate": "0.375", "fp_ci_low": "0.1", "fp_ci_high": "0.7",
+            "fn_rate": "unmeasured", "fn_ci_low": "", "fn_ci_high": "",
+            "error_count": "2",
+        })
+    # Append a new row with per-tier data — must not crash.
+    new_rows = [_row(human="false_positive"), _row(tier1="animal")]
+    m = metrics.compute_metrics(new_rows, fn_audit=None)
+    metrics.append_daily(csv_path, "2026-06-10", m)
+    # Both rows readable; old row has blank per-tier columns.
+    with open(csv_path) as f:
+        data_rows = list(csv.DictReader(f))
+    assert len(data_rows) == 2
+    assert {r["date"] for r in data_rows} == {"2026-06-01", "2026-06-10"}
+    old_row = next(r for r in data_rows if r["date"] == "2026-06-01")
+    per_tier_cols = [
+        "n_human", "fp_human_count", "fp_human_rate",
+        "n_claude", "fp_claude_count", "fp_claude_rate",
+        "n_md", "fp_md_count", "fp_md_rate",
+    ]
+    for col in per_tier_cols:
+        assert old_row[col] == "", f"old row should have blank {col!r}, got {old_row[col]!r}"
