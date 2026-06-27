@@ -74,7 +74,8 @@
     "n_md": 20,
     "total_triggers": 25
   },
-  "last_tick_completed_day": "2026-06-26",
+  "last_tick_completed_day": "2026-06-27",
+  "nightly_verdict": "Every one of last night's 25 triggers was a false alarm \u2014 wind-blown garden plants \u2014 including 5 the AI mislabelled as 'animal' and sent to the main channel as if real sightings; no change deployed, since there's still no safe way to filter these without risking real animals. Heads-up: two days now with no feedback labels, so one more label-free day trips the automatic safety freeze \u2014 a few taps on recent alerts would prevent it.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 1040

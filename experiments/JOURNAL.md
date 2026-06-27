@@ -489,3 +489,38 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   as designed. Backlog unchanged: #1 concluded/live, #2 parked (replay.py), #3
   concluded/not-viable, #4 concluded. Next substantive step remains engineering (build
   replay.py to unpark exp #2), not a per-tick delta. See runs/0001-notification-gate-live.md.
+- 2026-06-28 — Tick over batch ids 1016–1040 (25 triggers, 06-27 13:00–15:46;
+  watermark 1015→1040). Status mix: 11 no_animal + 9 unclassifiable + 5 identified.
+  **Tier-2 adjudication of the 5 "identified" (ids 1033–1037, 15:16–15:22, one
+  SpeciesNet rollup UUID):** frames on disk show the SAME static garden scene
+  (wild grass + bamboo bush + ground mesh); triggering motion is wind-bent
+  bamboo/grass; the only salient object is a small fixed bright-blue blob (static
+  man-made, not a bird — unmoved across all 5 bursts/6 min). No animal present →
+  all 5 = classifier-FP. Wrote 5 append-only `source='tier2'` FP labels
+  (feedback rows 532–536). Re-ran metrics (reset watermark 1040→1015 to reprocess
+  the batch with the new tier-2 labels; metrics re-advanced it to 1040).
+- 2026-06-28 — Metrics: **FP 25/25 = 1.00**, CI [0.87, 1.0], trustworthy; FN
+  unmeasured. Partition: n_human=0, n_claude=5 (5 FP, tier-2 mine), n_md=20 (20 FP,
+  MegaDetector tier-1). Volume 25 < baseline 42 (lower, but nothing deployed →
+  natural daytime variation, no volume-guardrail action). **0 human labels** this
+  loop-day; 06-27 also 0 → 2 consecutive label-free days. Feedback-starved freeze
+  triggers at 3 → one day from freeze; flagged to Daniel in verdict.
+- 2026-06-28 — **Finding (feeds B1 + exp #2): SpeciesNet's generic "animal" rollup
+  (`<uuid>;;;;;;animal`, blank genus/species, top-level common name) yields
+  status=IDENTIFIED, which is NOT in `_REVIEW_STATUSES`={no_animal,unclassifiable}
+  (data_models.is_review_detection). So these classifier-FP BYPASS the exp #1 🔍
+  REVIEW prefix and reach the MAIN channel as if real sightings — tonight 5 of them.
+  The rollup is a stable, parseable signal (recent identified rows: 11×`;;;;;;animal`,
+  2×`aves;;;;;bird` class-level rollups vs real `…homo;sapiens;human`). Candidate
+  lever: extend the REVIEW set to flag blank/class-level rollups (notification-layer
+  only, ZERO FN risk — notification still sends, just with REVIEW header; mirrors
+  exp #1 architecture). Lower-risk than exp #2 (raise UNKNOWN_THRESHOLD 0.5→0.75,
+  still parked pending replay.py). Recorded as evidence, NOT deployed tonight.
+- 2026-06-28 — **Decision: KEEP / HOLD** (no deploy/delta/restart;
+  active_experiment_id stays null; nothing deployed → nothing to roll back). FP mass
+  is daytime garden vegetation movement, visually+spatially entangled with the rare
+  real animals (exp #3/#4 concluded); no safe trigger lever and FN unmeasured →
+  FN-veto/HOLD stands on data. The blank-rollup→main-channel leak is a real
+  notification-quality gap but deserves a designed run-file (B1 owns it in worktree
+  loop-fn-audit), not an end-of-tick reflex. Backlog unchanged: #1 concluded/live,
+  #2 parked, #3 concluded, #4 concluded.
