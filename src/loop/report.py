@@ -17,9 +17,6 @@ _SRC = Path(__file__).resolve().parent.parent
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-_JOURNAL_TELEGRAM_LIMIT = 4000  # Telegram max is 4096; leave a small margin
-
-
 def latest_journal_entry(journal_path: str | Path) -> str | None:
     """Return the last top-level bullet entry from JOURNAL.md, or None.
 
@@ -58,48 +55,51 @@ def latest_journal_entry(journal_path: str | Path) -> str | None:
     return text if text else None
 
 
-def _fmt_pct(x) -> str:
-    if isinstance(x, (int, float)):
-        return f"{x * 100:.0f}%"
-    return str(x)
-
-
 def render_summary(metrics: dict, state: dict, active_experiment: dict) -> str:
-    """Daily summary: FP + FN, active experiment, paused banner."""
+    """Daily summary: per-tier labelling breakdown. Plain English, no CI/jargon."""
     paused = bool(state.get("paused", False))
-    lines = [f"🦊 Wildlife loop — daily summary {metrics.get('date', '')}"]
+    total = metrics.get("total_triggers", 0)
+
+    lines = [f"🦊 Last night: {total} images captured."]
+
     if paused:
         lines.append("⏸️ PAUSED — tuning frozen until resumed")
 
-    # Fix #2: alert when FP rate is untrustworthy due to high error rate.
-    # fp_trustworthy may be absent in old state.json shapes — default to True
-    # (backward-compatible: no alert for legacy metrics that lack the field).
+    # Alert when FP rate is untrustworthy due to high error rate.
+    # fp_trustworthy may be absent in old state.json shapes — default to True.
     fp_trustworthy = metrics.get("fp_trustworthy", True)
     if not fp_trustworthy:
         error_rate = metrics.get("error_rate", 0.0)
         error_count = metrics.get("error_count", "?")
-        total = metrics.get("total_triggers", "?")
         lines.append(
             f"⚠️ FP rate UNTRUSTWORTHY this period — "
-            f"error_rate {error_rate:.0%} ({error_count}/{total})"
+            f"error_rate {error_rate:.0%} ({error_count}/{metrics.get('total_triggers', '?')})"
         )
 
-    fp_ci = metrics["fp_ci"]
-    lines.append(
-        f"FP rate: {_fmt_pct(metrics['fp_rate'])} "
-        f"(95% CI {_fmt_pct(fp_ci[0])}–{_fmt_pct(fp_ci[1])}, "
-        f"{metrics['fp_count']}/{metrics['labeled_triggers']} labeled)"
-    )
-    fn = metrics["fn_rate"]
-    if fn == "unmeasured":
-        lines.append("FN rate: unmeasured (timelapse audit not yet wired)")
-    else:
-        fn_ci = metrics["fn_ci"]
-        lines.append(
-            f"FN rate: {_fmt_pct(fn)} (95% CI {_fmt_pct(fn_ci[0])}–{_fmt_pct(fn_ci[1])})"
-        )
+    # Per-tier lines — backward-compat: .get defaults to 0 for old metrics shapes.
+    n_human = metrics.get("n_human", 0)
+    fp_human = metrics.get("fp_human_count", 0)
+    n_claude = metrics.get("n_claude", 0)
+    fp_claude = metrics.get("fp_claude_count", 0)
+    n_md = metrics.get("n_md", 0)
+    fp_md = metrics.get("fp_md_count", 0)
 
-    lines.append(f"Triggers tonight: {metrics['total_triggers']}")
+    def _tier_line(label: str, n: int, fp: int) -> str:
+        if n == 0:
+            return f"• {label} 0"
+        alarm_word = "false alarm" if fp == 1 else "false alarms"
+        return f"• {label} {n} — {fp} {alarm_word}"
+
+    lines.append(_tier_line("You labelled", n_human, fp_human))
+    lines.append(_tier_line("Claude labelled", n_claude, fp_claude))
+
+    # MegaDetector always tagged (auto, unverified).
+    lines.append(_tier_line("MegaDetector (auto, unverified):", n_md, fp_md))
+
+    # Remainder: images not yet labelled by any tier.
+    remainder = total - (n_human + n_claude + n_md)
+    if remainder > 0:
+        lines.append(f"• Not yet labelled: {remainder}")
 
     if active_experiment and not paused:
         lines.append(
@@ -108,6 +108,7 @@ def render_summary(metrics: dict, state: dict, active_experiment: dict) -> str:
         )
     elif not paused:
         lines.append("Active experiment: none")
+
     return "\n".join(lines)
 
 
@@ -140,11 +141,6 @@ def main() -> None:
         default=False,
         help="Render the report text and print it to stdout; do NOT call Telegram.",
     )
-    parser.add_argument(
-        "--journal",
-        default="experiments/JOURNAL.md",
-        help="Path to JOURNAL.md for the second summary message (default: experiments/JOURNAL.md).",
-    )
     args = parser.parse_args()
     try:
         st = state_mod.load_state(args.state)
@@ -161,37 +157,37 @@ def main() -> None:
         metrics = st.get("last_metrics")
         if metrics is None:
             raise RuntimeError("state.json has no last_metrics to report")
-        # Tuples were serialised to lists in state.json; restore CI shape.
+        # Tuples were serialised to lists in state.json; restore CI shape if present
+        # (old state shapes have fp_ci/fn_ci; new per-tier shapes may not).
         metrics = dict(metrics)
-        metrics["fp_ci"] = tuple(metrics["fp_ci"])
-        metrics["fn_ci"] = tuple(metrics["fn_ci"]) if metrics["fn_ci"] else None
+        if "fp_ci" in metrics:
+            metrics["fp_ci"] = tuple(metrics["fp_ci"])
+        if metrics.get("fn_ci") is not None:
+            metrics["fn_ci"] = tuple(metrics["fn_ci"])
         active_id = st.get("active_experiment_id")
         active = next(
             (e for e in st.get("backlog", []) if e.get("id") == active_id), {}
         )
         text = render_summary(metrics, st, active)
 
-        # Fetch the latest journal entry (may be None if file missing / no bullets).
-        entry = latest_journal_entry(args.journal)
-        if entry and len(entry) > _JOURNAL_TELEGRAM_LIMIT:
-            entry = entry[:_JOURNAL_TELEGRAM_LIMIT] + "… (truncated)"
+        # Read the agent's plain-English verdict (may be absent in older state shapes).
+        verdict = st.get("nightly_verdict") or None  # treat empty string as absent
 
         if args.no_send:
             print(json.dumps({
                 "sent": False,
                 "mode": args.mode,
                 "rendered": text,
-                "journal_entry": entry,
+                "nightly_verdict": verdict,
             }))
         else:
             ok = asyncio.run(send(text))
-            journal_sent: bool | None = None
-            if entry is not None:
+            if verdict:
                 try:
-                    journal_sent = asyncio.run(send(entry))
+                    asyncio.run(send(verdict))
                 except Exception:  # noqa: BLE001
-                    journal_sent = False
-            print(json.dumps({"sent": ok, "mode": args.mode, "journal_sent": journal_sent}))
+                    pass
+            print(json.dumps({"sent": ok, "mode": args.mode}))
     except Exception as e:  # noqa: BLE001
         print(json.dumps({"error": str(e)}))
         raise SystemExit(1)

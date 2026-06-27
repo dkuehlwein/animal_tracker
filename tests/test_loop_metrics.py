@@ -148,7 +148,7 @@ def test_metrics_main_writes_last_metrics_into_state(tmp_path, monkeypatch):
     lm_for_render["fn_ci"] = tuple(lm["fn_ci"]) if lm["fn_ci"] else None
     from loop import report as report_mod
     text = report_mod.render_summary(lm_for_render, state={"paused": False}, active_experiment={})
-    assert "FP" in text
+    assert "images captured" in text
 
 
 def test_metrics_main_last_metrics_readable_by_report_without_flatten(tmp_path, monkeypatch):
@@ -193,7 +193,7 @@ def test_metrics_main_last_metrics_readable_by_report_without_flatten(tmp_path, 
     from loop import report as report_mod
     # Must not raise KeyError.
     text = report_mod.render_summary(lm_copy, state=st, active_experiment={})
-    assert "Wildlife loop" in text
+    assert "images captured" in text
 
 
 # ---------------------------------------------------------------------------
@@ -503,3 +503,179 @@ def test_metrics_main_watermark_no_op_on_no_data_tick(tmp_path, monkeypatch):
     updated = state_mod.load_state(state_path)
     # Watermark is unchanged (same as max_id, no new data).
     assert updated["watermark"] == max_id
+
+
+# ---------------------------------------------------------------------------
+# Per-tier FP partition: human / Claude (tier2) / MegaDetector (tier1)
+# ---------------------------------------------------------------------------
+
+def _row(human=None, tier2=None, tier1=None):
+    """Build a minimal ingest row with the tier-label fields."""
+    reconciled = human or tier2 or tier1
+    return {
+        "human": human,
+        "tier2": tier2,
+        "tier1": tier1,
+        "reconciled_label": reconciled,
+        "detection_status": "no_animal",
+    }
+
+
+def test_per_tier_partition_no_overlap_sums_to_labeled():
+    """n_human + n_claude + n_md must equal labeled_triggers (no overlap, no gap)."""
+    rows = [
+        _row(human="false_positive"),
+        _row(human="animal"),
+        _row(tier2="false_positive"),
+        _row(tier2="animal"),
+        _row(tier1="false_positive"),
+        _row(tier1="no_animal"),
+        {"reconciled_label": None, "human": None, "tier2": None, "tier1": None,
+         "detection_status": "no_animal"},  # unlabeled — excluded
+    ]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_human"] + m["n_claude"] + m["n_md"] == m["labeled_triggers"]
+    assert m["labeled_triggers"] == 6
+
+
+def test_per_tier_precedence_human_wins():
+    """A row with both human and tier2 set lands in the human bucket only."""
+    rows = [_row(human="animal", tier2="false_positive")]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_human"] == 1
+    assert m["n_claude"] == 0
+    assert m["fp_human_count"] == 0   # human label is "animal", not FP
+    assert m["fp_claude_count"] == 0
+
+
+def test_per_tier_precedence_claude_over_md():
+    """A row with tier2 and tier1 (no human) → Claude bucket, not MD."""
+    rows = [_row(tier2="false_positive", tier1="animal")]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_claude"] == 1
+    assert m["n_md"] == 0
+    assert m["fp_claude_count"] == 1
+    assert m["fp_md_count"] == 0
+
+
+def test_per_tier_fp_uses_own_tier_label():
+    """Row where human='animal' but tier1='false_positive' → human-bucket non-FP (tier1 ignored)."""
+    rows = [_row(human="animal", tier1="false_positive")]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_human"] == 1
+    assert m["fp_human_count"] == 0  # own-tier label is "animal"
+    assert m["n_md"] == 0            # tier1 ignored when human wins
+
+
+def test_per_tier_artifact_regression():
+    """5 human rows (1 FP) + 37 MD-only rows (35 FP): per-tier rates expose the blending artifact."""
+    human_rows = (
+        [_row(human="false_positive")]
+        + [_row(human="animal")] * 4
+    )
+    md_rows = (
+        [_row(tier1="false_positive")] * 35
+        + [_row(tier1="animal")] * 2
+    )
+    rows = human_rows + md_rows
+    m = metrics.compute_metrics(rows, fn_audit=None)
+
+    assert m["n_human"] == 5
+    assert abs(m["fp_human_rate"] - 0.2) < 1e-9
+
+    assert m["n_md"] == 37
+    assert abs(m["fp_md_rate"] - 35 / 37) < 1e-9
+
+    # Headline blended rate is ~0.857 — very different from fp_human_rate 0.2.
+    assert abs(m["fp_rate"] - 36 / 42) < 1e-9
+
+
+# ---------------------------------------------------------------------------
+# Task 2: persist per-tier fields to state.json + daily.csv
+# ---------------------------------------------------------------------------
+
+def test_jsonable_serializes_per_tier_ci_to_lists():
+    """_jsonable must listify fp_human_ci, fp_claude_ci, fp_md_ci into JSON-serializable 2-element lists."""
+    import json as _json
+    rows = [
+        _row(human="false_positive"),
+        _row(tier2="animal"),
+        _row(tier1="false_positive"),
+    ]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    j = metrics._jsonable(m)
+    for key in ("fp_human_ci", "fp_claude_ci", "fp_md_ci"):
+        assert isinstance(j[key], list), f"{key} must be a list, got {type(j[key])}"
+        assert len(j[key]) == 2, f"{key} must have 2 elements"
+    # Must round-trip through JSON without error.
+    _json.dumps(j)
+
+
+def test_csv_has_per_tier_columns(tmp_path):
+    """append_daily must write n_human, fp_human_count, fp_human_rate,
+    n_claude, fp_claude_count, fp_claude_rate, n_md, fp_md_count, fp_md_rate."""
+    csv_path = tmp_path / "daily.csv"
+    rows = [
+        _row(human="false_positive"),
+        _row(human="animal"),
+        _row(tier2="false_positive"),
+        _row(tier1="animal"),
+    ]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    metrics.append_daily(csv_path, "2026-06-10", m)
+    with open(csv_path) as f:
+        reader = csv.DictReader(f)
+        fieldnames = reader.fieldnames
+        data_rows = list(reader)
+    expected_cols = [
+        "n_human", "fp_human_count", "fp_human_rate",
+        "n_claude", "fp_claude_count", "fp_claude_rate",
+        "n_md", "fp_md_count", "fp_md_rate",
+    ]
+    for col in expected_cols:
+        assert col in fieldnames, f"column {col!r} missing from CSV header: {fieldnames}"
+    row = data_rows[0]
+    assert row["n_human"] == "2"
+    assert row["fp_human_count"] == "1"
+    assert row["n_claude"] == "1"
+    assert row["fp_claude_count"] == "1"
+    assert row["n_md"] == "1"
+    assert row["fp_md_count"] == "0"
+
+
+def test_csv_append_backward_compat(tmp_path):
+    """An old CSV (only original columns, no per-tier columns) survives append_daily:
+    old rows get blank new columns, no crash."""
+    csv_path = tmp_path / "daily.csv"
+    # Write an old-style CSV with only the original 11 columns (no per-tier).
+    old_fields = [
+        "date", "total_triggers", "labeled_triggers", "fp_count", "fp_rate",
+        "fp_ci_low", "fp_ci_high", "fn_rate", "fn_ci_low", "fn_ci_high",
+        "error_count",
+    ]
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=old_fields)
+        writer.writeheader()
+        writer.writerow({
+            "date": "2026-06-01", "total_triggers": "10", "labeled_triggers": "8",
+            "fp_count": "3", "fp_rate": "0.375", "fp_ci_low": "0.1", "fp_ci_high": "0.7",
+            "fn_rate": "unmeasured", "fn_ci_low": "", "fn_ci_high": "",
+            "error_count": "2",
+        })
+    # Append a new row with per-tier data — must not crash.
+    new_rows = [_row(human="false_positive"), _row(tier1="animal")]
+    m = metrics.compute_metrics(new_rows, fn_audit=None)
+    metrics.append_daily(csv_path, "2026-06-10", m)
+    # Both rows readable; old row has blank per-tier columns.
+    with open(csv_path) as f:
+        data_rows = list(csv.DictReader(f))
+    assert len(data_rows) == 2
+    assert {r["date"] for r in data_rows} == {"2026-06-01", "2026-06-10"}
+    old_row = next(r for r in data_rows if r["date"] == "2026-06-01")
+    per_tier_cols = [
+        "n_human", "fp_human_count", "fp_human_rate",
+        "n_claude", "fp_claude_count", "fp_claude_rate",
+        "n_md", "fp_md_count", "fp_md_rate",
+    ]
+    for col in per_tier_cols:
+        assert old_row[col] == "", f"old row should have blank {col!r}, got {old_row[col]!r}"

@@ -21,15 +21,13 @@ def _metrics(fp_rate=0.38, fn="unmeasured"):
     }
 
 
-def test_summary_includes_fp_and_fn():
+def test_summary_includes_active_experiment_and_totals():
+    """Updated for Task 3: plain-English format no longer emits FP/FN/CI jargon."""
     text = report.render_summary(
         metrics=_metrics(), state={"active_experiment_id": 1, "paused": False},
         active_experiment={"slug": "notification-gate-live", "status": "running"},
     )
-    assert "FP" in text
-    assert "FN" in text
-    assert "unmeasured" in text
-    assert "38%" in text or "0.38" in text
+    assert "42 images captured" in text
     assert "notification-gate-live" in text
 
 
@@ -100,8 +98,9 @@ def test_report_main_no_send_renders_without_telegram(tmp_path, monkeypatch):
     parsed = json.loads(output.strip())
     assert parsed["sent"] is False
     assert "rendered" in parsed
-    assert "Wildlife loop" in parsed["rendered"]
-    assert "FP" in parsed["rendered"]
+    # Updated for Task 3: plain-English format — check "images captured" instead of legacy "Wildlife loop"/"FP"
+    assert "images captured" in parsed["rendered"]
+    assert "labelled" in parsed["rendered"]
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +160,8 @@ def test_summary_backward_compat_without_fp_trustworthy():
         # No fp_trustworthy, no error_rate, no error_count — old shape
     }
     text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
-    assert "FP" in text
+    # Updated for Task 3: assert basic render works, not legacy FP line
+    assert "images captured" in text
 
 
 def test_report_main_no_send_does_not_require_telegram_credentials(tmp_path, monkeypatch):
@@ -209,7 +209,8 @@ def test_report_main_no_send_does_not_require_telegram_credentials(tmp_path, mon
 
     parsed = json.loads(output.strip())
     assert parsed["sent"] is False
-    assert "FP" in parsed["rendered"]
+    # Updated for Task 3: plain-English format — "images captured" instead of legacy "FP"
+    assert "images captured" in parsed["rendered"]
 
 
 # ---------------------------------------------------------------------------
@@ -261,15 +262,13 @@ Just some prose, no bullet entries yet.
     assert result is None
 
 
-def test_latest_journal_entry_truncates_long_entry(tmp_path):
-    """An entry exceeding _JOURNAL_TELEGRAM_LIMIT is truncated with a marker."""
+def test_latest_journal_entry_returns_full_entry(tmp_path):
+    """latest_journal_entry returns the raw full string without truncating."""
     j = tmp_path / "JOURNAL.md"
     long_body = "x" * 5000
     _write_journal(j, f"- 2026-06-10 — {long_body}\n")
     result = report.latest_journal_entry(j)
     assert result is not None
-    # The function itself does NOT truncate — truncation happens in main().
-    # Verify raw result is long, then test main()'s truncation separately.
     assert len(result) > 4000
 
 
@@ -287,10 +286,10 @@ def test_latest_journal_entry_single_entry(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# main() summary + journal: --no-send includes journal_entry in JSON
+# main() summary + nightly_verdict: --no-send / real-send tests
 # ---------------------------------------------------------------------------
 
-def _make_state(tmp_path):
+def _make_state(tmp_path, extra: dict | None = None):
     """Helper: write a minimal state.json and return its path."""
     from loop import state as state_mod
     state_path = tmp_path / "state.json"
@@ -304,12 +303,15 @@ def _make_state(tmp_path):
         "fn_rate": "unmeasured",
         "fn_ci": None,
     }
-    state_mod.save_state(state_path, {
+    payload = {
         "paused": False,
         "active_experiment_id": None,
         "backlog": [],
         "last_metrics": lm,
-    })
+    }
+    if extra:
+        payload.update(extra)
+    state_mod.save_state(state_path, payload)
     return state_path
 
 
@@ -328,88 +330,48 @@ def _capture_main(monkeypatch, argv):
     return buf.getvalue()
 
 
-def test_no_send_summary_includes_journal_entry(tmp_path, monkeypatch):
-    """--no-send JSON must include 'journal_entry' key with the latest bullet."""
+def test_no_send_summary_includes_nightly_verdict(tmp_path, monkeypatch):
+    """--no-send JSON exposes 'nightly_verdict' key when state contains one."""
     import json
-    state_path = _make_state(tmp_path)
-    journal_path = tmp_path / "JOURNAL.md"
-    _write_journal(journal_path, """\
-# Loop Journal
-
-- 2026-06-09 — Older entry.
-- 2026-06-10 — Latest entry for the report.
-""")
+    verdict = "All clear tonight — only 2 real animals, 40 false alarms. No change needed."
+    state_path = _make_state(tmp_path, extra={"nightly_verdict": verdict})
 
     monkeypatch.setattr(report, "send", lambda t: (_ for _ in ()).throw(AssertionError("send() must not be called")))
 
     output = _capture_main(monkeypatch, [
         "loop.report", "--mode", "summary",
         "--state", str(state_path),
-        "--journal", str(journal_path),
         "--no-send",
     ])
     parsed = json.loads(output.strip())
     assert parsed["sent"] is False
     assert "rendered" in parsed
-    assert "journal_entry" in parsed
-    assert parsed["journal_entry"] is not None
-    assert "Latest entry for the report" in parsed["journal_entry"]
-    assert "Older entry" not in parsed["journal_entry"]
+    assert "nightly_verdict" in parsed
+    assert parsed["nightly_verdict"] == verdict
 
 
-def test_no_send_summary_journal_entry_null_when_missing(tmp_path, monkeypatch):
-    """--no-send JSON has journal_entry=null when journal file doesn't exist."""
+def test_no_send_summary_no_verdict_when_absent(tmp_path, monkeypatch):
+    """--no-send JSON has nightly_verdict=null when state lacks the key; no crash."""
     import json
-    state_path = _make_state(tmp_path)
+    state_path = _make_state(tmp_path)  # no nightly_verdict
 
     monkeypatch.setattr(report, "send", lambda t: (_ for _ in ()).throw(AssertionError("send() must not be called")))
 
     output = _capture_main(monkeypatch, [
         "loop.report", "--mode", "summary",
         "--state", str(state_path),
-        "--journal", str(tmp_path / "no_such_journal.md"),
         "--no-send",
     ])
     parsed = json.loads(output.strip())
-    assert parsed["journal_entry"] is None
+    assert parsed["sent"] is False
+    assert parsed.get("nightly_verdict") is None
 
 
-def test_no_send_summary_truncates_long_journal_entry(tmp_path, monkeypatch):
-    """--no-send truncates entries > _JOURNAL_TELEGRAM_LIMIT with a marker."""
+def test_real_send_summary_calls_send_twice_with_verdict(tmp_path, monkeypatch):
+    """In real-send mode with nightly_verdict, send() is called twice."""
     import json
-    state_path = _make_state(tmp_path)
-    journal_path = tmp_path / "JOURNAL.md"
-    _write_journal(journal_path, "- 2026-06-10 — " + "y" * 5000 + "\n")
-
-    monkeypatch.setattr(report, "send", lambda t: (_ for _ in ()).throw(AssertionError("send() must not be called")))
-
-    output = _capture_main(monkeypatch, [
-        "loop.report", "--mode", "summary",
-        "--state", str(state_path),
-        "--journal", str(journal_path),
-        "--no-send",
-    ])
-    parsed = json.loads(output.strip())
-    entry = parsed["journal_entry"]
-    assert entry is not None
-    assert entry.endswith("… (truncated)")
-    assert len(entry) <= 4100  # well within Telegram limit
-
-
-# ---------------------------------------------------------------------------
-# main() summary real-send: two send() calls (metrics + journal)
-# ---------------------------------------------------------------------------
-
-def test_real_send_summary_calls_send_twice_with_journal(tmp_path, monkeypatch):
-    """In real-send mode, send() is called once for metrics and once for journal."""
-    import json
-    state_path = _make_state(tmp_path)
-    journal_path = tmp_path / "JOURNAL.md"
-    _write_journal(journal_path, """\
-# Loop Journal
-
-- 2026-06-10 — Entry to send as second message.
-""")
+    verdict = "High false alarm rate tonight. Recommend reviewing motion threshold."
+    state_path = _make_state(tmp_path, extra={"nightly_verdict": verdict})
 
     send_calls = []
 
@@ -422,22 +384,18 @@ def test_real_send_summary_calls_send_twice_with_journal(tmp_path, monkeypatch):
     output = _capture_main(monkeypatch, [
         "loop.report", "--mode", "summary",
         "--state", str(state_path),
-        "--journal", str(journal_path),
     ])
     parsed = json.loads(output.strip())
     assert parsed["sent"] is True
-    assert parsed["journal_sent"] is True
     assert len(send_calls) == 2
-    # First call: metrics summary
-    assert "Wildlife loop" in send_calls[0]
-    # Second call: journal entry
-    assert "Entry to send as second message" in send_calls[1]
+    assert "images captured" in send_calls[0]
+    assert "High false alarm rate" in send_calls[1]
 
 
-def test_real_send_summary_journal_sent_null_when_no_entry(tmp_path, monkeypatch):
-    """journal_sent is null (None) when there is no journal entry."""
+def test_real_send_summary_sends_once_when_no_verdict(tmp_path, monkeypatch):
+    """In real-send mode without nightly_verdict, send() is called exactly once."""
     import json
-    state_path = _make_state(tmp_path)
+    state_path = _make_state(tmp_path)  # no nightly_verdict
 
     send_calls = []
 
@@ -450,10 +408,159 @@ def test_real_send_summary_journal_sent_null_when_no_entry(tmp_path, monkeypatch
     output = _capture_main(monkeypatch, [
         "loop.report", "--mode", "summary",
         "--state", str(state_path),
-        "--journal", str(tmp_path / "missing.md"),
     ])
     parsed = json.loads(output.strip())
     assert parsed["sent"] is True
-    assert parsed["journal_sent"] is None
-    # Only the metrics message was sent
     assert len(send_calls) == 1
+
+
+def test_no_send_empty_verdict_treated_as_absent(tmp_path, monkeypatch):
+    """--no-send: nightly_verdict="" collapses to null in JSON output (empty == absent)."""
+    import json
+    state_path = _make_state(tmp_path, extra={"nightly_verdict": ""})
+
+    monkeypatch.setattr(report, "send", lambda t: (_ for _ in ()).throw(AssertionError("send() must not be called")))
+
+    output = _capture_main(monkeypatch, [
+        "loop.report", "--mode", "summary",
+        "--state", str(state_path),
+        "--no-send",
+    ])
+    parsed = json.loads(output.strip())
+    assert parsed["sent"] is False
+    assert parsed.get("nightly_verdict") is None
+
+
+def test_real_send_empty_verdict_sends_once(tmp_path, monkeypatch):
+    """Real-send: nightly_verdict="" is treated as absent; send() called exactly once."""
+    import json
+    state_path = _make_state(tmp_path, extra={"nightly_verdict": ""})
+
+    send_calls = []
+
+    async def fake_send(text):
+        send_calls.append(text)
+        return True
+
+    monkeypatch.setattr(report, "send", fake_send)
+
+    output = _capture_main(monkeypatch, [
+        "loop.report", "--mode", "summary",
+        "--state", str(state_path),
+    ])
+    parsed = json.loads(output.strip())
+    assert parsed["sent"] is True
+    assert len(send_calls) == 1
+
+
+# ---------------------------------------------------------------------------
+# Task 3: plain-English per-tier render_summary (8 TDD test cases)
+# ---------------------------------------------------------------------------
+
+def _tier_metrics(
+    total=42,
+    n_human=2, fp_human=1,
+    n_claude=0, fp_claude=0,
+    n_md=40, fp_md=38,
+):
+    """Metrics with per-tier keys (Tasks 1/2 shape)."""
+    return {
+        "date": "2026-06-27",
+        "total_triggers": total,
+        "n_human": n_human,
+        "fp_human_count": fp_human,
+        "n_claude": n_claude,
+        "fp_claude_count": fp_claude,
+        "n_md": n_md,
+        "fp_md_count": fp_md,
+        "fp_trustworthy": True,
+    }
+
+
+def test_summary_per_tier_lines():
+    """Output contains total and per-tier lines with correct counts."""
+    text = report.render_summary(
+        metrics=_tier_metrics(), state={"paused": False}, active_experiment={},
+    )
+    assert "42 images captured" in text
+    assert "You labelled 2" in text
+    assert "1 false alarm" in text
+    assert "Claude labelled 0" in text
+    assert "MegaDetector" in text
+    assert "38 false alarms" in text
+
+
+def test_summary_md_line_marked_unverified():
+    """MegaDetector line must contain both 'auto' and 'unverified'."""
+    text = report.render_summary(
+        metrics=_tier_metrics(), state={"paused": False}, active_experiment={},
+    )
+    md_lines = [line for line in text.splitlines() if "MegaDetector" in line]
+    assert len(md_lines) == 1
+    assert "auto" in md_lines[0]
+    assert "unverified" in md_lines[0]
+
+
+def test_summary_no_ci_or_jargon():
+    """Output must not contain CI notation or aHash jargon."""
+    text = report.render_summary(
+        metrics=_tier_metrics(), state={"paused": False}, active_experiment={},
+    )
+    assert "CI" not in text
+    assert "aHash" not in text
+
+
+def test_summary_zero_tiers_still_listed():
+    """A tier with n==0 still renders its line."""
+    m = _tier_metrics(n_human=0, fp_human=0, n_claude=0, fp_claude=0)
+    text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
+    assert "You labelled 0" in text
+    assert "Claude labelled 0" in text
+
+
+def test_summary_remainder_line_when_unlabelled():
+    """'Not yet labelled' line present when remainder>0; absent when 0."""
+    # Remainder = 42 - (2 + 0 + 38) = 2 → line present
+    m = _tier_metrics(total=42, n_human=2, fp_human=0, n_claude=0, fp_claude=0, n_md=38, fp_md=0)
+    text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
+    assert "Not yet labelled: 2" in text
+
+    # Remainder = 42 - (2 + 0 + 40) = 0 → line absent
+    m2 = _tier_metrics(total=42, n_human=2, fp_human=0, n_claude=0, fp_claude=0, n_md=40, fp_md=0)
+    text2 = report.render_summary(metrics=m2, state={"paused": False}, active_experiment={})
+    assert "Not yet labelled" not in text2
+
+
+def test_summary_paused_banner_preserved():
+    """Paused banner is still emitted in the new plain-English format."""
+    text = report.render_summary(
+        metrics=_tier_metrics(), state={"paused": True}, active_experiment={},
+    )
+    assert "PAUSED" in text
+    assert "tuning frozen" in text.lower() or "paused" in text.lower()
+
+
+def test_summary_untrustworthy_alert_preserved():
+    """Untrustworthy alert is still emitted in the new plain-English format."""
+    m = _tier_metrics()
+    m["fp_trustworthy"] = False
+    m["error_rate"] = 0.3
+    m["error_count"] = 3
+    text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
+    assert "UNTRUSTWORTHY" in text or "untrustworthy" in text.lower()
+    assert "3/" in text or "30%" in text
+
+
+def test_summary_backward_compat_missing_per_tier_keys():
+    """Old metrics lacking n_*/fp_*_count keys render without crashing (.get defaults)."""
+    m = {
+        "date": "2026-06-10",
+        "total_triggers": 5,
+        "fp_trustworthy": True,
+        # No n_human, n_claude, n_md, fp_*_count — old shape
+    }
+    text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
+    assert "5 images captured" in text
+    assert "You labelled 0" in text
+    assert "Claude labelled 0" in text
+    assert "MegaDetector" in text
