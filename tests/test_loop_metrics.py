@@ -148,7 +148,7 @@ def test_metrics_main_writes_last_metrics_into_state(tmp_path, monkeypatch):
     lm_for_render["fn_ci"] = tuple(lm["fn_ci"]) if lm["fn_ci"] else None
     from loop import report as report_mod
     text = report_mod.render_summary(lm_for_render, state={"paused": False}, active_experiment={})
-    assert "FP" in text
+    assert "images captured" in text
 
 
 def test_metrics_main_last_metrics_readable_by_report_without_flatten(tmp_path, monkeypatch):
@@ -193,7 +193,7 @@ def test_metrics_main_last_metrics_readable_by_report_without_flatten(tmp_path, 
     from loop import report as report_mod
     # Must not raise KeyError.
     text = report_mod.render_summary(lm_copy, state=st, active_experiment={})
-    assert "Wildlife loop" in text
+    assert "images captured" in text
 
 
 # ---------------------------------------------------------------------------
