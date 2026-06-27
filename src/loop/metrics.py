@@ -62,6 +62,12 @@ def _per_tier_partition(rows: list[dict]) -> dict:
         "claude": {"n": 0, "fp": 0},
         "md": {"n": 0, "fp": 0},
     }
+    # Note: bucket assignment uses `is not None` which agrees with ingest's
+    # truthiness-based reconciled_label assignment — and the invariant
+    # n_human + n_claude + n_md == labeled_triggers holds — only because every
+    # label in the vocabulary is a non-empty (truthy) string (e.g. "false_positive",
+    # "true_positive").  An empty-string label would be truthy for `is not None`
+    # but falsy for the reconciled_label filter, breaking the invariant.
     for r in rows:
         if r.get("human") is not None:
             buckets["human"]["n"] += 1

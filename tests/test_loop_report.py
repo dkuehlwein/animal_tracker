@@ -262,15 +262,13 @@ Just some prose, no bullet entries yet.
     assert result is None
 
 
-def test_latest_journal_entry_truncates_long_entry(tmp_path):
-    """An entry exceeding _JOURNAL_TELEGRAM_LIMIT is truncated with a marker."""
+def test_latest_journal_entry_returns_full_entry(tmp_path):
+    """latest_journal_entry returns the raw full string without truncating."""
     j = tmp_path / "JOURNAL.md"
     long_body = "x" * 5000
     _write_journal(j, f"- 2026-06-10 — {long_body}\n")
     result = report.latest_journal_entry(j)
     assert result is not None
-    # The function itself does NOT truncate — truncation happens in main().
-    # Verify raw result is long, then test main()'s truncation separately.
     assert len(result) > 4000
 
 
@@ -398,6 +396,45 @@ def test_real_send_summary_sends_once_when_no_verdict(tmp_path, monkeypatch):
     """In real-send mode without nightly_verdict, send() is called exactly once."""
     import json
     state_path = _make_state(tmp_path)  # no nightly_verdict
+
+    send_calls = []
+
+    async def fake_send(text):
+        send_calls.append(text)
+        return True
+
+    monkeypatch.setattr(report, "send", fake_send)
+
+    output = _capture_main(monkeypatch, [
+        "loop.report", "--mode", "summary",
+        "--state", str(state_path),
+    ])
+    parsed = json.loads(output.strip())
+    assert parsed["sent"] is True
+    assert len(send_calls) == 1
+
+
+def test_no_send_empty_verdict_treated_as_absent(tmp_path, monkeypatch):
+    """--no-send: nightly_verdict="" collapses to null in JSON output (empty == absent)."""
+    import json
+    state_path = _make_state(tmp_path, extra={"nightly_verdict": ""})
+
+    monkeypatch.setattr(report, "send", lambda t: (_ for _ in ()).throw(AssertionError("send() must not be called")))
+
+    output = _capture_main(monkeypatch, [
+        "loop.report", "--mode", "summary",
+        "--state", str(state_path),
+        "--no-send",
+    ])
+    parsed = json.loads(output.strip())
+    assert parsed["sent"] is False
+    assert parsed.get("nightly_verdict") is None
+
+
+def test_real_send_empty_verdict_sends_once(tmp_path, monkeypatch):
+    """Real-send: nightly_verdict="" is treated as absent; send() called exactly once."""
+    import json
+    state_path = _make_state(tmp_path, extra={"nightly_verdict": ""})
 
     send_calls = []
 

@@ -17,9 +17,6 @@ _SRC = Path(__file__).resolve().parent.parent
 if str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-_JOURNAL_TELEGRAM_LIMIT = 4000  # Telegram max is 4096; leave a small margin
-
-
 def latest_journal_entry(journal_path: str | Path) -> str | None:
     """Return the last top-level bullet entry from JOURNAL.md, or None.
 
@@ -58,12 +55,6 @@ def latest_journal_entry(journal_path: str | Path) -> str | None:
     return text if text else None
 
 
-def _fmt_pct(x) -> str:
-    if isinstance(x, (int, float)):
-        return f"{x * 100:.0f}%"
-    return str(x)
-
-
 def render_summary(metrics: dict, state: dict, active_experiment: dict) -> str:
     """Daily summary: per-tier labelling breakdown. Plain English, no CI/jargon."""
     paused = bool(state.get("paused", False))
@@ -82,7 +73,7 @@ def render_summary(metrics: dict, state: dict, active_experiment: dict) -> str:
         error_count = metrics.get("error_count", "?")
         lines.append(
             f"⚠️ FP rate UNTRUSTWORTHY this period — "
-            f"error_rate {error_rate:.0%} ({error_count}/{total})"
+            f"error_rate {error_rate:.0%} ({error_count}/{metrics.get('total_triggers', '?')})"
         )
 
     # Per-tier lines — backward-compat: .get defaults to 0 for old metrics shapes.
@@ -103,11 +94,7 @@ def render_summary(metrics: dict, state: dict, active_experiment: dict) -> str:
     lines.append(_tier_line("Claude labelled", n_claude, fp_claude))
 
     # MegaDetector always tagged (auto, unverified).
-    if n_md == 0:
-        lines.append("• MegaDetector (auto, unverified): 0")
-    else:
-        alarm_word = "false alarm" if fp_md == 1 else "false alarms"
-        lines.append(f"• MegaDetector (auto, unverified): {n_md} — {fp_md} {alarm_word}")
+    lines.append(_tier_line("MegaDetector (auto, unverified):", n_md, fp_md))
 
     # Remainder: images not yet labelled by any tier.
     remainder = total - (n_human + n_claude + n_md)
