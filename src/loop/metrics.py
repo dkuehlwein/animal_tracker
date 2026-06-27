@@ -45,6 +45,40 @@ def wilson_ci(successes: int, trials: int) -> tuple[float, float]:
     return (low, high)
 
 
+def _per_tier_partition(rows: list[dict]) -> dict:
+    """Single-pass per-tier FP partition.
+
+    Assigns each row to exactly one bucket by precedence:
+      human (if row["human"] is not None) >
+      Claude/tier2 (elif row["tier2"] is not None) >
+      MegaDetector/tier1 (elif row["tier1"] is not None) >
+      unlabeled (excluded).
+
+    Returns a dict with nested {"n": int, "fp": int} for each bucket key
+    ("human", "claude", "md").
+    """
+    buckets: dict[str, dict[str, int]] = {
+        "human": {"n": 0, "fp": 0},
+        "claude": {"n": 0, "fp": 0},
+        "md": {"n": 0, "fp": 0},
+    }
+    for r in rows:
+        if r.get("human") is not None:
+            buckets["human"]["n"] += 1
+            if r["human"] == "false_positive":
+                buckets["human"]["fp"] += 1
+        elif r.get("tier2") is not None:
+            buckets["claude"]["n"] += 1
+            if r["tier2"] == "false_positive":
+                buckets["claude"]["fp"] += 1
+        elif r.get("tier1") is not None:
+            buckets["md"]["n"] += 1
+            if r["tier1"] == "false_positive":
+                buckets["md"]["fp"] += 1
+        # else: unlabeled — excluded from all buckets
+    return buckets
+
+
 def compute_metrics(rows: list[dict], fn_audit: Optional[dict]) -> dict:
     """Paired FP/FN with Wilson CIs over reconciled rows.
 
@@ -77,6 +111,23 @@ def compute_metrics(rows: list[dict], fn_audit: Optional[dict]) -> dict:
         fn_rate = "unmeasured"
         fn_ci = None
 
+    tier = _per_tier_partition(rows)
+
+    n_human = tier["human"]["n"]
+    fp_human_count = tier["human"]["fp"]
+    fp_human_rate = (fp_human_count / n_human) if n_human else 0.0
+    fp_human_ci = wilson_ci(fp_human_count, n_human)
+
+    n_claude = tier["claude"]["n"]
+    fp_claude_count = tier["claude"]["fp"]
+    fp_claude_rate = (fp_claude_count / n_claude) if n_claude else 0.0
+    fp_claude_ci = wilson_ci(fp_claude_count, n_claude)
+
+    n_md = tier["md"]["n"]
+    fp_md_count = tier["md"]["fp"]
+    fp_md_rate = (fp_md_count / n_md) if n_md else 0.0
+    fp_md_ci = wilson_ci(fp_md_count, n_md)
+
     return {
         "labeled_triggers": len(labeled),
         "total_triggers": total_triggers,
@@ -88,6 +139,19 @@ def compute_metrics(rows: list[dict], fn_audit: Optional[dict]) -> dict:
         "error_count": error_count,
         "error_rate": error_rate,
         "fp_trustworthy": fp_trustworthy,
+        # Per-tier FP breakdown (human > Claude/tier2 > MegaDetector/tier1).
+        "fp_human_rate": fp_human_rate,
+        "fp_human_count": fp_human_count,
+        "n_human": n_human,
+        "fp_human_ci": fp_human_ci,
+        "fp_claude_rate": fp_claude_rate,
+        "fp_claude_count": fp_claude_count,
+        "n_claude": n_claude,
+        "fp_claude_ci": fp_claude_ci,
+        "fp_md_rate": fp_md_rate,
+        "fp_md_count": fp_md_count,
+        "n_md": n_md,
+        "fp_md_ci": fp_md_ci,
     }
 
 

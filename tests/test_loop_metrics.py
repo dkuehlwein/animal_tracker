@@ -503,3 +503,88 @@ def test_metrics_main_watermark_no_op_on_no_data_tick(tmp_path, monkeypatch):
     updated = state_mod.load_state(state_path)
     # Watermark is unchanged (same as max_id, no new data).
     assert updated["watermark"] == max_id
+
+
+# ---------------------------------------------------------------------------
+# Per-tier FP partition: human / Claude (tier2) / MegaDetector (tier1)
+# ---------------------------------------------------------------------------
+
+def _row(human=None, tier2=None, tier1=None):
+    """Build a minimal ingest row with the tier-label fields."""
+    reconciled = human or tier2 or tier1
+    return {
+        "human": human,
+        "tier2": tier2,
+        "tier1": tier1,
+        "reconciled_label": reconciled,
+        "detection_status": "no_animal",
+    }
+
+
+def test_per_tier_partition_no_overlap_sums_to_labeled():
+    """n_human + n_claude + n_md must equal labeled_triggers (no overlap, no gap)."""
+    rows = [
+        _row(human="false_positive"),
+        _row(human="animal"),
+        _row(tier2="false_positive"),
+        _row(tier2="animal"),
+        _row(tier1="false_positive"),
+        _row(tier1="no_animal"),
+        {"reconciled_label": None, "human": None, "tier2": None, "tier1": None,
+         "detection_status": "no_animal"},  # unlabeled — excluded
+    ]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_human"] + m["n_claude"] + m["n_md"] == m["labeled_triggers"]
+    assert m["labeled_triggers"] == 6
+
+
+def test_per_tier_precedence_human_wins():
+    """A row with both human and tier2 set lands in the human bucket only."""
+    rows = [_row(human="animal", tier2="false_positive")]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_human"] == 1
+    assert m["n_claude"] == 0
+    assert m["fp_human_count"] == 0   # human label is "animal", not FP
+    assert m["fp_claude_count"] == 0
+
+
+def test_per_tier_precedence_claude_over_md():
+    """A row with tier2 and tier1 (no human) → Claude bucket, not MD."""
+    rows = [_row(tier2="false_positive", tier1="animal")]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_claude"] == 1
+    assert m["n_md"] == 0
+    assert m["fp_claude_count"] == 1
+    assert m["fp_md_count"] == 0
+
+
+def test_per_tier_fp_uses_own_tier_label():
+    """Row where human='animal' but tier1='false_positive' → human-bucket non-FP (tier1 ignored)."""
+    rows = [_row(human="animal", tier1="false_positive")]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_human"] == 1
+    assert m["fp_human_count"] == 0  # own-tier label is "animal"
+    assert m["n_md"] == 0            # tier1 ignored when human wins
+
+
+def test_per_tier_artifact_regression():
+    """5 human rows (1 FP) + 37 MD-only rows (35 FP): per-tier rates expose the blending artifact."""
+    human_rows = (
+        [_row(human="false_positive")]
+        + [_row(human="animal")] * 4
+    )
+    md_rows = (
+        [_row(tier1="false_positive")] * 35
+        + [_row(tier1="animal")] * 2
+    )
+    rows = human_rows + md_rows
+    m = metrics.compute_metrics(rows, fn_audit=None)
+
+    assert m["n_human"] == 5
+    assert abs(m["fp_human_rate"] - 0.2) < 1e-9
+
+    assert m["n_md"] == 37
+    assert abs(m["fp_md_rate"] - 35 / 37) < 1e-9
+
+    # Headline blended rate is ~0.857 — very different from fp_human_rate 0.2.
+    assert abs(m["fp_rate"] - 36 / 42) < 1e-9
