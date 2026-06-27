@@ -13,9 +13,16 @@ every 2h, gated to the night window.
    FN-vetoed/paused/frozen).
 4. Write the notebook: update the active `runs/NNNN-<slug>.md`, append to
    `JOURNAL.md`, update `state.json` (active_experiment_id, last_metrics,
-   pending_restart_at). Do NOT hand-write the watermark — `loop.metrics` persists
-   it automatically.
-5. `python -m loop.report --mode summary` (sends two Telegram messages: metrics summary + latest JOURNAL.md entry). Then, as your FINAL actions, run
+   pending_restart_at, **nightly_verdict**). Do NOT hand-write the watermark —
+   `loop.metrics` persists it automatically.
+   **Before running `loop.report`**, set `state["nightly_verdict"]` to a ≤2-sentence
+   plain-English verdict (no jargon, no CIs, no aHash) summarising tonight's outcome
+   and action. Example: `"High false-alarm night — 40/42 triggers were garden movement.
+   No change deployed; FN unmeasured so threshold hold stands."` The report will send
+   this as Telegram message 2. JOURNAL.md stays dense and git-only.
+5. `python -m loop.report --mode summary` (sends two Telegram messages: message 1 =
+   plain-English metrics summary; message 2 = `state["nightly_verdict"]` if set,
+   otherwise only message 1 is sent). Then, as your FINAL actions, run
    `python -m loop.endtick` to mark tonight complete (stamps `last_tick_completed_day`
    so the remaining 2h ticks skip — one Opus session/night), then commit + push the
    notebook. Run `loop.endtick` ONLY after the whole workflow above succeeded — if you
@@ -94,7 +101,8 @@ PYTHONPATH=src uv run python -m loop.metrics --state experiments/state.json
 
 # 3. Report: read last_metrics from state.json, render summary, and SEND it to
 #    Telegram. This is the real nightly send — note: NO --no-send here.
-#    Sends TWO messages: (1) metrics summary, (2) latest JOURNAL.md entry.
+#    Sends message 1 (metrics summary) always; message 2 = state["nightly_verdict"]
+#    if set (plain English, ≤2 sentences). JOURNAL.md is git-only, not sent.
 #    (Add --no-send ONLY for a dry run: it renders + prints the text WITHOUT
 #    calling Telegram. Never leave --no-send on the actual nightly tick or the
 #    summary is silently not delivered.)

@@ -288,10 +288,10 @@ def test_latest_journal_entry_single_entry(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# main() summary + journal: --no-send includes journal_entry in JSON
+# main() summary + nightly_verdict: --no-send / real-send tests
 # ---------------------------------------------------------------------------
 
-def _make_state(tmp_path):
+def _make_state(tmp_path, extra: dict | None = None):
     """Helper: write a minimal state.json and return its path."""
     from loop import state as state_mod
     state_path = tmp_path / "state.json"
@@ -305,12 +305,15 @@ def _make_state(tmp_path):
         "fn_rate": "unmeasured",
         "fn_ci": None,
     }
-    state_mod.save_state(state_path, {
+    payload = {
         "paused": False,
         "active_experiment_id": None,
         "backlog": [],
         "last_metrics": lm,
-    })
+    }
+    if extra:
+        payload.update(extra)
+    state_mod.save_state(state_path, payload)
     return state_path
 
 
@@ -329,88 +332,48 @@ def _capture_main(monkeypatch, argv):
     return buf.getvalue()
 
 
-def test_no_send_summary_includes_journal_entry(tmp_path, monkeypatch):
-    """--no-send JSON must include 'journal_entry' key with the latest bullet."""
+def test_no_send_summary_includes_nightly_verdict(tmp_path, monkeypatch):
+    """--no-send JSON exposes 'nightly_verdict' key when state contains one."""
     import json
-    state_path = _make_state(tmp_path)
-    journal_path = tmp_path / "JOURNAL.md"
-    _write_journal(journal_path, """\
-# Loop Journal
-
-- 2026-06-09 — Older entry.
-- 2026-06-10 — Latest entry for the report.
-""")
+    verdict = "All clear tonight — only 2 real animals, 40 false alarms. No change needed."
+    state_path = _make_state(tmp_path, extra={"nightly_verdict": verdict})
 
     monkeypatch.setattr(report, "send", lambda t: (_ for _ in ()).throw(AssertionError("send() must not be called")))
 
     output = _capture_main(monkeypatch, [
         "loop.report", "--mode", "summary",
         "--state", str(state_path),
-        "--journal", str(journal_path),
         "--no-send",
     ])
     parsed = json.loads(output.strip())
     assert parsed["sent"] is False
     assert "rendered" in parsed
-    assert "journal_entry" in parsed
-    assert parsed["journal_entry"] is not None
-    assert "Latest entry for the report" in parsed["journal_entry"]
-    assert "Older entry" not in parsed["journal_entry"]
+    assert "nightly_verdict" in parsed
+    assert parsed["nightly_verdict"] == verdict
 
 
-def test_no_send_summary_journal_entry_null_when_missing(tmp_path, monkeypatch):
-    """--no-send JSON has journal_entry=null when journal file doesn't exist."""
+def test_no_send_summary_no_verdict_when_absent(tmp_path, monkeypatch):
+    """--no-send JSON has nightly_verdict=null when state lacks the key; no crash."""
     import json
-    state_path = _make_state(tmp_path)
+    state_path = _make_state(tmp_path)  # no nightly_verdict
 
     monkeypatch.setattr(report, "send", lambda t: (_ for _ in ()).throw(AssertionError("send() must not be called")))
 
     output = _capture_main(monkeypatch, [
         "loop.report", "--mode", "summary",
         "--state", str(state_path),
-        "--journal", str(tmp_path / "no_such_journal.md"),
         "--no-send",
     ])
     parsed = json.loads(output.strip())
-    assert parsed["journal_entry"] is None
+    assert parsed["sent"] is False
+    assert parsed.get("nightly_verdict") is None
 
 
-def test_no_send_summary_truncates_long_journal_entry(tmp_path, monkeypatch):
-    """--no-send truncates entries > _JOURNAL_TELEGRAM_LIMIT with a marker."""
+def test_real_send_summary_calls_send_twice_with_verdict(tmp_path, monkeypatch):
+    """In real-send mode with nightly_verdict, send() is called twice."""
     import json
-    state_path = _make_state(tmp_path)
-    journal_path = tmp_path / "JOURNAL.md"
-    _write_journal(journal_path, "- 2026-06-10 — " + "y" * 5000 + "\n")
-
-    monkeypatch.setattr(report, "send", lambda t: (_ for _ in ()).throw(AssertionError("send() must not be called")))
-
-    output = _capture_main(monkeypatch, [
-        "loop.report", "--mode", "summary",
-        "--state", str(state_path),
-        "--journal", str(journal_path),
-        "--no-send",
-    ])
-    parsed = json.loads(output.strip())
-    entry = parsed["journal_entry"]
-    assert entry is not None
-    assert entry.endswith("… (truncated)")
-    assert len(entry) <= 4100  # well within Telegram limit
-
-
-# ---------------------------------------------------------------------------
-# main() summary real-send: two send() calls (metrics + journal)
-# ---------------------------------------------------------------------------
-
-def test_real_send_summary_calls_send_twice_with_journal(tmp_path, monkeypatch):
-    """In real-send mode, send() is called once for metrics and once for journal."""
-    import json
-    state_path = _make_state(tmp_path)
-    journal_path = tmp_path / "JOURNAL.md"
-    _write_journal(journal_path, """\
-# Loop Journal
-
-- 2026-06-10 — Entry to send as second message.
-""")
+    verdict = "High false alarm rate tonight. Recommend reviewing motion threshold."
+    state_path = _make_state(tmp_path, extra={"nightly_verdict": verdict})
 
     send_calls = []
 
@@ -423,22 +386,18 @@ def test_real_send_summary_calls_send_twice_with_journal(tmp_path, monkeypatch):
     output = _capture_main(monkeypatch, [
         "loop.report", "--mode", "summary",
         "--state", str(state_path),
-        "--journal", str(journal_path),
     ])
     parsed = json.loads(output.strip())
     assert parsed["sent"] is True
-    assert parsed["journal_sent"] is True
     assert len(send_calls) == 2
-    # First call: metrics summary (Updated for Task 3: "images captured" not "Wildlife loop")
     assert "images captured" in send_calls[0]
-    # Second call: journal entry
-    assert "Entry to send as second message" in send_calls[1]
+    assert "High false alarm rate" in send_calls[1]
 
 
-def test_real_send_summary_journal_sent_null_when_no_entry(tmp_path, monkeypatch):
-    """journal_sent is null (None) when there is no journal entry."""
+def test_real_send_summary_sends_once_when_no_verdict(tmp_path, monkeypatch):
+    """In real-send mode without nightly_verdict, send() is called exactly once."""
     import json
-    state_path = _make_state(tmp_path)
+    state_path = _make_state(tmp_path)  # no nightly_verdict
 
     send_calls = []
 
@@ -451,12 +410,9 @@ def test_real_send_summary_journal_sent_null_when_no_entry(tmp_path, monkeypatch
     output = _capture_main(monkeypatch, [
         "loop.report", "--mode", "summary",
         "--state", str(state_path),
-        "--journal", str(tmp_path / "missing.md"),
     ])
     parsed = json.loads(output.strip())
     assert parsed["sent"] is True
-    assert parsed["journal_sent"] is None
-    # Only the metrics message was sent
     assert len(send_calls) == 1
 
 

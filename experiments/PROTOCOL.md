@@ -78,8 +78,13 @@ on `loop.report` to render without calling Telegram (safe for dry runs and testi
 9. **Deploy** — `python -m loop.deploy --delta '{...}' --restart-at <pre-sunrise>`;
    writes state.json + renders env + stamps the restart.
 10. **Record** — update `runs/NNNN-<slug>.md` (front matter + observations), append
-    a `JOURNAL.md` line, update `state.json` pointers.
-11. **Report** — `python -m loop.report --mode summary`; commit + push.
+    a `JOURNAL.md` line, update `state.json` pointers. Before reporting, set
+    `state["nightly_verdict"]` to a ≤2-sentence plain-English verdict (no jargon,
+    no CIs, no aHash) — e.g. `"High FP night, 40/42 garden movement. No change;
+    FN unmeasured so threshold hold stands."` The report sends this as Telegram
+    message 2. JOURNAL.md stays dense and git-only.
+11. **Report** — `python -m loop.report --mode summary` (sends message 1 = metrics
+    summary; message 2 = `state["nightly_verdict"]` if set); commit + push.
 12. **Mark complete** — `python -m loop.endtick` stamps
     `state.json["last_tick_completed_day"] = loop_day()` so the rest of tonight's 2h
     ticks skip (one Opus session/night). Run this ONLY after a fully successful tick.

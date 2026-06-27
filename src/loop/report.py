@@ -154,11 +154,6 @@ def main() -> None:
         default=False,
         help="Render the report text and print it to stdout; do NOT call Telegram.",
     )
-    parser.add_argument(
-        "--journal",
-        default="experiments/JOURNAL.md",
-        help="Path to JOURNAL.md for the second summary message (default: experiments/JOURNAL.md).",
-    )
     args = parser.parse_args()
     try:
         st = state_mod.load_state(args.state)
@@ -188,27 +183,24 @@ def main() -> None:
         )
         text = render_summary(metrics, st, active)
 
-        # Fetch the latest journal entry (may be None if file missing / no bullets).
-        entry = latest_journal_entry(args.journal)
-        if entry and len(entry) > _JOURNAL_TELEGRAM_LIMIT:
-            entry = entry[:_JOURNAL_TELEGRAM_LIMIT] + "… (truncated)"
+        # Read the agent's plain-English verdict (may be absent in older state shapes).
+        verdict = st.get("nightly_verdict") or None  # treat empty string as absent
 
         if args.no_send:
             print(json.dumps({
                 "sent": False,
                 "mode": args.mode,
                 "rendered": text,
-                "journal_entry": entry,
+                "nightly_verdict": verdict,
             }))
         else:
             ok = asyncio.run(send(text))
-            journal_sent: bool | None = None
-            if entry is not None:
+            if verdict:
                 try:
-                    journal_sent = asyncio.run(send(entry))
+                    asyncio.run(send(verdict))
                 except Exception:  # noqa: BLE001
-                    journal_sent = False
-            print(json.dumps({"sent": ok, "mode": args.mode, "journal_sent": journal_sent}))
+                    pass
+            print(json.dumps({"sent": ok, "mode": args.mode}))
     except Exception as e:  # noqa: BLE001
         print(json.dumps({"error": str(e)}))
         raise SystemExit(1)
