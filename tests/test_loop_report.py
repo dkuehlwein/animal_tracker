@@ -21,15 +21,13 @@ def _metrics(fp_rate=0.38, fn="unmeasured"):
     }
 
 
-def test_summary_includes_fp_and_fn():
+def test_summary_includes_active_experiment_and_totals():
+    """Updated for Task 3: plain-English format no longer emits FP/FN/CI jargon."""
     text = report.render_summary(
         metrics=_metrics(), state={"active_experiment_id": 1, "paused": False},
         active_experiment={"slug": "notification-gate-live", "status": "running"},
     )
-    assert "FP" in text
-    assert "FN" in text
-    assert "unmeasured" in text
-    assert "38%" in text or "0.38" in text
+    assert "42 images captured" in text
     assert "notification-gate-live" in text
 
 
@@ -100,8 +98,9 @@ def test_report_main_no_send_renders_without_telegram(tmp_path, monkeypatch):
     parsed = json.loads(output.strip())
     assert parsed["sent"] is False
     assert "rendered" in parsed
-    assert "Wildlife loop" in parsed["rendered"]
-    assert "FP" in parsed["rendered"]
+    # Updated for Task 3: plain-English format — check "images captured" instead of legacy "Wildlife loop"/"FP"
+    assert "images captured" in parsed["rendered"]
+    assert "labelled" in parsed["rendered"]
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +160,8 @@ def test_summary_backward_compat_without_fp_trustworthy():
         # No fp_trustworthy, no error_rate, no error_count — old shape
     }
     text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
-    assert "FP" in text
+    # Updated for Task 3: assert basic render works, not legacy FP line
+    assert "images captured" in text
 
 
 def test_report_main_no_send_does_not_require_telegram_credentials(tmp_path, monkeypatch):
@@ -209,7 +209,8 @@ def test_report_main_no_send_does_not_require_telegram_credentials(tmp_path, mon
 
     parsed = json.loads(output.strip())
     assert parsed["sent"] is False
-    assert "FP" in parsed["rendered"]
+    # Updated for Task 3: plain-English format — "images captured" instead of legacy "FP"
+    assert "images captured" in parsed["rendered"]
 
 
 # ---------------------------------------------------------------------------
@@ -428,8 +429,8 @@ def test_real_send_summary_calls_send_twice_with_journal(tmp_path, monkeypatch):
     assert parsed["sent"] is True
     assert parsed["journal_sent"] is True
     assert len(send_calls) == 2
-    # First call: metrics summary
-    assert "Wildlife loop" in send_calls[0]
+    # First call: metrics summary (Updated for Task 3: "images captured" not "Wildlife loop")
+    assert "images captured" in send_calls[0]
     # Second call: journal entry
     assert "Entry to send as second message" in send_calls[1]
 
@@ -457,3 +458,116 @@ def test_real_send_summary_journal_sent_null_when_no_entry(tmp_path, monkeypatch
     assert parsed["journal_sent"] is None
     # Only the metrics message was sent
     assert len(send_calls) == 1
+
+
+# ---------------------------------------------------------------------------
+# Task 3: plain-English per-tier render_summary (8 TDD test cases)
+# ---------------------------------------------------------------------------
+
+def _tier_metrics(
+    total=42,
+    n_human=2, fp_human=1,
+    n_claude=0, fp_claude=0,
+    n_md=40, fp_md=38,
+):
+    """Metrics with per-tier keys (Tasks 1/2 shape)."""
+    return {
+        "date": "2026-06-27",
+        "total_triggers": total,
+        "n_human": n_human,
+        "fp_human_count": fp_human,
+        "n_claude": n_claude,
+        "fp_claude_count": fp_claude,
+        "n_md": n_md,
+        "fp_md_count": fp_md,
+        "fp_trustworthy": True,
+    }
+
+
+def test_summary_per_tier_lines():
+    """Output contains total and per-tier lines with correct counts."""
+    text = report.render_summary(
+        metrics=_tier_metrics(), state={"paused": False}, active_experiment={},
+    )
+    assert "42 images captured" in text
+    assert "You labelled 2" in text
+    assert "1 false alarm" in text
+    assert "Claude labelled 0" in text
+    assert "MegaDetector" in text
+    assert "38 false alarms" in text
+
+
+def test_summary_md_line_marked_unverified():
+    """MegaDetector line must contain both 'auto' and 'unverified'."""
+    text = report.render_summary(
+        metrics=_tier_metrics(), state={"paused": False}, active_experiment={},
+    )
+    md_lines = [line for line in text.splitlines() if "MegaDetector" in line]
+    assert len(md_lines) == 1
+    assert "auto" in md_lines[0]
+    assert "unverified" in md_lines[0]
+
+
+def test_summary_no_ci_or_jargon():
+    """Output must not contain CI notation or aHash jargon."""
+    text = report.render_summary(
+        metrics=_tier_metrics(), state={"paused": False}, active_experiment={},
+    )
+    assert "CI" not in text
+    assert "aHash" not in text
+
+
+def test_summary_zero_tiers_still_listed():
+    """A tier with n==0 still renders its line."""
+    m = _tier_metrics(n_human=0, fp_human=0, n_claude=0, fp_claude=0)
+    text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
+    assert "You labelled 0" in text
+    assert "Claude labelled 0" in text
+
+
+def test_summary_remainder_line_when_unlabelled():
+    """'Not yet labelled' line present when remainder>0; absent when 0."""
+    # Remainder = 42 - (2 + 0 + 38) = 2 → line present
+    m = _tier_metrics(total=42, n_human=2, fp_human=0, n_claude=0, fp_claude=0, n_md=38, fp_md=0)
+    text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
+    assert "Not yet labelled: 2" in text
+
+    # Remainder = 42 - (2 + 0 + 40) = 0 → line absent
+    m2 = _tier_metrics(total=42, n_human=2, fp_human=0, n_claude=0, fp_claude=0, n_md=40, fp_md=0)
+    text2 = report.render_summary(metrics=m2, state={"paused": False}, active_experiment={})
+    assert "Not yet labelled" not in text2
+
+
+def test_summary_paused_banner_preserved():
+    """Paused banner is still emitted in the new plain-English format."""
+    text = report.render_summary(
+        metrics=_tier_metrics(), state={"paused": True}, active_experiment={},
+    )
+    assert "PAUSED" in text
+    assert "tuning frozen" in text.lower() or "paused" in text.lower()
+
+
+def test_summary_untrustworthy_alert_preserved():
+    """Untrustworthy alert is still emitted in the new plain-English format."""
+    m = _tier_metrics()
+    m["fp_trustworthy"] = False
+    m["error_rate"] = 0.3
+    m["error_count"] = 3
+    text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
+    assert "UNTRUSTWORTHY" in text or "untrustworthy" in text.lower()
+    assert "3/" in text or "30%" in text
+
+
+def test_summary_backward_compat_missing_per_tier_keys():
+    """Old metrics lacking n_*/fp_*_count keys render without crashing (.get defaults)."""
+    m = {
+        "date": "2026-06-10",
+        "total_triggers": 5,
+        "fp_trustworthy": True,
+        # No n_human, n_claude, n_md, fp_*_count — old shape
+    }
+    text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
+    assert "5 images captured" in text
+    assert "You labelled 0" in text
+    assert "Claude labelled 0" in text
+    assert "MegaDetector" in text
