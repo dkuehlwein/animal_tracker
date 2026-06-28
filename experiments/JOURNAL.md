@@ -524,3 +524,23 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   notification-quality gap but deserves a designed run-file (B1 owns it in worktree
   loop-fn-audit), not an end-of-tick reflex. Backlog unchanged: #1 concluded/live,
   #2 parked, #3 concluded, #4 concluded.
+- 2026-06-28 (2nd batch, same loop-day — prior tick committed+pushed e902e33 but
+  was interrupted before `loop.endtick`, so the night stayed unmarked and this tick
+  resumed; 51 NEW daytime detections 1041–1091 had accrued past watermark 1040).
+  **Metrics: FP 45/51 = 0.882**, CI [0.77, 0.94], trustworthy; FN unmeasured.
+  Partition all tier-1 MegaDetector (n_md=51, n_human=0, n_claude=0). The 6 non-FP
+  are tier1="animal" rows (1042,1043,1045,1046,1047,1048, hours 10–11) — tier-2
+  adjudicated: all 6 frames clearly show a PERSON (legs/dark trousers close to lens,
+  Daniel in garden). SpeciesNet classified them `homo;sapiens;human` /
+  `homo;;homo species` — CORRECT, so reconciled "animal"/non-FP stands; no tier-2 FP
+  override written (these are genuine human triggers, not vegetation FP). **Contrast
+  with the 1st-batch 5 blank `;;;;;;animal` rollups that leaked to MAIN channel:
+  THIS batch's 6 animal-tier rows are all confidently+correctly human → no
+  notification-quality leak this batch.** That reinforces the B1/exp-#2 finding is
+  specifically about *blank/class-level* rollups, not human rows.
+- 2026-06-28 — **Decision: KEEP / HOLD** (no deploy/delta/restart; active_experiment_id
+  stays null; nothing deployed → nothing to roll back). FP mass is daytime garden
+  vegetation + people, no safe trigger lever (exp #3/#4 concluded), FN unmeasured →
+  FN-veto/HOLD stands on data. **0 human feedback labels again → 2 consecutive
+  label-free days (06-27, 06-28); feedback-starved freeze trips at 3 → one more
+  label-free day freezes the loop.** Flagged to Daniel in verdict. Backlog unchanged.
