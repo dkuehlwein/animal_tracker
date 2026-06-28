@@ -36,7 +36,7 @@
   "best_known_good": {},
   "deployed": {},
   "history": [],
-  "last_heartbeat_loopday": "2026-06-27",
+  "last_heartbeat_loopday": "2026-06-28",
   "last_metrics": {
     "date": "2026-06-28",
     "error_count": 0,
@@ -44,16 +44,16 @@
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.8668077490609515,
-      1.0
+      0.7661915568567753,
+      0.9449492632208182
     ],
     "fp_claude_ci": [
-      0.5655175352168251,
+      0.0,
       1.0
     ],
-    "fp_claude_count": 5,
-    "fp_claude_rate": 1.0,
-    "fp_count": 25,
+    "fp_claude_count": 0,
+    "fp_claude_rate": 0.0,
+    "fp_count": 45,
     "fp_human_ci": [
       0.0,
       1.0
@@ -61,22 +61,22 @@
     "fp_human_count": 0,
     "fp_human_rate": 0.0,
     "fp_md_ci": [
-      0.8388748419471806,
-      1.0
+      0.7661915568567753,
+      0.9449492632208182
     ],
-    "fp_md_count": 20,
-    "fp_md_rate": 1.0,
-    "fp_rate": 1.0,
+    "fp_md_count": 45,
+    "fp_md_rate": 0.8823529411764706,
+    "fp_rate": 0.8823529411764706,
     "fp_trustworthy": true,
-    "labeled_triggers": 25,
-    "n_claude": 5,
+    "labeled_triggers": 51,
+    "n_claude": 0,
     "n_human": 0,
-    "n_md": 20,
-    "total_triggers": 25
+    "n_md": 51,
+    "total_triggers": 51
   },
   "last_tick_completed_day": "2026-06-27",
   "nightly_verdict": "Every one of last night's 25 triggers was a false alarm \u2014 wind-blown garden plants \u2014 including 5 the AI mislabelled as 'animal' and sent to the main channel as if real sightings; no change deployed, since there's still no safe way to filter these without risking real animals. Heads-up: two days now with no feedback labels, so one more label-free day trips the automatic safety freeze \u2014 a few taps on recent alerts would prevent it.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 1040
+  "watermark": 1091
 }
