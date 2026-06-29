@@ -544,3 +544,20 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   FN-veto/HOLD stands on data. **0 human feedback labels again → 2 consecutive
   label-free days (06-27, 06-28); feedback-starved freeze trips at 3 → one more
   label-free day freezes the loop.** Flagged to Daniel in verdict. Backlog unchanged.
+- 2026-06-29 — Batch 1092-1142 (51 daytime triggers, hrs 8-19). FP 47/51 = 0.922
+  (CI [0.815,0.969]); 45 no_animal + 2 unclassifiable = FP-tier, 4 identified/animal.
+  **Tier-2 (frames on disk): the 4 main-channel 'identified;aves;bird' alerts
+  (1096-1099, 13:11-13:16, conf 0.75-0.85) are ALL genuine — a real blackbird (Amsel)
+  visiting the garden bird bath, clearly perched/bathing in 1098/1099. No
+  classifier-FP main-channel leak this batch (contrast 06-27 leak audit).** The 2
+  unclassifiable (1134 18:20 = person in garden at frame edge; 1142 19:12 = dusk
+  vegetation, no animal) are true FP and correctly REVIEW-prefixed. All 6
+  adjudications confirm tier1 → no tier-2 corrections / no reconciled-label change.
+  **Decision: KEEP / HOLD** — no active experiment, nothing deployed, FN unmeasured,
+  no safe trigger lever (exp #3/#4 concluded); FP mass is the known daytime
+  garden-movement pattern handled by the REVIEW prefix (exp #1), not trigger-side.
+  **Feedback: tonight's batch again n_human=0; human taps on 06-28 (05:39, labeling
+  the prior batch) were the last calendar feedback — experimentation stays effectively
+  frozen (best_known_good={}, already stock config, so freeze is operationally moot).**
+  Backlog unchanged. Positive signal: classifier correctly surfaced real birds to main
+  channel while REVIEW-gating the human/dusk FP.

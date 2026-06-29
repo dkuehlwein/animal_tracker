@@ -74,8 +74,8 @@
     "n_md": 51,
     "total_triggers": 51
   },
-  "last_tick_completed_day": "2026-06-28",
-  "nightly_verdict": "A second batch of 51 daytime triggers came in: 45 were false alarms (wind-blown garden plants) and the other 6 were correctly recognised as a person in the garden \u2014 no animal alerts were mislabelled this time, unlike earlier today. No change deployed. Heads-up: still no feedback taps two days running, so one more label-free day trips the automatic safety freeze \u2014 a few taps on recent alerts would prevent it.",
+  "last_tick_completed_day": "2026-06-29",
+  "nightly_verdict": "Quiet day: 51 daytime triggers, 47 were false alarms from garden plants moving in the wind, plus a person and a dusk shot. The good news is the 4 alerts that reached the main channel were all a real blackbird at the bird bath \u2014 correctly identified, nothing wrongly flagged. No change made. Reminder: no feedback taps on recent alerts, so the loop is holding the stock settings and not running any experiments until some labels come in.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 1142
