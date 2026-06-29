@@ -36,16 +36,16 @@
   "best_known_good": {},
   "deployed": {},
   "history": [],
-  "last_heartbeat_loopday": "2026-06-28",
+  "last_heartbeat_loopday": "2026-06-29",
   "last_metrics": {
-    "date": "2026-06-28",
+    "date": "2026-06-29",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.7661915568567753,
-      0.9449492632208182
+      0.8150005368740411,
+      0.9690778032115107
     ],
     "fp_claude_ci": [
       0.0,
@@ -53,7 +53,7 @@
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 45,
+    "fp_count": 47,
     "fp_human_ci": [
       0.0,
       1.0
@@ -61,12 +61,12 @@
     "fp_human_count": 0,
     "fp_human_rate": 0.0,
     "fp_md_ci": [
-      0.7661915568567753,
-      0.9449492632208182
+      0.8150005368740411,
+      0.9690778032115107
     ],
-    "fp_md_count": 45,
-    "fp_md_rate": 0.8823529411764706,
-    "fp_rate": 0.8823529411764706,
+    "fp_md_count": 47,
+    "fp_md_rate": 0.9215686274509803,
+    "fp_rate": 0.9215686274509803,
     "fp_trustworthy": true,
     "labeled_triggers": 51,
     "n_claude": 0,
@@ -78,5 +78,5 @@
   "nightly_verdict": "A second batch of 51 daytime triggers came in: 45 were false alarms (wind-blown garden plants) and the other 6 were correctly recognised as a person in the garden \u2014 no animal alerts were mislabelled this time, unlike earlier today. No change deployed. Heads-up: still no feedback taps two days running, so one more label-free day trips the automatic safety freeze \u2014 a few taps on recent alerts would prevent it.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 1091
+  "watermark": 1142
 }
