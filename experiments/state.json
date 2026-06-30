@@ -38,14 +38,14 @@
   "history": [],
   "last_heartbeat_loopday": "2026-06-30",
   "last_metrics": {
-    "date": "2026-06-29",
+    "date": "2026-06-30",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.8150005368740411,
-      0.9690778032115107
+      0.7004420607907267,
+      0.9583318284955964
     ],
     "fp_claude_ci": [
       0.0,
@@ -53,30 +53,30 @@
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 47,
+    "fp_count": 22,
     "fp_human_ci": [
-      0.0,
-      1.0
+      0.43649717781352987,
+      0.9699466302516935
     ],
-    "fp_human_count": 0,
-    "fp_human_rate": 0.0,
+    "fp_human_count": 5,
+    "fp_human_rate": 0.8333333333333334,
     "fp_md_ci": [
-      0.8150005368740411,
-      0.9690778032115107
+      0.6860591728889099,
+      0.9706414397011299
     ],
-    "fp_md_count": 47,
-    "fp_md_rate": 0.9215686274509803,
-    "fp_rate": 0.9215686274509803,
+    "fp_md_count": 17,
+    "fp_md_rate": 0.8947368421052632,
+    "fp_rate": 0.88,
     "fp_trustworthy": true,
-    "labeled_triggers": 51,
+    "labeled_triggers": 25,
     "n_claude": 0,
-    "n_human": 0,
-    "n_md": 51,
-    "total_triggers": 51
+    "n_human": 6,
+    "n_md": 19,
+    "total_triggers": 25
   },
   "last_tick_completed_day": "2026-06-29",
   "nightly_verdict": "Quiet day: 51 daytime triggers, 47 were false alarms from garden plants moving in the wind, plus a person and a dusk shot. The good news is the 4 alerts that reached the main channel were all a real blackbird at the bird bath \u2014 correctly identified, nothing wrongly flagged. No change made. Reminder: no feedback taps on recent alerts, so the loop is holding the stock settings and not running any experiments until some labels come in.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 1142
+  "watermark": 1167
 }
