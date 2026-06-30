@@ -28,6 +28,13 @@
       "slug": "mog2-recurrent-frames",
       "status": "concluded",
       "validation": "live"
+    },
+    {
+      "hypothesis": "PROPOSED 2026-06-30 (pending Daniel's product/privacy call). Humans the classifier IDs as 'homo species' get detection_status=identified, which is NOT in _REVIEW_STATUSES={NO_ANIMAL,UNCLASSIFIABLE}, so they bypass the \ud83d\udd0d REVIEW prefix and LEAK to the MAIN channel as if a real wildlife ID. Confirmed in code (data_models.is_review_detection is taxon-blind; wildlife_system.py:446) + 2 visually-confirmed human leaks tonight (1163 19:28, 1167 19:48). Fix = route homo/human IDs to REVIEW (or suppress) regardless of status; code change, minimal/reversible, ZERO FN risk to wildlife. Parked because whether to alert on humans at all is Daniel's call (cf. no-second-channel). See runs/0004.",
+      "id": 5,
+      "slug": "human-main-channel-leak",
+      "status": "proposed",
+      "validation": "parked"
     }
   ],
   "baselines": {
@@ -74,8 +81,8 @@
     "n_md": 19,
     "total_triggers": 25
   },
-  "last_tick_completed_day": "2026-06-29",
-  "nightly_verdict": "Quiet day: 51 daytime triggers, 47 were false alarms from garden plants moving in the wind, plus a person and a dusk shot. The good news is the 4 alerts that reached the main channel were all a real blackbird at the bird bath \u2014 correctly identified, nothing wrongly flagged. No change made. Reminder: no feedback taps on recent alerts, so the loop is holding the stock settings and not running any experiments until some labels come in.",
+  "last_tick_completed_day": "2026-06-30",
+  "nightly_verdict": "25 triggers today, mostly garden-movement false alarms; you tapped feedback on 6 of them (thanks \u2014 that ended the no-feedback streak that was about to freeze the loop). One real blackbird was correctly flagged. Heads up: two alerts of YOU/a person in the garden at dusk reached the main channel as normal sightings \u2014 the camera recognises people but currently treats them like wildlife. I can make it tag people as 'review' (or hide them) but whether to alert on people at all is your call, so I held off. No settings changed tonight.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 1167

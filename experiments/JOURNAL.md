@@ -561,3 +561,30 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   frozen (best_known_good={}, already stock config, so freeze is operationally moot).**
   Backlog unchanged. Positive signal: classifier correctly surfaced real birds to main
   channel while REVIEW-gating the human/dusk FP.
+- 2026-06-30 — Batch 1143-1167 (25 daytime triggers, hrs 9-19). Reconciled FP 22/25
+  = 0.88 (CI [0.70,0.96]). **6 HUMAN labels this batch (1143-1148: 5 false_positive +
+  1 animal) → feedback drought BROKEN; the 3-label-free-day freeze (06-27/06-28 were
+  2 of the 3) is averted.** Headline (human-only): fp_human 5/6 = 0.83 (CI
+  [0.44,0.97]). FN unmeasured; error_count 0. Tier-2 (frames on disk) on the 3
+  animal-tier rows: 1147 (10:20, aves;bird, conf 0.81) = genuine blackbird on the
+  ground, human-confirmed ✅, no correction. **1163 (19:28) & 1167 (19:48), both
+  classifier rollup `mammalia;primates;hominidae;homo;;homo species` (conf 0.82/0.92)
+  = REAL HUMANS** — 1163 a close-up of a person bending in front of the camera, 1167 a
+  person at the dusk frame edge. **MAIN-CHANNEL LEAK: detection_status=identified is
+  NOT in _REVIEW_STATUSES={NO_ANIMAL,UNCLASSIFIABLE} (data_models.is_review_detection
+  is taxon-blind; wildlife_system.py:446), so both alerted Daniel's MAIN channel as if
+  a real wildlife ID — no 🔍 REVIEW prefix.** Same class as the 06-27 leak audit;
+  06-28's humans did NOT leak because their status wasn't `identified`, tonight's two
+  were. **Metrics caveat:** tier-1 maps identified→animal, so 1163/1167 reconcile as
+  animal (not FP) and, lacking a human tap, are excluded from fp_count — reconciled
+  22/25 UNDER-counts; true operational FP = 24/25. Per standing rule (auto-labels not
+  truth; headline=human-only) I did NOT tier-2-relabel them to FP (avoids poisoning the
+  reconciled series); footnoted only. **Decision: KEEP / HOLD** — no active experiment,
+  nothing deployed (best_known_good={}, stock), FN unmeasured, no safe trigger lever
+  (exp #3/#4 concluded: motion knobs can't separate FP from animal). **New backlog
+  exp #5 (human-main-channel-leak, runs/0004): route homo/human IDs → REVIEW (or
+  suppress) regardless of status; code change, minimal/reversible, ZERO FN risk to
+  wildlife. PARKED pending Daniel's product/privacy call (alert on humans at all? cf.
+  no-second-channel) — flagged in tonight's verdict.** Positive: feedback returned and
+  the classifier correctly ID'd both the real bird and the humans (the gap is routing,
+  not classification).
