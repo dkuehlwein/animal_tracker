@@ -81,7 +81,7 @@
     "n_md": 57,
     "total_triggers": 68
   },
-  "last_tick_completed_day": "2026-06-30",
+  "last_tick_completed_day": "2026-07-01",
   "nightly_verdict": "Busy garden day \u2014 68 triggers, 65 were sun-and-wind movement (all correctly tagged 'review', none reached the main channel as false sightings). Three real blackbirds were flagged correctly and no people slipped through this time. You tapped feedback on 10, so the loop is well-fed. Nothing changed tonight; still waiting on your call about whether to alert on people at all.",
   "paused": false,
   "pending_restart_at": null,
