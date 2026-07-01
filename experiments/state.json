@@ -45,45 +45,45 @@
   "history": [],
   "last_heartbeat_loopday": "2026-07-01",
   "last_metrics": {
-    "date": "2026-06-30",
+    "date": "2026-07-01",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.7004420607907267,
-      0.9583318284955964
+      0.8781280481750362,
+      0.9848833802919585
     ],
     "fp_claude_ci": [
       0.0,
-      1.0
+      0.7934506856227626
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 22,
+    "fp_count": 65,
     "fp_human_ci": [
-      0.43649717781352987,
-      0.9699466302516935
+      0.49016247153664183,
+      0.9433178485456247
     ],
-    "fp_human_count": 5,
-    "fp_human_rate": 0.8333333333333334,
+    "fp_human_count": 8,
+    "fp_human_rate": 0.8,
     "fp_md_ci": [
-      0.6860591728889099,
-      0.9706414397011299
+      0.9368611651470209,
+      1.0
     ],
-    "fp_md_count": 17,
-    "fp_md_rate": 0.8947368421052632,
-    "fp_rate": 0.88,
+    "fp_md_count": 57,
+    "fp_md_rate": 1.0,
+    "fp_rate": 0.9558823529411765,
     "fp_trustworthy": true,
-    "labeled_triggers": 25,
-    "n_claude": 0,
-    "n_human": 6,
-    "n_md": 19,
-    "total_triggers": 25
+    "labeled_triggers": 68,
+    "n_claude": 1,
+    "n_human": 10,
+    "n_md": 57,
+    "total_triggers": 68
   },
   "last_tick_completed_day": "2026-06-30",
-  "nightly_verdict": "25 triggers today, mostly garden-movement false alarms; you tapped feedback on 6 of them (thanks \u2014 that ended the no-feedback streak that was about to freeze the loop). One real blackbird was correctly flagged. Heads up: two alerts of YOU/a person in the garden at dusk reached the main channel as normal sightings \u2014 the camera recognises people but currently treats them like wildlife. I can make it tag people as 'review' (or hide them) but whether to alert on people at all is your call, so I held off. No settings changed tonight.",
+  "nightly_verdict": "Busy garden day \u2014 68 triggers, 65 were sun-and-wind movement (all correctly tagged 'review', none reached the main channel as false sightings). Three real blackbirds were flagged correctly and no people slipped through this time. You tapped feedback on 10, so the loop is well-fed. Nothing changed tonight; still waiting on your call about whether to alert on people at all.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 1167
+  "watermark": 1235
 }

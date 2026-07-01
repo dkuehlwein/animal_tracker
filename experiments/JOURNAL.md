@@ -588,3 +588,28 @@ Cross-experiment notes live here; per-experiment detail lives in `runs/NNNN-<slu
   no-second-channel) — flagged in tonight's verdict.** Positive: feedback returned and
   the classifier correctly ID'd both the real bird and the humans (the gap is routing,
   not classification).
+
+## 2026-07-01 — KEEP/HOLD (no change): 68 triggers, 65 FP (95.6%); exp #5 leak-watch CLEAN
+
+Batch 1168–1235 (68 triggers, watermark 1167→1235). Headline **fp_human 8/10 =
+0.80** (2 human-confirmed real blackbirds 1179/1180 = animal; 8 human FP). Auto:
+fp_md 57/57=1.0, tier-2 0/1 (1196). Reconciled fp 65/68=0.956. FN unmeasured. **10
+human labels — feedback healthy, drought stays broken (2 nights running).**
+
+**Exp #5 (human-main-channel-leak) leak-watch: CLEAN tonight.** All three
+`status=identified` main-channel alerts (1179 10:21, 1180 10:25, 1196 12:43) were
+`aves;;;;;bird` — real blackbirds, NOT homo/human. 1179/1180 human-confirmed animal;
+1196 tier-2 visually confirmed (dark blackbird at pond, lower-left frame). No
+homo-taxon leak occurred, so no new evidence forcing the exp #5 policy call — it
+stays PARKED pending Daniel's product/privacy decision (runs/0004 unchanged in
+substance; leak-watch noted). REVIEW gate held: all 65 FP were no_animal/
+unclassifiable → correctly 🔍 REVIEW-prefixed, none leaked to main.
+
+**Decision: HOLD, no deploy.** active_experiment=null, deployed={} (stock). Volume
+68 vs baseline 42 is elevated (bright-summer-daytime garden movement, hours 7–20)
+but not an explosion, and with nothing deployed there is nothing to roll back. No
+env knob and no un-parked experiment to advance: #2 replay-gated, #5 awaits Daniel.
+FN unmeasured → FN-veto keeps the threshold hold standing. Trigger-side FP
+suppression remains ruled out (exp #3/#4 concluded: motion knobs can't separate FP
+from real animals). Nothing to change tonight; the notification-layer REVIEW gate is
+doing its job.
