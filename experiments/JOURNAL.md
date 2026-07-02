@@ -613,3 +613,25 @@ FN unmeasured → FN-veto keeps the threshold hold standing. Trigger-side FP
 suppression remains ruled out (exp #3/#4 concluded: motion knobs can't separate FP
 from real animals). Nothing to change tonight; the notification-layer REVIEW gate is
 doing its job.
+
+## 2026-07-02 — KEEP/HOLD, no deploy (stock config)
+
+**Batch 1236-1292, 57 triggers.** fp 55/57=0.965 (2 real animals = blackbirds
+1260/1261). fp_human 3/3=1.0 (1290/1291/1292, all no_animal/unclassifiable garden
+movement). fp_md 52/54=0.963. tier-2 2/2 (1260/1261). FN unmeasured. **3 human
+labels — feedback drought stays broken (3 nights running).**
+
+**Exp #5 (human-main-channel-leak) leak-watch: CLEAN.** Both `status=identified`
+main-channel alerts were real birds, not humans: 1260 classified generic
+`;;;;;;animal`, 1261 `aves;;;;;bird`; both frames show the same dark blackbird
+foraging at the pond edge (lower-left). No homo-taxon leak → no new evidence forcing
+the policy call. Exp #5 stays PARKED pending Daniel's product/privacy decision
+(runs/0004 leak-watch log appended). REVIEW gate held: all 55 FP were
+no_animal/unclassifiable → correctly 🔍 REVIEW-prefixed, none leaked to main.
+
+**Decision: HOLD, no deploy.** active_experiment=null, deployed={} (stock). Volume
+57 vs baseline 42 elevated (bright-summer daytime garden movement, hours 9-17) but
+not an explosion; nothing deployed → nothing to roll back. No env knob and no
+un-parked experiment to advance: #2 replay-gated, #5 awaits Daniel. FN unmeasured →
+FN-veto keeps the threshold hold standing. Trigger-side FP suppression stays ruled
+out (exp #3/#4 concluded). Notification-layer REVIEW gate doing its job.

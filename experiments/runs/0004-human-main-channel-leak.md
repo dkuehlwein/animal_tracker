@@ -58,3 +58,8 @@ leave) that is Daniel's to make — same posture as the no-second-channel call. 
 mechanism and impact are settled; the policy choice is not. Flagged in tonight's
 verdict. If Daniel says go, this becomes a running code experiment with the fix
 committed separately (`fix(notify): exp #5 ...`) + a pre-sunrise restart stamp.
+
+## Leak-watch log
+
+- **2026-07-01**: CLEAN. 3 `identified` main-channel alerts (1179/1180/1196) all `aves;;;;;bird` — real blackbirds, no homo leak.
+- **2026-07-02**: CLEAN. 2 `identified` main-channel alerts (1260 `;;;;;;animal`, 1261 `aves;;;;;bird`) both visually confirmed = same real blackbird foraging at pond edge (lower-left frame). No homo/human taxon leak. Exp #5 stays PARKED pending Daniel's product/privacy call; no new forcing evidence.
