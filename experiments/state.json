@@ -81,8 +81,8 @@
     "n_md": 96,
     "total_triggers": 96
   },
-  "last_tick_completed_day": "2026-07-02",
-  "nightly_verdict": "Another busy garden day \u2014 57 triggers, 55 were sun-and-wind movement (all correctly tagged 'review', none reached the main channel as false sightings). Two real blackbirds were flagged correctly and no people slipped through. You tapped feedback on 3, so the loop stays well-fed. Nothing changed tonight; still waiting on your call about whether to alert on people at all.",
+  "last_tick_completed_day": "2026-07-03",
+  "nightly_verdict": "Heads-up: two real people walked into the garden today (early afternoon and late afternoon) and both landed in your main channel as if they were wildlife sightings \u2014 the camera can now flag people as \"review\" instead, but that is your call to make. Otherwise a very busy sunny day (96 alerts, roughly double normal, nearly all wind-and-sun movement correctly tagged review), no real animals identified, and nothing changed in the settings.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 1388

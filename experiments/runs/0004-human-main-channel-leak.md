@@ -63,3 +63,7 @@ committed separately (`fix(notify): exp #5 ...`) + a pre-sunrise restart stamp.
 
 - **2026-07-01**: CLEAN. 3 `identified` main-channel alerts (1179/1180/1196) all `aves;;;;;bird` — real blackbirds, no homo leak.
 - **2026-07-02**: CLEAN. 2 `identified` main-channel alerts (1260 `;;;;;;animal`, 1261 `aves;;;;;bird`) both visually confirmed = same real blackbird foraging at pond edge (lower-left frame). No homo/human taxon leak. Exp #5 stays PARKED pending Daniel's product/privacy call; no new forcing evidence.
+- **2026-07-03**: **NOT CLEAN — 2 real human leaks.** Both `identified` main-channel alerts tonight were humans, zero real-animal IDs:
+  - **1362** (14:51, `mammalia;primates;hominidae;homo;;homo species`) — unmistakable person: bare legs, yellow shorts, walking through the garden bed in bright daylight. Leaked to main channel with no REVIEW prefix.
+  - **1388** (17:42, `mammalia;primates;hominidae;homo;sapiens;human`) — human: bare arm/hand reaching in from the right holding a blue-nozzled watering can. Leaked to main channel.
+  This is the **first recurrence with actual humans** since the 06-30 audit (1163/1167); the two prior nights' `identified` leaks were birds. The leak mechanism is exactly as documented above (`identified` bypasses `_REVIEW_STATUSES`). No human tap on either → not in fp_count (reconciled fp = 94/96 auto). Exp #5 fix remains **code-ready but PARKED pending Daniel's product/privacy call** — flagged prominently in tonight's verdict as forcing evidence. No unilateral deploy (alerting-on-humans is Daniel's policy decision).

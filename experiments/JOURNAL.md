@@ -635,3 +635,24 @@ not an explosion; nothing deployed → nothing to roll back. No env knob and no
 un-parked experiment to advance: #2 replay-gated, #5 awaits Daniel. FN unmeasured →
 FN-veto keeps the threshold hold standing. Trigger-side FP suppression stays ruled
 out (exp #3/#4 concluded). Notification-layer REVIEW gate doing its job.
+
+- 2026-07-03 — Loop tick (batch 1293-1388, 96 triggers). FP 94/96 = 0.979 auto
+  (fp_md), CI [0.927,0.994]; n_human = 0 (Daniel tapped no feedback today);
+  fp_trustworthy true. Volume 96 vs baseline 42 — a bright-July garden-activity
+  spike (hours 8-17, wind + sun + people in the garden), >2x baseline but NOT a
+  deploy-driven explosion (deployed={} stock → nothing to roll back).
+  **Exp #5 (human-main-channel-leak) leak-watch: NOT CLEAN — 2 real human leaks.**
+  Both `identified` main-channel alerts tonight were humans, zero real-animal IDs:
+  1362 (14:51 `homo species`) = person in yellow shorts walking the bed; 1388
+  (17:42 `homo sapiens;human`) = bare arm/hand with a watering can. First recurrence
+  with actual humans since the 06-30 audit (prior two nights' `identified` leaks were
+  birds). Leak mechanism unchanged (`identified` bypasses `_REVIEW_STATUSES`, taxon-
+  blind `is_review_detection`). Neither human-tapped → reconciled as animal, not in
+  fp_count (per auto-labels-not-truth). Exp #5 fix is code-ready + minimal/reversible
+  but stays PARKED — alerting-on-humans is Daniel's product/privacy call; flagged in
+  tonight's verdict as forcing evidence, no unilateral deploy. (runs/0004 leak-watch
+  log appended.)
+  **Decision: HOLD, no deploy.** active_experiment=null, deployed={} stock. No env
+  knob addresses today's issue (busy day + human leaks); #2 replay-gated, #5 awaits
+  Daniel. FN unmeasured → FN-veto holds the threshold. Feedback 22/3/0 over the last
+  3 days — only today at 0, so no feedback-starved freeze yet (watch tomorrow).
