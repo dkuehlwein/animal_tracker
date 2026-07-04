@@ -81,8 +81,8 @@
     "n_md": 76,
     "total_triggers": 76
   },
-  "last_tick_completed_day": "2026-07-03",
-  "nightly_verdict": "Heads-up: two real people walked into the garden today (early afternoon and late afternoon) and both landed in your main channel as if they were wildlife sightings \u2014 the camera can now flag people as \"review\" instead, but that is your call to make. Otherwise a very busy sunny day (96 alerts, roughly double normal, nearly all wind-and-sun movement correctly tagged review), no real animals identified, and nothing changed in the settings.",
+  "last_tick_completed_day": "2026-07-04",
+  "nightly_verdict": "Second day running that a real person landed in your main channel as if it were a wildlife sighting (one this morning in yellow shorts) \u2014 the fix to flag people as \"review\" is ready whenever you want it, but that stays your call. The rest was a good day: a blackbird foraged and another bathed at the water dish (real sightings, correctly shown), and the other 71 alerts were sunny-garden movement correctly tagged review. Nothing changed in the settings. One note: you haven't tapped feedback for two days \u2014 one more quiet day and I pause tuning until you weigh in.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 1464

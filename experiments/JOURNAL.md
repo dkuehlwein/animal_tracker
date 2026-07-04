@@ -656,3 +656,28 @@ out (exp #3/#4 concluded). Notification-layer REVIEW gate doing its job.
   knob addresses today's issue (busy day + human leaks); #2 replay-gated, #5 awaits
   Daniel. FN unmeasured → FN-veto holds the threshold. Feedback 22/3/0 over the last
   3 days — only today at 0, so no feedback-starved freeze yet (watch tomorrow).
+
+- 2026-07-04 — Loop tick (batch 1389-1464, 76 triggers). FP 71/76 = 0.934 auto
+  (fp_md), CI [0.855,0.972]; n_human = 0 (no feedback tapped today); fp_trustworthy
+  true. Volume 76 vs baseline 42 — another bright-July garden-activity day (hours
+  08-19, wind + sun + garden use), ~1.8x baseline but NOT a deploy-driven explosion
+  (deployed={} stock → nothing to roll back).
+  **Exp #5 (human-main-channel-leak) leak-watch: NOT CLEAN — 1 human leak.** 5
+  `identified` main-channel alerts tonight, visually adjudicated: 1389 (08:17
+  `homo sapiens;human`, conf 0.966) = person in yellow shorts, bare legs/forearm
+  crossing the bed → HUMAN LEAK; 1396/1399/1400 (11:08-11:29, aves/animal) = same
+  real blackbird foraging lower-left over ~20 min; 1423 (15:02, animal) = real bird
+  bathing at the water dish. So 1/5 identified = human, 4/5 = genuine wildlife.
+  **Second consecutive night with a human leak** (07-03 had 1362+1388). Mechanism
+  unchanged (`identified` bypasses `_REVIEW_STATUSES`, taxon-blind
+  is_review_detection). Human not tapped → reconciled as animal, not in fp_count
+  (auto fp = 71/76); true operational fp = 72/76. Exp #5 fix stays code-ready but
+  PARKED pending Daniel's product/privacy call — flagged in verdict as accumulating
+  forcing evidence (2 nights running). (runs/0004 leak-watch log appended.)
+  **Decision: HOLD, no deploy.** active_experiment=null, deployed={} stock. No env
+  knob addresses today's issue (busy day + human leak); #2 replay-gated/parked, #5
+  awaits Daniel. FN unmeasured → FN-veto holds the threshold. **Feedback-starved
+  watch:** last human label was 07-02; 07-03 + 07-04 both zero = 2-day gap. Freeze
+  triggers at 3 consecutive zero days → one more quiet day (07-05) trips it, though
+  with no active experiment it is a near-no-op (already holding stock). Noted in
+  verdict.
