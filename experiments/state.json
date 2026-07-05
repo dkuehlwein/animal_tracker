@@ -43,16 +43,16 @@
   "best_known_good": {},
   "deployed": {},
   "history": [],
-  "last_heartbeat_loopday": "2026-07-04",
+  "last_heartbeat_loopday": "2026-07-05",
   "last_metrics": {
-    "date": "2026-07-04",
+    "date": "2026-07-05",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.8550647346629656,
-      0.9715734677804679
+      0.8767653602534898,
+      0.9899704587106665
     ],
     "fp_claude_ci": [
       0.0,
@@ -60,30 +60,30 @@
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 71,
+    "fp_count": 53,
     "fp_human_ci": [
-      0.0,
-      1.0
+      0.6668604907890041,
+      0.9862895787574435
     ],
-    "fp_human_count": 0,
-    "fp_human_rate": 0.0,
+    "fp_human_count": 12,
+    "fp_human_rate": 0.9230769230769231,
     "fp_md_ci": [
-      0.8550647346629656,
-      0.9715734677804679
+      0.8767879842623334,
+      0.9957845958655673
     ],
-    "fp_md_count": 71,
-    "fp_md_rate": 0.9342105263157895,
-    "fp_rate": 0.9342105263157895,
+    "fp_md_count": 41,
+    "fp_md_rate": 0.9761904761904762,
+    "fp_rate": 0.9636363636363636,
     "fp_trustworthy": true,
-    "labeled_triggers": 76,
+    "labeled_triggers": 55,
     "n_claude": 0,
-    "n_human": 0,
-    "n_md": 76,
-    "total_triggers": 76
+    "n_human": 13,
+    "n_md": 42,
+    "total_triggers": 55
   },
   "last_tick_completed_day": "2026-07-04",
   "nightly_verdict": "Second day running that a real person landed in your main channel as if it were a wildlife sighting (one this morning in yellow shorts) \u2014 the fix to flag people as \"review\" is ready whenever you want it, but that stays your call. The rest was a good day: a blackbird foraged and another bathed at the water dish (real sightings, correctly shown), and the other 71 alerts were sunny-garden movement correctly tagged review. Nothing changed in the settings. One note: you haven't tapped feedback for two days \u2014 one more quiet day and I pause tuning until you weigh in.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 1464
+  "watermark": 1519
 }
