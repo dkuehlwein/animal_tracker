@@ -681,3 +681,24 @@ out (exp #3/#4 concluded). Notification-layer REVIEW gate doing its job.
   triggers at 3 consecutive zero days → one more quiet day (07-05) trips it, though
   with no active experiment it is a near-no-op (already holding stock). Noted in
   verdict.
+
+## 2026-07-05 — HOLD (stock), leak-watch CLEAN, feedback drought BROKEN
+- **Batch 1465-1519, 55 triggers, 53 FP (96.4% auto).** n_human=13, fp_human 12/13
+  (=0.92); n_md=42, fp_md 41/42. FN unmeasured. Volume 1.3x baseline (42) — sunny
+  garden, within normal, no collapse/explosion. Stock config (deployed={},
+  active_experiment=null).
+- **Feedback DROUGHT BROKEN.** 2 zero-label days (07-03, 07-04) had put us one quiet
+  day from the 3-day feedback-starved freeze; today Daniel tapped **13 labels** (12
+  false_positive on the morning no_animal/unclassifiable run 1465-1476, + 1 `animal`
+  on 1478). Freeze does NOT trip; the watch resets. Daniel is engaged again.
+- **Exp #5 leak-watch CLEAN** — breaks the 07-03/07-04 two-night human-leak streak.
+  Only 2 `identified` main-channel alerts tonight, both `aves;;;;;bird`
+  (`b1352069…`), both visually confirmed **blackbirds**: 1478 (10:17, human-tapped
+  `animal`, on the water-dish rim) and 1515 (18:35, foraging in grass). No `homo`/
+  `homo species` taxon anywhere in the batch. taxonomy_release.txt confirms
+  `b1352069…`=bird, `990ae9dd…`=homo sapiens (absent), `f2efdae9…`=no-cv-result
+  (the unclassifiable frames 1476/1481/1487/1493/1507, all correctly REVIEW-gated).
+- **Decision: HOLD, no deploy.** No env knob addresses a clean high-FP sunny-garden
+  day; #2 replay-gated/parked, #5 awaits Daniel's product/privacy call (no new
+  forcing evidence tonight). FN unmeasured → FN-veto holds the threshold. Stock
+  config unchanged. (runs/0004 leak-watch log appended.)
