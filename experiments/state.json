@@ -43,16 +43,16 @@
   "best_known_good": {},
   "deployed": {},
   "history": [],
-  "last_heartbeat_loopday": "2026-07-05",
+  "last_heartbeat_loopday": "2026-07-06",
   "last_metrics": {
-    "date": "2026-07-05",
+    "date": "2026-07-06",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.8767653602534898,
-      0.9899704587106665
+      0.8455098688621009,
+      0.969546397560289
     ],
     "fp_claude_ci": [
       0.0,
@@ -60,30 +60,30 @@
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 53,
+    "fp_count": 66,
     "fp_human_ci": [
-      0.6668604907890041,
-      0.9862895787574435
+      0.20654931437723745,
+      1.0
     ],
-    "fp_human_count": 12,
-    "fp_human_rate": 0.9230769230769231,
+    "fp_human_count": 1,
+    "fp_human_rate": 1.0,
     "fp_md_ci": [
-      0.8767879842623334,
-      0.9957845958655673
+      0.8434458778290468,
+      0.969105782962153
     ],
-    "fp_md_count": 41,
-    "fp_md_rate": 0.9761904761904762,
-    "fp_rate": 0.9636363636363636,
+    "fp_md_count": 65,
+    "fp_md_rate": 0.9285714285714286,
+    "fp_rate": 0.9295774647887324,
     "fp_trustworthy": true,
-    "labeled_triggers": 55,
+    "labeled_triggers": 71,
     "n_claude": 0,
-    "n_human": 13,
-    "n_md": 42,
-    "total_triggers": 55
+    "n_human": 1,
+    "n_md": 70,
+    "total_triggers": 71
   },
   "last_tick_completed_day": "2026-07-05",
   "nightly_verdict": "Good day: no people leaked into your main channel this time (the last two days each had one), and the only two wildlife alerts were both real blackbirds \u2014 one on the water-dish rim, one foraging in the grass. Thanks for the feedback taps today too; they reset the quiet-days clock, so I'm not pausing. The other 53 alerts were sunny-garden movement, all correctly tagged review, and nothing changed in the settings.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 1519
+  "watermark": 1590
 }
