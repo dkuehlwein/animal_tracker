@@ -81,8 +81,8 @@
     "n_md": 70,
     "total_triggers": 71
   },
-  "last_tick_completed_day": "2026-07-05",
-  "nightly_verdict": "Good day: no people leaked into your main channel this time (the last two days each had one), and the only two wildlife alerts were both real blackbirds \u2014 one on the water-dish rim, one foraging in the grass. Thanks for the feedback taps today too; they reset the quiet-days clock, so I'm not pausing. The other 53 alerts were sunny-garden movement, all correctly tagged review, and nothing changed in the settings.",
+  "last_tick_completed_day": "2026-07-06",
+  "nightly_verdict": "Another clean day \u2014 no people leaked into your main channel (second day in a row), and all 5 wildlife alerts were the same real blackbird: once on the water-dish rim, then foraging in the grass border. The other 66 alerts were sunny-garden movement, all correctly tagged review. Nothing changed in the settings.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 1590

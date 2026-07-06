@@ -702,3 +702,23 @@ out (exp #3/#4 concluded). Notification-layer REVIEW gate doing its job.
   day; #2 replay-gated/parked, #5 awaits Daniel's product/privacy call (no new
   forcing evidence tonight). FN unmeasured → FN-veto holds the threshold. Stock
   config unchanged. (runs/0004 leak-watch log appended.)
+
+## 2026-07-06 — HOLD (stock), leak-watch CLEAN (2nd consecutive), busy sunny day
+- **Batch 1520-1590, 71 triggers, 66 FP (92.96% auto).** n_human=1 (1 false_positive
+  tap); n_md=70, fp_md 65/70. FN unmeasured. Volume 71 = 1.7x baseline (42) — sunny
+  garden, within normal range, no collapse/explosion. Stock config (deployed={},
+  active_experiment=null).
+- **Exp #5 leak-watch CLEAN — 2nd consecutive clean night** (07-05 + 07-06), breaking
+  further from the 07-03/07-04 human-leak streak. 5 `identified` main-channel alerts,
+  ALL visually-confirmed real blackbirds, no `homo`/`homo species` taxon in the batch:
+  1521 (10:17, `aves;;;;;bird` 0.671, blackbird on water-dish rim) + a 4-alert series
+  1544/1545/1546/1547 (11:42-11:44, same blackbird foraging left grass border; the
+  generic `1f689929…;;;;;;animal` taxon on 1545-47 is just lower classifier confidence
+  on the same bird). tier-1 already labeled all 5 `animal`; no tier-2 change. No forcing
+  evidence added; exp #5 stays code-ready + PARKED pending Daniel's product/privacy call.
+- **Feedback watch:** 07-05 had 13 taps (drought broken), 07-06 has 1 human tap — not a
+  zero-label day, so the 3-day feedback-starved freeze does NOT trip; watch stays reset.
+- **Decision: HOLD, no deploy.** No env knob addresses a clean high-FP sunny-garden day;
+  #2 replay-gated/parked, #5 awaits Daniel's product/privacy call (no new forcing evidence
+  tonight). FN unmeasured → FN-veto holds the threshold. Stock config unchanged.
+  (runs/0004 leak-watch log appended.)
