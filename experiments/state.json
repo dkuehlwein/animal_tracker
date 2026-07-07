@@ -43,16 +43,16 @@
   "best_known_good": {},
   "deployed": {},
   "history": [],
-  "last_heartbeat_loopday": "2026-07-06",
+  "last_heartbeat_loopday": "2026-07-07",
   "last_metrics": {
-    "date": "2026-07-06",
+    "date": "2026-07-07",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.8455098688621009,
-      0.969546397560289
+      0.9030514828405729,
+      0.9814504336338952
     ],
     "fp_claude_ci": [
       0.0,
@@ -60,30 +60,30 @@
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 66,
+    "fp_count": 111,
     "fp_human_ci": [
-      0.20654931437723745,
+      0.0,
       1.0
     ],
-    "fp_human_count": 1,
-    "fp_human_rate": 1.0,
+    "fp_human_count": 0,
+    "fp_human_rate": 0.0,
     "fp_md_ci": [
-      0.8434458778290468,
-      0.969105782962153
+      0.9030514828405729,
+      0.9814504336338952
     ],
-    "fp_md_count": 65,
-    "fp_md_rate": 0.9285714285714286,
-    "fp_rate": 0.9295774647887324,
+    "fp_md_count": 111,
+    "fp_md_rate": 0.9568965517241379,
+    "fp_rate": 0.9568965517241379,
     "fp_trustworthy": true,
-    "labeled_triggers": 71,
+    "labeled_triggers": 116,
     "n_claude": 0,
-    "n_human": 1,
-    "n_md": 70,
-    "total_triggers": 71
+    "n_human": 0,
+    "n_md": 116,
+    "total_triggers": 116
   },
   "last_tick_completed_day": "2026-07-06",
   "nightly_verdict": "Another clean day \u2014 no people leaked into your main channel (second day in a row), and all 5 wildlife alerts were the same real blackbird: once on the water-dish rim, then foraging in the grass border. The other 66 alerts were sunny-garden movement, all correctly tagged review. Nothing changed in the settings.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 1590
+  "watermark": 1706
 }
