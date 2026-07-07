@@ -81,8 +81,8 @@
     "n_md": 116,
     "total_triggers": 116
   },
-  "last_tick_completed_day": "2026-07-06",
-  "nightly_verdict": "Another clean day \u2014 no people leaked into your main channel (second day in a row), and all 5 wildlife alerts were the same real blackbird: once on the water-dish rim, then foraging in the grass border. The other 66 alerts were sunny-garden movement, all correctly tagged review. Nothing changed in the settings.",
+  "last_tick_completed_day": "2026-07-07",
+  "nightly_verdict": "Two photos of a person tending the pond (14:00 and 18:39) slipped into your main channel tonight without the review tag \u2014 the known human-leak issue, back after two clean days. The other 3 wildlife alerts were real birds; the remaining 111 of 116 triggers were correctly tagged review on a very busy sunny day. Nothing changed in settings \u2014 the fix for human alerts is ready but waiting on your call about whether to tag or hide them.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 1706

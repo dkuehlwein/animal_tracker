@@ -722,3 +722,26 @@ out (exp #3/#4 concluded). Notification-layer REVIEW gate doing its job.
   #2 replay-gated/parked, #5 awaits Daniel's product/privacy call (no new forcing evidence
   tonight). FN unmeasured → FN-veto holds the threshold. Stock config unchanged.
   (runs/0004 leak-watch log appended.)
+
+## 2026-07-07 — HOLD (stock), leak-watch NOT CLEAN (2 human leaks), high-volume sunny day
+- **Batch 1590-1706, 116 triggers, 111 FP (95.69% auto).** n_human=0 (no taps today);
+  n_md=116, fp_md 111/116. FN unmeasured. Volume 116 = **2.8x baseline (42)** — busy
+  sunny garden with people present (watering + pond tending); stock config so nothing to
+  roll back, noted not actioned. active_experiment=null, deployed={}.
+- **Exp #5 leak-watch NOT CLEAN — 2 real human leaks** (breaks the 07-05/07-06 clean
+  streak; 3rd human-leak night in 5). 5 `identified` main-channel alerts (1590-1706):
+  1592 (08:44 `aves` 0.886) + 1612 (11:59 `aves` 0.780) = birds (frames aged out, but
+  `aves` never carries homo); 1656 (14:47 `;;;;;;animal` 0.609) = low-conf bird at right
+  frame edge; **1633 (14:00 `homo;;homo species` 0.994) = HUMAN** (person in dark clothes
+  watering pond with blue-nozzle hose, left third, bright daylight — frame unmistakable);
+  **1694 (18:39 `homo;;homo species` 0.730) = HUMAN** (large motion-blurred person-mass
+  filling left half close to lens, dusk, tending pond). Both leaked to MAIN channel with
+  no REVIEW prefix (`identified` bypasses `_REVIEW_STATUSES`, taxon-blind is_review_detection).
+  Neither tapped → reconciled animal, not in fp_count (auto fp 111/116; true operational
+  fp 113/116 counting humans as non-wildlife). No tier-2 relabel (avoids self-poisoning).
+- **Feedback watch:** 07-05 had 13 taps, 07-06 had 1, 07-07 has 0 — last 3 days are NOT
+  all-zero, so the 3-day feedback-starved freeze does NOT trip. Watch active but unfrozen.
+- **Decision: HOLD, no deploy.** exp #5 fix is code-ready but PARKED — alerting-on-humans
+  is Daniel's product/privacy call, not an autonomous deploy; tonight's 2 leaks are
+  continuing forcing evidence, flagged in the verdict. #2 replay-gated/parked. FN
+  unmeasured → FN-veto holds the threshold. Stock config unchanged.
