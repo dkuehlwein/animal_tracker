@@ -1,13 +1,13 @@
 ---
 id: 5
 slug: human-main-channel-leak
-status: proposed          # proposed | running | concluded | rolled_back | parked
-validation: parked        # live | replay | parked — pending Daniel's product/privacy call
+status: concluded         # proposed | running | concluded | rolled_back | parked
+validation: live          # live | replay | parked — pending Daniel's product/privacy call
 hypothesis: "Humans the classifier IDs as 'homo species' with detection_status=identified bypass the REVIEW prefix (which only fires on NO_ANIMAL/UNCLASSIFIABLE) and leak to the MAIN channel as if a real wildlife identification. Route human/homo identifications to REVIEW (or suppress) to stop main-channel human alerts. Zero FN risk to wildlife (humans are not target animals)."
 param_delta: null         # no env lever — REVIEW routing is taxon-blind in code (is_review_detection / _REVIEW_STATUSES); a fix is a CODE change
 predicted_effect: { fp_rate: "main-channel human leaks -> 0", fn_risk: "none for wildlife (suppressing human alerts cannot hide an animal)" }
 created: 2026-06-30
-decision: pending         # product/privacy dimension is Daniel's call (cf. no-second-channel precedent)
+decision: "Daniel decided 2026-07-07: SUPPRESS human alerts entirely (no Telegram, not REVIEW-tagged). Saved photos of HUMAN-status detections are kept 48h then purged from disk; the DB row is kept as a metadata-only record. Shipped as a MegaDetector person-gate (>=0.3) OR homo-taxon check, broader than the originally-proposed taxon-only REVIEW-tag fix — see Resolution below."
 confidence: high          # leak mechanism confirmed in code; two visually-confirmed human leaks on disk
 ---
 
@@ -86,3 +86,41 @@ committed separately (`fix(notify): exp #5 ...`) + a pre-sunrise restart stamp.
   - **1656** (14:47, `1f689929…;;;;;;animal`, 0.609) — generic `animal`; frame shows a small dark bird-sized shape at the right frame edge over the garden, no human. Genuine wildlife (low-conf blackbird), correctly on main channel.
   - **1694** (18:39, `mammalia;primates;hominidae;homo;;homo species`, conf 0.730) — **real human**. Frame is a large motion-blurred person-mass filling the left half close to the lens (dusk, tending the pond). **HUMAN LEAK.**
   So 2 of 5 identified = human leaks, 3 = real birds. Mechanism unchanged (`identified` bypasses `_REVIEW_STATUSES`, taxon-blind `is_review_detection`). Neither human tapped → reconciled as animal, not in fp_count (auto fp = 111/116); true operational fp = 113/116 (humans are non-wildlife). This is the **third night with human leaks in five** (07-03, 07-04, now 07-07) — the pattern is recurrent, tracking Daniel's garden/pond activity on sunny days. High trigger volume tonight (116, ~2.8× the 42 baseline) reflects a busy sunny-garden day with people present. Exp #5 fix stays **code-ready but PARKED** pending Daniel's product/privacy call; flagged prominently in tonight's verdict as continuing forcing evidence. No unilateral deploy (alerting-on-humans is Daniel's policy decision).
+
+## Resolution (2026-07-07)
+
+Daniel made the product/privacy call the same day as the 07-07 leak-watch entry
+above: **suppress human alerts entirely.** No Telegram notification at all for
+HUMAN-status detections — not a REVIEW-tagged compromise. Saved burst photos are
+kept 48h (useful if Daniel wants to check who was in the garden) then purged from
+disk; the DB metadata row (timestamp, status, confidence) is kept indefinitely for
+loop metrics and audit trail.
+
+**The shipped fix is broader than the originally-proposed REVIEW-tag-on-homo-taxon
+approach in this run's "Proposed fix" section above.** That proposal only looked at
+the final ensemble taxonomy (`homo` / `homo species`), because the confirmed leaks
+to date (1163/1167, 1362/1388, 1389, 1633/1694) were all confident, correctly-taxed
+`identified` results. But the 07-07 triggering incident (see JOURNAL and
+`runs/0005-blur-gate-false-negative.md`) surfaced a second, larger population: most
+human captures on a busy garden day are **blurry NO_ANIMAL/UNCLASSIFIABLE frames the
+classifier never confidently labels `homo` at all** — a taxon-only fix would have
+left every one of those un-suppressed (or, under the old blur gate, silently
+dropped with no record either way). The actual fix therefore gates upstream of the
+final taxonomy call: a **MegaDetector person-category detection at
+`human_detection_confidence` >= 0.3, OR a `homo` segment in the ensemble
+prediction**, evaluated *before* the animal branch (so a frame with both a person
+and a confident animal still routes to HUMAN and is suppressed — privacy takes
+precedence). This routes every human capture — confident taxon match or not — to
+`DetectionStatus.HUMAN`, which `suppress_human_alerts` (default true) then mutes at
+the notification layer while `process_detection` still logs it to the DB.
+
+Config added: `SPECIES_HUMAN_DETECTION_CONFIDENCE` (default 0.3),
+`PERFORMANCE_SUPPRESS_HUMAN_ALERTS` (default true),
+`PERFORMANCE_HUMAN_RETENTION_HOURS` (default 48). New `DetectionStatus.HUMAN`.
+See `CLAUDE.md` for the full parameter description.
+
+Shipped on branch `fix/human-gate-blur-gate` (5 commits, Tasks 1-4); this run doc
+and the rest of the lab notebook were updated as Task 5. The exp #5 leak-watch log
+above continues nightly as **post-deploy verification** — once the fix is live on
+the Pi, a "clean" night now means zero human-taxon *and* zero blurry-human
+main-channel appearances, not just zero `homo`-taxon leaks.

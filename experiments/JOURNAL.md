@@ -745,3 +745,51 @@ out (exp #3/#4 concluded). Notification-layer REVIEW gate doing its job.
   is Daniel's product/privacy call, not an autonomous deploy; tonight's 2 leaks are
   continuing forcing evidence, flagged in the verdict. #2 replay-gated/parked. FN
   unmeasured → FN-veto holds the threshold. Stock config unchanged.
+
+## 2026-07-08 — SHIPPED: human-suppression (exp #5) + blur-gate false-negative fix (exp #6) — loop baselines change, not an anomaly
+
+- **Daniel made the product/privacy call on exp #5 (07-07):** SUPPRESS human alerts
+  entirely (no Telegram, not REVIEW-tagged). Saved photos of HUMAN-status detections
+  are kept 48h then purged; the DB row is kept as a metadata-only record. The shipped
+  fix is a **MegaDetector person-gate (`human_detection_confidence` >= 0.3) OR
+  `homo`-taxon check**, evaluated before the animal branch — broader than the
+  originally-proposed taxon-only REVIEW-tag approach, because most human captures
+  turned out to be blurry NO_ANIMAL/UNCLASSIFIABLE frames the classifier never
+  confidently tags `homo` at all. See `runs/0004-human-main-channel-leak.md`
+  ("Resolution" section, appended, leak-watch log kept intact).
+- **Separately, a real false negative on 07-07 ~19:10** (Daniel watched a bird bathe
+  at the pond; 17 motion triggers, 4 captured bursts, all discarded silently by the
+  8.6-9.4 < 11.0 sharpness floor — zero DB rows, zero notification) forced a second
+  fix: the blur gate no longer silently drops below-floor bursts. Every burst now
+  gets species ID + a DB row; a blurry burst with an animal found still alerts, a
+  blurry burst with no animal found is DB-logged but muted (not sent to Telegram),
+  so REVIEW volume doesn't rise. New run doc: `runs/0005-blur-gate-false-negative.md`.
+- **Both fixes shipped together on branch `fix/human-gate-blur-gate`** (5 commits:
+  config + DB + purge + blur-gate-no-drop + blur-gate-notify-mute), merging Tasks 1-4
+  (code) and this Task 5 (docs). New config: `SPECIES_HUMAN_DETECTION_CONFIDENCE`
+  (0.3), `PERFORMANCE_SUPPRESS_HUMAN_ALERTS` (true), `PERFORMANCE_HUMAN_RETENTION_HOURS`
+  (48). New `DetectionStatus.HUMAN`. Full description in `CLAUDE.md`.
+- **LOOP: read this before flagging an anomaly.** Config/behavior changed today —
+  the nightly loop's volume and rollback baselines assume "stock config" and must be
+  re-read in light of both fixes:
+  - **Telegram notification volume will DROP.** Humans are now fully suppressed
+    (previously some leaked to main channel, e.g. 1633/1694 on 07-07) and blurry
+    no-animal bursts are now muted instead of occasionally clearing the old
+    sharpness floor and reaching REVIEW. Do not read a volume drop vs the 42/night
+    baseline as a trigger-side collapse — check `n_human` / human-tagged DB rows
+    and `below_sharpness_floor` rows before concluding motion detection broke.
+  - **DB rows/day will RISE, roughly ~2x.** Below-floor bursts that used to vanish
+    with zero trace (no DB row at all) are now logged every time. This is a
+    measurement-completeness change, not trigger-volume growth — do not read a
+    jump in `total_triggers` as an anomaly or as evidence the motion threshold
+    needs retuning.
+  - Neither shift is an FP or FN regression signal by itself. If `fp_rate` or
+    `fn_rate` genuinely move, attribute using the new `detection_status=human` and
+    `sharpness_info.below_sharpness_floor` fields before concluding a knob needs
+    to change.
+- **No env-lever deploy recorded in `state.json.deployed`** — both fixes are code
+  defaults already in the running config (not env-var overrides), so `deployed={}`
+  ("stock config") remains literally true even though behavior changed. This is
+  exactly why this entry exists: `deployed={}` is no longer a reliable proxy for
+  "nothing changed" starting today. `experiments/state.json` backlog entries #5 and
+  #6 updated to `concluded`/`live` to match the run docs.

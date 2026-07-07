@@ -30,11 +30,18 @@
       "validation": "live"
     },
     {
-      "hypothesis": "PROPOSED 2026-06-30 (pending Daniel's product/privacy call). Humans the classifier IDs as 'homo species' get detection_status=identified, which is NOT in _REVIEW_STATUSES={NO_ANIMAL,UNCLASSIFIABLE}, so they bypass the \ud83d\udd0d REVIEW prefix and LEAK to the MAIN channel as if a real wildlife ID. Confirmed in code (data_models.is_review_detection is taxon-blind; wildlife_system.py:446) + 2 visually-confirmed human leaks tonight (1163 19:28, 1167 19:48). Fix = route homo/human IDs to REVIEW (or suppress) regardless of status; code change, minimal/reversible, ZERO FN risk to wildlife. Parked because whether to alert on humans at all is Daniel's call (cf. no-second-channel). See runs/0004.",
+      "hypothesis": "CONCLUDED 2026-07-07 (shipped). Daniel's product/privacy call: SUPPRESS human alerts entirely (no Telegram, not REVIEW-tagged); saved photos of HUMAN-status detections kept 48h then purged, DB row kept as metadata-only. Fix shipped as a MegaDetector person-gate (human_detection_confidence>=0.3) OR homo-taxon check, evaluated before the animal branch \u2014 broader than the originally-proposed taxon-only REVIEW-tag fix, since most human captures are blurry NO_ANIMAL/UNCLASSIFIABLE frames never tagged 'homo'. New config: SPECIES_HUMAN_DETECTION_CONFIDENCE, PERFORMANCE_SUPPRESS_HUMAN_ALERTS, PERFORMANCE_HUMAN_RETENTION_HOURS; new DetectionStatus.HUMAN. Shipped on branch fix/human-gate-blur-gate. Leak-watch continues post-deploy as verification. See runs/0004 Resolution + JOURNAL 2026-07-08.",
       "id": 5,
       "slug": "human-main-channel-leak",
-      "status": "proposed",
-      "validation": "parked"
+      "status": "concluded",
+      "validation": "live"
+    },
+    {
+      "hypothesis": "CONCLUDED 2026-07-07 (shipped). The sharpness floor (min_sharpness_threshold=11.0) in _capture_and_select_best_frame silently discarded low-light/dusk captures (return None,None before DB logging or notification), causing unrecorded false negatives \u2014 e.g. the 07-07 ~19:10 pond bird detected 17x across 4 captured bursts, never logged. Fix: below-floor bursts now always get species ID + a DB row; alert if an animal is found (even blurry), mute (DB-log only, no Telegram) if not, so REVIEW volume does not rise. fn_risk down, fp_rate unchanged. Shipped on branch fix/human-gate-blur-gate. See runs/0005 + JOURNAL 2026-07-08.",
+      "id": 6,
+      "slug": "blur-gate-false-negative",
+      "status": "concluded",
+      "validation": "live"
     }
   ],
   "baselines": {

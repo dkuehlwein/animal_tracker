@@ -111,6 +111,8 @@ All configuration is centralized in `Config` class with nested dataclasses:
 - **Storage**: `max_images` (100 bursts) with automatic cleanup of oldest bursts
 - **Debug**: `send_annotated_image` (false) - when enabled, sends motion detection overlay image alongside the original photo in Telegram
 - **Species Identification**: `model_version` (v4.0.1a), `country_code` (DEU), `admin1_region` (NW), `unknown_species_threshold` (0.5)
+- **Human/Privacy Gate**: `human_detection_confidence` (0.3) - MegaDetector person-category confidence that, alone or together with a `homo` taxonomy segment in the SpeciesNet ensemble prediction, classifies a burst as `DetectionStatus.HUMAN`; evaluated *before* the animal branch, so a frame with both a person and a confident animal still routes to HUMAN. `suppress_human_alerts` (true) - HUMAN-status detections are still species-ID'd and DB-logged, but no Telegram notification is sent (not REVIEW-tagged, suppressed entirely). `human_retention_hours` (48) - saved burst photos for HUMAN-status detections are purged this many hours after capture; the DB row is kept as a metadata-only record.
+- **Blur Gate**: `min_sharpness_threshold` (11.0) - a burst whose best frame scores below this is no longer silently discarded. It still gets a real image path + `sharpness_info`, flows through species ID, and is always DB-logged. The notification layer then decides: an animal found in a below-floor burst still alerts (with `below_sharpness_floor` noted); a below-floor burst with a review-class status (NO_ANIMAL/UNCLASSIFIABLE, no animal found) is DB-logged but *not* sent to Telegram, so REVIEW-channel volume doesn't rise. The human-privacy gate takes precedence over the blur mute (a blurry human burst is suppressed as HUMAN, not as blur).
 
 ### Configuration Architecture
 
@@ -173,7 +175,9 @@ Additional optional environment variables for fine-tuning:
 - Camera: `CAMERA_MAIN_RESOLUTION`, `CAMERA_MOTION_RESOLUTION`, `CAMERA_EXPOSURE_TIME`, `CAMERA_ANALOGUE_GAIN`
 - Performance: `PERFORMANCE_COOLDOWN`, `PERFORMANCE_MAX_IMAGES`, `PERFORMANCE_SEND_ANNOTATED_IMAGE` (debug: send motion overlay alongside original, default false)
   `PERFORMANCE_REVIEW_PREFIX_ENABLED` (prefix likely-false-positive notifications — NO_ANIMAL/UNCLASSIFIABLE — with a 🔍 REVIEW header in the same channel; default true)
-- Species: `SPECIES_COUNTRY_CODE`, `SPECIES_REGION`, `SPECIES_UNKNOWN_THRESHOLD`
+  `PERFORMANCE_SUPPRESS_HUMAN_ALERTS` (skip the Telegram notification entirely for HUMAN-status detections; still species-ID'd and DB-logged; default true)
+  `PERFORMANCE_HUMAN_RETENTION_HOURS` (purge saved burst photos of HUMAN-status detections after this many hours; DB row kept as metadata-only; default 48)
+- Species: `SPECIES_COUNTRY_CODE`, `SPECIES_REGION`, `SPECIES_UNKNOWN_THRESHOLD`, `SPECIES_HUMAN_DETECTION_CONFIDENCE` (MegaDetector person-category confidence, combined with a `homo` taxonomy check, that fires `DetectionStatus.HUMAN`; default 0.3)
 
 ### Hardware Dependencies
 
