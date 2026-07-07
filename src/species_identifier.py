@@ -203,7 +203,7 @@ class SpeciesIdentifier:
 
         if human_gate_fired:
             human_confidence = (
-                max_person_conf if person_detections else pred.get('prediction_score', 0.0)
+                max_person_conf if max_person_conf >= self.config.species.human_detection_confidence else pred.get('prediction_score', 0.0)
             )
             logger.info(
                 f"Human detected (person_conf={max_person_conf:.2f}, "

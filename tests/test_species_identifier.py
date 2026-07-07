@@ -112,6 +112,32 @@ def test_homo_taxon_ensemble_with_zero_person_conf_sets_human_status(tmp_path):
     assert result.confidence == 0.994
 
 
+def test_person_below_threshold_but_homo_taxon_fires_uses_ensemble_confidence(tmp_path):
+    """Person box at conf 0.1 < threshold 0.3, homo-taxon ensemble at 0.85 → HUMAN with confidence 0.85.
+
+    Regression: when the gate fires due to homo-taxon (not person-box), the reported
+    confidence must come from the signal that fired it, not from the weak person-box conf.
+    """
+    from data_models import DetectionStatus
+
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "person", "conf": 0.1, "bbox": [0, 0, 1, 1]}],
+        prediction="e3954aac;mammalia;primates;hominidae;homo;;homo species",
+        prediction_score=0.85,
+        classifications={
+            "classes": ["e3954aac;mammalia;primates;hominidae;homo;;homo species"],
+            "scores": [0.85],
+        },
+    )
+    assert result.status == DetectionStatus.HUMAN
+    assert result.species_name == "human"
+    # Gate fired due to homo-taxon (person conf 0.1 < 0.3 threshold), so confidence
+    # must come from the ensemble prediction_score, not the weak person-box.
+    assert result.confidence == 0.85
+
+
 def test_non_homo_taxon_prediction_does_not_trigger_human_gate(tmp_path):
     """A normal species taxonomy string must not be mistaken for 'homo'."""
     from data_models import DetectionStatus
