@@ -288,11 +288,15 @@ class WildlifeSystem:
                 logger.error("Sharpness analysis failed")
                 return None, None
 
-            # Check if sharpness meets minimum threshold - skip if too blurry
-            if best_score < self.config.performance.min_sharpness_threshold:
+            # Check if sharpness meets minimum threshold. Below-floor bursts are
+            # no longer silently dropped (Task 4) — they still get a real path
+            # and sharpness_info so process_detection can log + ID them; only
+            # the notification layer decides whether to alert on them.
+            below_sharpness_floor = best_score < self.config.performance.min_sharpness_threshold
+            if below_sharpness_floor:
                 logger.info(f"Best frame sharpness ({best_score:.1f}) below threshold "
-                           f"({self.config.performance.min_sharpness_threshold}) - skipping")
-                return None, None
+                           f"({self.config.performance.min_sharpness_threshold}) - "
+                           f"processing anyway (blur gate no longer discards bursts)")
 
             # The best frame was already saved as one of the burst frames
             # Identify which saved path corresponds to the best frame
@@ -313,6 +317,7 @@ class WildlifeSystem:
                 'frame_count': len(frames),
                 'all_scores': all_scores,
                 'meets_threshold': best_score >= self.config.performance.min_sharpness_threshold,
+                'below_sharpness_floor': below_sharpness_floor,
                 'all_frame_paths': saved_paths  # Include all saved paths for reference
             }
 

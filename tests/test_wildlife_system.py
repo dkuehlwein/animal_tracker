@@ -215,6 +215,66 @@ async def test_human_detection_notifies_when_flag_disabled(system, tmp_path):
     system.cleanup_old_images.assert_called_once()
 
 
+def test_capture_and_select_best_frame_below_floor_returns_path_not_none(system, tmp_path, monkeypatch):
+    """Task 4: a below-floor best frame must NOT be silently discarded —
+    the burst still yields a usable path + sharpness_info tagged
+    below_sharpness_floor=True (previously this returned (None, None) and
+    the whole burst vanished with no DB row).
+    """
+    import wildlife_system
+
+    fake_frame = np.zeros((10, 10, 3), dtype=np.uint8)
+    system.camera.capture_burst_frames = MagicMock(return_value=[fake_frame] * 3)
+    image_dir = system.config.storage.image_dir
+    image_dir.mkdir(parents=True, exist_ok=True)
+    saved_paths = [image_dir / f"capture_x_frame{i}.jpg" for i in range(1, 4)]
+    for p in saved_paths:
+        p.write_bytes(b"fake")
+    system.camera.save_burst_frames = MagicMock(return_value=saved_paths)
+
+    below_floor_score = system.config.performance.min_sharpness_threshold - 2.0
+    monkeypatch.setattr(
+        wildlife_system.SharpnessAnalyzer,
+        "select_sharpest_frame",
+        staticmethod(lambda *a, **k: (fake_frame, 1, below_floor_score, [8.0, below_floor_score, 8.2])),
+    )
+
+    path, info = system._capture_and_select_best_frame()
+
+    assert path == saved_paths[1]
+    assert info is not None
+    assert info['below_sharpness_floor'] is True
+    assert info['meets_threshold'] is False
+    assert info['sharpness_score'] == below_floor_score
+
+
+def test_capture_and_select_best_frame_above_floor_flag_false(system, tmp_path, monkeypatch):
+    """Baseline: an above-floor best frame is tagged below_sharpness_floor=False."""
+    import wildlife_system
+
+    fake_frame = np.zeros((10, 10, 3), dtype=np.uint8)
+    system.camera.capture_burst_frames = MagicMock(return_value=[fake_frame] * 3)
+    image_dir = system.config.storage.image_dir
+    image_dir.mkdir(parents=True, exist_ok=True)
+    saved_paths = [image_dir / f"capture_y_frame{i}.jpg" for i in range(1, 4)]
+    for p in saved_paths:
+        p.write_bytes(b"fake")
+    system.camera.save_burst_frames = MagicMock(return_value=saved_paths)
+
+    above_floor_score = system.config.performance.min_sharpness_threshold + 10.0
+    monkeypatch.setattr(
+        wildlife_system.SharpnessAnalyzer,
+        "select_sharpest_frame",
+        staticmethod(lambda *a, **k: (fake_frame, 0, above_floor_score, [above_floor_score] * 3)),
+    )
+
+    path, info = system._capture_and_select_best_frame()
+
+    assert path == saved_paths[0]
+    assert info['below_sharpness_floor'] is False
+    assert info['meets_threshold'] is True
+
+
 @pytest.mark.asyncio
 async def test_cooldown_keeps_feeding_motion_detector(monkeypatch):
     """During post-detection cooldown the loop must keep calling
