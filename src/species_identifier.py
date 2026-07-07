@@ -181,6 +181,45 @@ class SpeciesIdentifier:
             processing_time=processing_time
         )
 
+        # ------------------------------------------------------------------
+        # Human/privacy gate — evaluated before the animal branch so a frame
+        # with both a person and a confident animal still routes to HUMAN.
+        # ------------------------------------------------------------------
+        person_detections = [
+            d for d in detections
+            if d['category'] in (2, '2', 'person', 'human')
+        ]
+        max_person_conf = max((d['conf'] for d in person_detections), default=0.0)
+
+        ensemble_prediction = pred.get('prediction') or ''
+        is_homo_taxon = any(
+            segment == 'homo' for segment in ensemble_prediction.split(';')
+        )
+
+        human_gate_fired = (
+            max_person_conf >= self.config.species.human_detection_confidence
+            or is_homo_taxon
+        )
+
+        if human_gate_fired:
+            human_confidence = (
+                max_person_conf if person_detections else pred.get('prediction_score', 0.0)
+            )
+            logger.info(
+                f"Human detected (person_conf={max_person_conf:.2f}, "
+                f"homo_taxon={is_homo_taxon}, processing: {processing_time:.2f}s)"
+            )
+            return IdentificationResult(
+                species_name='human',
+                confidence=human_confidence,
+                api_success=True,
+                processing_time=processing_time,
+                fallback_reason='Human detected (privacy gate)',
+                detection_result=detection_result,
+                animals_detected=animals_detected,
+                status=DetectionStatus.HUMAN,
+            )
+
         # Check if any animals were detected
         if not animals_detected:
             logger.info(f"No animals detected (total detections: {len(detections)}, "
