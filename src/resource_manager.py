@@ -8,7 +8,8 @@ into a cohesive module for Raspberry Pi resource optimization.
 import gc
 import logging
 import psutil
-from datetime import datetime
+from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Optional
 
 from config import Config
@@ -63,15 +64,21 @@ class MemoryManager:
 class StorageManager:
     """File and storage management utilities."""
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, database=None):
         self.config = config
+        # Optional DatabaseManager reference used only by purge_human_bursts()
+        # (Task 3 privacy purge). None keeps legacy call sites (and tests)
+        # working unchanged; the purge is simply a no-op without it.
+        self.database = database
 
     def cleanup_old_images(self) -> int:
         """
-        Delete oldest image bursts if exceeding max limit.
+        Delete oldest image bursts if exceeding max limit, and purge any
+        HUMAN-status bursts past the privacy retention window.
         Groups burst frames together (e.g., capture_20231225_120000_frame1.jpg, _frame2.jpg, etc.)
         and treats each burst as a single unit for cleanup purposes.
         """
+        self.purge_human_bursts()
         try:
             # Get all capture files (excluding annotated versions)
             all_files = [
@@ -133,6 +140,86 @@ class StorageManager:
         except Exception as e:
             logger.error(f"Error in image cleanup: {e}", exc_info=True)
             return 0
+
+    def purge_human_bursts(self) -> int:
+        """
+        Delete the saved photos of HUMAN-status detections older than
+        `human_retention_hours` (privacy purge, Task 3). The DB row for each
+        detection is deliberately kept as a metadata-only record — only the
+        image files are removed.
+
+        A no-op if this StorageManager wasn't given a database reference, or
+        if no burst files remain (idempotent when files are already gone).
+        """
+        if self.database is None:
+            return 0
+
+        try:
+            cutoff = datetime.now() - timedelta(hours=self.config.performance.human_retention_hours)
+            rows = self.database.get_human_detections_older_than(cutoff)
+
+            deleted_count = 0
+            for _detection_id, image_path, _timestamp in rows:
+                base = self._burst_base(image_path)
+                deleted_count += self._delete_burst_files(base)
+
+            if rows:
+                logger.info(
+                    f"Purged {len(rows)} human-status burst(s) "
+                    f"({deleted_count} files) older than "
+                    f"{self.config.performance.human_retention_hours}h"
+                )
+            return deleted_count
+
+        except Exception as e:
+            logger.error(f"Error purging human bursts: {e}", exc_info=True)
+            return 0
+
+    @staticmethod
+    def _burst_base(image_path) -> str:
+        """Derive a burst's base name from any one of its frame paths.
+
+        e.g. ".../capture_20231225_120000_frame1.jpg" -> "capture_20231225_120000"
+        """
+        stem = Path(image_path).stem
+        if "_frame" in stem:
+            return stem.rsplit("_frame", 1)[0]
+        return stem
+
+    def _delete_burst_files(self, base: str) -> int:
+        """Delete every file belonging to one burst (frames + annotated
+        variants), constrained to image_dir. Idempotent: files that are
+        already missing are simply skipped, never raised on.
+        """
+        deleted_count = 0
+        image_dir = self.config.storage.image_dir
+
+        # Burst frames (capture_TS_frameN.jpg) and old-format single files
+        # (capture_TS.jpg) that happen to still be on disk for this base.
+        candidates = [
+            f for f in image_dir.glob(f"{base}*.jpg")
+            if "_annotated" not in f.stem
+        ]
+
+        for file_path in candidates:
+            try:
+                file_path.unlink()
+                deleted_count += 1
+            except FileNotFoundError:
+                pass
+            except Exception as e:
+                logger.error(f"Error deleting {file_path}: {e}", exc_info=True)
+                continue
+
+            annotated_path = file_path.parent / f"{file_path.stem}_annotated{file_path.suffix}"
+            try:
+                if annotated_path.exists():
+                    annotated_path.unlink()
+                    deleted_count += 1
+            except Exception as e:
+                logger.error(f"Error deleting {annotated_path}: {e}", exc_info=True)
+
+        return deleted_count
 
     def get_storage_info(self) -> Optional[dict]:
         """Get storage space information."""

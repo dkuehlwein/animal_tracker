@@ -44,8 +44,10 @@ class WildlifeSystem:
         self.motion_detector = MotionDetector(self.config)
         self.telegram_service = NotificationService(self.config)
         self.system_monitor = SystemMonitor(self.config)
-        self.file_manager = StorageManager(self.config)
         self.database = DatabaseManager(self.config)
+        # file_manager needs the DB reference for the Task 3 human-burst
+        # privacy purge (queries HUMAN-status rows to delete their photos).
+        self.file_manager = StorageManager(self.config, database=self.database)
         self.species_identifier = SpeciesIdentifier(self.config)
         self.sun_checker = SunChecker(self.config)
         self.timelapse_writer = TimelapseWriter(self.config)
