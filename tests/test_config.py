@@ -277,5 +277,17 @@ def test_suppress_human_alerts_env_override(monkeypatch):
     assert PerformanceConfig().suppress_human_alerts is False
 
 
+def test_human_retention_hours_defaults_48():
+    from config import Config
+    cfg = Config.create_test_config()
+    assert cfg.performance.human_retention_hours == 48
+
+
+def test_human_retention_hours_env_override(monkeypatch):
+    monkeypatch.setenv("PERFORMANCE_HUMAN_RETENTION_HOURS", "12")
+    from config import PerformanceConfig
+    assert PerformanceConfig().human_retention_hours == 12
+
+
 if __name__ == '__main__':
     pytest.main([__file__])

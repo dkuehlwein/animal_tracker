@@ -154,6 +154,7 @@ class PerformanceConfig(BaseSettings):
     send_annotated_image: bool = False  # Debug: send motion detection overlay alongside original
     review_prefix_enabled: bool = True  # Prefix likely-FP (NO_ANIMAL/UNCLASSIFIABLE) captions with 🔍 REVIEW header
     suppress_human_alerts: bool = True  # Skip Telegram notification for HUMAN-status detections (still DB-logged)
+    human_retention_hours: int = 48  # Purge saved photos of HUMAN-status detections after this many hours (DB row kept)
 
     # Timelapse FN-audit channel (ADR-004 Phase 1): low-rate independent capture
     enable_timelapse: bool = True
