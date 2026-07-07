@@ -547,11 +547,32 @@ class WildlifeSystem:
         # only decide whether to bother building annotations and sending the
         # Telegram notification. Family members walking through the garden
         # shouldn't flood the channel.
-        if (self.config.performance.suppress_human_alerts
-                and is_human_detection(species_result.get('detection_status'))):
+        #
+        # Blur gate (Task 4): the sharpness floor used to silently drop the
+        # whole burst (no DB row, no notification) whenever the best frame
+        # was too blurry. process_detection now always logs the burst; here
+        # we only suppress Telegram for blurry bursts where nothing was
+        # found (review-class status), so REVIEW-channel volume doesn't
+        # increase. A blurry animal still alerts — human-gate takes
+        # precedence so a blurry human gets exactly one suppression log.
+        is_human = (self.config.performance.suppress_human_alerts
+                    and is_human_detection(species_result.get('detection_status')))
+        is_blurry_review = (
+            not is_human
+            and bool(sharpness_info)
+            and sharpness_info.get('below_sharpness_floor')
+            and is_review_detection(species_result.get('detection_status'))
+        )
+        if is_human:
             logger.info(
                 f"[HUMAN-GATE] Suppressing notification for detection "
                 f"{species_result.get('detection_id')} (status=human)"
+            )
+        elif is_blurry_review:
+            logger.info(
+                f"[BLUR] Suppressing notification for detection "
+                f"{species_result.get('detection_id')} "
+                f"(sharpness={sharpness_info.get('sharpness_score'):.1f}, no animal found)"
             )
         else:
             # Annotated image: combined motion overlay + MegaDetector

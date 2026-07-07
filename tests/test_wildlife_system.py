@@ -60,6 +60,31 @@ def _identification(animals_detected, boxes=None):
     )
 
 
+def _identification_no_animal():
+    """A review-class (NO_ANIMAL) result — status is what is_review_detection
+    actually keys off, distinct from the plain `animals_detected=False` used
+    by `_identification(False)` (which leaves status at its IDENTIFIED
+    default and is not review-class).
+    """
+    from data_models import IdentificationResult, DetectionResult, DetectionStatus
+    det = DetectionResult(
+        animals_detected=False,
+        detection_count=0,
+        bounding_boxes=[],
+        detections=[],
+        processing_time=0.1,
+    )
+    return IdentificationResult(
+        species_name="Unknown species",
+        confidence=0.0,
+        api_success=True,
+        processing_time=0.5,
+        detection_result=det,
+        animals_detected=False,
+        status=DetectionStatus.NO_ANIMAL,
+    )
+
+
 def _identification_human(confidence=0.9):
     from data_models import IdentificationResult, DetectionResult, DetectionStatus
     det = DetectionResult(
@@ -213,6 +238,142 @@ async def test_human_detection_notifies_when_flag_disabled(system, tmp_path):
 
     assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
     system.cleanup_old_images.assert_called_once()
+
+
+def _below_floor_sharpness_info(score=8.6):
+    return {
+        'sharpness_score': score,
+        'selected_frame_index': 0,
+        'frame_count': 5,
+        'all_scores': [score] * 5,
+        'meets_threshold': False,
+        'below_sharpness_floor': True,
+        'all_frame_paths': [],
+    }
+
+
+def _above_floor_sharpness_info(score=25.0):
+    return {
+        'sharpness_score': score,
+        'selected_frame_index': 0,
+        'frame_count': 5,
+        'all_scores': [score] * 5,
+        'meets_threshold': True,
+        'below_sharpness_floor': False,
+        'all_frame_paths': [],
+    }
+
+
+@pytest.mark.asyncio
+async def test_blurry_animal_still_notifies(system, tmp_path):
+    """Task 4: a below-floor burst that DID find an animal still alerts —
+    a blurry bird beats no bird.
+    """
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification(True, boxes=[{'confidence': 0.7}])
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(
+        img, 5000, sharpness_info=_below_floor_sharpness_info()
+    )
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    system.cleanup_old_images.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_blurry_no_animal_suppresses_notification_but_logs_and_cleans_up(system, tmp_path, caplog):
+    """Task 4: a below-floor burst with no animal found gets a DB row
+    (process_detection logs unconditionally) but no Telegram send, and
+    cleanup still runs — the blur gate no longer creates untracked drops
+    and doesn't add REVIEW-channel volume either.
+    """
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(
+            img, 5000, sharpness_info=_below_floor_sharpness_info()
+        )
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    telegram.send_detection_notification.assert_not_called()
+    telegram.send_document.assert_not_called()
+    system.cleanup_old_images.assert_called_once()
+    assert any("[BLUR]" in r.message for r in caplog.records)
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row is not None
+    assert row['detection_status'] == 'no_animal'
+
+
+@pytest.mark.asyncio
+async def test_sharp_no_animal_still_notifies_unchanged(system, tmp_path):
+    """Baseline (must stay unchanged by Task 4): an above-floor burst with
+    no animal found still gets a Telegram notification today (routed
+    through the REVIEW-prefix path), it's just not the blur gate's job to
+    suppress it.
+    """
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(
+        img, 5000, sharpness_info=_above_floor_sharpness_info()
+    )
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    system.cleanup_old_images.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_blurry_human_suppressed_via_human_gate_single_log(system, tmp_path, caplog):
+    """Task 4: a below-floor HUMAN burst must be suppressed by the human
+    gate (Task 2), not double-handled by the blur gate — exactly one
+    suppression log line, and it's the [HUMAN-GATE] one, not [BLUR].
+    """
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(return_value=_identification_human())
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(
+            img, 5000, sharpness_info=_below_floor_sharpness_info()
+        )
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    system.cleanup_old_images.assert_called_once()
+
+    gate_logs = [r.message for r in caplog.records if "HUMAN-GATE" in r.message or "[BLUR]" in r.message]
+    assert len(gate_logs) == 1
+    assert "HUMAN-GATE" in gate_logs[0]
 
 
 def test_capture_and_select_best_frame_below_floor_returns_path_not_none(system, tmp_path, monkeypatch):
