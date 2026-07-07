@@ -5,7 +5,7 @@ WAL, schema migration, richer detection logging, and the feedback table.
 
 import sqlite3
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -211,3 +211,56 @@ def test_add_feedback_created_at_is_local_time(tmp_path):
         f"Expected local time in [{before}, {after}] but got {stored}. "
         "Is created_at being written in UTC instead of local time?"
     )
+
+
+# ---------------------------------------------------------------------------
+# get_human_detections_older_than (Task 3: 48h privacy purge)
+# ---------------------------------------------------------------------------
+
+def _age_row(db_path, detection_id, hours_ago):
+    """Back-date a detections.timestamp for purge-window testing."""
+    ts = (datetime.now() - timedelta(hours=hours_ago)).strftime("%Y-%m-%d %H:%M:%S")
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("UPDATE detections SET timestamp = ? WHERE id = ?", (ts, detection_id))
+        conn.commit()
+    return ts
+
+
+def test_get_human_detections_older_than_returns_old_human_row(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(
+        image_path="capture_old_frame1.jpg", motion_area=10, detection_status="human"
+    )
+    ts = _age_row(db_path, det_id, hours_ago=49)
+
+    cutoff = datetime.now() - timedelta(hours=48)
+    rows = db.get_human_detections_older_than(cutoff)
+
+    assert rows == [(det_id, "capture_old_frame1.jpg", ts)]
+
+
+def test_get_human_detections_older_than_excludes_recent_human_row(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(
+        image_path="capture_recent_frame1.jpg", motion_area=10, detection_status="human"
+    )
+    _age_row(db_path, det_id, hours_ago=1)
+
+    cutoff = datetime.now() - timedelta(hours=48)
+    rows = db.get_human_detections_older_than(cutoff)
+
+    assert rows == []
+
+
+def test_get_human_detections_older_than_excludes_non_human_row(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(
+        image_path="capture_old_animal_frame1.jpg", motion_area=10,
+        detection_status="identified",
+    )
+    _age_row(db_path, det_id, hours_ago=100)
+
+    cutoff = datetime.now() - timedelta(hours=48)
+    rows = db.get_human_detections_older_than(cutoff)
+
+    assert rows == []

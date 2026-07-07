@@ -327,6 +327,31 @@ class DatabaseManager:
             logger.error(f"Error cleaning up old detections: {e}", exc_info=True)
             return 0
     
+    def get_human_detections_older_than(self, cutoff: datetime) -> List[tuple]:
+        """Return (id, image_path, timestamp) for HUMAN-status detections older than cutoff.
+
+        Used by the Task 3 privacy purge: saved photos of human detections are
+        deleted after `human_retention_hours`, but the DB row (a metadata-only
+        record) is kept. `timestamp` is stored as a local wall-clock string in
+        "%Y-%m-%d %H:%M:%S" format, which sorts lexicographically identically
+        to chronological order, so a plain string comparison against the
+        cutoff (formatted the same way) is correct here.
+        """
+        cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT id, image_path, timestamp
+                    FROM detections
+                    WHERE detection_status = 'human' AND timestamp < ?
+                ''', (cutoff_str,))
+                return cursor.fetchall()
+        except sqlite3.Error as e:
+            raise DatabaseOperationError(f"Failed to get human detections: {e}") from e
+        except Exception as e:
+            raise DatabaseError(f"Unexpected error getting human detections: {e}") from e
+
     def is_first_detection_today(self, species_name):
         """Check if this is the first detection of this species today"""
         today = datetime.now().strftime('%Y-%m-%d')
