@@ -265,5 +265,17 @@ def test_review_prefix_enabled_env_override(monkeypatch):
     assert PerformanceConfig().review_prefix_enabled is False
 
 
+def test_suppress_human_alerts_defaults_true():
+    from config import Config
+    cfg = Config.create_test_config()
+    assert cfg.performance.suppress_human_alerts is True
+
+
+def test_suppress_human_alerts_env_override(monkeypatch):
+    monkeypatch.setenv("PERFORMANCE_SUPPRESS_HUMAN_ALERTS", "false")
+    from config import PerformanceConfig
+    assert PerformanceConfig().suppress_human_alerts is False
+
+
 if __name__ == '__main__':
     pytest.main([__file__])
