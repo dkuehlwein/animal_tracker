@@ -24,7 +24,7 @@ from resource_manager import SystemMonitor, StorageManager
 from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnalyzer, get_species_emoji
 from feedback_protocol import build_feedback_keyboard
 from timelapse_writer import TimelapseWriter
-from data_models import DetectionStatus, is_review_detection
+from data_models import DetectionStatus, is_review_detection, is_human_detection
 
 logger = logging.getLogger(__name__)
 
@@ -512,8 +512,102 @@ class WildlifeSystem:
             await self.telegram_service.send_detection_notification(
                 species_result, motion_area, timestamp, temperature
             )
-    
-    
+
+    async def _process_and_notify_detection(self, image_path: Path, motion_area: int,
+                                             sharpness_info: Optional[dict] = None) -> None:
+        """Run species ID + DB logging for a captured burst, then notify
+        (unless human-gated) and clean up. Extracted from the main loop so
+        the human-privacy gate can be exercised directly in tests.
+        """
+        loop = asyncio.get_running_loop()
+
+        # Process detection (species ID + database logging)
+        # Run in executor to avoid blocking event loop during 15-20s SpeciesNet inference
+        species_result, timestamp = await loop.run_in_executor(
+            self.executor,
+            self.process_detection,
+            image_path,
+            motion_area,
+            self.last_motion_result
+        )
+
+        # Add sharpness info to species result for notification
+        if sharpness_info:
+            species_result['sharpness_info'] = sharpness_info
+
+        # Human-privacy gate (Task 2): the detection is already logged to the
+        # DB above (process_detection does that unconditionally); here we
+        # only decide whether to bother building annotations and sending the
+        # Telegram notification. Family members walking through the garden
+        # shouldn't flood the channel.
+        if (self.config.performance.suppress_human_alerts
+                and is_human_detection(species_result.get('detection_status'))):
+            logger.info(
+                f"[HUMAN-GATE] Suppressing notification for detection "
+                f"{species_result.get('detection_id')} (status=human)"
+            )
+        else:
+            # Annotated image: combined motion overlay + MegaDetector
+            # species box. Sent whenever a detection box exists (default-on);
+            # otherwise the motion-only overlay is built only when the
+            # send_annotated_image debug flag is set.
+            annotated_path = None
+            detection_result = species_result.get('detection_result')
+            species_boxes = (
+                detection_result.bounding_boxes if detection_result else None
+            )
+            motion_result_for_overlay = (
+                self.last_motion_result
+                if self.last_motion_frame is not None else None
+            )
+            want_annotation = bool(species_boxes) or (
+                self.config.performance.send_annotated_image
+                and motion_result_for_overlay is not None
+            )
+            if want_annotation:
+                # Title the detection box with the identified
+                # species (fall back to "Animal" when SpeciesNet
+                # detected something but couldn't name it).
+                species_label = None
+                if species_boxes:
+                    sp = self._extract_species_name(
+                        species_result.get('species_name', '')
+                    )
+                    if sp and sp.strip().lower() not in (
+                        'unknown species', 'blank', ''
+                    ):
+                        species_label = sp
+                    else:
+                        species_label = "Animal"
+                annotated_path = await loop.run_in_executor(
+                    self.executor,
+                    functools.partial(
+                        MotionVisualizer.create_annotated_image,
+                        image_path,
+                        self.last_motion_frame,
+                        self.config,
+                        motion_result_for_overlay,
+                        bounding_boxes=species_boxes,
+                        species_label=species_label,
+                    )
+                )
+
+            # Send notification with image (and annotated image if debug enabled).
+            # Attach the full-res original as a document only when a detection
+            # box exists (i.e. an actual animal detection), not for FP motion.
+            document_path = image_path if species_boxes else None
+            await self.send_notification(species_result, motion_area, timestamp,
+                                        image_path, annotated_path,
+                                        document_path=document_path)
+
+        # Cleanup old images (now only when needed, not in hot path)
+        # Only cleanup after successful detection to avoid overhead
+        await loop.run_in_executor(self.executor, self.cleanup_old_images)
+
+        # Log system status after large detections
+        if motion_area > self.config.motion.motion_threshold * 2:
+            self.system_monitor.log_system_status()
+
     async def run(self):
         """Main loop for wildlife detection system"""
         logger.info("Wildlife Detection System with SpeciesNet is running...")
@@ -697,80 +791,9 @@ class WildlifeSystem:
                                     )
 
                             if image_path:
-                                # Process detection (species ID + database logging)
-                                # Run in executor to avoid blocking event loop during 15-20s SpeciesNet inference
-                                species_result, timestamp = await loop.run_in_executor(
-                                    self.executor,
-                                    self.process_detection,
-                                    image_path,
-                                    motion_area,
-                                    self.last_motion_result
+                                await self._process_and_notify_detection(
+                                    image_path, motion_area, sharpness_info
                                 )
-                                
-                                # Add sharpness info to species result for notification
-                                if sharpness_info:
-                                    species_result['sharpness_info'] = sharpness_info
-
-                                # Annotated image: combined motion overlay + MegaDetector
-                                # species box. Sent whenever a detection box exists (default-on);
-                                # otherwise the motion-only overlay is built only when the
-                                # send_annotated_image debug flag is set.
-                                annotated_path = None
-                                detection_result = species_result.get('detection_result')
-                                species_boxes = (
-                                    detection_result.bounding_boxes if detection_result else None
-                                )
-                                motion_result_for_overlay = (
-                                    self.last_motion_result
-                                    if self.last_motion_frame is not None else None
-                                )
-                                want_annotation = bool(species_boxes) or (
-                                    self.config.performance.send_annotated_image
-                                    and motion_result_for_overlay is not None
-                                )
-                                if want_annotation:
-                                    # Title the detection box with the identified
-                                    # species (fall back to "Animal" when SpeciesNet
-                                    # detected something but couldn't name it).
-                                    species_label = None
-                                    if species_boxes:
-                                        sp = self._extract_species_name(
-                                            species_result.get('species_name', '')
-                                        )
-                                        if sp and sp.strip().lower() not in (
-                                            'unknown species', 'blank', ''
-                                        ):
-                                            species_label = sp
-                                        else:
-                                            species_label = "Animal"
-                                    annotated_path = await loop.run_in_executor(
-                                        self.executor,
-                                        functools.partial(
-                                            MotionVisualizer.create_annotated_image,
-                                            image_path,
-                                            self.last_motion_frame,
-                                            self.config,
-                                            motion_result_for_overlay,
-                                            bounding_boxes=species_boxes,
-                                            species_label=species_label,
-                                        )
-                                    )
-
-                                # Send notification with image (and annotated image if debug enabled).
-                                # Attach the full-res original as a document only when a detection
-                                # box exists (i.e. an actual animal detection), not for FP motion.
-                                document_path = image_path if species_boxes else None
-                                await self.send_notification(species_result, motion_area, timestamp,
-                                                            image_path, annotated_path,
-                                                            document_path=document_path)
-
-                                # Cleanup old images (now only when needed, not in hot path)
-                                # Only cleanup after successful detection to avoid overhead
-                                await loop.run_in_executor(self.executor, self.cleanup_old_images)
-
-                                # Log system status after large detections
-                                if motion_area > self.config.motion.motion_threshold * 2:
-                                    self.system_monitor.log_system_status()
 
                             # Disabled: was wiping MOG2 shadow model on every detection;
                             # rely on natural background adaptation (history=500) + shadow detection instead.

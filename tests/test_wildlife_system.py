@@ -60,6 +60,26 @@ def _identification(animals_detected, boxes=None):
     )
 
 
+def _identification_human(confidence=0.9):
+    from data_models import IdentificationResult, DetectionResult, DetectionStatus
+    det = DetectionResult(
+        animals_detected=True,
+        detection_count=1,
+        bounding_boxes=[{'confidence': confidence, 'category': '1'}],
+        detections=[],
+        processing_time=0.1,
+    )
+    return IdentificationResult(
+        species_name="Homo sapiens",
+        confidence=confidence,
+        api_success=True,
+        processing_time=0.5,
+        detection_result=det,
+        animals_detected=True,
+        status=DetectionStatus.HUMAN,
+    )
+
+
 def test_process_detection_persists_richer_fields_and_id(system):
     from data_models import MotionResult
     system.species_identifier.identify_species = MagicMock(
@@ -118,6 +138,81 @@ async def test_send_notification_attaches_feedback_keyboard(system, tmp_path):
     keyboard = kwargs['reply_markup']
     data = [b.callback_data for b in keyboard.inline_keyboard[0]]
     assert data == ["fb:123:a", "fb:123:fp", "fb:123:ws"]
+
+
+def _mock_telegram(system):
+    system.telegram_service = MagicMock()
+    system.telegram_service.send_photo_with_caption = AsyncMock()
+    system.telegram_service.send_media_group = AsyncMock()
+    system.telegram_service.send_text_message = AsyncMock()
+    system.telegram_service.send_detection_notification = AsyncMock()
+    system.telegram_service.send_document = AsyncMock()
+    return system.telegram_service
+
+
+@pytest.mark.asyncio
+async def test_human_detection_suppresses_notification_but_still_cleans_up(system, tmp_path):
+    """HUMAN detection + suppress_human_alerts=True (default): no Telegram
+    call at all, but the DB row is still written (by process_detection) and
+    cleanup_old_images still runs.
+    """
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(return_value=_identification_human())
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    telegram.send_detection_notification.assert_not_called()
+    telegram.send_document.assert_not_called()
+    system.cleanup_old_images.assert_called_once()
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['detection_status'] == 'human'
+
+
+@pytest.mark.asyncio
+async def test_non_human_detection_still_notifies(system, tmp_path):
+    """Baseline: a normal animal detection is unaffected by the gate."""
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification(True, boxes=[{'confidence': 0.7}])
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    system.cleanup_old_images.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_human_detection_notifies_when_flag_disabled(system, tmp_path):
+    """Escape hatch: PERFORMANCE_SUPPRESS_HUMAN_ALERTS=false still notifies on HUMAN."""
+    system.config.performance.suppress_human_alerts = False
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(return_value=_identification_human())
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    system.cleanup_old_images.assert_called_once()
 
 
 @pytest.mark.asyncio
