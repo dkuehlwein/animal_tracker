@@ -41,16 +41,30 @@ class DetectionStatus:
     #: process_detection exception.  Human-readable detail in fallback_reason.
     ERROR = "error"
 
+    #: A person was detected (MegaDetector 'person' box above threshold, or
+    #: the ensemble taxonomy resolved to genus "homo"). Takes precedence over
+    #: the animal branch — privacy first. Downstream tasks suppress
+    #: notifications and purge photos for this status.
+    HUMAN = "human"
+
 
 #: Detection statuses that are routed to human "review" (likely false
 #: positives). Used by the notification layer to prepend a 🔍 REVIEW header.
 #: Kept independent of the DB `gate_would_suppress` shadow column.
 _REVIEW_STATUSES = frozenset({DetectionStatus.NO_ANIMAL, DetectionStatus.UNCLASSIFIABLE})
 
+#: Detection statuses that identify a person rather than wildlife.
+_HUMAN_STATUSES = frozenset({DetectionStatus.HUMAN})
+
 
 def is_review_detection(status) -> bool:
     """True if `status` is a review-class (likely false-positive) detection."""
     return status in _REVIEW_STATUSES
+
+
+def is_human_detection(status) -> bool:
+    """True if `status` identifies a person rather than wildlife."""
+    return status in _HUMAN_STATUSES
 
 
 # =============================================================================

@@ -33,6 +33,31 @@ def test_detection_status_constants_exist():
     assert DetectionStatus.NO_ANIMAL == "no_animal"
     assert DetectionStatus.UNCLASSIFIABLE == "unclassifiable"
     assert DetectionStatus.ERROR == "error"
+    assert DetectionStatus.HUMAN == "human"
+
+
+# ===========================================================================
+# 1c. is_human_detection predicate
+# ===========================================================================
+
+def test_is_human_detection_true_for_human_status():
+    from data_models import DetectionStatus, is_human_detection
+    assert is_human_detection(DetectionStatus.HUMAN) is True
+
+
+def test_is_human_detection_false_for_non_human_statuses():
+    from data_models import DetectionStatus, is_human_detection
+    assert is_human_detection(DetectionStatus.IDENTIFIED) is False
+    assert is_human_detection(DetectionStatus.ANIMAL_UNCERTAIN) is False
+    assert is_human_detection(DetectionStatus.NO_ANIMAL) is False
+    assert is_human_detection(DetectionStatus.UNCLASSIFIABLE) is False
+    assert is_human_detection(DetectionStatus.ERROR) is False
+
+
+def test_is_human_detection_false_for_unknown_value():
+    from data_models import is_human_detection
+    assert is_human_detection(None) is False
+    assert is_human_detection("something_else") is False
 
 
 def test_identification_result_has_status_field():
