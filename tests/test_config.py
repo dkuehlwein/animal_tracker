@@ -105,6 +105,27 @@ class TestSpeciesConfig:
         with pytest.raises(ValidationError):
             SpeciesConfig(model_version="v1.0.0")
 
+    def test_human_detection_confidence_default(self):
+        """Default human_detection_confidence must be 0.3."""
+        config = SpeciesConfig()
+        assert config.human_detection_confidence == 0.3
+
+    def test_human_detection_confidence_env_override(self, monkeypatch):
+        """SPECIES_HUMAN_DETECTION_CONFIDENCE overrides the default."""
+        monkeypatch.setenv("SPECIES_HUMAN_DETECTION_CONFIDENCE", "0.6")
+        config = SpeciesConfig(_env_file=None)
+        assert config.human_detection_confidence == 0.6
+
+    def test_human_detection_confidence_rejects_above_one(self, monkeypatch):
+        monkeypatch.setenv("SPECIES_HUMAN_DETECTION_CONFIDENCE", "1.5")
+        with pytest.raises(ValidationError):
+            SpeciesConfig(_env_file=None)
+
+    def test_human_detection_confidence_rejects_below_zero(self, monkeypatch):
+        monkeypatch.setenv("SPECIES_HUMAN_DETECTION_CONFIDENCE", "-0.1")
+        with pytest.raises(ValidationError):
+            SpeciesConfig(_env_file=None)
+
 
 class TestConfig:
     """Test main configuration class."""

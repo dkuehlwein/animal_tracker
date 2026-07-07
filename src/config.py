@@ -199,6 +199,9 @@ class SpeciesConfig(BaseSettings):
     processing_timeout: float = 30.0
     return_top_k: int = 5
     crop_padding: float = 0.1
+    # Human/privacy gate: MegaDetector person-box confidence at/above this
+    # value fires DetectionStatus.HUMAN (see species_identifier._parse_predictions).
+    human_detection_confidence: float = 0.3
 
     @field_validator('model_version')
     @classmethod
@@ -214,6 +217,15 @@ class SpeciesConfig(BaseSettings):
         if not (low <= v <= high):
             raise ValueError(
                 f"SPECIES_UNKNOWN_SPECIES_THRESHOLD={v} out of allowed bounds [{low}, {high}]"
+            )
+        return v
+
+    @field_validator('human_detection_confidence')
+    @classmethod
+    def validate_human_detection_confidence(cls, v):
+        if not (0.0 <= v <= 1.0):
+            raise ValueError(
+                f"SPECIES_HUMAN_DETECTION_CONFIDENCE={v} out of allowed bounds [0.0, 1.0]"
             )
         return v
 
