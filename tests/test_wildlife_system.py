@@ -146,6 +146,40 @@ def test_process_detection_shadow_gate_records_suppression(system):
     assert row['animals_detected'] == 0
 
 
+def test_process_detection_fails_closed_to_human_on_db_error(system):
+    """If species ID found a HUMAN but the DB write then blows up (e.g. disk
+    full / WAL contention), the fallback must still report HUMAN so the
+    Telegram suppression gate fires — NOT ERROR, which would leak the photo.
+    """
+    from data_models import DetectionStatus
+
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_human()
+    )
+    system.database.log_detection = MagicMock(side_effect=Exception("disk full"))
+
+    result, _ = system.process_detection("capture.jpg", 5000, None)
+
+    assert result['detection_status'] == DetectionStatus.HUMAN
+    assert result['detection_id'] is None
+
+
+def test_process_detection_stays_error_when_identify_species_throws(system):
+    """If identify_species itself raises, we never got a species_result, so
+    we genuinely don't know if a human was present — fallback must stay ERROR.
+    """
+    from data_models import DetectionStatus
+
+    system.species_identifier.identify_species = MagicMock(
+        side_effect=Exception("model crashed")
+    )
+
+    result, _ = system.process_detection("capture.jpg", 5000, None)
+
+    assert result['detection_status'] == DetectionStatus.ERROR
+    assert result['detection_id'] is None
+
+
 @pytest.mark.asyncio
 async def test_send_notification_attaches_feedback_keyboard(system, tmp_path):
     img = tmp_path / "photo.jpg"

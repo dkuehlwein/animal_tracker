@@ -153,6 +153,7 @@ class WildlifeSystem:
         fields are persisted (ADR-004 Phase 1) instead of being dropped.
         """
         timestamp = datetime.now()
+        species_result = None
 
         try:
             # Two-stage species identification with performance timing
@@ -228,17 +229,27 @@ class WildlifeSystem:
 
         except Exception as e:
             logger.error(f"Error processing detection: {e}", exc_info=True)
+            # Fail-closed: if we already identified a HUMAN before the error
+            # (e.g. the DB write itself blew up), keep reporting HUMAN so the
+            # privacy suppression gate still fires downstream — reporting
+            # ERROR here would let the human's photo leak to Telegram.
+            fallback_reason = f'Processing error: {e}'
+            if species_result is not None and is_human_detection(species_result.status):
+                fallback_status = DetectionStatus.HUMAN
+                fallback_reason = f'Processing error after human detection (fail-closed): {e}'
+            else:
+                fallback_status = DetectionStatus.ERROR
             # Return fallback result
             return {
                 'species_name': 'Unknown species',
                 'confidence': 0.0,
                 'api_success': False,
                 'processing_time': 0.0,
-                'fallback_reason': f'Processing error: {e}',
+                'fallback_reason': fallback_reason,
                 'animals_detected': False,
                 'detection_count': 0,
                 'detection_id': None,
-                'detection_status': DetectionStatus.ERROR,
+                'detection_status': fallback_status,
             }, timestamp
 
     @staticmethod
