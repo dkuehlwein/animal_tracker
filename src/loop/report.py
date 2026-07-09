@@ -96,8 +96,16 @@ def render_summary(metrics: dict, state: dict, active_experiment: dict) -> str:
     # MegaDetector always tagged (auto, unverified).
     lines.append(_tier_line("MegaDetector (auto, unverified):", n_md, fp_md))
 
-    # Remainder: images not yet labelled by any tier.
-    remainder = total - (n_human + n_claude + n_md)
+    # Human "can't tell" (unusable image) verdicts — someone looked, the
+    # image just wasn't usable. Surfaced distinctly so it doesn't read as
+    # "nobody looked at these" in the remainder line below.
+    n_cant_tell = metrics.get("n_cant_tell", 0)
+    if n_cant_tell > 0:
+        lines.append(f"• Can't tell (unusable image): {n_cant_tell}")
+
+    # Remainder: images not yet labelled by any tier (cant_tell rows were
+    # labelled — just unusable — so they're excluded here too).
+    remainder = total - (n_human + n_claude + n_md + n_cant_tell)
     if remainder > 0:
         lines.append(f"• Not yet labelled: {remainder}")
 

@@ -4,6 +4,8 @@ import csv
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from loop import metrics
@@ -641,6 +643,80 @@ def test_csv_has_per_tier_columns(tmp_path):
     assert row["fp_claude_count"] == "1"
     assert row["n_md"] == "1"
     assert row["fp_md_count"] == "0"
+
+
+# ---------------------------------------------------------------------------
+# Task 3: cant_tell excluded from fp denominator and tier buckets
+# ---------------------------------------------------------------------------
+
+def test_cant_tell_excluded_from_fp_denominator():
+    """A human 'cant_tell' row must not count toward labeled_triggers or fp_count."""
+    rows = [
+        _row(human="false_positive"),
+        _row(human="cant_tell"),
+        _row(human="animal"),
+    ]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["labeled_triggers"] == 2
+    assert m["fp_count"] == 1
+    assert abs(m["fp_rate"] - 0.5) < 1e-9
+
+
+def test_cant_tell_excluded_from_tier_buckets():
+    """A human 'cant_tell' row must not land in any per-tier bucket, and the
+    invariant n_human + n_claude + n_md == labeled_triggers must still hold."""
+    rows = [
+        _row(human="false_positive"),
+        _row(human="cant_tell"),
+        _row(human="animal"),
+    ]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_human"] == 2
+    assert m["n_human"] + m["n_claude"] + m["n_md"] == m["labeled_triggers"]
+
+
+def test_cant_tell_blocks_lower_tiers():
+    """human='cant_tell' wins reconciliation (per ingest precedence) and the
+    row is counted nowhere — not in the denominator, not in any tier bucket —
+    even though tier2/tier1 have real labels underneath."""
+    rows = [_row(human="cant_tell", tier2="false_positive", tier1="animal")]
+    assert rows[0]["reconciled_label"] == "cant_tell"
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["labeled_triggers"] == 0
+    assert m["n_human"] == 0
+    assert m["n_claude"] == 0
+    assert m["n_md"] == 0
+
+
+@pytest.mark.parametrize("label", ["animal_wrong_id", "person", "wrong_species"])
+def test_new_labels_count_as_non_fp(label):
+    """New non-FP human labels (and legacy wrong_species) land in the
+    denominator but are never counted as false_positive."""
+    rows = [_row(human=label)]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["labeled_triggers"] == 1
+    assert m["fp_count"] == 0
+
+
+def test_compute_metrics_n_cant_tell_counted():
+    """n_cant_tell counts rows whose winning label (human > tier2 > tier1
+    precedence) is 'cant_tell', regardless of which tier won."""
+    rows = [
+        _row(human="cant_tell"),
+        _row(tier2="cant_tell"),  # no human -> tier2 wins
+        _row(human="false_positive", tier2="cant_tell"),  # human wins, not cant_tell
+        _row(tier1="cant_tell"),  # no human/tier2 -> tier1 wins
+        _row(human="animal"),
+    ]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_cant_tell"] == 3
+
+
+def test_compute_metrics_n_cant_tell_zero_when_none():
+    """n_cant_tell is 0 when no row's winning label is cant_tell."""
+    rows = [_row(human="animal"), _row(tier1="false_positive")]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_cant_tell"] == 0
 
 
 def test_csv_append_backward_compat(tmp_path):
