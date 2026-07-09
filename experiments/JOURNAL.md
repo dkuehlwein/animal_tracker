@@ -865,3 +865,100 @@ lost on the 2026-07-08 21:14 reboot and took forensic log lines with it.
 `systemctl status wildlife-camera.service` is `active`, and
 `data/logs/wildlife.log` shows INFO lines flowing plus an AE-mode log line
 (`"Auto-exposure mode: short"` from `_apply_ae_exposure_mode`).
+
+## 2026-07-09 (loop tick; covers the missed 07-08 night too)
+
+**Window:** ids 1707–1786, 80 triggers over two nights (07-08 + 07-09). The
+07-08 tick never ran (`last_tick_completed_day` was 07-07), so `loop.metrics`
+stamped both nights under date 2026-07-09. Volume 40/night vs baseline 42 —
+inside the collapse/explosion band.
+
+**Headline FP rate is 37.7%, not 95%.** `fp_human_rate = 20/53` (CI 26–51%).
+The `fp_rate=0.56` field mixes in 22 tier-1 auto-labels whose `fp_md_rate` is
+1.0 *by construction*, so it is not the truth number (see memory: auto-labels
+are not truth). This is the first night with enough human labels (53) to say
+anything real — and it says the system is far better than the auto-label
+headline has been claiming for weeks. Prior nights' ~95% figures were
+tier-1 tautology, not measured performance.
+
+**Notification gate (exp #1) validated on human labels for the first time.**
+All 20 human-labelled FPs have status ∈ {no_animal (16), unclassifiable (4)} —
+i.e. the 🔍 REVIEW prefix catches 20/20 of them. Main-channel (`identified`)
+precision was 31/31 = 100%. Cost: 2 real animals demoted to REVIEW.
+
+**FN, measured for the first time (2 of 33 human-`animal` rows ≈ 6%).**
+`loop.metrics` still reports `fn_rate: "unmeasured"` because it only derives FN
+from an `fn_audit` timelapse pass that is not implemented. But the
+classification-FN signal is available *today* by joining human `animal` labels
+against `no_animal`/`unclassifiable` status (as CLAUDE.md documents): ids **1718**
+and **1733**. Tier-2 adjudication of the frames: **1718 is a confirmed FN** — a
+blackbird sits plainly on the gravel by the water spout in
+`capture_20260708_114905_frame3.jpg`, logged `no_animal`. 1733's best frame
+shows no animal I can confirm; left unasserted. Note these two are *classification*
+FNs (trigger fired, classifier missed); they are NOT *trigger* FNs (animal present,
+no capture at all), which remain genuinely unmeasurable without a timelapse pass.
+Do not conflate them — an FP experiment must not claim FN safety on this number.
+
+**Exp #6 (dusk-short-exposure) ROLLED BACK the same day it shipped.**
+Its success metric was "dusk `sharpness_score` rises above the 11.0 floor, no
+midday regression." Measured offline on 537 saved frames (the DB columns only
+begin 07-09, so the frames were the only pre-deploy record — and retention is at
+cap, so this was the last tick that could do it):
+
+- AE=short *is* live and working mechanically: `wildlife.log` logs
+  `Auto-exposure mode: short` at both restarts, and matched-hour 19h luma fell
+  68.9 → 52.0. Shorter exposure, darker frame.
+- Dusk `sharpness_score` **fell** (19h 10.19 → 9.76); 6 of 12 post-deploy rows
+  landed below the floor (17:30–18:49 at 7.1–9.1).
+- The pre-registered midday-regression trigger fired (16h 19.18 → 15.07).
+
+The structural point: `sharpness_score` is Laplacian variance, which scales with
+frame contrast (≈ luminance²). `AeExposureMode=Short` lowers luminance by design.
+**The fix mathematically lowers the number it was shipped to raise.** It was
+doomed by construction, and no amount of additional dusk data would have shown
+otherwise. Because it depresses `sharpness_score` globally, it makes the
+`runs/0005` mute path (below-floor AND no animal found → no Telegram) strictly
+more reachable — the silent-FN class 0005 exists to close. FN unmeasured +
+plausible FN rise ⇒ **FN-veto ⇒ rollback**, per the guardrail contract.
+
+Rolled back via the lever `runs/0006` itself names: `CAMERA_AE_EXPOSURE_MODE=normal`
+appended to `.env` (backup `.env.bak.20260709`), `Config()` verified to read
+`normal`. **`.env` is gitignored — this change is invisible to git and is recorded
+here on purpose.** It did *not* go through `loop.deploy`: `guardrails.BOUNDS` only
+holds numeric `(low, high)` ranges and rejects `CAMERA_AE_EXPOSURE_MODE` as "not a
+tunable parameter", so `state.deployed` stays `{}` and no `deployed_config.env`
+is rendered. `pending_restart_at=2026-07-10T03:00:00+02:00`; `wildlife-deploy.timer`
+fires 03:30 and `apply_pending_deploy` restarts on any due stamp regardless of
+whether a delta was rendered. Exp #6 reopened as backlog id 7 (`running`) to
+collect the 17–19h AE=normal baseline that never existed.
+
+**New backlog id 8 — `sharpness-floor-is-a-brightness-gate` (the real root cause).**
+Unconfounded, 470 pre-deploy AE=normal frames across multiple days:
+P(lap<11.0) = 0% at luma≥80, **71% at luma 60–80**, 100% at luma<40, 0% at 80–100
+and 100–130. `min_sharpness_threshold=11.0` is operationally a **light-level gate**,
+not a blur gate: at dusk nearly every burst is "below floor" however sharp it is.
+That, not the AE mode, decides whether a dusk burst can be silently muted.
+Corroborating: the confirmed-FN frame 1718 is uniformly soft across the *whole*
+scene, foreground and background — that is focus/contrast, not motion blur.
+Candidate fixes (all code, no env knob reaches this): brightness-normalized
+sharpness (`lap/gray_var`) as the floor statistic; a luma-dependent floor; or drop
+the mute path and lean on the REVIEW prefix. **This is the next experiment.**
+
+**Verification duties.**
+- Human/privacy gate (`runs/0004` leak-watch): 5 HUMAN-status rows (1725, 1742,
+  1743, 1773, 1786), **zero** of them carry any feedback label — no keyboard was
+  ever attached, so none was notified. Gate holding. id 1786 recorded
+  `person_confidence=0.42`.
+- Blur gate (`runs/0005`): id 1781 (17:36, no_animal, `below_sharpness_floor=1`)
+  was DB-logged and muted, exactly as designed. It is also, by construction, an
+  *unobservable* FN candidate — muted means never labelled.
+- Observability columns went live with the 15:49 restart; first populated row is
+  id 1775. Recomputing Laplacian variance from `image_path` reproduced stored
+  `sharpness_score` within ±0.3 on 11 of 12 rows, so the column is trustworthy.
+- id 1725 purge check is **not yet due** (07-10 ~14:49); frames still present, as
+  expected. Next tick must check it.
+- New 5-button feedback keyboard shipped today, but all 53 human labels this
+  window use the legacy vocabulary (`animal`/`false_positive`). No
+  `animal_wrong_id`/`person`/`cant_tell` yet — consistent with the sidecar not
+  having been restarted, or simply with no new-keyboard message being labelled
+  yet. Worth confirming next tick before reading anything into label mix.
