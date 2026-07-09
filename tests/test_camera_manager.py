@@ -2,15 +2,46 @@
 Unit tests for camera management system.
 """
 
+import sys
+from types import ModuleType
+
 import pytest
 import numpy as np
 from unittest.mock import Mock
 
-import sys
 sys.path.append('src')
 
-from camera_manager import CameraManager, MockCameraManager
+from camera_manager import CameraManager, MockCameraManager, PiCameraManager
 from config import Config
+
+
+def _install_fake_picamera2(monkeypatch, mock_camera_instance):
+    """Inject a fake `picamera2` module into sys.modules.
+
+    `PiCameraManager._initialize_camera` does `from picamera2 import Picamera2`
+    locally (guarded by try/except ImportError) so it works whether or not the
+    real hardware library is installed. Overriding the sys.modules entry lets
+    the local import resolve to our mock without touching real hardware.
+    """
+    fake_module = ModuleType('picamera2')
+    fake_module.Picamera2 = Mock(return_value=mock_camera_instance)
+    monkeypatch.setitem(sys.modules, 'picamera2', fake_module)
+
+
+def _install_fake_libcamera(monkeypatch):
+    """Inject a fake `libcamera` module exposing `controls.AeExposureModeEnum`.
+
+    Mirrors the Picamera2 mocking approach above for the guarded
+    `from libcamera import controls` import used by the AE-exposure-mode fix.
+    """
+    fake_controls = Mock()
+    fake_controls.AeExposureModeEnum.Normal = "ENUM_NORMAL"
+    fake_controls.AeExposureModeEnum.Short = "ENUM_SHORT"
+    fake_controls.AeExposureModeEnum.Long = "ENUM_LONG"
+
+    fake_module = ModuleType('libcamera')
+    fake_module.controls = fake_controls
+    monkeypatch.setitem(sys.modules, 'libcamera', fake_module)
 
 
 
@@ -174,6 +205,119 @@ class TestCameraManager:
             assert photo_path is None
         finally:
             manager.stop()
+
+
+class TestPiCameraManagerAeExposureMode:
+    """Dusk-exposure fix: bias AE toward short exposure via AeExposureMode.
+
+    Uses PiCameraManager with picamera2/libcamera mocked out (no hardware
+    required) to assert the controls dict passed to `set_controls()`.
+    """
+
+    def test_auto_exposure_mode_sets_mapped_enum(self, monkeypatch):
+        """Default (short) maps to the libcamera enum in auto-exposure mode."""
+        mock_camera_instance = Mock()
+        _install_fake_picamera2(monkeypatch, mock_camera_instance)
+        _install_fake_libcamera(monkeypatch)
+
+        config = Config.create_test_config()
+        assert config.camera.exposure_time is None
+        assert config.camera.analogue_gain is None
+        camera = PiCameraManager(config)
+
+        camera.start()
+
+        applied_controls = mock_camera_instance.set_controls.call_args[0][0]
+        assert applied_controls["AeExposureMode"] == "ENUM_SHORT"
+
+    def test_ae_exposure_mode_env_override_maps_to_long(self, monkeypatch):
+        """CAMERA_AE_EXPOSURE_MODE=long maps to the Long enum member."""
+        monkeypatch.setenv("CAMERA_AE_EXPOSURE_MODE", "long")
+        mock_camera_instance = Mock()
+        _install_fake_picamera2(monkeypatch, mock_camera_instance)
+        _install_fake_libcamera(monkeypatch)
+
+        config = Config.create_test_config()
+        camera = PiCameraManager(config)
+
+        camera.start()
+
+        applied_controls = mock_camera_instance.set_controls.call_args[0][0]
+        assert applied_controls["AeExposureMode"] == "ENUM_LONG"
+
+    def test_manual_exposure_mode_omits_ae_exposure_mode_control(self, monkeypatch):
+        """Manual exposure branch (:158-161) is untouched: no AeExposureMode key."""
+        monkeypatch.setenv("CAMERA_EXPOSURE_TIME", "2000")
+        monkeypatch.setenv("CAMERA_ANALOGUE_GAIN", "2.5")
+        mock_camera_instance = Mock()
+        _install_fake_picamera2(monkeypatch, mock_camera_instance)
+        _install_fake_libcamera(monkeypatch)
+
+        config = Config.create_test_config()
+        camera = PiCameraManager(config)
+
+        camera.start()
+
+        applied_controls = mock_camera_instance.set_controls.call_args[0][0]
+        assert "AeExposureMode" not in applied_controls
+        # Manual exposure controls are still set exactly as before.
+        assert applied_controls["AeEnable"] is False
+        assert applied_controls["ExposureTime"] == 2000
+        assert applied_controls["AnalogueGain"] == 2.5
+
+    def test_camera_hardware_still_started_in_both_modes(self, monkeypatch):
+        """Regression guard: hardware start() must run in auto AND manual mode."""
+        mock_camera_instance = Mock()
+        _install_fake_picamera2(monkeypatch, mock_camera_instance)
+        _install_fake_libcamera(monkeypatch)
+
+        config = Config.create_test_config()
+        camera = PiCameraManager(config)
+        camera.start()
+        assert mock_camera_instance.start.called
+        assert camera.is_available()
+
+        monkeypatch.setenv("CAMERA_EXPOSURE_TIME", "2000")
+        monkeypatch.setenv("CAMERA_ANALOGUE_GAIN", "2.5")
+        mock_camera_instance2 = Mock()
+        _install_fake_picamera2(monkeypatch, mock_camera_instance2)
+        config2 = Config.create_test_config()
+        camera2 = PiCameraManager(config2)
+        camera2.start()
+        assert mock_camera_instance2.start.called
+        assert camera2.is_available()
+
+    def test_libcamera_unavailable_degrades_gracefully(self, monkeypatch):
+        """libcamera not importable: warn and continue without AeExposureMode."""
+        mock_camera_instance = Mock()
+        _install_fake_picamera2(monkeypatch, mock_camera_instance)
+        monkeypatch.delitem(sys.modules, 'libcamera', raising=False)
+        monkeypatch.setitem(sys.modules, 'libcamera', None)  # force ImportError
+
+        config = Config.create_test_config()
+        camera = PiCameraManager(config)
+
+        camera.start()  # must not raise
+
+        assert camera.is_available()
+        applied_controls = mock_camera_instance.set_controls.call_args[0][0]
+        assert "AeExposureMode" not in applied_controls
+        # Other controls still applied.
+        assert "FrameDurationLimits" in applied_controls
+
+    def test_set_controls_exception_does_not_propagate(self, monkeypatch):
+        """A rejected control (e.g. unsupported enum/sensor) must not crash startup."""
+        mock_camera_instance = Mock()
+        mock_camera_instance.set_controls.side_effect = Exception("control rejected")
+        _install_fake_picamera2(monkeypatch, mock_camera_instance)
+        _install_fake_libcamera(monkeypatch)
+
+        config = Config.create_test_config()
+        camera = PiCameraManager(config)
+
+        camera.start()  # must not raise
+
+        assert camera.is_available()
 
 
 if __name__ == '__main__':

@@ -41,6 +41,22 @@ class TestCameraConfig:
         with pytest.raises(ValidationError):
             CameraConfig(analogue_gain=10.0)  # Above 8.0
 
+    def test_ae_exposure_mode_default_is_short(self):
+        """Default biases AE toward short exposure (dusk fix)."""
+        config = CameraConfig()
+        assert config.ae_exposure_mode == "short"
+
+    @patch.dict(os.environ, {'CAMERA_AE_EXPOSURE_MODE': 'long'}, clear=False)
+    def test_ae_exposure_mode_env_override(self):
+        """CAMERA_AE_EXPOSURE_MODE overrides the default (e.g. rollback lever)."""
+        config = CameraConfig()
+        assert config.ae_exposure_mode == "long"
+
+    def test_invalid_ae_exposure_mode(self):
+        """Only normal|short|long are accepted."""
+        with pytest.raises(ValidationError):
+            CameraConfig(ae_exposure_mode="bogus")
+
 
 class TestMotionConfig:
     """Test motion detection configuration validation."""

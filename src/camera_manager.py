@@ -162,6 +162,12 @@ class PiCameraManager(CameraInterface):
                 logger.info(f"Manual exposure mode: ExposureTime={self.config.camera.exposure_time}μs "
                            f"(1/{1000000/self.config.camera.exposure_time:.0f}s), "
                            f"Gain={self.config.camera.analogue_gain}x")
+            else:
+                # Auto-exposure mode: bias AE toward the configured exposure
+                # mode (dusk fix — default "short" keeps dusk bursts above
+                # the sharpness floor). Only reachable when manual exposure
+                # is not configured.
+                self._apply_ae_exposure_mode(controls)
 
             self.camera.set_controls(controls)
         except Exception as e:
@@ -173,7 +179,24 @@ class PiCameraManager(CameraInterface):
             time.sleep(self.config.camera.startup_delay)
         except Exception as e:
             raise CameraInitializationError(f"Failed to start camera: {e}") from e
-    
+
+    def _apply_ae_exposure_mode(self, controls: dict) -> None:
+        """Add libcamera's AeExposureMode control, mapped from config.
+
+        Only called in auto-exposure mode. Wrapped so an unavailable
+        libcamera module or unsupported enum member degrades gracefully:
+        logs a warning and leaves ``controls`` unmodified rather than
+        raising (Global Constraint: never crash the pipeline).
+        """
+        mode = self.config.camera.ae_exposure_mode
+        try:
+            from libcamera import controls as libcamera_controls
+            enum_name = mode.capitalize()  # "short" -> "Short", etc.
+            controls["AeExposureMode"] = getattr(libcamera_controls.AeExposureModeEnum, enum_name)
+            logger.info(f"Auto-exposure mode: {mode}")
+        except Exception as e:
+            logger.warning(f"Failed to set AeExposureMode={mode}: {e}")
+
     def stop(self) -> None:
         """Stop the camera and cleanup resources."""
         if not self._is_running:

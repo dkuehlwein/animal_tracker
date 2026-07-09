@@ -37,6 +37,11 @@ class CameraConfig(BaseSettings):
     startup_delay: float = 2.0
     exposure_time: Optional[int] = None  # None = auto-exposure
     analogue_gain: Optional[float] = None  # None = auto-gain
+    # Dusk-exposure fix: bias AE toward shorter exposure (+ higher gain) so
+    # dusk bursts don't fall below the sharpness floor. Only applies when AE
+    # is active (exposure_time/analogue_gain are None); mapped to libcamera's
+    # AeExposureMode by PiCameraManager. Rollback lever: set to "normal".
+    ae_exposure_mode: str = "short"
 
     @field_validator('motion_detection_format')
     @classmethod
@@ -57,6 +62,13 @@ class CameraConfig(BaseSettings):
     def validate_gain(cls, v):
         if v is not None and (v < 1.0 or v > 8.0):
             raise ValueError("Analogue gain must be between 1.0-8.0")
+        return v
+
+    @field_validator('ae_exposure_mode')
+    @classmethod
+    def validate_ae_exposure_mode(cls, v):
+        if v not in ("normal", "short", "long"):
+            raise ValueError(f"Invalid AE exposure mode: {v} (must be normal|short|long)")
         return v
 
 
