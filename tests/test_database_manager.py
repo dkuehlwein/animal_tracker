@@ -111,6 +111,41 @@ def test_log_detection_persists_richer_fields(tmp_path):
     assert 0 <= row["hour_of_day"] <= 23  # derived from insert time
 
 
+def test_log_detection_persists_observability_fields(tmp_path):
+    """Task 1 (ADR-004 observability): sharpness_score, below_sharpness_floor,
+    and person_confidence round-trip through log_detection so the nightly
+    tuning loop can attribute metric shifts to blur/person signals."""
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(
+        image_path="capture_2.jpg",
+        motion_area=1200,
+        sharpness_score=15.2,
+        below_sharpness_floor=False,
+        person_confidence=0.25,
+    )
+    assert det_id is not None
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?", (det_id,)).fetchone()
+
+    assert row["sharpness_score"] == pytest.approx(15.2)
+    assert row["below_sharpness_floor"] == 0
+    assert row["person_confidence"] == pytest.approx(0.25)
+
+
+def test_log_detection_observability_fields_default_null(tmp_path):
+    """Old call signature (no observability kwargs) still works; new cols are NULL."""
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(image_path="c2.jpg", motion_area=10)
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?", (det_id,)).fetchone()
+    assert row["sharpness_score"] is None
+    assert row["below_sharpness_floor"] is None
+    assert row["person_confidence"] is None
+
+
 def test_log_detection_backward_compatible(tmp_path):
     """Old call signature (no richer kwargs) still works; new cols are NULL."""
     db, db_path = _make_db(tmp_path)
