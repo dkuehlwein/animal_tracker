@@ -82,6 +82,24 @@ def test_record_feedback_callback_writes_row(tmp_path):
     assert sorted(labels) == sorted(CODE_TO_LABEL.values())
 
 
+@pytest.mark.parametrize("code,label,expected_message", [
+    ("a", "animal", "✅ Recorded: animal"),
+    ("wid", "animal_wrong_id", "🐦 Recorded: animal, wrong ID"),
+    ("p", "person", "👤 Recorded: human in frame"),
+    ("fp", "false_positive", "❌ Recorded: nothing there"),
+    ("ct", "cant_tell", "🤷 Recorded: can't tell"),
+    ("ws", "wrong_species", "🐦 Recorded: wrong species"),
+])
+def test_record_feedback_callback_confirmations(tmp_path, code, label, expected_message):
+    db = _make_db(tmp_path)
+    det_id = db.log_detection(image_path="c.jpg", motion_area=10)
+    msg = record_feedback_callback(f"fb:{det_id}:{code}", db)
+    assert msg == expected_message
+    rows = db.get_feedback(det_id)
+    assert [(r[1], r[2]) for r in rows] == [(det_id, label)]
+    assert rows[0][3] == "human"
+
+
 def test_record_feedback_callback_rejects_malformed(tmp_path):
     db = _make_db(tmp_path)
     det_id = db.log_detection(image_path="c.jpg", motion_area=10)

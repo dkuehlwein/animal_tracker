@@ -3,8 +3,9 @@
 Telegram feedback sidecar (ADR-004 Phase 1).
 
 A standalone, long-lived process that listens for taps on the inline feedback
-keyboard (✅ Animal / ❌ False positive / 🐦 Wrong species) attached to each
-detection notification, and appends the human label to `detection_feedback`.
+keyboard (✅ Animal / 🐦 Animal, wrong ID / 👤 Human / ❌ Nothing there / 🤷 Can't
+tell) attached to each detection notification, and appends the human label to
+`detection_feedback`.
 
 Runs as a *separate process* from the main detection loop, sharing the SQLite DB
 via WAL. The main process is send-only, so only this sidecar polls getUpdates —
@@ -35,8 +36,11 @@ logger = logging.getLogger(__name__)
 # Human-facing confirmation shown after a tap, per recorded label.
 _LABEL_CONFIRMATION = {
     "animal": "✅ Recorded: animal",
-    "false_positive": "❌ Recorded: false positive",
-    "wrong_species": "🐦 Recorded: wrong species",
+    "animal_wrong_id": "🐦 Recorded: animal, wrong ID",
+    "person": "👤 Recorded: human in frame",
+    "false_positive": "❌ Recorded: nothing there",
+    "cant_tell": "🤷 Recorded: can't tell",
+    "wrong_species": "🐦 Recorded: wrong species",  # legacy taps
 }
 
 
