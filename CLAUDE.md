@@ -10,6 +10,12 @@ This is a Raspberry Pi 5-based wildlife camera system that automatically detects
 
 An in-progress effort to reduce false positives **and** false negatives via a self-improving daily loop (human feedback over Telegram + a git-backed lab notebook + on-Pi Claude Code `/loop`). The design is converged; **Phase 1 is the next thing to build**. See **`docs/ADR-004-autonomous-tuning-loop.md`** — start with its "Status & how to resume" section.
 
+## Development Workflow (default — no need to restate per session)
+
+- **Subagent-driven development is the default** for any multi-step implementation: the main session orchestrates (superpowers:subagent-driven-development); implementation, test runs, and code review are delegated to subagents. Don't do heavy implementation work in the main session.
+- **Model selection**: Sonnet for coding/implementation subagents; Opus for planning/design/architecture agents. Escalate a coder to Opus only if the task is genuinely hard (cross-cutting design, subtle concurrency, repeated Sonnet failures).
+- **Plans describe intent and structure, not literal code** — let the coding subagents write the code and run the deterministic test suite (`uv run pytest tests/ -v`).
+
 ## Key Commands
 
 ### Camera preview for focus adjustment
