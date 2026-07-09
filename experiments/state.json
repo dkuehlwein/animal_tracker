@@ -52,14 +52,14 @@
   "history": [],
   "last_heartbeat_loopday": "2026-07-09",
   "last_metrics": {
-    "date": "2026-07-07",
+    "date": "2026-07-09",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.9030514828405729,
-      0.9814504336338952
+      0.4474677138145549,
+      0.6666854250875085
     ],
     "fp_claude_ci": [
       0.0,
@@ -67,30 +67,31 @@
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 111,
+    "fp_count": 42,
     "fp_human_ci": [
-      0.0,
+      0.2593626547287611,
+      0.5119310405824662
+    ],
+    "fp_human_count": 20,
+    "fp_human_rate": 0.37735849056603776,
+    "fp_md_ci": [
+      0.8513451253913791,
       1.0
     ],
-    "fp_human_count": 0,
-    "fp_human_rate": 0.0,
-    "fp_md_ci": [
-      0.9030514828405729,
-      0.9814504336338952
-    ],
-    "fp_md_count": 111,
-    "fp_md_rate": 0.9568965517241379,
-    "fp_rate": 0.9568965517241379,
+    "fp_md_count": 22,
+    "fp_md_rate": 1.0,
+    "fp_rate": 0.56,
     "fp_trustworthy": true,
-    "labeled_triggers": 116,
+    "labeled_triggers": 75,
+    "n_cant_tell": 0,
     "n_claude": 0,
-    "n_human": 0,
-    "n_md": 116,
-    "total_triggers": 116
+    "n_human": 53,
+    "n_md": 22,
+    "total_triggers": 80
   },
   "last_tick_completed_day": "2026-07-07",
   "nightly_verdict": "Two photos of a person tending the pond (14:00 and 18:39) slipped into your main channel tonight without the review tag \u2014 the known human-leak issue, back after two clean days. The other 3 wildlife alerts were real birds; the remaining 111 of 116 triggers were correctly tagged review on a very busy sunny day. Nothing changed in settings \u2014 the fix for human alerts is ready but waiting on your call about whether to tag or hide them.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 1706
+  "watermark": 1786
 }
