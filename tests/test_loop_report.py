@@ -551,6 +551,56 @@ def test_summary_untrustworthy_alert_preserved():
     assert "3/" in text or "30%" in text
 
 
+def test_summary_cant_tell_line_when_present():
+    """A dedicated line renders when n_cant_tell > 0, distinct from 'not yet labelled'."""
+    m = _tier_metrics()
+    m["n_cant_tell"] = 3
+    text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
+    assert "Can't tell (unusable image): 3" in text
+
+
+def test_summary_cant_tell_line_absent_when_zero():
+    m = _tier_metrics()
+    m["n_cant_tell"] = 0
+    text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
+    assert "Can't tell" not in text
+
+
+def test_summary_cant_tell_line_absent_when_key_missing():
+    """Old last_metrics dicts lack n_cant_tell entirely — must not crash or render the line."""
+    m = _tier_metrics()  # no n_cant_tell key
+    text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
+    assert "Can't tell" not in text
+
+
+def test_summary_remainder_excludes_cant_tell():
+    """'Not yet labelled' remainder must subtract n_cant_tell too, so human
+    cant_tell verdicts don't misread as unlabelled."""
+    # remainder = 42 - (2+0+38+2) = 0 -> line absent
+    m = _tier_metrics(total=42, n_human=2, fp_human=0, n_claude=0, fp_claude=0, n_md=38, fp_md=0)
+    m["n_cant_tell"] = 2
+    text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
+    assert "Not yet labelled" not in text
+
+    # remainder = 42 - (2+0+38+1) = 1 -> line present with corrected count
+    m2 = _tier_metrics(total=42, n_human=2, fp_human=0, n_claude=0, fp_claude=0, n_md=38, fp_md=0)
+    m2["n_cant_tell"] = 1
+    text2 = report.render_summary(metrics=m2, state={"paused": False}, active_experiment={})
+    assert "Not yet labelled: 1" in text2
+
+
+def test_summary_cant_tell_line_order():
+    """Can't-tell line appears after the tier lines and before 'Not yet labelled'."""
+    m = _tier_metrics(total=50, n_human=2, fp_human=0, n_claude=0, fp_claude=0, n_md=38, fp_md=0)
+    m["n_cant_tell"] = 5
+    text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
+    lines = text.splitlines()
+    md_idx = next(i for i, l in enumerate(lines) if "MegaDetector" in l)
+    cant_tell_idx = next(i for i, l in enumerate(lines) if "Can't tell" in l)
+    remainder_idx = next(i for i, l in enumerate(lines) if "Not yet labelled" in l)
+    assert md_idx < cant_tell_idx < remainder_idx
+
+
 def test_summary_backward_compat_missing_per_tier_keys():
     """Old metrics lacking n_*/fp_*_count keys render without crashing (.get defaults)."""
     m = {

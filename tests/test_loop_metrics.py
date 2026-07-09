@@ -698,6 +698,27 @@ def test_new_labels_count_as_non_fp(label):
     assert m["fp_count"] == 0
 
 
+def test_compute_metrics_n_cant_tell_counted():
+    """n_cant_tell counts rows whose winning label (human > tier2 > tier1
+    precedence) is 'cant_tell', regardless of which tier won."""
+    rows = [
+        _row(human="cant_tell"),
+        _row(tier2="cant_tell"),  # no human -> tier2 wins
+        _row(human="false_positive", tier2="cant_tell"),  # human wins, not cant_tell
+        _row(tier1="cant_tell"),  # no human/tier2 -> tier1 wins
+        _row(human="animal"),
+    ]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_cant_tell"] == 3
+
+
+def test_compute_metrics_n_cant_tell_zero_when_none():
+    """n_cant_tell is 0 when no row's winning label is cant_tell."""
+    rows = [_row(human="animal"), _row(tier1="false_positive")]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_cant_tell"] == 0
+
+
 def test_csv_append_backward_compat(tmp_path):
     """An old CSV (only original columns, no per-tier columns) survives append_daily:
     old rows get blank new columns, no crash."""

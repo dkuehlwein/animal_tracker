@@ -59,15 +59,18 @@ def _per_tier_partition(rows: list[dict]) -> dict:
     unusable, so it must not land in any bucket (checked uniformly across
     tiers, not only for human rows: a row can only reach the tier2/tier1
     branches when human is None, so "cant_tell" only ever appears there via
-    those tiers' own labels).
+    those tiers' own labels). Skipped rows are counted once in
+    "n_cant_tell" so callers can surface them distinctly instead of letting
+    them fall into an "unlabeled" bucket.
 
     Returns a dict with nested {"n": int, "fp": int} for each bucket key
-    ("human", "claude", "md").
+    ("human", "claude", "md"), plus a top-level int "n_cant_tell".
     """
-    buckets: dict[str, dict[str, int]] = {
+    buckets: dict[str, object] = {
         "human": {"n": 0, "fp": 0},
         "claude": {"n": 0, "fp": 0},
         "md": {"n": 0, "fp": 0},
+        "n_cant_tell": 0,
     }
     # Note: bucket assignment uses `is not None` which agrees with ingest's
     # truthiness-based reconciled_label assignment — and the invariant
@@ -82,6 +85,7 @@ def _per_tier_partition(rows: list[dict]) -> dict:
         if r.get("human") is not None:
             winner = r["human"]
             if winner == "cant_tell":
+                buckets["n_cant_tell"] += 1
                 continue
             buckets["human"]["n"] += 1
             if winner == "false_positive":
@@ -89,6 +93,7 @@ def _per_tier_partition(rows: list[dict]) -> dict:
         elif r.get("tier2") is not None:
             winner = r["tier2"]
             if winner == "cant_tell":
+                buckets["n_cant_tell"] += 1
                 continue
             buckets["claude"]["n"] += 1
             if winner == "false_positive":
@@ -96,6 +101,7 @@ def _per_tier_partition(rows: list[dict]) -> dict:
         elif r.get("tier1") is not None:
             winner = r["tier1"]
             if winner == "cant_tell":
+                buckets["n_cant_tell"] += 1
                 continue
             buckets["md"]["n"] += 1
             if winner == "false_positive":
@@ -159,6 +165,8 @@ def compute_metrics(rows: list[dict], fn_audit: Optional[dict]) -> dict:
     fp_md_rate = (fp_md_count / n_md) if n_md else 0.0
     fp_md_ci = wilson_ci(fp_md_count, n_md)
 
+    n_cant_tell = tier["n_cant_tell"]
+
     return {
         "labeled_triggers": len(labeled),
         "total_triggers": total_triggers,
@@ -183,6 +191,13 @@ def compute_metrics(rows: list[dict], fn_audit: Optional[dict]) -> dict:
         "fp_md_count": fp_md_count,
         "n_md": n_md,
         "fp_md_ci": fp_md_ci,
+        # Human "can't tell" (unusable image) verdicts, winning at any tier
+        # per the same precedence as the buckets above. Not part of any FP
+        # bucket or the CSV schema — flows to the report only via
+        # last_metrics (see report.render_summary). Intentionally excluded
+        # from _CSV_FIELDS: this is a report-surfacing concern, not a
+        # trend-tracked metric.
+        "n_cant_tell": n_cant_tell,
     }
 
 
