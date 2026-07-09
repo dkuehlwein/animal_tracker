@@ -169,6 +169,9 @@ class StorageConfig(BaseSettings):
     data_dir: Path = Path("data")
     database_path: str = "data/detections.db"
     image_prefix: str = "capture_"
+    # Rotating file log destination (Task 2: journald history does not
+    # survive a Pi reboot, so INFO+ logs are also written to disk here).
+    log_dir: Path = Path("data/logs")
 
     @property
     def image_dir(self) -> Path:

@@ -289,5 +289,18 @@ def test_human_retention_hours_env_override(monkeypatch):
     assert PerformanceConfig().human_retention_hours == 12
 
 
+def test_log_dir_defaults_to_data_logs():
+    """log_dir must default to data/logs so rotating file logs survive
+    reboots without requiring any configuration (journald history does not)."""
+    from config import StorageConfig
+    assert StorageConfig().log_dir == Path("data/logs")
+
+
+def test_log_dir_env_override(monkeypatch):
+    monkeypatch.setenv("STORAGE_LOG_DIR", "custom/log/path")
+    from config import StorageConfig
+    assert StorageConfig().log_dir == Path("custom/log/path")
+
+
 if __name__ == '__main__':
     pytest.main([__file__])

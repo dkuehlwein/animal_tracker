@@ -7,6 +7,7 @@ Combines motion detection, species identification, database logging, and Telegra
 import asyncio
 import functools
 import logging
+import logging.handlers
 import os
 import time
 from datetime import datetime
@@ -872,16 +873,55 @@ class WildlifeSystem:
                 self.executor.shutdown(wait=True, cancel_futures=True)
 
 
-if __name__ == "__main__":
+def configure_logging(config) -> None:
+    """Configure root logging: console stream handler (keeps journald working)
+    plus a rotating file handler under ``config.storage.log_dir`` so INFO+
+    history survives a Pi reboot (journald's does not).
+
+    Never raises: if the log directory can't be created or written to, a
+    warning is logged via the stream handler and setup continues without
+    the file handler rather than crashing the pipeline.
+    """
     log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
-    logging.basicConfig(
-        level=getattr(logging, log_level, logging.INFO),
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    level = getattr(logging, log_level, logging.INFO)
+    log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    formatter = logging.Formatter(log_format)
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+
+    # Clear any pre-existing handlers so repeated calls don't duplicate lines.
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(level)
+    stream_handler.setFormatter(formatter)
+    root_logger.addHandler(stream_handler)
+
+    try:
+        log_dir = Path(config.storage.log_dir)
+        log_dir.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.handlers.RotatingFileHandler(
+            log_dir / "wildlife.log",
+            maxBytes=5_000_000,
+            backupCount=5,
+        )
+        # DEBUG stays console-only: the DIAG-MOTION firehose (~5s cadence)
+        # would churn the rotation if written to disk.
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(formatter)
+        root_logger.addHandler(file_handler)
+    except OSError as e:
+        root_logger.warning(f"Could not set up rotating file log handler: {e}")
+
     # Reduce verbosity of noisy third-party loggers
     logging.getLogger('picamera2').setLevel(logging.WARNING)
     for noisy in ('httpx', 'httpcore', 'asyncio', 'urllib3', 'telegram'):
         logging.getLogger(noisy).setLevel(logging.INFO)
-    
+
+
+if __name__ == "__main__":
+    configure_logging(Config())
     system = WildlifeSystem()
     asyncio.run(system.run())
