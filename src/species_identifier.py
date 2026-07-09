@@ -151,6 +151,10 @@ class SpeciesIdentifier:
                 detection_result=None,
                 animals_detected=False,
                 status=DetectionStatus.ERROR,
+                # No detections list is available at all here, so there's no
+                # person signal to report — but the key is always present
+                # (Task 1) so callers never need a None-metadata special case.
+                metadata={'person_confidence': 0.0},
             )
 
         pred = predictions['predictions'][0]
@@ -218,6 +222,7 @@ class SpeciesIdentifier:
                 detection_result=detection_result,
                 animals_detected=animals_detected,
                 status=DetectionStatus.HUMAN,
+                metadata={'person_confidence': max_person_conf},
             )
 
         # Check if any animals were detected
@@ -233,6 +238,10 @@ class SpeciesIdentifier:
                 detection_result=detection_result,
                 animals_detected=False,
                 status=DetectionStatus.NO_ANIMAL,
+                # Sub-threshold person confidence still recorded here (Task 1)
+                # so the tuning loop can attribute NO_ANIMAL bursts that were
+                # actually a person who didn't trip the privacy gate.
+                metadata={'person_confidence': max_person_conf},
             )
 
         # Extract classification (ensemble result)
@@ -262,7 +271,16 @@ class SpeciesIdentifier:
         elif isinstance(classifications, list):
             top_predictions = classifications[:self.config.species.return_top_k]
             if classifications:
-                top_classifier_prediction = classifications[0]
+                # Normalize the legacy list shape to the {'label', 'score'}
+                # contract; a non-dict entry carries no usable label/score
+                # pair, so leave None rather than leak a raw value that would
+                # crash downstream .get() callers (never-crash constraint).
+                first = classifications[0]
+                if isinstance(first, dict) and first.get('label') is not None:
+                    top_classifier_prediction = {
+                        'label': first.get('label'),
+                        'score': first.get('score', 0.0),
+                    }
 
         # Find best geofenced species-level prediction using model's geofence
         best_geofenced_species = self._find_best_geofenced_species(
@@ -280,7 +298,11 @@ class SpeciesIdentifier:
             'top_predictions': top_predictions,
             'prediction_source': prediction_source,
             'top_classifier_prediction': top_classifier_prediction,
-            'best_geofenced_species': best_geofenced_species
+            'best_geofenced_species': best_geofenced_species,
+            # Task 1 (ADR-004 observability): recorded on every branch below
+            # (UNCLASSIFIABLE / ANIMAL_UNCERTAIN / IDENTIFIED) too, not just
+            # HUMAN/NO_ANIMAL above — 0.0 when no person box was present.
+            'person_confidence': max_person_conf,
         }
 
         # Detect the "no cv result" sentinel (case-insensitive) — the image crop
@@ -366,6 +388,10 @@ class SpeciesIdentifier:
             return None
 
         for pred in top_predictions:
+            # Legacy list-shaped classifications can carry non-dict entries
+            # (e.g. bare label strings) — skip them instead of crashing.
+            if not isinstance(pred, dict):
+                continue
             label = pred.get('label', '')
             parts = label.split(';')
 

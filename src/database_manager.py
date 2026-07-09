@@ -29,6 +29,18 @@ class DatabaseManager:
         "gate_would_suppress": "BOOLEAN",
         "background_drift": "REAL",
         "detection_status": "TEXT",
+        # Task 1 (ADR-004 observability): already-computed values that were
+        # never persisted, so the nightly tuning loop can attribute metric
+        # shifts to blur/person signals instead of just guessing.
+        "sharpness_score": "REAL",
+        "below_sharpness_floor": "BOOLEAN",
+        "person_confidence": "REAL",
+        # Task 3 (ADR-004 observability): the classifier's raw top-1
+        # prediction (before geofence/rollup), distinct from the (possibly
+        # rolled-up) ensemble species_name — lets the nightly loop and the
+        # notification caption both see the more specific guess.
+        "top_species_raw": "TEXT",
+        "top_species_score": "REAL",
     }
 
     def init_database(self):
@@ -129,12 +141,19 @@ class DatabaseManager:
                      max_detection_confidence=None, contour_count=None,
                      largest_contour_area=None, foreground_pixel_count=None,
                      gate_would_suppress=None, background_drift=None,
-                     detection_status=None) -> Optional[int]:
+                     detection_status=None, sharpness_score=None,
+                     below_sharpness_floor=None, person_confidence=None,
+                     top_species_raw=None, top_species_score=None) -> Optional[int]:
         """Log a detection event to the database.
 
         The trailing keyword arguments are the Phase-1 richer-logging fields
         (ADR-004); all default to None so existing callers keep working.
-        `hour_of_day` is derived from the insert time.
+        `hour_of_day` is derived from the insert time. `sharpness_score`,
+        `below_sharpness_floor`, and `person_confidence` are Task 1's
+        observability fields (already computed upstream, now persisted).
+        `top_species_raw`/`top_species_score` are Task 3's: the classifier's
+        raw top-1 prediction label/score, distinct from the (possibly
+        rolled-up) ensemble `species_name`.
         """
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -165,6 +184,11 @@ class DatabaseManager:
                     "gate_would_suppress": gate_would_suppress,
                     "background_drift": background_drift,
                     "detection_status": detection_status,
+                    "sharpness_score": sharpness_score,
+                    "below_sharpness_floor": below_sharpness_floor,
+                    "person_confidence": person_confidence,
+                    "top_species_raw": top_species_raw,
+                    "top_species_score": top_species_score,
                 }
                 columns = ", ".join(values)
                 placeholders = ", ".join("?" * len(values))

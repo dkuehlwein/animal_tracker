@@ -41,6 +41,22 @@ class TestCameraConfig:
         with pytest.raises(ValidationError):
             CameraConfig(analogue_gain=10.0)  # Above 8.0
 
+    def test_ae_exposure_mode_default_is_short(self):
+        """Default biases AE toward short exposure (dusk fix)."""
+        config = CameraConfig()
+        assert config.ae_exposure_mode == "short"
+
+    @patch.dict(os.environ, {'CAMERA_AE_EXPOSURE_MODE': 'long'}, clear=False)
+    def test_ae_exposure_mode_env_override(self):
+        """CAMERA_AE_EXPOSURE_MODE overrides the default (e.g. rollback lever)."""
+        config = CameraConfig()
+        assert config.ae_exposure_mode == "long"
+
+    def test_invalid_ae_exposure_mode(self):
+        """Only normal|short|long are accepted."""
+        with pytest.raises(ValidationError):
+            CameraConfig(ae_exposure_mode="bogus")
+
 
 class TestMotionConfig:
     """Test motion detection configuration validation."""
@@ -88,7 +104,9 @@ class TestStorageConfig:
         """Test derived path properties."""
         config = StorageConfig(data_dir=Path("custom"))
         assert config.image_dir == Path("custom/images")
-        assert config.logs_dir == Path("custom/logs")
+        # logs_dir aliases log_dir (single source of truth), which is
+        # independent of data_dir and defaults to data/logs.
+        assert config.logs_dir == config.log_dir == Path("data/logs")
 
 
 class TestSpeciesConfig:
@@ -287,6 +305,29 @@ def test_human_retention_hours_env_override(monkeypatch):
     monkeypatch.setenv("PERFORMANCE_HUMAN_RETENTION_HOURS", "12")
     from config import PerformanceConfig
     assert PerformanceConfig().human_retention_hours == 12
+
+
+def test_log_dir_defaults_to_data_logs():
+    """log_dir must default to data/logs so rotating file logs survive
+    reboots without requiring any configuration (journald history does not)."""
+    from config import StorageConfig
+    assert StorageConfig().log_dir == Path("data/logs")
+
+
+def test_log_dir_env_override(monkeypatch):
+    monkeypatch.setenv("STORAGE_LOG_DIR", "custom/log/path")
+    from config import StorageConfig
+    assert StorageConfig().log_dir == Path("custom/log/path")
+
+
+def test_logs_dir_property_follows_log_dir_override(monkeypatch):
+    """logs_dir (used by resource_manager.ensure_directories) must share a
+    single source of truth with log_dir, so a STORAGE_LOG_DIR override moves
+    both — otherwise the file handler writes to one directory while
+    ensure_directories creates another."""
+    monkeypatch.setenv("STORAGE_LOG_DIR", "custom/log/path")
+    from config import StorageConfig
+    assert StorageConfig().logs_dir == Path("custom/log/path")
 
 
 if __name__ == '__main__':

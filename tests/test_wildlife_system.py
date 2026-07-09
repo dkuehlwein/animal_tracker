@@ -146,6 +146,143 @@ def test_process_detection_shadow_gate_records_suppression(system):
     assert row['animals_detected'] == 0
 
 
+def test_process_detection_persists_sharpness_and_person_confidence(system):
+    """Task 1 (ADR-004 observability): process_detection reads sharpness
+    values from its sharpness_info parameter and person_confidence from the
+    identification result's metadata, and logs all three to the DB."""
+    from data_models import IdentificationResult, DetectionResult
+
+    det = DetectionResult(
+        animals_detected=True, detection_count=1,
+        bounding_boxes=[{'confidence': 0.7}], detections=[],
+        processing_time=0.1,
+    )
+    identification = IdentificationResult(
+        species_name="Fox", confidence=0.9, api_success=True, processing_time=0.5,
+        detection_result=det, animals_detected=True,
+        metadata={'person_confidence': 0.22},
+    )
+    system.species_identifier.identify_species = MagicMock(return_value=identification)
+
+    sharpness_info = {
+        'sharpness_score': 18.4,
+        'below_sharpness_floor': False,
+        'selected_frame_index': 0,
+        'frame_count': 5,
+        'all_scores': [18.4] * 5,
+        'meets_threshold': True,
+        'all_frame_paths': [],
+    }
+
+    result, ts = system.process_detection("capture.jpg", 5000, None, sharpness_info)
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?",
+                           (result['detection_id'],)).fetchone()
+    assert row['sharpness_score'] == pytest.approx(18.4)
+    assert row['below_sharpness_floor'] == 0
+    assert row['person_confidence'] == pytest.approx(0.22)
+
+
+def test_process_detection_observability_fields_null_without_sharpness_info(system):
+    """No sharpness_info passed (single-frame capture path) → sharpness
+    columns are NULL, not an error; person_confidence still flows from
+    metadata when present."""
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification(True, boxes=[{'confidence': 0.7}])
+    )
+
+    result, ts = system.process_detection("capture.jpg", 5000, None)
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?",
+                           (result['detection_id'],)).fetchone()
+    assert row['sharpness_score'] is None
+    assert row['below_sharpness_floor'] is None
+    assert row['person_confidence'] is None
+
+
+def test_process_detection_persists_top_species_guess(system):
+    """Task 3 (ADR-004 observability): process_detection reads
+    metadata['top_classifier_prediction'] and persists label/score as
+    top_species_raw / top_species_score."""
+    from data_models import IdentificationResult, DetectionResult
+
+    det = DetectionResult(
+        animals_detected=True, detection_count=1,
+        bounding_boxes=[{'confidence': 0.7}], detections=[],
+        processing_time=0.1,
+    )
+    identification = IdentificationResult(
+        species_name="aves;;;;;bird", confidence=0.8, api_success=True, processing_time=0.5,
+        detection_result=det, animals_detected=True,
+        metadata={
+            'top_classifier_prediction': {
+                'label': 'def;aves;passeriformes;turdidae;turdus;merula;eurasian blackbird',
+                'score': 0.34,
+            },
+        },
+    )
+    system.species_identifier.identify_species = MagicMock(return_value=identification)
+
+    result, ts = system.process_detection("capture.jpg", 5000, None)
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?",
+                           (result['detection_id'],)).fetchone()
+    assert row['top_species_raw'] == 'def;aves;passeriformes;turdidae;turdus;merula;eurasian blackbird'
+    assert row['top_species_score'] == pytest.approx(0.34)
+
+
+def test_process_detection_top_species_guess_null_without_metadata(system):
+    """No top_classifier_prediction in metadata (or no metadata at all) →
+    columns stay NULL, not an error."""
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification(True, boxes=[{'confidence': 0.7}])
+    )
+
+    result, ts = system.process_detection("capture.jpg", 5000, None)
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?",
+                           (result['detection_id'],)).fetchone()
+    assert row['top_species_raw'] is None
+    assert row['top_species_score'] is None
+
+
+def test_process_detection_top_species_guess_null_when_metadata_value_not_dict(system):
+    """Never-crash constraint: a malformed (non-dict) top_classifier_prediction
+    in metadata must not raise — the detection is still logged, with the
+    top-species columns NULL."""
+    from data_models import IdentificationResult, DetectionResult
+
+    det = DetectionResult(
+        animals_detected=True, detection_count=1,
+        bounding_boxes=[{'confidence': 0.7}], detections=[],
+        processing_time=0.1,
+    )
+    identification = IdentificationResult(
+        species_name="aves;;;;;bird", confidence=0.8, api_success=True, processing_time=0.5,
+        detection_result=det, animals_detected=True,
+        metadata={'top_classifier_prediction': "not-a-dict"},
+    )
+    system.species_identifier.identify_species = MagicMock(return_value=identification)
+
+    result, ts = system.process_detection("capture.jpg", 5000, None)
+
+    assert result['detection_id'] is not None  # row written, no crash
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?",
+                           (result['detection_id'],)).fetchone()
+    assert row['top_species_raw'] is None
+    assert row['top_species_score'] is None
+
+
 def test_process_detection_fails_closed_to_human_on_db_error(system):
     """If species ID found a HUMAN but the DB write then blows up (e.g. disk
     full / WAL contention), the fallback must still report HUMAN so the
@@ -178,6 +315,112 @@ def test_process_detection_stays_error_when_identify_species_throws(system):
 
     assert result['detection_status'] == DetectionStatus.ERROR
     assert result['detection_id'] is None
+
+
+# ===========================================================================
+# Task 3 (ADR-004 observability): "Best guess" caption line
+#
+# SpeciesNet's ensemble often rolls a low-confidence species-level guess up
+# to a generic label (e.g. "aves;;;;;bird"). The classifier's raw top-1
+# prediction (metadata['top_classifier_prediction']) is more specific and
+# should be surfaced — but only when it actually adds information.
+# ===========================================================================
+
+def _identified_species_result(species_name_raw, confidence=0.8, metadata=None):
+    from data_models import DetectionResult, DetectionStatus
+    det = DetectionResult(
+        animals_detected=True, detection_count=1,
+        bounding_boxes=[{'confidence': 0.8}], detections=[],
+        processing_time=0.1,
+    )
+    return {
+        'species_name': species_name_raw,
+        'confidence': confidence,
+        'detection_status': DetectionStatus.IDENTIFIED,
+        'detection_result': det,
+        'metadata': metadata if metadata is not None else {},
+        'fallback_reason': None,
+    }
+
+
+def test_build_caption_shows_best_guess_for_generic_rollup(system):
+    """Ensemble rolled up to 'aves;;;;;bird' (genus/species empty) and the
+    classifier's raw top-1 is species-level and non-generic → caption shows
+    'Best guess: eurasian blackbird (34%)', even though the score is low."""
+    species_result = _identified_species_result(
+        "abc;aves;;;;;bird",
+        confidence=0.8,
+        metadata={
+            'top_classifier_prediction': {
+                'label': 'def;aves;passeriformes;turdidae;turdus;merula;eurasian blackbird',
+                'score': 0.34,
+            },
+        },
+    )
+    caption = system._build_caption(species_result, 1000, datetime.now())
+    assert "Best guess: eurasian blackbird (34%)" in caption
+
+
+def test_build_caption_no_best_guess_when_ensemble_already_species_level(system):
+    """Ensemble already resolved to a full species (genus+species present)
+    — the best-guess line would add nothing, so it must not appear."""
+    species_result = _identified_species_result(
+        "abc;mammalia;carnivora;canidae;vulpes;vulpes;red fox",
+        confidence=0.9,
+        metadata={
+            'top_classifier_prediction': {
+                'label': 'abc;mammalia;carnivora;canidae;vulpes;vulpes;red fox',
+                'score': 0.9,
+            },
+        },
+    )
+    caption = system._build_caption(species_result, 1000, datetime.now())
+    assert "Best guess" not in caption
+
+
+def test_build_caption_no_best_guess_when_top_classifier_prediction_missing(system):
+    """Generic ensemble rollup but no classifier top-1 available at all."""
+    species_result = _identified_species_result("abc;aves;;;;;bird", metadata={})
+    caption = system._build_caption(species_result, 1000, datetime.now())
+    assert "Best guess" not in caption
+
+
+def test_build_caption_no_best_guess_when_top_prediction_itself_generic(system):
+    """The classifier's own top-1 is itself a generic sentinel ('blank') —
+    showing it would add no information, so it must be suppressed."""
+    species_result = _identified_species_result(
+        "abc;;;;;;animal",
+        metadata={
+            'top_classifier_prediction': {'label': 'def;;;;;;blank', 'score': 0.5},
+        },
+    )
+    caption = system._build_caption(species_result, 1000, datetime.now())
+    assert "Best guess" not in caption
+
+
+def test_build_caption_never_crashes_on_malformed_top_classifier_prediction(system):
+    """Never-crash constraint: a malformed metadata value must not block
+    caption generation (or, by extension, the notification)."""
+    species_result = _identified_species_result(
+        "abc;aves;;;;;bird",
+        metadata={'top_classifier_prediction': "not-a-dict"},
+    )
+    caption = system._build_caption(species_result, 1000, datetime.now())
+    assert "📅" in caption  # caption still built despite the malformed value
+
+
+def test_extract_common_name_helper():
+    """Task 3: small utils helper — last non-empty semicolon segment."""
+    from utils import extract_common_name
+
+    assert extract_common_name(
+        "def;aves;passeriformes;turdidae;turdus;merula;eurasian blackbird"
+    ) == "eurasian blackbird"
+    assert extract_common_name("aves;;;;;bird") == "bird"
+    # Trailing empty segment (missing common name) — falls back further left.
+    assert extract_common_name("abc;mammalia;carnivora;canidae;vulpes;vulpes;") == "vulpes"
+    assert extract_common_name("") == ""
+    assert extract_common_name(None) == ""
 
 
 @pytest.mark.asyncio

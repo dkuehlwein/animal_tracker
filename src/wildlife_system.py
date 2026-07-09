@@ -7,6 +7,7 @@ Combines motion detection, species identification, database logging, and Telegra
 import asyncio
 import functools
 import logging
+import logging.handlers
 import os
 import time
 from datetime import datetime
@@ -21,7 +22,7 @@ from database_manager import DatabaseManager
 from species_identifier import SpeciesIdentifier
 from notification_service import NotificationService
 from resource_manager import SystemMonitor, StorageManager
-from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnalyzer, get_species_emoji
+from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnalyzer, get_species_emoji, extract_common_name
 from feedback_protocol import build_feedback_keyboard
 from timelapse_writer import TimelapseWriter
 from data_models import DetectionStatus, is_review_detection, is_human_detection
@@ -146,11 +147,14 @@ class WildlifeSystem:
             logger.error(f"Error in cleanup: {e}", exc_info=True)
     
     def process_detection(self, image_path: Path, motion_area: int,
-                          motion_result=None) -> tuple:
+                          motion_result=None, sharpness_info: Optional[dict] = None) -> tuple:
         """Process a detection with two-stage species identification and database logging.
 
         `motion_result` is the triggering MotionResult; its richer diagnostic
         fields are persisted (ADR-004 Phase 1) instead of being dropped.
+        `sharpness_info` is the dict built by `_capture_and_select_best_frame`
+        (Task 1, ADR-004 observability); its sharpness fields are persisted
+        alongside person_confidence read from the identification metadata.
         """
         timestamp = datetime.now()
         species_result = None
@@ -188,6 +192,35 @@ class WildlifeSystem:
                 species_result.detection_result
             )
 
+            # Task 1 (ADR-004 observability): sharpness values come from our
+            # own sharpness_info parameter; person_confidence comes from the
+            # identification metadata (set on every parsed result upstream).
+            sharpness_score = sharpness_info.get('sharpness_score') if sharpness_info else None
+            below_sharpness_floor = sharpness_info.get('below_sharpness_floor') if sharpness_info else None
+            person_confidence = (
+                species_result.metadata.get('person_confidence')
+                if species_result.metadata else None
+            )
+
+            # Task 3 (ADR-004 observability): the classifier's raw top-1
+            # prediction (before geofence/rollup) — distinct from the
+            # (possibly rolled-up) ensemble species_name.
+            top_classifier_prediction = (
+                species_result.metadata.get('top_classifier_prediction')
+                if species_result.metadata else None
+            )
+            # Only trust the {'label', 'score'} contract — a malformed
+            # (non-dict) value must degrade to NULL columns, not crash the
+            # detection (never-crash constraint).
+            if not isinstance(top_classifier_prediction, dict):
+                top_classifier_prediction = None
+            top_species_raw = (
+                top_classifier_prediction.get('label') if top_classifier_prediction else None
+            )
+            top_species_score = (
+                top_classifier_prediction.get('score') if top_classifier_prediction else None
+            )
+
             # Log to database (richer Phase-1 fields included)
             detection_id = self.database.log_detection(
                 image_path=image_path,
@@ -205,6 +238,11 @@ class WildlifeSystem:
                 gate_would_suppress=gate_would_suppress,
                 background_drift=self.reference_drift,
                 detection_status=species_result.status,
+                sharpness_score=sharpness_score,
+                below_sharpness_floor=below_sharpness_floor,
+                person_confidence=person_confidence,
+                top_species_raw=top_species_raw,
+                top_species_score=top_species_score,
             )
 
             logger.info(f"Detection {detection_id} logged: {species_result.species_name} "
@@ -366,7 +404,45 @@ class WildlifeSystem:
                     return scientific.title()
             return 'Unknown species'
         return species_name_raw
-    
+
+    def _best_guess_line(self, ensemble_species_name_raw: str, metadata: Optional[dict]) -> Optional[str]:
+        """Build a 'Best guess: <common name> (NN%)' caption line from the
+        classifier's raw top-1 prediction (Task 3, ADR-004 observability).
+
+        Only returns a line when it adds real information: the ensemble
+        label itself must be a generic rollup (genus and/or species taxonomy
+        segments empty, e.g. "aves;;;;;bird" or ";;;;;;animal"), a top
+        classifier prediction must exist, and its own common name must not
+        itself be a generic sentinel ("blank" / "no cv result" / "animal").
+        Scores are shown even when low — that's the point.
+
+        Never raises: any error here must not block the notification.
+        """
+        try:
+            if not metadata:
+                return None
+            top = metadata.get('top_classifier_prediction')
+            if not top:
+                return None
+
+            parts = (ensemble_species_name_raw or '').split(';')
+            genus = parts[-3].strip() if len(parts) >= 3 else ''
+            species = parts[-2].strip() if len(parts) >= 2 else ''
+            if genus and species:
+                # Ensemble already resolved to species level — nothing to add.
+                return None
+
+            top_label = top.get('label', '')
+            top_score = top.get('score', 0.0)
+            common_name = extract_common_name(top_label)
+            if not common_name or common_name.strip().lower() in ('blank', 'no cv result', 'animal'):
+                return None
+
+            return f"Best guess: {common_name} ({top_score:.0%})"
+        except Exception as e:
+            logger.error(f"Error building best-guess caption line: {e}")
+            return None
+
     def _build_caption(self, species_result: dict, motion_area: int, timestamp: datetime,
                         temperature: Optional[float] = None) -> str:
         """Build compact notification caption based on detection status.
@@ -424,6 +500,15 @@ class WildlifeSystem:
                     top_score = best_geofenced.get('score', 0.0)
                     if top_species_name and top_species_name.lower() != 'unknown species':
                         caption += f" → {top_species_name} ({top_score:.0%})"
+
+                # Task 3: surface the classifier's raw top-1 guess when the
+                # ensemble label itself is a generic rollup and the guess
+                # adds real information (see _best_guess_line docstring).
+                best_guess_line = self._best_guess_line(
+                    species_result.get('species_name', ''), metadata
+                )
+                if best_guess_line:
+                    caption += f"\n{best_guess_line}"
 
             caption += stats_line
 
@@ -546,7 +631,8 @@ class WildlifeSystem:
             self.process_detection,
             image_path,
             motion_area,
-            self.last_motion_result
+            self.last_motion_result,
+            sharpness_info
         )
 
         # Add sharpness info to species result for notification
@@ -855,16 +941,55 @@ class WildlifeSystem:
                 self.executor.shutdown(wait=True, cancel_futures=True)
 
 
-if __name__ == "__main__":
+def configure_logging(config) -> None:
+    """Configure root logging: console stream handler (keeps journald working)
+    plus a rotating file handler under ``config.storage.log_dir`` so INFO+
+    history survives a Pi reboot (journald's does not).
+
+    Never raises: if the log directory can't be created or written to, a
+    warning is logged via the stream handler and setup continues without
+    the file handler rather than crashing the pipeline.
+    """
     log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
-    logging.basicConfig(
-        level=getattr(logging, log_level, logging.INFO),
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
+    level = getattr(logging, log_level, logging.INFO)
+    log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    formatter = logging.Formatter(log_format)
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(level)
+
+    # Clear any pre-existing handlers so repeated calls don't duplicate lines.
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel(level)
+    stream_handler.setFormatter(formatter)
+    root_logger.addHandler(stream_handler)
+
+    try:
+        log_dir = Path(config.storage.log_dir)
+        log_dir.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.handlers.RotatingFileHandler(
+            log_dir / "wildlife.log",
+            maxBytes=5_000_000,
+            backupCount=5,
+        )
+        # DEBUG stays console-only: the DIAG-MOTION firehose (~5s cadence)
+        # would churn the rotation if written to disk.
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(formatter)
+        root_logger.addHandler(file_handler)
+    except OSError as e:
+        root_logger.warning(f"Could not set up rotating file log handler: {e}")
+
     # Reduce verbosity of noisy third-party loggers
     logging.getLogger('picamera2').setLevel(logging.WARNING)
     for noisy in ('httpx', 'httpcore', 'asyncio', 'urllib3', 'telegram'):
         logging.getLogger(noisy).setLevel(logging.INFO)
-    
+
+
+if __name__ == "__main__":
+    configure_logging(Config())
     system = WildlifeSystem()
     asyncio.run(system.run())

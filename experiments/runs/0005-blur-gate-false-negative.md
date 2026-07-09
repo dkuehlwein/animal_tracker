@@ -84,3 +84,34 @@ See `experiments/JOURNAL.md` (2026-07-08 entry) for the combined loop-facing not
 covering both this fix and `runs/0004`'s human-suppression fix — the loop's
 "stock config" volume/rollback baselines assume neither shift and must not
 mistake either for an anomaly.
+
+## Post-deploy evidence (2026-07-08, 19:33-19:35)
+
+The fix's own predicted failure mode showed up the same night it went live, at
+almost the same pond location and hour as the 07-07 triggering incident: four
+pond-bird bursts scored best-frame sharpness **10.0-10.4**, below the 11.0
+floor — visually indistinguishable from the 8.6-9.4 scores that were silently
+dropped on 07-07. Under the pre-fix code these would again have vanished with
+zero DB rows and zero notification. Under the shipped fix, **all four
+below-floor bursts alerted** (detections 1738-1741): an animal was found in
+each blurry frame, so the notification layer's `is_blurry_review` mute never
+applied (mute only fires when a below-floor burst is *also* review-class
+NO_ANIMAL/UNCLASSIFIABLE — i.e. no animal found).
+
+This is exactly the class of false negative the fix targeted, now producing a
+positive result: dusk/low-light animal captures that would previously have
+been invisible to every downstream signal (DB, loop metrics, human feedback)
+instead reached species ID, a DB row, and Daniel's Telegram — confirming the
+mechanism fix (`_capture_and_select_best_frame` no longer returns `(None,
+None)` before `process_detection` runs) end-to-end on live dusk data, not just
+in the unit tests.
+
+**Follow-on note:** the *cause* of the sub-floor scores in the first place —
+auto-exposure choosing long exposures at dusk, which blurs motion — is a
+separate, still-open problem. Sharpness climbing just above 11.0 rather than
+comfortably clear of it means dusk captures remain marginal. That is the
+subject of a new experiment, `runs/0006-dusk-short-exposure.md` (Task 4:
+`CameraConfig.ae_exposure_mode` biases auto-exposure toward shorter
+exposures), which this fix's below-floor handling makes measurable for the
+first time via the Task 1 `sharpness_score`/`below_sharpness_floor` DB
+columns (persisted from 2026-07-09 onward).

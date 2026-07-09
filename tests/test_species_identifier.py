@@ -217,6 +217,78 @@ def test_max_person_confidence_used_when_multiple_person_boxes(tmp_path):
 
 
 # ===========================================================================
+# Observability (Task 1, ADR-004): max person-category confidence is
+# recorded in metadata on every parsed result, not only HUMAN ones, so the
+# nightly tuning loop can attribute metric shifts even to sub-threshold
+# person detections that never fired the privacy gate.
+# ===========================================================================
+
+def test_metadata_person_confidence_recorded_below_gate_threshold(tmp_path):
+    """person conf 0.25 < default 0.3 threshold, no animal → status stays
+    NO_ANIMAL, but metadata still carries the raw person confidence."""
+    from data_models import DetectionStatus
+
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "person", "conf": 0.25, "bbox": [0, 0, 1, 1]}],
+    )
+    assert result.status == DetectionStatus.NO_ANIMAL
+    assert result.metadata is not None
+    assert result.metadata['person_confidence'] == 0.25
+
+
+def test_metadata_person_confidence_recorded_on_human_status(tmp_path):
+    from data_models import DetectionStatus
+
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "person", "conf": 0.8, "bbox": [0, 0, 1, 1]}],
+    )
+    assert result.status == DetectionStatus.HUMAN
+    assert result.metadata is not None
+    assert result.metadata['person_confidence'] == 0.8
+
+
+def test_metadata_person_confidence_defaults_zero_when_no_person(tmp_path):
+    """No person detection at all → metadata['person_confidence'] == 0.0
+    (not missing, not None) on the IDENTIFIED path."""
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "animal", "conf": 0.9, "bbox": [0, 0, 1, 1]}],
+        prediction="abc;mammalia;carnivora;canidae;vulpes;vulpes;Red Fox",
+        prediction_score=0.85,
+        classifications={
+            "classes": ["abc;mammalia;carnivora;canidae;vulpes;vulpes;Red Fox"],
+            "scores": [0.85],
+        },
+    )
+    assert result.metadata is not None
+    assert result.metadata['person_confidence'] == 0.0
+
+
+def test_metadata_person_confidence_recorded_when_no_predictions_returned(tmp_path):
+    """Even the early 'no predictions returned' ERROR path carries the key
+    (as 0.0), so downstream code can always do metadata['person_confidence']
+    without a None-check special case."""
+    from data_models import DetectionStatus
+
+    identifier, cfg = _make_identifier()
+    identifier._model_loaded = True
+    identifier._model = MagicMock()
+    identifier._model.predict.return_value = {"predictions": []}
+    img = tmp_path / "test.jpg"
+    img.write_bytes(b"fake")
+    result = identifier.identify_species(img)
+
+    assert result.status == DetectionStatus.ERROR
+    assert result.metadata is not None
+    assert result.metadata['person_confidence'] == 0.0
+
+
+# ===========================================================================
 # Regression: existing no-detection and identified paths unchanged
 # ===========================================================================
 
@@ -244,3 +316,90 @@ def test_animal_only_high_confidence_still_identified(tmp_path):
     )
     assert result.status == DetectionStatus.IDENTIFIED
     assert result.species_name == "abc;mammalia;carnivora;canidae;vulpes;vulpes;Red Fox"
+
+
+# ===========================================================================
+# Task 3 (ADR-004 observability): the classifier's raw top-1 prediction
+# (before geofence/rollup) must be carried in metadata even when the
+# ensemble rolls the final label up to a generic class-level guess
+# ("aves;;;;;bird"), so callers (caption, DB) can surface the more specific
+# guess the classifier actually made.
+# ===========================================================================
+
+def test_top_classifier_prediction_in_metadata_for_generic_rollup(tmp_path):
+    """Ensemble rolls up to 'aves;;;;;bird' but the classifier's raw top-1
+    (species-level, low confidence) is still carried in metadata."""
+    from data_models import DetectionStatus
+
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "animal", "conf": 0.9, "bbox": [0, 0, 1, 1]}],
+        prediction="aves;;;;;bird",
+        prediction_score=0.8,
+        classifications={
+            "classes": [
+                "def;aves;passeriformes;turdidae;turdus;merula;eurasian blackbird"
+            ],
+            "scores": [0.34],
+        },
+    )
+    assert result.status == DetectionStatus.IDENTIFIED
+    assert result.species_name == "aves;;;;;bird"
+    assert result.metadata is not None
+    assert result.metadata["top_classifier_prediction"] == {
+        "label": "def;aves;passeriformes;turdidae;turdus;merula;eurasian blackbird",
+        "score": 0.34,
+    }
+
+
+def test_top_classifier_prediction_list_branch_normalized_to_contract(tmp_path):
+    """Legacy list-shaped classifications: the first entry is normalized to
+    the {'label': str, 'score': float} contract when it is a conforming dict."""
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "animal", "conf": 0.9, "bbox": [0, 0, 1, 1]}],
+        prediction="aves;;;;;bird",
+        prediction_score=0.8,
+        classifications=[
+            {"label": "def;aves;passeriformes;turdidae;turdus;merula;eurasian blackbird",
+             "score": 0.34, "extra": "ignored"},
+        ],
+    )
+    assert result.metadata is not None
+    assert result.metadata["top_classifier_prediction"] == {
+        "label": "def;aves;passeriformes;turdidae;turdus;merula;eurasian blackbird",
+        "score": 0.34,
+    }
+
+
+def test_top_classifier_prediction_list_branch_non_dict_entry_yields_none(tmp_path):
+    """Legacy list-shaped classifications whose first entry is not a dict
+    (e.g. a bare label string) must NOT leak a non-dict into metadata —
+    downstream .get() calls would crash the pipeline (never-crash constraint)."""
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "animal", "conf": 0.9, "bbox": [0, 0, 1, 1]}],
+        prediction="aves;;;;;bird",
+        prediction_score=0.8,
+        classifications=["def;aves;passeriformes;turdidae;turdus;merula;eurasian blackbird"],
+    )
+    assert result.metadata is not None
+    assert result.metadata["top_classifier_prediction"] is None
+
+
+def test_top_classifier_prediction_none_when_no_classifications(tmp_path):
+    """No classifications payload at all → metadata key is present but None,
+    so callers never need a KeyError special-case."""
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "animal", "conf": 0.9, "bbox": [0, 0, 1, 1]}],
+        prediction="abc;mammalia;carnivora;canidae;vulpes;vulpes;Red Fox",
+        prediction_score=0.85,
+        classifications={},
+    )
+    assert result.metadata is not None
+    assert result.metadata["top_classifier_prediction"] is None
