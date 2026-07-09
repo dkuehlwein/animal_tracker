@@ -78,7 +78,7 @@ The system follows a modular architecture with these main components:
 - **`resource_manager.py`**: Memory management, storage cleanup, and system monitoring
 - **`data_models.py`**: Consolidated data models (MotionResult, DetectionResult, IdentificationResult, DetectionRecord) - named `data_models` to avoid conflict with YOLO's internal `models` package
 - **`exceptions.py`**: Unified exception hierarchy for all components
-- **`utils.py`**: Utilities (PerformanceTimer, MotionVisualizer, SharpnessAnalyzer, SunChecker)
+- **`utils.py`**: Utilities (PerformanceTimer, MotionVisualizer, SharpnessAnalyzer, SunChecker, `extract_common_name`)
 - **`scripts/camera_preview.py`**: MJPEG streaming server for live camera preview (focus adjustment tool)
 
 ### Data Flow
@@ -98,7 +98,7 @@ The system follows a modular architecture with these main components:
 All configuration is centralized in `Config` class with nested dataclasses:
 
 - **Motion Detection**:
-  - `motion_threshold` (default: 2000, current: 500 px) - minimum motion area to trigger detection
+  - `motion_threshold` (default: 2000, current: 800 px) - minimum motion area to trigger detection
   - `min_contour_area` (50) - minimum size of individual contours
   - `consecutive_detections_required` (2) - reduces momentary false positives
   - **Color Filtering** (disabled by default): Reduces false positives from uniform vegetation
@@ -107,12 +107,16 @@ All configuration is centralized in `Config` class with nested dataclasses:
 - **Camera**: Dual resolution streams with frame rate limiting (`frame_duration`: 100000 microseconds)
   - **Exposure Control**: `exposure_time` (2000μs = 1/500s) and `analogue_gain` (2.5x) for motion freeze
   - Set either to `None` to enable auto-exposure mode (currently: auto-exposure enabled)
+  - **Auto-Exposure Bias**: `ae_exposure_mode` (default `"short"`, one of `normal|short|long`) — only applies when auto-exposure is active (i.e. `exposure_time`/`analogue_gain` are `None`); mapped to libcamera's `AeExposureModeEnum` in `PiCameraManager._apply_ae_exposure_mode`. Biases AE toward shorter exposures at dusk/low light so bursts don't fall below `min_sharpness_threshold` (see dusk-exposure fix, `experiments/runs/0006-dusk-short-exposure.md`). Degrades gracefully (logs a warning, no `AeExposureMode` control set) if libcamera is unavailable or the enum lookup fails. Rollback lever: `CAMERA_AE_EXPOSURE_MODE=normal` + service restart.
 - **Timing**: `cooldown_period` (30s), `frame_interval` (0.2s for 5 FPS)
 - **Storage**: `max_images` (100 bursts) with automatic cleanup of oldest bursts
+  - **File Logging**: `log_dir` (default `data/logs`, env `STORAGE_LOG_DIR`) - `configure_logging(config)` (called from `wildlife_system.py`'s `__main__`) installs a `RotatingFileHandler` at `<log_dir>/wildlife.log` (5MB × 5 backups) alongside the existing console/journald stream handler, so INFO+ history survives a Pi reboot (journald's does not). DEBUG stays console-only to avoid the DIAG-MOTION firehose churning rotation. If the log directory can't be created/written, a warning is logged via the stream handler and setup continues without the file handler (never crashes). `StorageConfig.logs_dir` (used by `resource_manager.ensure_directories`) is now a property aliasing `log_dir`, so a `STORAGE_LOG_DIR` override moves both the file handler's target and the directory `ensure_directories` creates.
 - **Debug**: `send_annotated_image` (false) - when enabled, sends motion detection overlay image alongside the original photo in Telegram
 - **Species Identification**: `model_version` (v4.0.1a), `country_code` (DEU), `admin1_region` (NW), `unknown_species_threshold` (0.5)
 - **Human/Privacy Gate**: `human_detection_confidence` (0.3) - MegaDetector person-category confidence that, alone or together with a `homo` taxonomy segment in the SpeciesNet ensemble prediction, classifies a burst as `DetectionStatus.HUMAN`; evaluated *before* the animal branch, so a frame with both a person and a confident animal still routes to HUMAN. `suppress_human_alerts` (true) - HUMAN-status detections are still species-ID'd and DB-logged, but no Telegram notification is sent (not REVIEW-tagged, suppressed entirely). `human_retention_hours` (48) - saved burst photos for HUMAN-status detections are purged this many hours after capture; the DB row is kept as a metadata-only record.
 - **Blur Gate**: `min_sharpness_threshold` (11.0) - a burst whose best frame scores below this is no longer silently discarded. It still gets a real image path + `sharpness_info`, flows through species ID, and is always DB-logged. The notification layer then decides: an animal found in a below-floor burst still alerts (with `below_sharpness_floor` noted); a below-floor burst with a review-class status (NO_ANIMAL/UNCLASSIFIABLE, no animal found) is DB-logged but *not* sent to Telegram, so REVIEW-channel volume doesn't rise. The human-privacy gate takes precedence over the blur mute (a blurry human burst is suppressed as HUMAN, not as blur).
+- **Observability columns (ADR-004, nightly tuning loop)**: the `detections` table has five nullable columns, populated on every write from 2026-07-09 onward (NULL on rows logged before that date — there is no backfill). `sharpness_score` (REAL) and `below_sharpness_floor` (BOOLEAN) mirror the Blur Gate's `sharpness_info` dict. `person_confidence` (REAL) is the max MegaDetector person-category confidence from `species_identifier`'s parsed metadata — recorded on *every* identification result (HUMAN, NO_ANIMAL, UNCLASSIFIABLE, ANIMAL_UNCERTAIN, IDENTIFIED, ERROR), not only ones that tripped the Human/Privacy Gate, so sub-threshold person scores are visible too (0.0 when no person box was present). `top_species_raw` (TEXT) and `top_species_score` (REAL) are the species classifier's raw top-1 prediction (label/score), captured independently of the (possibly rolled-up) ensemble `species_name` — see `utils.extract_common_name` and the "Best guess" caption line below. All five round-trip through `DatabaseManager.log_detection` and `WildlifeSystem.process_detection`, which reads `sharpness_info` (now an explicit `process_detection` parameter) and `IdentificationResult.metadata` to populate them.
+- **"Best guess" caption line**: when the ensemble's final species label is a generic rollup (blank/empty genus or species taxonomy segments, e.g. `aves;;;;;bird` or `;;;;;;animal`) but the classifier's raw top-1 prediction (`metadata['top_classifier_prediction']`) names something more specific and non-generic, the Telegram caption appends a line `Best guess: <common name> (NN%)` (built by `WildlifeSystem._best_guess_line`, using `utils.extract_common_name` to pull the last non-empty semicolon-delimited segment). Shown even at low confidence — that's the point. Wrapped defensively so a formatting error never blocks the notification; a non-dict/malformed `top_classifier_prediction` (legacy classifier shape) degrades to no caption line and NULL DB columns rather than crashing.
 
 ### Configuration Architecture
 
@@ -172,12 +176,13 @@ Requires `.env` file with:
 
 Additional optional environment variables for fine-tuning:
 - Motion: `MOTION_THRESHOLD`, `MOTION_CONSECUTIVE_REQUIRED`, `MOTION_FRAME_INTERVAL`, `MOTION_ENABLE_COLOR_FILTERING`, `MOTION_MIN_COLOR_VARIANCE`
-- Camera: `CAMERA_MAIN_RESOLUTION`, `CAMERA_MOTION_RESOLUTION`, `CAMERA_EXPOSURE_TIME`, `CAMERA_ANALOGUE_GAIN`
+- Camera: `CAMERA_MAIN_RESOLUTION`, `CAMERA_MOTION_RESOLUTION`, `CAMERA_EXPOSURE_TIME`, `CAMERA_ANALOGUE_GAIN`, `CAMERA_AE_EXPOSURE_MODE` (auto-exposure bias, one of `normal|short|long`, only applies when `CAMERA_EXPOSURE_TIME`/`CAMERA_ANALOGUE_GAIN` are unset; default `short` — dusk-exposure fix, rollback via `normal`)
 - Performance: `PERFORMANCE_COOLDOWN`, `PERFORMANCE_MAX_IMAGES`, `PERFORMANCE_SEND_ANNOTATED_IMAGE` (debug: send motion overlay alongside original, default false)
   `PERFORMANCE_REVIEW_PREFIX_ENABLED` (prefix likely-false-positive notifications — NO_ANIMAL/UNCLASSIFIABLE — with a 🔍 REVIEW header in the same channel; default true)
   `PERFORMANCE_SUPPRESS_HUMAN_ALERTS` (skip the Telegram notification entirely for HUMAN-status detections; still species-ID'd and DB-logged; default true)
   `PERFORMANCE_HUMAN_RETENTION_HOURS` (purge saved burst photos of HUMAN-status detections after this many hours; DB row kept as metadata-only; default 48)
 - Species: `SPECIES_COUNTRY_CODE`, `SPECIES_REGION`, `SPECIES_UNKNOWN_THRESHOLD`, `SPECIES_HUMAN_DETECTION_CONFIDENCE` (MegaDetector person-category confidence, combined with a `homo` taxonomy check, that fires `DetectionStatus.HUMAN`; default 0.3)
+- Storage: `STORAGE_LOG_DIR` (rotating file log destination, `<log_dir>/wildlife.log`; default `data/logs`)
 
 ### Hardware Dependencies
 

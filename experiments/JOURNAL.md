@@ -793,3 +793,75 @@ out (exp #3/#4 concluded). Notification-layer REVIEW gate doing its job.
   exactly why this entry exists: `deployed={}` is no longer a reliable proxy for
   "nothing changed" starting today. `experiments/state.json` backlog entries #5 and
   #6 updated to `concluded`/`live` to match the run docs.
+
+## 2026-07-09 — SHIPPED: observability columns, file logging, best-guess caption, dusk short-exposure bias (ADR-004 Tasks 1-4) — four loop-facing notes below
+
+Branch `feat/observability-and-dusk` (Tasks 1-4, code) merged today. Four
+independent, individually-reversible changes; the loop must read all four
+notes below before attributing any metric shift to an anomaly.
+
+**(a) The observability columns runs/0005 told you to use for attribution
+are now real DB columns — starting today.** The `detections` table gained
+five nullable columns via the existing migration mechanism: `sharpness_score`
+(REAL), `below_sharpness_floor` (BOOLEAN), `person_confidence` (REAL),
+`top_species_raw` (TEXT), `top_species_score` (REAL). **They are populated on
+every detection logged from 2026-07-09 onward and NULL on every row before
+that date — there is no backfill.** The 07-08 entry above told the loop to
+"attribute using the new `detection_status=human` and
+`sharpness_info.below_sharpness_floor` fields before concluding a knob needs
+to change" — `sharpness_info.below_sharpness_floor` existed in memory/logs
+at that point but was never persisted to a queryable column; as of today it
+(and `sharpness_score`, `person_confidence`) is. Those attribution
+instructions are now actually actionable via SQL, not just via reading log
+lines. See `CLAUDE.md` ("Observability columns" bullet) and commits
+`91356a6`/`83c9d69`/`3d7d52d` (Task 1), `86979b3`/`8de0b4f`/`30376a6` (Task 3,
+adds `top_species_raw`/`top_species_score` + the "Best guess" caption line).
+
+**(b) Dusk sharpness scores are expected to RISE starting today — this is
+the intended effect of Task 4, not an anomaly.** `CameraConfig.ae_exposure_mode`
+now defaults to `"short"` (env `CAMERA_AE_EXPOSURE_MODE`, `normal|short|long`),
+biasing libcamera's auto-exposure toward shorter exposures at dusk/low light
+— the direct fix for the mechanism `runs/0006-dusk-short-exposure.md`
+diagnoses behind both the 07-07 silent-drop incident and the 07-08 19:33-19:35
+marginal below-floor alerts (10.0-10.4 vs. the 11.0 floor). **If a future
+tick sees dusk-hour `sharpness_score` values trending up and
+`below_sharpness_floor` rows at dusk trending down, that is this fix working
+as designed — do not flag it as a data anomaly or a sensor change.** Watch
+for the opposite failure mode instead: a *midday* sharpness regression would
+be forcing evidence the short-exposure bias trades away too much
+brightness/gain even in good light. **Rollback lever:**
+`CAMERA_AE_EXPOSURE_MODE=normal` + `sudo systemctl restart
+wildlife-camera.service` — single env var, no schema change, no code
+rollback needed. See `runs/0006-dusk-short-exposure.md`.
+
+**(c) Verify the first 48h human-purge cycle on the first tick after
+2026-07-10 ~14:49.** Detection id **1725** (2026-07-08 14:49,
+`capture_20260708_144907_frame*.jpg`) is a `DetectionStatus.HUMAN` row from
+before today's deploy, and is the earliest HUMAN row old enough to exercise
+`PERFORMANCE_HUMAN_RETENTION_HOURS` (48h, shipped 07-08 per `runs/0004`
+Resolution) end-to-end since that feature went live. **On the first loop tick
+that runs at or after 2026-07-10 ~14:49, check: (1) the `capture_20260708_144907_frame*.jpg`
+files are gone from disk (purged); (2) the DB row for id 1725 is still
+present and intact (metadata-only, per design — timestamp/status/confidence
+kept, only the image files deleted).** If the files are still present past
+that time, or the DB row is missing/altered, that is a real purge-mechanism
+bug worth a new run doc, not a one-off to silently ignore.
+
+**(d) `deployed={}` still means "no env-lever override," not "no behavior
+change" — same posture as 07-08, reaffirmed.** All four of today's changes
+(observability columns, file logging, best-guess caption, AE short-exposure
+bias) are **code defaults**, not env-var overrides Daniel opted into, so
+`state.json.deployed` stays `{}` even though DB schema, logging destination,
+notification captions, and camera exposure behavior all changed today. Keep
+reading `experiments/runs/000{1..6}` and this JOURNAL, not just `deployed`,
+to know what's actually different about the running system.
+
+Separately (Task 2, `ee8cdcf`/`524b19d`): `configure_logging(config)` now
+installs a `RotatingFileHandler` at `<log_dir>/wildlife.log` (5MB × 5
+backups, INFO+) alongside the console handler, because journald history was
+lost on the 2026-07-08 21:14 reboot and took forensic log lines with it.
+`StorageConfig.log_dir` (env `STORAGE_LOG_DIR`, default `data/logs`);
+`logs_dir` is now a property aliasing `log_dir`. Verify after restart:
+`systemctl status wildlife-camera.service` is `active`, and
+`data/logs/wildlife.log` shows INFO lines flowing plus an AE-mode log line
+(`"Auto-exposure mode: short"` from `_apply_ae_exposure_mode`).
