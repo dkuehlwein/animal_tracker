@@ -179,7 +179,9 @@ class StorageConfig(BaseSettings):
 
     @property
     def logs_dir(self) -> Path:
-        return self.data_dir / "logs"
+        # Alias for log_dir (single source of truth) so existing callers
+        # (resource_manager.ensure_directories) follow STORAGE_LOG_DIR too.
+        return self.log_dir
 
     def ensure_directories(self):
         """Create required directories."""

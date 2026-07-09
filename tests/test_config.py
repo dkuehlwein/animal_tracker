@@ -88,7 +88,9 @@ class TestStorageConfig:
         """Test derived path properties."""
         config = StorageConfig(data_dir=Path("custom"))
         assert config.image_dir == Path("custom/images")
-        assert config.logs_dir == Path("custom/logs")
+        # logs_dir aliases log_dir (single source of truth), which is
+        # independent of data_dir and defaults to data/logs.
+        assert config.logs_dir == config.log_dir == Path("data/logs")
 
 
 class TestSpeciesConfig:
@@ -300,6 +302,16 @@ def test_log_dir_env_override(monkeypatch):
     monkeypatch.setenv("STORAGE_LOG_DIR", "custom/log/path")
     from config import StorageConfig
     assert StorageConfig().log_dir == Path("custom/log/path")
+
+
+def test_logs_dir_property_follows_log_dir_override(monkeypatch):
+    """logs_dir (used by resource_manager.ensure_directories) must share a
+    single source of truth with log_dir, so a STORAGE_LOG_DIR override moves
+    both — otherwise the file handler writes to one directory while
+    ensure_directories creates another."""
+    monkeypatch.setenv("STORAGE_LOG_DIR", "custom/log/path")
+    from config import StorageConfig
+    assert StorageConfig().logs_dir == Path("custom/log/path")
 
 
 if __name__ == '__main__':
