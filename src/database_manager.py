@@ -219,8 +219,14 @@ class DatabaseManager:
         except Exception as e:
             raise DatabaseError(f"Unexpected error logging detection: {e}") from e
 
-    # Human-tap labels map to these canonical strings (see telegram_feedback.py).
-    VALID_FEEDBACK_LABELS = ("animal", "false_positive", "wrong_species")
+    # Human-tap labels map to these canonical strings (see feedback_protocol.py,
+    # the single source of truth for wire codes; this tuple must cover every
+    # CODE_TO_LABEL value, including legacy wrong_species, which is parse-only
+    # on the keyboard but still a valid stored label for old channel messages).
+    VALID_FEEDBACK_LABELS = (
+        "animal", "animal_wrong_id", "person", "false_positive", "cant_tell",
+        "wrong_species",
+    )
 
     def add_feedback(self, detection_id: int, label: str,
                      source: str = "human") -> Optional[int]:

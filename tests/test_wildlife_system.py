@@ -438,8 +438,8 @@ async def test_send_notification_attaches_feedback_keyboard(system, tmp_path):
 
     _, kwargs = system.telegram_service.send_photo_with_caption.call_args
     keyboard = kwargs['reply_markup']
-    data = [b.callback_data for b in keyboard.inline_keyboard[0]]
-    assert data == ["fb:123:a", "fb:123:fp", "fb:123:ws"]
+    data = [b.callback_data for row in keyboard.inline_keyboard for b in row]
+    assert data == ["fb:123:a", "fb:123:wid", "fb:123:p", "fb:123:fp", "fb:123:ct"]
 
 
 def _mock_telegram(system):
