@@ -217,6 +217,78 @@ def test_max_person_confidence_used_when_multiple_person_boxes(tmp_path):
 
 
 # ===========================================================================
+# Observability (Task 1, ADR-004): max person-category confidence is
+# recorded in metadata on every parsed result, not only HUMAN ones, so the
+# nightly tuning loop can attribute metric shifts even to sub-threshold
+# person detections that never fired the privacy gate.
+# ===========================================================================
+
+def test_metadata_person_confidence_recorded_below_gate_threshold(tmp_path):
+    """person conf 0.25 < default 0.3 threshold, no animal → status stays
+    NO_ANIMAL, but metadata still carries the raw person confidence."""
+    from data_models import DetectionStatus
+
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "person", "conf": 0.25, "bbox": [0, 0, 1, 1]}],
+    )
+    assert result.status == DetectionStatus.NO_ANIMAL
+    assert result.metadata is not None
+    assert result.metadata['person_confidence'] == 0.25
+
+
+def test_metadata_person_confidence_recorded_on_human_status(tmp_path):
+    from data_models import DetectionStatus
+
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "person", "conf": 0.8, "bbox": [0, 0, 1, 1]}],
+    )
+    assert result.status == DetectionStatus.HUMAN
+    assert result.metadata is not None
+    assert result.metadata['person_confidence'] == 0.8
+
+
+def test_metadata_person_confidence_defaults_zero_when_no_person(tmp_path):
+    """No person detection at all → metadata['person_confidence'] == 0.0
+    (not missing, not None) on the IDENTIFIED path."""
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "animal", "conf": 0.9, "bbox": [0, 0, 1, 1]}],
+        prediction="abc;mammalia;carnivora;canidae;vulpes;vulpes;Red Fox",
+        prediction_score=0.85,
+        classifications={
+            "classes": ["abc;mammalia;carnivora;canidae;vulpes;vulpes;Red Fox"],
+            "scores": [0.85],
+        },
+    )
+    assert result.metadata is not None
+    assert result.metadata['person_confidence'] == 0.0
+
+
+def test_metadata_person_confidence_recorded_when_no_predictions_returned(tmp_path):
+    """Even the early 'no predictions returned' ERROR path carries the key
+    (as 0.0), so downstream code can always do metadata['person_confidence']
+    without a None-check special case."""
+    from data_models import DetectionStatus
+
+    identifier, cfg = _make_identifier()
+    identifier._model_loaded = True
+    identifier._model = MagicMock()
+    identifier._model.predict.return_value = {"predictions": []}
+    img = tmp_path / "test.jpg"
+    img.write_bytes(b"fake")
+    result = identifier.identify_species(img)
+
+    assert result.status == DetectionStatus.ERROR
+    assert result.metadata is not None
+    assert result.metadata['person_confidence'] == 0.0
+
+
+# ===========================================================================
 # Regression: existing no-detection and identified paths unchanged
 # ===========================================================================
 

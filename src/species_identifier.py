@@ -151,6 +151,10 @@ class SpeciesIdentifier:
                 detection_result=None,
                 animals_detected=False,
                 status=DetectionStatus.ERROR,
+                # No detections list is available at all here, so there's no
+                # person signal to report — but the key is always present
+                # (Task 1) so callers never need a None-metadata special case.
+                metadata={'person_confidence': 0.0},
             )
 
         pred = predictions['predictions'][0]
@@ -218,6 +222,7 @@ class SpeciesIdentifier:
                 detection_result=detection_result,
                 animals_detected=animals_detected,
                 status=DetectionStatus.HUMAN,
+                metadata={'person_confidence': max_person_conf},
             )
 
         # Check if any animals were detected
@@ -233,6 +238,10 @@ class SpeciesIdentifier:
                 detection_result=detection_result,
                 animals_detected=False,
                 status=DetectionStatus.NO_ANIMAL,
+                # Sub-threshold person confidence still recorded here (Task 1)
+                # so the tuning loop can attribute NO_ANIMAL bursts that were
+                # actually a person who didn't trip the privacy gate.
+                metadata={'person_confidence': max_person_conf},
             )
 
         # Extract classification (ensemble result)
@@ -280,7 +289,11 @@ class SpeciesIdentifier:
             'top_predictions': top_predictions,
             'prediction_source': prediction_source,
             'top_classifier_prediction': top_classifier_prediction,
-            'best_geofenced_species': best_geofenced_species
+            'best_geofenced_species': best_geofenced_species,
+            # Task 1 (ADR-004 observability): recorded on every branch below
+            # (UNCLASSIFIABLE / ANIMAL_UNCERTAIN / IDENTIFIED) too, not just
+            # HUMAN/NO_ANIMAL above — 0.0 when no person box was present.
+            'person_confidence': max_person_conf,
         }
 
         # Detect the "no cv result" sentinel (case-insensitive) — the image crop
