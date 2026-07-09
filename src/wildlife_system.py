@@ -146,11 +146,14 @@ class WildlifeSystem:
             logger.error(f"Error in cleanup: {e}", exc_info=True)
     
     def process_detection(self, image_path: Path, motion_area: int,
-                          motion_result=None) -> tuple:
+                          motion_result=None, sharpness_info: Optional[dict] = None) -> tuple:
         """Process a detection with two-stage species identification and database logging.
 
         `motion_result` is the triggering MotionResult; its richer diagnostic
         fields are persisted (ADR-004 Phase 1) instead of being dropped.
+        `sharpness_info` is the dict built by `_capture_and_select_best_frame`
+        (Task 1, ADR-004 observability); its sharpness fields are persisted
+        alongside person_confidence read from the identification metadata.
         """
         timestamp = datetime.now()
         species_result = None
@@ -188,6 +191,16 @@ class WildlifeSystem:
                 species_result.detection_result
             )
 
+            # Task 1 (ADR-004 observability): sharpness values come from our
+            # own sharpness_info parameter; person_confidence comes from the
+            # identification metadata (set on every parsed result upstream).
+            sharpness_score = sharpness_info.get('sharpness_score') if sharpness_info else None
+            below_sharpness_floor = sharpness_info.get('below_sharpness_floor') if sharpness_info else None
+            person_confidence = (
+                species_result.metadata.get('person_confidence')
+                if species_result.metadata else None
+            )
+
             # Log to database (richer Phase-1 fields included)
             detection_id = self.database.log_detection(
                 image_path=image_path,
@@ -205,6 +218,9 @@ class WildlifeSystem:
                 gate_would_suppress=gate_would_suppress,
                 background_drift=self.reference_drift,
                 detection_status=species_result.status,
+                sharpness_score=sharpness_score,
+                below_sharpness_floor=below_sharpness_floor,
+                person_confidence=person_confidence,
             )
 
             logger.info(f"Detection {detection_id} logged: {species_result.species_name} "
@@ -546,7 +562,8 @@ class WildlifeSystem:
             self.process_detection,
             image_path,
             motion_area,
-            self.last_motion_result
+            self.last_motion_result,
+            sharpness_info
         )
 
         # Add sharpness info to species result for notification

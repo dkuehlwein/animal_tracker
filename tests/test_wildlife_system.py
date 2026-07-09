@@ -146,6 +146,64 @@ def test_process_detection_shadow_gate_records_suppression(system):
     assert row['animals_detected'] == 0
 
 
+def test_process_detection_persists_sharpness_and_person_confidence(system):
+    """Task 1 (ADR-004 observability): process_detection reads sharpness
+    values from its sharpness_info parameter and person_confidence from the
+    identification result's metadata, and logs all three to the DB."""
+    from data_models import IdentificationResult, DetectionResult
+
+    det = DetectionResult(
+        animals_detected=True, detection_count=1,
+        bounding_boxes=[{'confidence': 0.7}], detections=[],
+        processing_time=0.1,
+    )
+    identification = IdentificationResult(
+        species_name="Fox", confidence=0.9, api_success=True, processing_time=0.5,
+        detection_result=det, animals_detected=True,
+        metadata={'person_confidence': 0.22},
+    )
+    system.species_identifier.identify_species = MagicMock(return_value=identification)
+
+    sharpness_info = {
+        'sharpness_score': 18.4,
+        'below_sharpness_floor': False,
+        'selected_frame_index': 0,
+        'frame_count': 5,
+        'all_scores': [18.4] * 5,
+        'meets_threshold': True,
+        'all_frame_paths': [],
+    }
+
+    result, ts = system.process_detection("capture.jpg", 5000, None, sharpness_info)
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?",
+                           (result['detection_id'],)).fetchone()
+    assert row['sharpness_score'] == pytest.approx(18.4)
+    assert row['below_sharpness_floor'] == 0
+    assert row['person_confidence'] == pytest.approx(0.22)
+
+
+def test_process_detection_observability_fields_null_without_sharpness_info(system):
+    """No sharpness_info passed (single-frame capture path) → sharpness
+    columns are NULL, not an error; person_confidence still flows from
+    metadata when present."""
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification(True, boxes=[{'confidence': 0.7}])
+    )
+
+    result, ts = system.process_detection("capture.jpg", 5000, None)
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?",
+                           (result['detection_id'],)).fetchone()
+    assert row['sharpness_score'] is None
+    assert row['below_sharpness_floor'] is None
+    assert row['person_confidence'] is None
+
+
 def test_process_detection_fails_closed_to_human_on_db_error(system):
     """If species ID found a HUMAN but the DB write then blows up (e.g. disk
     full / WAL contention), the fallback must still report HUMAN so the
