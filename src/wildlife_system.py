@@ -22,7 +22,7 @@ from database_manager import DatabaseManager
 from species_identifier import SpeciesIdentifier
 from notification_service import NotificationService
 from resource_manager import SystemMonitor, StorageManager
-from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnalyzer, get_species_emoji
+from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnalyzer, get_species_emoji, extract_common_name
 from feedback_protocol import build_feedback_keyboard
 from timelapse_writer import TimelapseWriter
 from data_models import DetectionStatus, is_review_detection, is_human_detection
@@ -202,6 +202,20 @@ class WildlifeSystem:
                 if species_result.metadata else None
             )
 
+            # Task 3 (ADR-004 observability): the classifier's raw top-1
+            # prediction (before geofence/rollup) — distinct from the
+            # (possibly rolled-up) ensemble species_name.
+            top_classifier_prediction = (
+                species_result.metadata.get('top_classifier_prediction')
+                if species_result.metadata else None
+            )
+            top_species_raw = (
+                top_classifier_prediction.get('label') if top_classifier_prediction else None
+            )
+            top_species_score = (
+                top_classifier_prediction.get('score') if top_classifier_prediction else None
+            )
+
             # Log to database (richer Phase-1 fields included)
             detection_id = self.database.log_detection(
                 image_path=image_path,
@@ -222,6 +236,8 @@ class WildlifeSystem:
                 sharpness_score=sharpness_score,
                 below_sharpness_floor=below_sharpness_floor,
                 person_confidence=person_confidence,
+                top_species_raw=top_species_raw,
+                top_species_score=top_species_score,
             )
 
             logger.info(f"Detection {detection_id} logged: {species_result.species_name} "
@@ -383,7 +399,45 @@ class WildlifeSystem:
                     return scientific.title()
             return 'Unknown species'
         return species_name_raw
-    
+
+    def _best_guess_line(self, ensemble_species_name_raw: str, metadata: Optional[dict]) -> Optional[str]:
+        """Build a 'Best guess: <common name> (NN%)' caption line from the
+        classifier's raw top-1 prediction (Task 3, ADR-004 observability).
+
+        Only returns a line when it adds real information: the ensemble
+        label itself must be a generic rollup (genus and/or species taxonomy
+        segments empty, e.g. "aves;;;;;bird" or ";;;;;;animal"), a top
+        classifier prediction must exist, and its own common name must not
+        itself be a generic sentinel ("blank" / "no cv result" / "animal").
+        Scores are shown even when low — that's the point.
+
+        Never raises: any error here must not block the notification.
+        """
+        try:
+            if not metadata:
+                return None
+            top = metadata.get('top_classifier_prediction')
+            if not top:
+                return None
+
+            parts = (ensemble_species_name_raw or '').split(';')
+            genus = parts[-3].strip() if len(parts) >= 3 else ''
+            species = parts[-2].strip() if len(parts) >= 2 else ''
+            if genus and species:
+                # Ensemble already resolved to species level — nothing to add.
+                return None
+
+            top_label = top.get('label', '')
+            top_score = top.get('score', 0.0)
+            common_name = extract_common_name(top_label)
+            if not common_name or common_name.strip().lower() in ('blank', 'no cv result', 'animal'):
+                return None
+
+            return f"Best guess: {common_name} ({top_score:.0%})"
+        except Exception as e:
+            logger.error(f"Error building best-guess caption line: {e}")
+            return None
+
     def _build_caption(self, species_result: dict, motion_area: int, timestamp: datetime,
                         temperature: Optional[float] = None) -> str:
         """Build compact notification caption based on detection status.
@@ -441,6 +495,15 @@ class WildlifeSystem:
                     top_score = best_geofenced.get('score', 0.0)
                     if top_species_name and top_species_name.lower() != 'unknown species':
                         caption += f" → {top_species_name} ({top_score:.0%})"
+
+                # Task 3: surface the classifier's raw top-1 guess when the
+                # ensemble label itself is a generic rollup and the guess
+                # adds real information (see _best_guess_line docstring).
+                best_guess_line = self._best_guess_line(
+                    species_result.get('species_name', ''), metadata
+                )
+                if best_guess_line:
+                    caption += f"\n{best_guess_line}"
 
             caption += stats_line
 
