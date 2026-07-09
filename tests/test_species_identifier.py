@@ -353,6 +353,43 @@ def test_top_classifier_prediction_in_metadata_for_generic_rollup(tmp_path):
     }
 
 
+def test_top_classifier_prediction_list_branch_normalized_to_contract(tmp_path):
+    """Legacy list-shaped classifications: the first entry is normalized to
+    the {'label': str, 'score': float} contract when it is a conforming dict."""
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "animal", "conf": 0.9, "bbox": [0, 0, 1, 1]}],
+        prediction="aves;;;;;bird",
+        prediction_score=0.8,
+        classifications=[
+            {"label": "def;aves;passeriformes;turdidae;turdus;merula;eurasian blackbird",
+             "score": 0.34, "extra": "ignored"},
+        ],
+    )
+    assert result.metadata is not None
+    assert result.metadata["top_classifier_prediction"] == {
+        "label": "def;aves;passeriformes;turdidae;turdus;merula;eurasian blackbird",
+        "score": 0.34,
+    }
+
+
+def test_top_classifier_prediction_list_branch_non_dict_entry_yields_none(tmp_path):
+    """Legacy list-shaped classifications whose first entry is not a dict
+    (e.g. a bare label string) must NOT leak a non-dict into metadata —
+    downstream .get() calls would crash the pipeline (never-crash constraint)."""
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "animal", "conf": 0.9, "bbox": [0, 0, 1, 1]}],
+        prediction="aves;;;;;bird",
+        prediction_score=0.8,
+        classifications=["def;aves;passeriformes;turdidae;turdus;merula;eurasian blackbird"],
+    )
+    assert result.metadata is not None
+    assert result.metadata["top_classifier_prediction"] is None
+
+
 def test_top_classifier_prediction_none_when_no_classifications(tmp_path):
     """No classifications payload at all → metadata key is present but None,
     so callers never need a KeyError special-case."""

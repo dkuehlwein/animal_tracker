@@ -254,6 +254,35 @@ def test_process_detection_top_species_guess_null_without_metadata(system):
     assert row['top_species_score'] is None
 
 
+def test_process_detection_top_species_guess_null_when_metadata_value_not_dict(system):
+    """Never-crash constraint: a malformed (non-dict) top_classifier_prediction
+    in metadata must not raise — the detection is still logged, with the
+    top-species columns NULL."""
+    from data_models import IdentificationResult, DetectionResult
+
+    det = DetectionResult(
+        animals_detected=True, detection_count=1,
+        bounding_boxes=[{'confidence': 0.7}], detections=[],
+        processing_time=0.1,
+    )
+    identification = IdentificationResult(
+        species_name="aves;;;;;bird", confidence=0.8, api_success=True, processing_time=0.5,
+        detection_result=det, animals_detected=True,
+        metadata={'top_classifier_prediction': "not-a-dict"},
+    )
+    system.species_identifier.identify_species = MagicMock(return_value=identification)
+
+    result, ts = system.process_detection("capture.jpg", 5000, None)
+
+    assert result['detection_id'] is not None  # row written, no crash
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?",
+                           (result['detection_id'],)).fetchone()
+    assert row['top_species_raw'] is None
+    assert row['top_species_score'] is None
+
+
 def test_process_detection_fails_closed_to_human_on_db_error(system):
     """If species ID found a HUMAN but the DB write then blows up (e.g. disk
     full / WAL contention), the fallback must still report HUMAN so the

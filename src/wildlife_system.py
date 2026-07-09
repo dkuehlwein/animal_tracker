@@ -209,6 +209,11 @@ class WildlifeSystem:
                 species_result.metadata.get('top_classifier_prediction')
                 if species_result.metadata else None
             )
+            # Only trust the {'label', 'score'} contract — a malformed
+            # (non-dict) value must degrade to NULL columns, not crash the
+            # detection (never-crash constraint).
+            if not isinstance(top_classifier_prediction, dict):
+                top_classifier_prediction = None
             top_species_raw = (
                 top_classifier_prediction.get('label') if top_classifier_prediction else None
             )

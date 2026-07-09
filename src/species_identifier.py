@@ -271,7 +271,16 @@ class SpeciesIdentifier:
         elif isinstance(classifications, list):
             top_predictions = classifications[:self.config.species.return_top_k]
             if classifications:
-                top_classifier_prediction = classifications[0]
+                # Normalize the legacy list shape to the {'label', 'score'}
+                # contract; a non-dict entry carries no usable label/score
+                # pair, so leave None rather than leak a raw value that would
+                # crash downstream .get() callers (never-crash constraint).
+                first = classifications[0]
+                if isinstance(first, dict) and first.get('label') is not None:
+                    top_classifier_prediction = {
+                        'label': first.get('label'),
+                        'score': first.get('score', 0.0),
+                    }
 
         # Find best geofenced species-level prediction using model's geofence
         best_geofenced_species = self._find_best_geofenced_species(
@@ -379,6 +388,10 @@ class SpeciesIdentifier:
             return None
 
         for pred in top_predictions:
+            # Legacy list-shaped classifications can carry non-dict entries
+            # (e.g. bare label strings) — skip them instead of crashing.
+            if not isinstance(pred, dict):
+                continue
             label = pred.get('label', '')
             parts = label.split(';')
 
