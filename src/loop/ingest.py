@@ -9,6 +9,14 @@ Reconciliation precedence: human > tier-2 > tier-1.
   tier-1 = detections.animals_detected (MegaDetector).
   tier-2 = detection_feedback row with source='tier2'.
   human  = detection_feedback row with source='human' (latest wins).
+
+Human label vocabulary: animal, animal_wrong_id, person, false_positive,
+cant_tell (+ legacy wrong_species). A human "cant_tell" verdict intentionally
+still wins reconciliation here (plain truthiness, same as every other human
+label) so tier-1/tier-2 auto-labels can never backfill a label the human
+explicitly declared unusable — that would silently reintroduce a value a
+human rejected. No behavior change: metrics.py is responsible for excluding
+"cant_tell" reconciled rows from the FP denominator and per-tier buckets.
 """
 
 from __future__ import annotations

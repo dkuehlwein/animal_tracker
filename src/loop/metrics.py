@@ -54,6 +54,13 @@ def _per_tier_partition(rows: list[dict]) -> dict:
       MegaDetector/tier1 (elif row["tier1"] is not None) >
       unlabeled (excluded).
 
+    A row whose winning label (by that same precedence) is "cant_tell" is
+    skipped entirely — a human "can't tell" verdict means the frame is
+    unusable, so it must not land in any bucket (checked uniformly across
+    tiers, not only for human rows: a row can only reach the tier2/tier1
+    branches when human is None, so "cant_tell" only ever appears there via
+    those tiers' own labels).
+
     Returns a dict with nested {"n": int, "fp": int} for each bucket key
     ("human", "claude", "md").
     """
@@ -65,21 +72,33 @@ def _per_tier_partition(rows: list[dict]) -> dict:
     # Note: bucket assignment uses `is not None` which agrees with ingest's
     # truthiness-based reconciled_label assignment — and the invariant
     # n_human + n_claude + n_md == labeled_triggers holds — only because every
-    # label in the vocabulary is a non-empty (truthy) string (e.g. "false_positive",
-    # "true_positive").  An empty-string label would be truthy for `is not None`
-    # but falsy for the reconciled_label filter, breaking the invariant.
+    # label in the vocabulary is a non-empty (truthy) string (e.g.
+    # "false_positive", "animal", "cant_tell") and "cant_tell" rows are
+    # excluded from both the labeled-triggers count (compute_metrics) and
+    # every bucket here (below) by the same check.  An empty-string label
+    # would be truthy for `is not None` but falsy for the reconciled_label
+    # filter, breaking the invariant.
     for r in rows:
         if r.get("human") is not None:
+            winner = r["human"]
+            if winner == "cant_tell":
+                continue
             buckets["human"]["n"] += 1
-            if r["human"] == "false_positive":
+            if winner == "false_positive":
                 buckets["human"]["fp"] += 1
         elif r.get("tier2") is not None:
+            winner = r["tier2"]
+            if winner == "cant_tell":
+                continue
             buckets["claude"]["n"] += 1
-            if r["tier2"] == "false_positive":
+            if winner == "false_positive":
                 buckets["claude"]["fp"] += 1
         elif r.get("tier1") is not None:
+            winner = r["tier1"]
+            if winner == "cant_tell":
+                continue
             buckets["md"]["n"] += 1
-            if r["tier1"] == "false_positive":
+            if winner == "false_positive":
                 buckets["md"]["fp"] += 1
         # else: unlabeled — excluded from all buckets
     return buckets
@@ -88,11 +107,17 @@ def _per_tier_partition(rows: list[dict]) -> dict:
 def compute_metrics(rows: list[dict], fn_audit: Optional[dict]) -> dict:
     """Paired FP/FN with Wilson CIs over reconciled rows.
 
-    FP denominator = rows with a non-None reconciled_label (labeled triggers).
+    FP denominator = rows with a non-None reconciled_label, excluding
+    "cant_tell" (a human "can't tell" verdict wins reconciliation but marks
+    the frame unusable, not a labeled trigger) — this is "labeled triggers".
     FN is "unmeasured" unless fn_audit={"missed": int, "animal_frames": int} is
     supplied by a timelapse detector pass (NOT implemented this build).
     """
-    labeled = [r for r in rows if r.get("reconciled_label") is not None]
+    labeled = [
+        r for r in rows
+        if r.get("reconciled_label") is not None
+        and r.get("reconciled_label") != "cant_tell"
+    ]
     fp_count = sum(1 for r in labeled if r["reconciled_label"] == "false_positive")
     fp_rate = (fp_count / len(labeled)) if labeled else 0.0
     fp_ci = wilson_ci(fp_count, len(labeled))
