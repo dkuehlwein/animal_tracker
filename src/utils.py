@@ -47,6 +47,28 @@ def get_species_emoji(species_name: str, default: str = '🦌') -> str:
     return default
 
 
+def extract_common_name(taxonomy_label: str) -> str:
+    """Return the common name from a SpeciesNet semicolon taxonomy string.
+
+    SpeciesNet labels are formatted `uuid;class;order;family;genus;species;
+    common_name`, e.g. ``...;turdus;merula;eurasian blackbird`` ->
+    ``eurasian blackbird``. Rather than assuming a fixed field count (some
+    rollup labels, e.g. ``aves;;;;;bird``, omit the uuid segment), this walks
+    backward from the end and returns the last non-empty segment — so a
+    taxonomy string with a trailing empty common-name field (e.g.
+    ``...;vulpes;vulpes;``) still yields a usable name (``vulpes``).
+
+    Returns '' for falsy input or a string with no non-empty segment.
+    """
+    if not taxonomy_label:
+        return ''
+    for segment in reversed(taxonomy_label.split(';')):
+        segment = segment.strip()
+        if segment:
+            return segment
+    return ''
+
+
 class PerformanceTimer:
     """Performance timing utility."""
 

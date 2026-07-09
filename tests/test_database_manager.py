@@ -146,6 +146,39 @@ def test_log_detection_observability_fields_default_null(tmp_path):
     assert row["person_confidence"] is None
 
 
+def test_log_detection_persists_top_species_guess(tmp_path):
+    """Task 3 (ADR-004 observability): top_species_raw/top_species_score
+    round-trip through log_detection so the caption and the nightly tuning
+    loop can both see the classifier's raw top-1 prediction, distinct from
+    the (possibly rolled-up) ensemble species_name."""
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(
+        image_path="capture_3.jpg",
+        motion_area=1200,
+        top_species_raw="def;aves;passeriformes;turdidae;turdus;merula;eurasian blackbird",
+        top_species_score=0.34,
+    )
+    assert det_id is not None
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?", (det_id,)).fetchone()
+
+    assert row["top_species_raw"] == "def;aves;passeriformes;turdidae;turdus;merula;eurasian blackbird"
+    assert row["top_species_score"] == pytest.approx(0.34)
+
+
+def test_log_detection_top_species_guess_defaults_null(tmp_path):
+    """Old call signature (no top-species kwargs) still works; new columns NULL."""
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(image_path="c3.jpg", motion_area=10)
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?", (det_id,)).fetchone()
+    assert row["top_species_raw"] is None
+    assert row["top_species_score"] is None
+
+
 def test_log_detection_backward_compatible(tmp_path):
     """Old call signature (no richer kwargs) still works; new cols are NULL."""
     db, db_path = _make_db(tmp_path)
