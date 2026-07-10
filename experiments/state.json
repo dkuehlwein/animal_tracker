@@ -1,5 +1,5 @@
 {
-  "active_experiment_id": 7,
+  "active_experiment_id": 8,
   "backlog": [
     {
       "hypothesis": "CONCLUDED 2026-06-15 (keep). Same-channel \ud83d\udd0d REVIEW prefix on status\u2208{NO_ANIMAL,UNCLASSIFIABLE} flags 99% of FP at 0 FN; live since 06-12, location-agnostic. Second-channel routing is OUT per Daniel (no 2nd channel \u2014 adds overhead, won't click two). See runs/0001 + LEARNINGS.",
@@ -44,17 +44,17 @@
       "validation": "live"
     },
     {
-      "hypothesis": "ROLLED BACK 2026-07-09 (same day as ship). AE=short was meant to raise dusk sharpness_score above the 11.0 floor. Measurement on saved frames shows it CANNOT: sharpness_score is Laplacian variance, which scales with frame contrast/brightness; AE=short lowers luma by construction (19h matched-hour: luma 68.9->52.0), so it pushes MORE bursts below the floor, not fewer. Run 0006's own pre-registered 'midday regression => reconsider' trigger also fired (16h lap 19.18->15.07). FN unmeasured + plausible FN rise via the below-floor+no-animal mute path => FN-veto => reverted to AE=normal. Reopened as running to collect the matched-hour 17-19h AE=normal baseline that was never captured. See runs/0006.",
+      "hypothesis": "ROLLED BACK 2026-07-09 (same day as ship). AE=short was meant to raise dusk sharpness_score above the 11.0 floor. Measurement on saved frames shows it CANNOT: sharpness_score is Laplacian variance, which scales with frame contrast/brightness; AE=short lowers luma by construction (19h matched-hour: luma 68.9->52.0), so it pushes MORE bursts below the floor, not fewer. Run 0006's own pre-registered 'midday regression => reconsider' trigger also fired (16h lap 19.18->15.07). FN unmeasured + plausible FN rise via the below-floor+no-animal mute path => FN-veto => reverted to AE=normal. Reopened as running to collect the matched-hour 17-19h AE=normal baseline that was never captured. CONCLUDED 2026-07-10: AE=normal dusk baseline now in (07-10 17-18h sharpness 6.9-9.4) and is indistinguishable from AE=short (07-09 17-18h 7.8-8.6) \u2014 both below the 11.0 floor. AE mode is not the lever; the floor statistic is (backlog id 8, now active). AE=normal retained. See runs/0006.",
       "id": 7,
       "slug": "dusk-short-exposure",
-      "status": "running",
+      "status": "concluded",
       "validation": "live"
     },
     {
       "hypothesis": "ROOT CAUSE behind exp #6/#5. min_sharpness_threshold=11.0 is applied to raw Laplacian variance, a whole-frame contrast statistic, so it functions as a SCENE-BRIGHTNESS gate, not a blur gate. Measured on 470 pre-deploy frames (AE=normal, multi-day): P(lap<11.0) = 0% for luma>=80, 71% for luma 60-80, 100% for luma<40. Consequence: at dusk nearly every burst is 'below floor' regardless of actual motion blur, so the blur-gate mute path (below-floor AND no animal found -> no Telegram) is reachable mainly as a function of light level. Fix candidates: (a) brightness- normalized sharpness (lap/gray_var) as the floor statistic, (b) make the floor luma-dependent, (c) drop the mute path and rely on the REVIEW prefix. Needs a code change, not an env knob.",
       "id": 8,
       "slug": "sharpness-floor-is-a-brightness-gate",
-      "status": "proposed",
+      "status": "running",
       "validation": "parked"
     }
   ],
@@ -103,8 +103,8 @@
     "n_md": 17,
     "total_triggers": 62
   },
-  "last_tick_completed_day": "2026-07-09",
-  "nightly_verdict": "Good news: with 53 of your button presses to score against, the camera is right far more often than the old numbers suggested \u2014 about 38% of alerts were false alarms, not 95%, and every single one of them was already tagged review, while all 31 real-animal alerts came through clean. I rolled back this morning's dusk-exposure change: it made photos darker, which pushes them below the blur cutoff and risks silently hiding real animals \u2014 the camera restarts at 03:00 with the old setting.",
+  "last_tick_completed_day": "2026-07-10",
+  "nightly_verdict": "Steady night: of your 25 button presses, 11 were false alarms (44%) and every one was already tagged review \u2014 no bad alert reached the main list, and the new 5-button feedback keyboard is now working. I closed the dusk-exposure question (the camera setting never mattered \u2014 dusk photos are dim no matter what), and the real fix is a small code change so the camera stops silently hiding dark evening shots that might contain an animal; it slightly raises review-tagged messages at dusk, so I've held it for your OK before shipping.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 1848

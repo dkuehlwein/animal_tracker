@@ -1,7 +1,7 @@
 ---
 id: 7
 slug: dusk-short-exposure
-status: rolled_back       # proposed | running | concluded | rolled_back | parked
+status: concluded         # proposed | running | concluded | rolled_back | parked
 validation: live          # live | replay | parked
 hypothesis: "Auto-exposure picks long exposures at dusk/low light to compensate for reduced illumination, and long exposure blurs any motion in frame — this is the root cause behind the sub-11.0 sharpness scores that runs/0005 found (07-07 8.6-9.4, silently dropped; 07-08 19:33-19:35 10.0-10.4, now alerting but still marginal). Biasing auto-exposure toward shorter exposures at dusk (accepting more sensor noise/gain in exchange) should raise dusk-hour sharpness scores above the 11.0 floor without materially changing midday exposure behavior (midday light is already bright enough that AE isn't choosing long exposures)."
 param_delta: { "CAMERA_AE_EXPOSURE_MODE": "unset (libcamera default, effectively \"normal\") -> \"short\" (shipped as the new CameraConfig default)" }
@@ -230,3 +230,37 @@ falls below the 11.0 floor is a step function of brightness alone:
 almost everything is "below floor" no matter how sharp it is. That — not the
 auto-exposure mode — is what governs whether a dusk burst can be silently
 muted, and it is what backlog id 8 should fix.
+
+---
+
+## Conclusion — 2026-07-10 loop tick: CONCLUDED (baseline collected)
+
+The reopened purpose of this run was to gather the **AE=normal 17–19h dusk
+baseline** that never existed at rollback time (retention had already evicted
+all AE=normal dusk frames). AE=normal went live at the 03:00 CEST restart on
+07-10, and the first dusk under it has now been captured. The baseline is in,
+and it closes the question.
+
+**AE=normal dusk sharpness (07-10, from the DB `sharpness_score` column):**
+
+| hour | AE | n | sharpness_score (per-row) | luma-driven? |
+|---|---|---|---|---|
+| 17 | normal | 2 | 9.39, 7.84 | below floor |
+| 18 | normal | 2 | 7.51, 6.92 | below floor |
+
+Side by side with the AE=short rollback data (07-09): 17h median 8.64,
+18h 7.83. **The two AE modes are indistinguishable at dusk — both sit at
+~7–9, i.e. below the 11.0 floor.** AE mode is not the lever; it never moved
+dusk sharpness across the floor in either direction. This is exactly what the
+brightness-gate structural argument predicts (Laplacian variance tracks scene
+luminance, and at dusk luminance is low regardless of exposure bias).
+
+Small n (4 dusk rows), but the conclusion does not lean on power — it is
+structural and now corroborated in both directions. **AE=normal is retained**
+(already the live config since the 03:00 restart). Nothing further to test on
+the AE axis.
+
+Tonight's dusk also demonstrated the blur-gate behavior working as designed:
+id 1847 (18:23, below-floor animal) **alerted** correctly, while 1845/1846/1848
+(below-floor no-animal/unclassifiable) were **muted** — the unobservable-FN
+path that backlog id 8 exists to close. That path is now the active experiment.

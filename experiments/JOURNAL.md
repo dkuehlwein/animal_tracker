@@ -962,3 +962,49 @@ the mute path and lean on the REVIEW prefix. **This is the next experiment.**
   `animal_wrong_id`/`person`/`cant_tell` yet — consistent with the sidecar not
   having been restarted, or simply with no new-keyboard message being labelled
   yet. Worth confirming next tick before reading anything into label mix.
+
+---
+
+## 2026-07-10 — tick (loop-day 2026-07-10)
+
+**Metrics (07-10 window, 62 new triggers since watermark 1786).** Human-labeled
+FP 11/25 = **44%** (CI 0.27–0.63), statistically flat vs 07-09's 37.7% (CIs
+overlap). All 11 human-FP rows are NO_ANIMAL/UNCLASSIFIABLE status → 100%
+REVIEW-tagged, **zero clean-alert FP leaked to the main channel**. md-auto FP
+16/17, cant_tell=1 (excluded from denominators). FN still `unmeasured`.
+No volume collapse/explosion. No env deploy.
+
+**New 5-button keyboard is live and in use** (resolves last tick's open
+question): `person` (1793,1806,1821), `cant_tell` (1792), `animal_wrong_id`
+(1799,1813,1818) all appear as `source=human` labels this window. Sidecar was
+restarted; the legacy-only label mix from 07-09 is gone.
+
+**Exp #7 (dusk-short-exposure) → CONCLUDED.** Reopened purpose (AE=normal 17–19h
+dusk baseline) fulfilled. AE=normal went live at the 03:00 CEST restart;
+first dusk under it (07-10 17–18h) scored 6.9–9.4 — **indistinguishable** from
+AE=short's 07-09 17–18h (7.8–8.6), both below the 11.0 floor. AE mode is not the
+lever. AE=normal retained. See runs/0006 Conclusion.
+
+**Exp #8 (sharpness-floor-is-a-brightness-gate) → promoted to active/running.**
+runs/0007 written. The floor is a light-level gate (P(lap<11)=0% at luma≥80,
+100% at luma<40), so the blur-gate MUTE path (`is_blurry_review`,
+wildlife_system.py:657: below-floor AND no-animal → no Telegram) fires at dusk
+as a function of darkness, silently dropping possible dark-frame animal misses
+(unobservable FN). Mute path fired 4× this window (1787 morning, 1845/1846/1848
+dusk); one below-floor *animal* (1847, 18:23) correctly alerted. **Recommended
+fix: brightness-gate the mute** — add mean-gray luma to `sharpness_info`, only
+mute when `luma ≥ ~70` (new `blur_mute_min_luma` knob); below that, send as
+REVIEW. FN-reducing (FN-veto does not block), reversible (git revert + restart),
+volume cost bounded to dark no-animal bursts (~3/night, all REVIEW-tagged).
+**HELD tonight** pending Daniel's OK on the small REVIEW-volume increase (his
+standing product lever) + TDD/subagent implementation; no fire forces it.
+Alternatives (a) lap/gray_var and (c) drop-mute-entirely recorded, not chosen.
+
+**Verification duties (all pass).**
+- Human/privacy gate leak-watch: 24 HUMAN-status rows this corpus, **zero**
+  carry any feedback label — none was ever notified. Gate holding.
+- id 1725 HUMAN purge (due 07-08 14:49 + 48h): frame gone ✓. 1742/1743 frames
+  also gone (rolled off by the ~100-burst storage cap, <48h). 1773 (07-09 15:32)
+  and 1786 (07-09 19:18) frames retained — within 48h and recent. Correct.
+- Blur/observability columns trustworthy (recompute matched stored values in
+  prior tick); new rows populate all five columns.
