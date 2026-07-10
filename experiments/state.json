@@ -64,16 +64,16 @@
   "best_known_good": {},
   "deployed": {},
   "history": [],
-  "last_heartbeat_loopday": "2026-07-09",
+  "last_heartbeat_loopday": "2026-07-10",
   "last_metrics": {
-    "date": "2026-07-09",
+    "date": "2026-07-10",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.4474677138145549,
-      0.6666854250875085
+      0.4916636571945582,
+      0.7701081168438123
     ],
     "fp_claude_ci": [
       0.0,
@@ -81,31 +81,31 @@
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 42,
+    "fp_count": 27,
     "fp_human_ci": [
-      0.2593626547287611,
-      0.5119310405824662
+      0.26665638881067344,
+      0.6293266813020123
     ],
-    "fp_human_count": 20,
-    "fp_human_rate": 0.37735849056603776,
+    "fp_human_count": 11,
+    "fp_human_rate": 0.44,
     "fp_md_ci": [
-      0.8513451253913791,
-      1.0
+      0.7301796936242461,
+      0.9895395990150025
     ],
-    "fp_md_count": 22,
-    "fp_md_rate": 1.0,
-    "fp_rate": 0.56,
+    "fp_md_count": 16,
+    "fp_md_rate": 0.9411764705882353,
+    "fp_rate": 0.6428571428571429,
     "fp_trustworthy": true,
-    "labeled_triggers": 75,
-    "n_cant_tell": 0,
+    "labeled_triggers": 42,
+    "n_cant_tell": 1,
     "n_claude": 0,
-    "n_human": 53,
-    "n_md": 22,
-    "total_triggers": 80
+    "n_human": 25,
+    "n_md": 17,
+    "total_triggers": 62
   },
   "last_tick_completed_day": "2026-07-09",
   "nightly_verdict": "Good news: with 53 of your button presses to score against, the camera is right far more often than the old numbers suggested \u2014 about 38% of alerts were false alarms, not 95%, and every single one of them was already tagged review, while all 31 real-animal alerts came through clean. I rolled back this morning's dusk-exposure change: it made photos darker, which pushes them below the blur cutoff and risks silently hiding real animals \u2014 the camera restarts at 03:00 with the old setting.",
   "paused": false,
-  "pending_restart_at": "2026-07-10T03:00:00+02:00",
-  "watermark": 1786
+  "pending_restart_at": null,
+  "watermark": 1848
 }
