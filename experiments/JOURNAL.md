@@ -1008,3 +1008,41 @@ Alternatives (a) lap/gray_var and (c) drop-mute-entirely recorded, not chosen.
   and 1786 (07-09 19:18) frames retained — within 48h and recent. Correct.
 - Blur/observability columns trustworthy (recompute matched stored values in
   prior tick); new rows populate all five columns.
+
+---
+
+## 2026-07-11 — tick (loop-day 2026-07-11)
+
+**Metrics (07-11 window, 25 new triggers since watermark 1848).** Human-labeled
+FP **1/7 = 14%** (CI 0.03–0.51; small n, statistically consistent with 07-10's
+44%). fp_md 16/18. The one human FP (1863, no_animal) is REVIEW-tagged → **zero
+clean-alert FP leaked to the main channel**. No volume collapse/explosion. No env
+deploy. FN reported `unmeasured` by `loop.metrics`, but see below — it is no
+longer zero-signal.
+
+**First observable FNs.** Two human `animal_wrong_id` labels on review-status
+rows: 1861 (16:05, no_animal, luma 99, sharpness 15.4) and 1862 (16:28,
+unclassifiable, luma 88, sharpness 12.5). Both **above** the sharpness floor and
+in good light → **classifier recall misses**, not blur-gate mutes. No env knob or
+sharpness/luma change addresses classifier recall; recorded qualitatively (the
+metrics join for animal-on-review-status FN is not implemented).
+
+**Exp #8 (brightness-gate the blur mute) → HELD again, no deploy.** Adjudicated
+all 7 mute-path firings (1864–1869 @ 16:46–17:55, 1873 @ 21:04): **all
+true-negatives, no concealed animal**. Premise-revising finding: 6/7 fired in
+*daylight* (luma 71–81), only 1873 was dark (luma 20); the frames are uniformly
+**soft-focus**, so sub-floor scores this window are driven by focus softness, not
+brightness. A `blur_mute_min_luma≈70` gate would have un-muted exactly 1 row
+(1873, no animal) → ~nil live benefit, +1 REVIEW msg. Held pending (a) Daniel's
+OK on REVIEW volume (no approval signal in state) and (b) lower demonstrated
+urgency. New side-observation: soft focus may be depressing sharpness generally —
+candidate focus check via `scripts/camera_preview.py`, orthogonal to AE (exp #7)
+and the floor statistic. See runs/0007 Observations 2026-07-11.
+
+**Verification duties (all pass).**
+- Human/privacy gate: no HUMAN-status triggers this window; leak-watch = **0**
+  HUMAN rows carry any feedback label (gate holding, none notified).
+- HUMAN purge: latest HUMAN rows are 07-10, all within 48h, frames correctly
+  retained; none past-48h lingering. Purge functioning.
+- 5-button keyboard in active use (animal, animal_wrong_id, false_positive all
+  present this window as source=human).

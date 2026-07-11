@@ -96,3 +96,46 @@ ready to implement next tick.
   just dark ones — every genuinely-blurry daylight no-animal burst would then
   notify too. The luma-gate is (c) restricted to the cases where the floor is
   actually lying, so it buys the same FN safety at a fraction of the volume cost.
+
+## Observations — 2026-07-11 tick (still HELD)
+
+Adjudicated all 7 mute-path firings this window (below-floor + review-class):
+ids 1864,1865,1866,1867,1868,1869 (16:46–17:55) and 1873 (21:04). **All are
+true-negatives** — inspected the frames, no hidden animal in any → the mute path
+did not conceal a single FN tonight.
+
+**The finding that revises this experiment's premise:** the below-floor mutes
+this window are NOT a dusk-darkness phenomenon. 6 of the 7 fired in *daylight*
+(luma 71–81 @ 16:46–17:55; sunset ~21:40), with only 1873 (luma 20, 21:04)
+genuinely dark. The frames are uniformly **soft-focus** — the whole scene is out
+of focus even at good luma — which is why raw Laplacian variance sits at 8–25
+across the board, day and night. So this window's sub-floor scores are driven by
+**focus softness, not brightness**.
+
+Consequence for the proposed fix: a `blur_mute_min_luma≈70` gate would have
+un-muted exactly **1 of 7** rows tonight (1873), and that one held no animal —
+i.e. the luma-gate's live benefit this window was zero and its cost was one extra
+REVIEW message. The brightness→floor step function (runs 0006) is still real over
+the multi-day corpus, but tonight shows the mute path's *day-to-day* firing is
+dominated by soft focus, which the luma gate does not touch. Two implications:
+(1) the fix's urgency is lower than framed — it addresses a narrow dusk slice
+that was empty tonight; (2) a soft-focus camera may be depressing sharpness
+scores generally (worth checking focus via `scripts/camera_preview.py`), which
+is orthogonal to both AE mode (exp #7) and the floor statistic.
+
+**The real FN signal tonight is outside this experiment's scope.** Two observable
+FNs — 1861 (16:05, no_animal, luma 99, sharpness 15.4, *above* floor) and 1862
+(16:28, unclassifiable, luma 88, sharpness 12.5, above floor), both human-labeled
+`animal_wrong_id`. These are **classifier recall misses in good-light, in-focus-
+enough frames**, not blur-gate mutes. No env knob and neither the luma-gate nor
+any sharpness change addresses classifier recall. `loop.metrics` still reports
+`fn_rate: unmeasured` (it does not compute the animal-label-on-review-status join),
+so these FNs are recorded here qualitatively; FN is no longer strictly zero-signal.
+
+**Decision: HOLD again, no deploy.** (1) Still pending Daniel's OK on the
+REVIEW-volume increase (his standing product lever); no approval signal in state.
+(2) Tonight's evidence lowers the fix's expected live benefit to ~nil (mute path
+concealed no animal; luma-gate would have flipped 1 empty dusk row). (3) FP is
+well-controlled (human FP 1/7 this window). No fire forces the change. Next tick:
+if Daniel greenlights, implement TDD/subagent-driven per the plan; separately
+consider whether the soft-focus observation warrants a focus check.
