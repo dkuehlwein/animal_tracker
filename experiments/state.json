@@ -103,7 +103,7 @@
     "n_md": 18,
     "total_triggers": 25
   },
-  "last_tick_completed_day": "2026-07-10",
+  "last_tick_completed_day": "2026-07-11",
   "nightly_verdict": "Quiet, clean night: of the 7 alerts you rated, only 1 was a false alarm and it was already tagged review, so nothing bad reached the main list. Two birds were genuinely missed (the AI said 'nothing there' when there was a bird) but both were clear daytime shots \u2014 an AI recognition miss, not the dusk-blur problem \u2014 and the dusk code fix I've held for your OK would not have caught them; still waiting on your go-ahead before shipping it. One aside worth a look: today's photos are all a bit soft/out of focus, which might be worth a quick focus check on the camera.",
   "paused": false,
   "pending_restart_at": null,
