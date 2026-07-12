@@ -64,16 +64,16 @@
   "best_known_good": {},
   "deployed": {},
   "history": [],
-  "last_heartbeat_loopday": "2026-07-11",
+  "last_heartbeat_loopday": "2026-07-12",
   "last_metrics": {
-    "date": "2026-07-11",
+    "date": "2026-07-12",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.48410269273102247,
-      0.8279480969309202
+      0.4878005164454384,
+      0.8076950191632386
     ],
     "fp_claude_ci": [
       0.0,
@@ -81,31 +81,31 @@
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 17,
+    "fp_count": 20,
     "fp_human_ci": [
-      0.02567962434474355,
-      0.5131278292743189
+      0.0,
+      1.0
     ],
-    "fp_human_count": 1,
-    "fp_human_rate": 0.14285714285714285,
+    "fp_human_count": 0,
+    "fp_human_rate": 0.0,
     "fp_md_ci": [
-      0.672002348698212,
-      0.9689804773543876
+      0.4878005164454384,
+      0.8076950191632386
     ],
-    "fp_md_count": 16,
-    "fp_md_rate": 0.8888888888888888,
-    "fp_rate": 0.68,
+    "fp_md_count": 20,
+    "fp_md_rate": 0.6666666666666666,
+    "fp_rate": 0.6666666666666666,
     "fp_trustworthy": true,
-    "labeled_triggers": 25,
+    "labeled_triggers": 30,
     "n_cant_tell": 0,
     "n_claude": 0,
-    "n_human": 7,
-    "n_md": 18,
-    "total_triggers": 25
+    "n_human": 0,
+    "n_md": 30,
+    "total_triggers": 53
   },
   "last_tick_completed_day": "2026-07-11",
   "nightly_verdict": "Quiet, clean night: of the 7 alerts you rated, only 1 was a false alarm and it was already tagged review, so nothing bad reached the main list. Two birds were genuinely missed (the AI said 'nothing there' when there was a bird) but both were clear daytime shots \u2014 an AI recognition miss, not the dusk-blur problem \u2014 and the dusk code fix I've held for your OK would not have caught them; still waiting on your go-ahead before shipping it. One aside worth a look: today's photos are all a bit soft/out of focus, which might be worth a quick focus check on the camera.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 1873
+  "watermark": 1926
 }
