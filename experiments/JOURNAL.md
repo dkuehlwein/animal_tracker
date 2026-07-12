@@ -1046,3 +1046,36 @@ and the floor statistic. See runs/0007 Observations 2026-07-11.
   retained; none past-48h lingering. Purge functioning.
 - 5-button keyboard in active use (animal, animal_wrong_id, false_positive all
   present this window as source=human).
+
+---
+
+## 2026-07-12 — tick (loop-day 2026-07-12)
+
+**Window:** 53 new triggers (ids 1874–1926, watermark 1873→1926). Status: 23
+HUMAN / 15 no_animal / 5 unclassifiable / 10 identified. **Zero human feedback
+labels** this window → FP ground truth **unmeasured**; `loop.metrics` fp_rate
+0.67 is MegaDetector auto-only (n_md 30, n_human 0), not truth. FN unmeasured.
+No env deploy, no code change. Volume 53 vs baseline 42 — no collapse/explosion.
+
+**Dominant event: sustained human presence 17:40–18:27** — 23 HUMAN-status rows,
+20/23 pconf ≥ 0.35 (person in red trousers visible in frames), all correctly
+SUPPRESSED. Human/privacy gate leak-watch **0** (no HUMAN row carries feedback),
+purge clean (**0** HUMAN frames past 48h on disk). Gate working exactly as
+designed.
+
+**Mute-path adjudication: 6 firings, 0 concealed animals** (2nd night running).
+ids 1889/1892/1906/1925/1926 = empty soft-focus pond (TN); 1908 = the same HUMAN
+(pconf 0.17 < 0.3, no `homo` taxon → slipped the human gate but muted by the blur
+gate anyway; no leak, no animal). The blur-mute path hid no FN.
+
+**Exp #8 (brightness-gate the blur mute) → HELD again.** No Daniel greenlight on
+REVIEW volume; mute concealed 0 animals two nights running → live benefit ~nil;
+tonight's below-floor firings again dominated by soft focus, not darkness, which
+the luma-gate doesn't touch. No fire.
+
+**Soft-focus is now a two-night pattern (07-11 + 07-12).** Every frame out of
+focus, day and dusk; raw Laplacian 6–11 even at good luma. Escalating the
+physical focus check (`scripts/camera_preview.py`) to the top actionable item —
+soft focus depresses sharpness globally AND plausibly lowers classifier recall
+(blurry animals missed), an FN driver no env/code lever reaches. Orthogonal to
+AE (exp #7) and the floor statistic (exp #8). See runs/0007 Observations 2026-07-12.

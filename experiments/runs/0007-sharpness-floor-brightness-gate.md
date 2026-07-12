@@ -139,3 +139,45 @@ concealed no animal; luma-gate would have flipped 1 empty dusk row). (3) FP is
 well-controlled (human FP 1/7 this window). No fire forces the change. Next tick:
 if Daniel greenlights, implement TDD/subagent-driven per the plan; separately
 consider whether the soft-focus observation warrants a focus check.
+
+## Observations — 2026-07-12 tick (still HELD; big human-presence night)
+
+**Window:** 53 new triggers (ids 1874–1926, watermark 1873→1926). Status split:
+23 HUMAN, 15 no_animal, 5 unclassifiable, 10 identified. **Zero human feedback
+labels this window** — FP ground truth is unmeasured tonight; `loop.metrics`'s
+fp_rate 0.67 is entirely MegaDetector auto-labels (n_md 30, n_human 0), not truth
+(see memory: auto-labels are not truth).
+
+**The night's dominant event is a sustained human presence, 17:40–18:27** — 23
+HUMAN-status rows (ids 1891, 1895–1902, 1905, 1907, 1909–1921), 20 of 23 at
+pconf ≥ 0.35, correctly SUPPRESSED (no Telegram). Verified frames: a person in
+red trousers is plainly visible. The human/privacy gate did exactly its job.
+Leak-watch: **0 HUMAN rows carry any feedback label** (none notified). Purge:
+**0 HUMAN frames past 48h lingering**.
+
+**Mute-path adjudication (this experiment's core check): 6 firings, 0 concealed
+animals.** below-floor + review-class ids 1889 (17:05, no_animal, sharp 10.5),
+1892 (17:51, unclassifiable, 7.4), 1906 (18:13, no_animal, 8.7), 1908 (18:15,
+no_animal, 7.0), 1925 (19:31, unclassifiable, 6.5), 1926 (19:33, unclassifiable,
+6.5). Inspected every frame: 1889/1892/1906/1925/1926 are the empty soft-focus
+pond scene (true negatives); **1908 is a HUMAN** (same red-trouser person, foot
+in frame) that scored pconf 0.17 < 0.3 and carried no `homo` taxon, so it slipped
+the human gate but was still muted by the blur gate — muted either way, no
+Telegram, no leak, and no *animal* concealed. So the mute path hid **no false
+negative** for the second night running.
+
+**Soft-focus persists (07-11 carryover, now stronger).** Every frame this window,
+day and dusk, is out of focus; raw Laplacian sits 6–11 even at good luma. This is
+the same soft-focus signature flagged 07-11 — it is now a two-night pattern, not a
+one-off, and it depresses sharpness globally (independent of AE mode and of the
+floor statistic). Still recommend a physical focus check via
+`scripts/camera_preview.py`; escalating this from "worth a look" to the most
+actionable non-held item on the board, since soft focus plausibly also lowers
+classifier recall (blurry animals → missed) — a real FN driver the loop's env/code
+levers cannot touch.
+
+**Decision: HOLD exp #8 again.** Unchanged rationale: no Daniel greenlight on
+REVIEW volume; mute path concealed 0 animals two nights running, so live benefit
+remains ~nil; no fire. The luma-gate would have un-muted only dark dusk rows, and
+tonight's below-floor firings are again dominated by soft focus (not darkness),
+which the luma gate does not address.
