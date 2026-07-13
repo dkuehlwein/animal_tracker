@@ -73,14 +73,14 @@
   "history": [],
   "last_heartbeat_loopday": "2026-07-13",
   "last_metrics": {
-    "date": "2026-07-12",
+    "date": "2026-07-13",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.4878005164454384,
-      0.8076950191632386
+      0.6939599725535115,
+      0.9168408335360192
     ],
     "fp_claude_ci": [
       0.0,
@@ -88,31 +88,31 @@
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 20,
+    "fp_count": 35,
     "fp_human_ci": [
       0.0,
-      1.0
+      0.7934506856227626
     ],
     "fp_human_count": 0,
     "fp_human_rate": 0.0,
     "fp_md_ci": [
-      0.4878005164454384,
-      0.8076950191632386
+      0.7155654195751904,
+      0.9311575185870407
     ],
-    "fp_md_count": 20,
-    "fp_md_rate": 0.6666666666666666,
-    "fp_rate": 0.6666666666666666,
+    "fp_md_count": 35,
+    "fp_md_rate": 0.8536585365853658,
+    "fp_rate": 0.8333333333333334,
     "fp_trustworthy": true,
-    "labeled_triggers": 30,
+    "labeled_triggers": 42,
     "n_cant_tell": 0,
     "n_claude": 0,
-    "n_human": 0,
-    "n_md": 30,
-    "total_triggers": 53
+    "n_human": 1,
+    "n_md": 41,
+    "total_triggers": 64
   },
   "last_tick_completed_day": "2026-07-12",
   "nightly_verdict": "Busy evening: someone was in the garden from about 5:40 to 6:30pm and the camera caught them 20+ times, but the privacy filter hid every one of those from you as intended - nothing person-related reached your alerts. No real animals were missed and no wrong alerts slipped through, so no change was made. One thing to flag: for the second day running every photo is noticeably out of focus, so a quick focus check on the camera is worth doing when you get a moment.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 1926
+  "watermark": 1990
 }
