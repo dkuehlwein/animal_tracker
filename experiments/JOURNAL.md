@@ -1079,3 +1079,39 @@ physical focus check (`scripts/camera_preview.py`) to the top actionable item �
 soft focus depresses sharpness globally AND plausibly lowers classifier recall
 (blurry animals missed), an FN driver no env/code lever reaches. Orthogonal to
 AE (exp #7) and the floor statistic (exp #8). See runs/0007 Observations 2026-07-12.
+
+## 2026-07-13 — tick (loop-day 2026-07-13)
+
+**Window:** 64 new triggers (ids 1927–1990, watermark 1926→1990). Status: 22
+HUMAN / 31 no_animal / 4 unclassifiable / 7 identified. **1 human label** (id
+1965, `identified`, labelled `animal` → correctly-alerted TP, not an FN). FP
+ground truth otherwise unmeasured; `loop.metrics` fp_rate 0.83 is MegaDetector
+auto-only (n_md 41, n_human 1). FN: none observed. Volume 64 vs baseline 42 —
+elevated but explained by a 2nd family-in-garden evening (22 HUMAN), no config
+deployed so nothing to roll back.
+
+**PRIVACY LEAK (exp #5 leak-watch first hit, outranks exp #8).** id 1988 (19:50)
+leaked a person's photo to the MAIN channel: status=identified, ensemble
+species_name generic `;;;;;;animal` (conf 0.72 → notifies; "Best guess: human
+59%" caption), raw top-1 = homo sapiens human (0.59), pconf 0.10. Both gate paths
+bypassed — person box 0.10 < 0.30, and the ensemble rollup carries no `homo`
+segment. Fix (backlog #9, HELD for Daniel's OK): fire HUMAN when the RAW
+classifier top-1 has a `homo` taxon AND the ensemble did not confidently ID a
+specific animal. Whole-DB specificity: top_species_raw~homo = exactly 2 rows
+(1852 muted 07-12, 1988 leaked 07-13), both real humans, 0 animals → 0 observed
+false-suppression, negligible FN risk. HELD not shipped: it modifies the
+privacy-suppression gate (Daniel's strongest product lever) + FN unmeasured;
+recipient is Daniel's own private channel so exposure is design-intent-violation,
+not third-party breach → proportionate to a next-tick TDD ship on greenlight.
+
+**Mute-path adjudication (exp #8 core check): 3 firings, 0 concealed animals**
+(3rd night running). 1975 (19:02, no_animal) = adult legs/shorts (pconf 0.24,
+slipped human gate, muted anyway); 1987 (19:49, no_animal) = the child crouching
+(pconf 0.12, same); 1990 (20:22, unclassifiable) = empty dark pond (TN, the one
+genuine dusk-darkness firing, held no animal). No FN hidden.
+
+**Exp #8 → HELD 3rd night.** Mute path concealed 0 animals over 3 nights → live
+benefit ~nil; only 1/3 firings was dusk-darkness (empty), so the luma-gate's live
+benefit again ~zero. Low-value vs the human-gate leak, which is now the board's
+top actionable item (backlog #9). Soft-focus pattern persists (raw Laplacian 6–11
+at good luma) — physical focus check still recommended.

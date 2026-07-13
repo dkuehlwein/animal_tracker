@@ -110,8 +110,8 @@
     "n_md": 41,
     "total_triggers": 64
   },
-  "last_tick_completed_day": "2026-07-12",
-  "nightly_verdict": "Busy evening: someone was in the garden from about 5:40 to 6:30pm and the camera caught them 20+ times, but the privacy filter hid every one of those from you as intended - nothing person-related reached your alerts. No real animals were missed and no wrong alerts slipped through, so no change was made. One thing to flag: for the second day running every photo is noticeably out of focus, so a quick focus check on the camera is worth doing when you get a moment.",
+  "last_tick_completed_day": "2026-07-13",
+  "nightly_verdict": "Heads up: one photo of a person slipped past the privacy filter tonight (about 7:50pm, during a family-in-the-garden evening) and reached your normal alerts labelled 'human' - the filter hid the other 22 correctly, but this one got through because the person was blurry and close and the AI's main guess came out vague. I've found the exact cause and a targeted fix that would have caught it (plus a similar near-miss yesterday) with no risk to real animal alerts, but since it changes the privacy filter I'm holding it for your OK before switching it on. No real animals were missed; and the camera is still noticeably out of focus, so a quick focus check is worth doing when you can.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 1990
