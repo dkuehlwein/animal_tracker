@@ -181,3 +181,77 @@ REVIEW volume; mute path concealed 0 animals two nights running, so live benefit
 remains ~nil; no fire. The luma-gate would have un-muted only dark dusk rows, and
 tonight's below-floor firings are again dominated by soft focus (not darkness),
 which the luma gate does not address.
+
+## Observations — 2026-07-13 tick (exp #8 HELD 3rd night; PRIVACY LEAK found)
+
+**Window:** 64 new triggers (ids 1927–1990, watermark 1926→1990). Status split:
+22 human, 31 no_animal, 4 unclassifiable, 7 identified. **One human feedback
+label** this window: id 1965 (17:19, `identified`, generic `;;;;;;animal` conf
+0.53, raw top-1 bird) labelled `animal` → a correctly-alerted **true positive**,
+not an FN. FP ground truth otherwise unmeasured (n_human 1).
+
+**Second family-in-garden evening** (carryover from 07-12's human event): an
+adult + a small child around the pond ~18:56–20:22. 22 HUMAN-status rows
+correctly SUPPRESSED (pconf up to 0.94; e.g. 1967/1970/1982/1984/1986).
+
+**Mute-path adjudication (this exp's core check): 3 firings, 0 concealed
+animals** — below-floor + review-class ids 1975 (19:02, no_animal, sharp 9.3),
+1987 (19:49, no_animal, 8.0), 1990 (20:22, unclassifiable, 9.7). Inspected every
+frame: **1975 = an adult's bare legs/shorts** (person close to camera, pconf 0.24
+< 0.3 → slipped the human gate, muted by blur gate anyway), **1987 = the small
+child crouching** at the pond edge (pconf 0.12 → same), **1990 = empty dark pond**
+(true negative, genuinely dark dusk — the exact case the luma-gate targets, and it
+held no animal). So the mute path hid **no false negative for the 3rd night
+running**; two of the three firings were humans muted (no leak, no animal).
+
+**Exp #8 verdict unchanged: HOLD.** Mute path has concealed 0 animals across
+3 nights; live benefit remains ~nil. Only 1990 (1 of 3) was dusk-darkness, held
+no animal → luma-gate benefit again ~zero. This experiment is low-value; the
+board's live defect is elsewhere (below).
+
+---
+
+## CROSS-CUTTING FINDING — human/privacy gate LEAK (id 1988), exp #5 leak-watch
+
+**This is the first observed leak of exp #5's leak-watch and outranks exp #8.**
+
+**id 1988 (19:50) leaked a photo of a person to the MAIN channel.** Details:
+`detection_status = identified`, `species_name = 1f689929…;;;;;;animal` (generic
+rollup, conf 0.72 → notifies as a real detection, NOT REVIEW-prefixed),
+`top_species_raw = 990ae9dd…;mammalia;primates;hominidae;homo;sapiens;human`
+(tss 0.59), `person_confidence = 0.10`. Frame inspected: unmistakably the same
+adult (red/green clothing, close, motion-blurred). The "Best guess" caption line
+would have rendered **"Best guess: human (59%)"** — a person's photo alerted to
+Daniel labelled human.
+
+**Root cause — both human-gate paths bypassed:**
+1. MegaDetector person box scored 0.10 < `human_detection_confidence` 0.30 (person
+   heavily motion-blurred / partially framed at close range → weak box).
+2. The SpeciesNet **ensemble** rolled the classifier's homo-sapiens top-1 UP to a
+   generic `;;;;;;animal` label that carries **no `homo` taxon segment**, so the
+   ensemble-taxon homo check also missed it.
+
+The gate checks person_confidence and the *ensemble* taxon. It does **not** check
+the **raw classifier top-1** (`top_species_raw` / `metadata['top_classifier_prediction']`),
+which here correctly said "homo sapiens human" at 0.59. That raw signal is the
+missed lever.
+
+**Data-validated, FN-safe fix (proposed — needs Daniel's OK; his strongest
+product lever is human handling):** extend the human gate to also fire
+`DetectionStatus.HUMAN` when the raw classifier top-1 taxon contains a `homo`
+segment **and** the ensemble did NOT confidently identify a specific animal
+(i.e. the ensemble label is a generic rollup / `blank` / `no cv result` /
+review-class) — so a confident species ID is never overridden. Specificity check
+over the **entire DB**: `top_species_raw ~ homo/human` occurs on exactly **2 rows,
+both actual humans** (1852 unclassifiable-muted 07-12, 1988 leaked 07-13), **zero
+real animals** → the override would have caught both leak/near-leak with **zero
+observed false-suppression**. FN risk is therefore negligible on evidence (an
+animal whose raw top-1 is confidently "human" AND whose ensemble can't ID it has
+never occurred), but because it changes the **privacy-suppression gate** — Daniel's
+single strongest product call — and FN is formally unmeasured, it is **HELD for his
+explicit greenlight**, not auto-shipped tonight. Same discipline as exp #8's volume
+lever. Severity note: the leak recipient is Daniel's own private channel of his own
+garden/family, so exposure is "against design intent + annoying," not a third-party
+breach — which is why a next-tick TDD/subagent ship (on greenlight) is proportionate
+rather than an emergency unreviewed edit. Filed as **backlog id 9**
+(`human-gate-raw-classifier-leak`). Also caught the 1852 near-miss retroactively.

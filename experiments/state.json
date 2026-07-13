@@ -56,6 +56,13 @@
       "slug": "sharpness-floor-is-a-brightness-gate",
       "status": "running",
       "validation": "parked"
+    },
+    {
+      "hypothesis": "PROPOSED 2026-07-13 (exp #5 leak-watch first hit). The human/privacy gate leaked a person's photo to the MAIN channel: id 1988 (07-13 19:50) status=identified, ensemble species_name generic ';;;;;;animal' (conf 0.72 -> notifies, Best-guess line would read 'human 59%'), because (1) MegaDetector person box 0.10 < human_detection_confidence 0.30, and (2) the ensemble rolled the classifier's homo-sapiens top-1 up to a generic 'animal' label with no 'homo' taxon segment, so both existing gate paths missed it. Fix: also fire DetectionStatus.HUMAN when the RAW classifier top-1 (top_species_raw / metadata['top_classifier_prediction']) contains a 'homo' taxon AND the ensemble did not confidently ID a specific animal (generic/blank/no-cv/review-class), so a confident species ID is never overridden. Specificity across the WHOLE DB: top_species_raw~homo occurs on exactly 2 rows (1852, 1988), both actual humans, 0 real animals -> catches both with 0 observed false-suppression; FN risk negligible on evidence. Code change (no env knob reaches it); subagent-driven TDD, commit separately w/ exp id, restart-gated. HELD for Daniel's explicit OK because it modifies the privacy-suppression gate (his strongest product lever) and FN is formally unmeasured. See runs/0007 'CROSS-CUTTING FINDING' 2026-07-13.",
+      "id": 9,
+      "slug": "human-gate-raw-classifier-leak",
+      "status": "proposed",
+      "validation": "parked"
     }
   ],
   "baselines": {
@@ -64,7 +71,7 @@
   "best_known_good": {},
   "deployed": {},
   "history": [],
-  "last_heartbeat_loopday": "2026-07-12",
+  "last_heartbeat_loopday": "2026-07-13",
   "last_metrics": {
     "date": "2026-07-12",
     "error_count": 0,
