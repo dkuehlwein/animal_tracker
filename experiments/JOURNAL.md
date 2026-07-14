@@ -1115,3 +1115,51 @@ benefit ~nil; only 1/3 firings was dusk-darkness (empty), so the luma-gate's liv
 benefit again ~zero. Low-value vs the human-gate leak, which is now the board's
 top actionable item (backlog #9). Soft-focus pattern persists (raw Laplacian 6–11
 at good luma) — physical focus check still recommended.
+
+## 2026-07-14 — exp #8 HELD 4th night; FIRST concealed animal in mute path (2035 blackbird)
+
+**Window:** 64 triggers (ids 1991–2054, watermark 1990→2054). Status: 27 human,
+25 no_animal, 6 unclassifiable, 6 identified. Two human-presence events (morning
+07:04–07:47 incl. a child in a Ronaldo #7 shirt; evening 17:23–20:32). Human
+labels: 6 — 1991 fp, 2007/2009 person, 2011 animal_wrong_id, 2017/2018 animal.
+`loop.metrics` fp_rate 0.78 (fp_human 1/6; n_md 31 auto). Volume 64 vs baseline
+42 — elevated, explained by the two human events; no config deployed, nothing to
+roll back.
+
+**FIRST concealed animal in the exp #8 mute path (4 nights in).** id 2035 (17:15,
+unclassifiable, sharpness 8.54, below floor → MUTED, no Telegram) contains a clear
+**blackbird** foraging on the pond rocks (cropped+enlarged to confirm; empty 26 min
+later at 2041). Raw top-1 `bird` 0.12, ensemble rolled to unclassifiable. This is
+the FN class exp #8 exists to close, observed live for the first time (prior 3
+nights: 0 concealed). **The proposed luma-gate would have caught it** — 2035 luma
+67.8 < proposed `blur_mute_min_luma≈70` → un-muted into REVIEW. First live evidence
+the fix has non-zero benefit. **Net product harm nil**, though: the SAME bird was
+re-captured 3 min later at 2036 (17:18) and correctly ID'd `bird` 0.72 → alerted to
+main channel. So 2035 is a soft (concealed-but-net-covered) FN, saved by luck (2036
+re-catch), not by the gate.
+
+**Mute-path firings (5): 1 concealed animal (2035), 1 muted human (1992 = the
+child, pconf 0.17 slipped human gate), 3 empty (2041/2042/2043 soft-focus pond
+TNs).** Luma-gate@70 this window would un-mute 2035 (bird ✓), 2041/2043 (empty →
++2 REVIEW), 1992 (child → human into REVIEW, mild). Threshold 70 directly trades
+FN-safety vs REVIEW volume — do a small distribution check when implementing.
+
+**Observable FN outside the mute path: 2011 (07:59, no_animal, sharpness 12.99
+ABOVE floor)** labelled `animal_wrong_id` — classifier recall miss in good
+light/focus; above floor so REVIEW-notified (Daniel labelled it), not muted. No
+sharpness/env lever touches classifier recall.
+
+**Leak-watch (exp #5 / backlog #9): 0 main-channel leaks.** All 6 `identified`
+rows are birds, pconf ≤ 0.10, no `homo` in any top_species_raw. Human gate
+suppressed both events correctly. Two humans (2007/2009) slipped into 🔍 REVIEW
+(no_animal, pconf 0.06/0.14, no raw species) — known residual, REVIEW-tagged not
+main, and NOT catchable by backlog #9 (no top_species_raw). Soft-focus persists
+(raw Laplacian 8–9 at luma 64–80); physical focus check still the top non-held item.
+
+**Decision: HOLD exp #8 a 4th night, but ESCALATE.** The mute path has now
+demonstrably concealed a real animal and the luma-gate would have caught it → the
+fix's benefit is no longer ~nil. Still not shipped tonight (changes REVIEW volume =
+Daniel's product lever → needs greenlight; code change needs TDD/subagent +
+threshold check). Recommending greenlight in the verdict to implement next tick.
+exp #9 (human-gate raw-classifier leak) also stays HELD — no leak tonight but no
+Daniel OK yet. No deploy.
