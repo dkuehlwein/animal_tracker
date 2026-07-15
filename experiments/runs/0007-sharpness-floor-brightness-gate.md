@@ -325,3 +325,56 @@ work + a threshold distribution check, not a rushed end-of-tick edit. **Escalati
 in tonight's verdict: recommend greenlight to implement next tick.** Net harm
 tonight stayed nil only because 2036 happened to re-catch the same bird — that is
 luck, not the gate working.
+
+## Observations — 2026-07-15 tick (HELD 5th night; quiet daytime-only window, mute path 0 concealed)
+
+**Window:** 69 new triggers (ids 2055–2123, watermark 2054→2123). Status split:
+34 human, 26 no_animal, 6 unclassifiable, 3 identified. Time span **08:03–17:48
+only** — no deep-dusk frames this window (last trigger 17:48, still daylight;
+prior nights ran to 20:xx). Two human-presence events: morning (08:03–08:20,
+ids 2055–2064) and a large afternoon one (15:12–15:30, ids 2087–2111, ~24 HUMAN
+rows, pconf up to 0.95) — all correctly SUPPRESSED (no Telegram).
+
+**Human feedback this window: 4 labels — 3 `animal` (TPs) + 1 `person`.**
+- 2073 (11:34, identified, raw bird 0.64) → `animal` = **true positive**, alerted.
+- 2117 (17:03, identified, raw bird 0.58) → `animal` = **true positive**, alerted.
+- 2118 (17:04, identified, raw bird 0.65) → `animal` = **true positive**, alerted.
+- 2095 (15:17, no_animal, pconf 0.116, raw None) → `person` = a **blurry human that
+  slipped the human gate** (pconf 0.116 < 0.30, no `homo` taxon) into the 🔍 REVIEW
+  channel. Same known residual as 07-14's 2007/2009 — REVIEW-tagged, not main
+  channel, and **NOT addressable by backlog #9** (no `top_species_raw`).
+`loop.metrics`: fp_rate 0.886 but that is **MD-auto-driven** (n_md 31, fp_md 31/31);
+**fp_human 0/4 = 0.0** — zero human-confirmed false positives tonight. FN unmeasured.
+
+**Mute-path adjudication (exp #8 core check): 1 firing, 0 concealed animals.**
+Only ids **2093** (15:16, human, sharp 10.71, below floor) and **2121** (17:37,
+no_animal, sharp 10.87, below floor) fell below the 11.0 floor this window. 2093 is
+HUMAN (suppressed as human, not a blur-mute concern). **2121 is the sole review-class
+mute-path firing** — inspected the frame (luma 76.1, lap 10.9): **empty pond, no
+animal → true negative.** So the mute path concealed **no false negative**. Note
+2121's luma is **76.1 > proposed blur_mute_min_luma≈70**, so the luma-gate would NOT
+have un-muted it anyway — a soft-focus borderline, not a darkness case.
+
+**Sharpness minimum jumped to 10.7 (prior nights: 5.0–6.9) — but explained by the
+window, not a focus fix.** 07-15 sharpness min=10.7 median=18.6 max=24.3 across 69
+frames; only 2/69 below floor. The higher minimum is because **this window has no
+deep-dusk frames** (ends 17:48); prior nights' 5–7 minima came from 19–21h dark-dusk
+captures. The 2121 frame confirms the scene is **still visibly soft-focus** even at
+good luma → soft focus persists; the sharpness-min rise is a sampling artifact of a
+daytime-only window, NOT evidence the focus was corrected. (`scripts/camera_preview.py`
+has uncommitted local edits — Daniel may be working on the focus tool — but production
+frames remain soft.)
+
+**Leak-watch (exp #5 / backlog #9): 0 main-channel leaks.** All 3 `identified` rows
+are birds (raw bird 0.58–0.64), pconf ≤ 0.02, no `homo` in any `top_species_raw`.
+Human gate correctly suppressed both human events; the one residual (2095) went to
+🔍 REVIEW, not main, and carries no raw species → not a backlog-#9 case.
+
+**Decision: HOLD exp #8 (5th night) and backlog #9 — no Daniel greenlight in state,
+no deploy.** No greenlight signal arrived (state.paused=false, no note; only new
+working-tree changes are `scripts/camera_preview.py` + `.claude/`, neither a code-ship
+authorization). Both changes modify Daniel's product levers (REVIEW volume / privacy
+gate) and FN is formally unmeasured → both require his explicit OK per protocol.
+Nothing forced either tonight: mute path concealed 0 animals, 0 leaks, 0
+human-confirmed FPs, 3 TP birds correctly alerted. Both held fixes remain the board's
+top actionable items; recommending greenlight again in the verdict.

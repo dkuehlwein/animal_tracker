@@ -1163,3 +1163,33 @@ Daniel's product lever → needs greenlight; code change needs TDD/subagent +
 threshold check). Recommending greenlight in the verdict to implement next tick.
 exp #9 (human-gate raw-classifier leak) also stays HELD — no leak tonight but no
 Daniel OK yet. No deploy.
+
+## 2026-07-15 — exp #8 HELD 5th night; quiet daytime-only window, mute path 0 concealed
+
+**Window:** 69 triggers (ids 2055–2123, watermark 2054→2123), span **08:03–17:48
+only** (no deep dusk this window; prior nights ran to 20:xx). Status: 34 human, 26
+no_animal, 6 unclassifiable, 3 identified. Two human events (morning 08:03–08:20;
+big afternoon 15:12–15:30, ~24 HUMAN pconf≤0.95) all correctly SUPPRESSED.
+
+**Human labels: 4 — 3 `animal` (TPs) + 1 `person`.** 2073/2117/2118 all `identified`
+birds correctly ALERTED → true positives. 2095 (no_animal, pconf 0.116, raw None) →
+`person`: blurry human that slipped the gate into 🔍 REVIEW (known residual, not main,
+not backlog-#9-catchable). `loop.metrics` fp_rate 0.886 is MD-auto (n_md 31/31);
+**fp_human 0/4 = 0.0** (zero human-confirmed FP). FN unmeasured.
+
+**Mute path (exp #8 core): 1 review-class firing, 0 concealed animals.** Only 2093
+(human, sharp 10.71) and 2121 (no_animal, sharp 10.87) below the 11.0 floor. 2093 is
+HUMAN (suppressed as human). 2121 inspected (luma 76.1, empty pond) → true negative;
+luma 76>70 so luma-gate wouldn't un-mute it anyway (soft-focus borderline, not dark).
+
+**Sharpness min 10.7 (vs 5–7 prior nights) is a sampling artifact, not a focus fix** —
+window has no deep-dusk frames (ends 17:48); 2121 frame still visibly soft-focus at
+good luma. `scripts/camera_preview.py` has uncommitted edits (Daniel may be on the
+focus tool) but production frames remain soft.
+
+**Leak-watch: 0 main-channel leaks.** 3 identified rows all birds (raw bird 0.58–0.64,
+pconf ≤0.02, no homo). Both human events suppressed; 2095 residual → REVIEW only.
+
+**Decision: HOLD exp #8 (5th) + backlog #9 — no greenlight, no deploy, nothing to roll
+back.** Neither product-lever change authorized by Daniel; nothing forced them tonight
+(0 concealed, 0 leaks, 0 human FP, 3 TP birds). Recommending greenlight again in verdict.

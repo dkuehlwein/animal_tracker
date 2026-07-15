@@ -2,7 +2,7 @@
   "active_experiment_id": 8,
   "backlog": [
     {
-      "hypothesis": "CONCLUDED 2026-06-15 (keep). Same-channel \ud83d\udd0d REVIEW prefix on status\u2208{NO_ANIMAL,UNCLASSIFIABLE} flags 99% of FP at 0 FN; live since 06-12, location-agnostic. Second-channel routing is OUT per Daniel (no 2nd channel \u2014 adds overhead, won't click two). See runs/0001 + LEARNINGS.",
+      "hypothesis": "CONCLUDED 2026-06-15 (keep). Same-channel 🔍 REVIEW prefix on status∈{NO_ANIMAL,UNCLASSIFIABLE} flags 99% of FP at 0 FN; live since 06-12, location-agnostic. Second-channel routing is OUT per Daniel (no 2nd channel — adds overhead, won't click two). See runs/0001 + LEARNINGS.",
       "id": 1,
       "slug": "notification-gate-live",
       "status": "concluded",
@@ -16,7 +16,7 @@
       "validation": "parked"
     },
     {
-      "hypothesis": "CONCLUDED 2026-06-17 (not viable in current scene). In-tick spatial diagnostic (diff burst frames \u2192 motion centroid, 70 labeled detections w/ frames on disk: 18 real-animal incl wrong_species, 52 FP). FP and animal motion centroids are spatially ENTANGLED \u2014 both center-weighted (median ~0.5/0.5). NO edge band removes FP without removing a comparable-or-greater share of animals: left15% catches 8%FP vs 17%animals (hurts animals MORE), right15% 12%FP vs 11%animals (wash), top15% 10%FP vs 11%animals (wash), bottom15% 0 animals but only 1/52 FP (negligible). No zero-observed-FN ROI exists \u2192 FN-veto stands on data, not assumption. Reinforces exp #4 (motion knobs don't separate FP from animal) + exp #1 (notification-layer REVIEW prefix is the right architecture, not trigger-side suppression). See JOURNAL 2026-06-17.",
+      "hypothesis": "CONCLUDED 2026-06-17 (not viable in current scene). In-tick spatial diagnostic (diff burst frames → motion centroid, 70 labeled detections w/ frames on disk: 18 real-animal incl wrong_species, 52 FP). FP and animal motion centroids are spatially ENTANGLED — both center-weighted (median ~0.5/0.5). NO edge band removes FP without removing a comparable-or-greater share of animals: left15% catches 8%FP vs 17%animals (hurts animals MORE), right15% 12%FP vs 11%animals (wash), top15% 10%FP vs 11%animals (wash), bottom15% 0 animals but only 1/52 FP (negligible). No zero-observed-FN ROI exists → FN-veto stands on data, not assumption. Reinforces exp #4 (motion knobs don't separate FP from animal) + exp #1 (notification-layer REVIEW prefix is the right architecture, not trigger-side suppression). See JOURNAL 2026-06-17.",
       "id": 3,
       "slug": "roi-masking",
       "status": "concluded",
@@ -30,21 +30,21 @@
       "validation": "live"
     },
     {
-      "hypothesis": "CONCLUDED 2026-07-07 (shipped). Daniel's product/privacy call: SUPPRESS human alerts entirely (no Telegram, not REVIEW-tagged); saved photos of HUMAN-status detections kept 48h then purged, DB row kept as metadata-only. Fix shipped as a MegaDetector person-gate (human_detection_confidence>=0.3) OR homo-taxon check, evaluated before the animal branch \u2014 broader than the originally-proposed taxon-only REVIEW-tag fix, since most human captures are blurry NO_ANIMAL/UNCLASSIFIABLE frames never tagged 'homo'. New config: SPECIES_HUMAN_DETECTION_CONFIDENCE, PERFORMANCE_SUPPRESS_HUMAN_ALERTS, PERFORMANCE_HUMAN_RETENTION_HOURS; new DetectionStatus.HUMAN. Shipped on branch fix/human-gate-blur-gate. Leak-watch continues post-deploy as verification. See runs/0004 Resolution + JOURNAL 2026-07-08.",
+      "hypothesis": "CONCLUDED 2026-07-07 (shipped). Daniel's product/privacy call: SUPPRESS human alerts entirely (no Telegram, not REVIEW-tagged); saved photos of HUMAN-status detections kept 48h then purged, DB row kept as metadata-only. Fix shipped as a MegaDetector person-gate (human_detection_confidence>=0.3) OR homo-taxon check, evaluated before the animal branch — broader than the originally-proposed taxon-only REVIEW-tag fix, since most human captures are blurry NO_ANIMAL/UNCLASSIFIABLE frames never tagged 'homo'. New config: SPECIES_HUMAN_DETECTION_CONFIDENCE, PERFORMANCE_SUPPRESS_HUMAN_ALERTS, PERFORMANCE_HUMAN_RETENTION_HOURS; new DetectionStatus.HUMAN. Shipped on branch fix/human-gate-blur-gate. Leak-watch continues post-deploy as verification. See runs/0004 Resolution + JOURNAL 2026-07-08.",
       "id": 5,
       "slug": "human-main-channel-leak",
       "status": "concluded",
       "validation": "live"
     },
     {
-      "hypothesis": "CONCLUDED 2026-07-07 (shipped). The sharpness floor (min_sharpness_threshold=11.0) in _capture_and_select_best_frame silently discarded low-light/dusk captures (return None,None before DB logging or notification), causing unrecorded false negatives \u2014 e.g. the 07-07 ~19:10 pond bird detected 17x across 4 captured bursts, never logged. Fix: below-floor bursts now always get species ID + a DB row; alert if an animal is found (even blurry), mute (DB-log only, no Telegram) if not, so REVIEW volume does not rise. fn_risk down, fp_rate unchanged. Shipped on branch fix/human-gate-blur-gate. See runs/0005 + JOURNAL 2026-07-08.",
+      "hypothesis": "CONCLUDED 2026-07-07 (shipped). The sharpness floor (min_sharpness_threshold=11.0) in _capture_and_select_best_frame silently discarded low-light/dusk captures (return None,None before DB logging or notification), causing unrecorded false negatives — e.g. the 07-07 ~19:10 pond bird detected 17x across 4 captured bursts, never logged. Fix: below-floor bursts now always get species ID + a DB row; alert if an animal is found (even blurry), mute (DB-log only, no Telegram) if not, so REVIEW volume does not rise. fn_risk down, fp_rate unchanged. Shipped on branch fix/human-gate-blur-gate. See runs/0005 + JOURNAL 2026-07-08.",
       "id": 6,
       "slug": "blur-gate-false-negative",
       "status": "concluded",
       "validation": "live"
     },
     {
-      "hypothesis": "ROLLED BACK 2026-07-09 (same day as ship). AE=short was meant to raise dusk sharpness_score above the 11.0 floor. Measurement on saved frames shows it CANNOT: sharpness_score is Laplacian variance, which scales with frame contrast/brightness; AE=short lowers luma by construction (19h matched-hour: luma 68.9->52.0), so it pushes MORE bursts below the floor, not fewer. Run 0006's own pre-registered 'midday regression => reconsider' trigger also fired (16h lap 19.18->15.07). FN unmeasured + plausible FN rise via the below-floor+no-animal mute path => FN-veto => reverted to AE=normal. Reopened as running to collect the matched-hour 17-19h AE=normal baseline that was never captured. CONCLUDED 2026-07-10: AE=normal dusk baseline now in (07-10 17-18h sharpness 6.9-9.4) and is indistinguishable from AE=short (07-09 17-18h 7.8-8.6) \u2014 both below the 11.0 floor. AE mode is not the lever; the floor statistic is (backlog id 8, now active). AE=normal retained. See runs/0006.",
+      "hypothesis": "ROLLED BACK 2026-07-09 (same day as ship). AE=short was meant to raise dusk sharpness_score above the 11.0 floor. Measurement on saved frames shows it CANNOT: sharpness_score is Laplacian variance, which scales with frame contrast/brightness; AE=short lowers luma by construction (19h matched-hour: luma 68.9->52.0), so it pushes MORE bursts below the floor, not fewer. Run 0006's own pre-registered 'midday regression => reconsider' trigger also fired (16h lap 19.18->15.07). FN unmeasured + plausible FN rise via the below-floor+no-animal mute path => FN-veto => reverted to AE=normal. Reopened as running to collect the matched-hour 17-19h AE=normal baseline that was never captured. CONCLUDED 2026-07-10: AE=normal dusk baseline now in (07-10 17-18h sharpness 6.9-9.4) and is indistinguishable from AE=short (07-09 17-18h 7.8-8.6) — both below the 11.0 floor. AE mode is not the lever; the floor statistic is (backlog id 8, now active). AE=normal retained. See runs/0006.",
       "id": 7,
       "slug": "dusk-short-exposure",
       "status": "concluded",
@@ -111,7 +111,7 @@
     "total_triggers": 69
   },
   "last_tick_completed_day": "2026-07-14",
-  "nightly_verdict": "Good news: no person photos leaked to your main alerts tonight, and the privacy filter correctly hid both a morning and an evening of family-in-the-garden. But for the first time the 'too-blurry, skip it' shortcut silently swallowed a real blackbird at the pond (5:15pm) - you only got told about it because the same bird came back 3 minutes later and that shot was sharp enough to send. That's exactly the miss the fix I've been holding would prevent (it would have caught tonight's bird), so I'd like your OK to build and switch it on - it only adds a few extra 'review' messages. The camera is still visibly out of focus, which is the root cause here, so a focus check is worth doing when you get a chance.",
+  "nightly_verdict": "Quiet day: 3 birds correctly alerted (you confirmed all three), zero person photos reached your main alerts, and the two garden-visit stretches (morning and mid-afternoon) were all correctly hidden. The one blurry frame the camera skipped was an empty pond, so nothing real was missed. One blurry person did slip into a REVIEW message (not your main alerts) - a known harmless leftover. No changes made. The two fixes I keep flagging - the dusk-miss fix and the tighter person filter - are still waiting on your OK; just reply if you want me to build them. The camera is still a bit soft-focus, so a focus check is still worthwhile when convenient.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 2123
