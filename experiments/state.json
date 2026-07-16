@@ -110,7 +110,7 @@
     "n_md": 49,
     "total_triggers": 86
   },
-  "last_tick_completed_day": "2026-07-15",
+  "last_tick_completed_day": "2026-07-16",
   "nightly_verdict": "Busy evening with people working at the pond \u2014 all ~30 person captures were correctly kept out of your alerts, and the daytime birds were correctly flagged. One blurry person reached a REVIEW message and one blurry person-only frame was skipped (both harmless \u2014 no real animals missed). New find: occasionally an empty-pond shot posts a \u201cNo animal\u201d message to your main alerts (a long-standing minor quirk, ~once a day) \u2014 I logged it as a fix to queue. No changes tonight; the dusk-miss and tighter-person fixes still just need your OK.",
   "paused": false,
   "pending_restart_at": null,
