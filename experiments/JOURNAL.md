@@ -1193,3 +1193,21 @@ pconf ≤0.02, no homo). Both human events suppressed; 2095 residual → REVIEW 
 **Decision: HOLD exp #8 (5th) + backlog #9 — no greenlight, no deploy, nothing to roll
 back.** Neither product-lever change authorized by Daniel; nothing forced them tonight
 (0 concealed, 0 leaks, 0 human FP, 3 TP birds). Recommending greenlight again in verdict.
+
+## 2026-07-16 — exp #8 HELD 6th; dusk human cluster all-suppressed; NEW blank→main FP
+
+86 triggers (2124–2209, wm 2123→2209), 08:xx–18:56. Status: 33 human / 23 no_animal /
+20 unclassifiable / 10 identified. Big dusk pond-work human cluster ~18:29–18:56, all
+33 HUMAN correctly SUPPRESSED. Human labels: 1 (2184 person→REVIEW residual, above
+floor, pconf 0.034 not #9-catchable). metrics fp_rate 0.849 MD-auto; **fp_human 0/1**;
+fp_claude 3/3 (blank labels); FN unmeasured.
+NEW FINDING: 2139/2143/2158 = status=identified species=`;;;;;;blank` conf 0.99, empty
+pond → alert to MAIN as "🚫 No animal (99%)" (IDENTIFIED not REVIEW-prefixed). Long-
+standing (50+ blank-identified since 06-09, ~1/nt, in baseline). Adjudicated tier2 FP.
+Backlog candidate: route blank→REVIEW/mute (low FN risk, code change) — HELD (1-exp).
+Mute path: 1 review-class firing (2206 no_animal sharp 8.2) = a PERSON bent at pond
+(legs/back only, pconf 0.05, gate missed) → muted; 0 concealed animals, beneficial.
+Leak-watch: 0 main human leaks; 2 persons slipped gate as no_animal (2184→REVIEW,
+2206→muted), neither #9-catchable (pconf ~0.03–0.05, raw None) — distinct failure mode.
+Decision: HOLD exp #8 (6th) + backlog #9, no deploy, nothing rolled back. Blank→main
+pattern newly documented+labeled. Recommending Daniel greenlight queued fixes.

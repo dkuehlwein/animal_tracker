@@ -378,3 +378,55 @@ gate) and FN is formally unmeasured → both require his explicit OK per protoco
 Nothing forced either tonight: mute path concealed 0 animals, 0 leaks, 0
 human-confirmed FPs, 3 TP birds correctly alerted. Both held fixes remain the board's
 top actionable items; recommending greenlight again in the verdict.
+
+---
+
+## 2026-07-16 — exp #8 HELD 6th night; dusk human cluster all-suppressed; NEW: blank→main FP pattern
+
+**Window:** 86 triggers (ids 2124–2209, watermark 2123→2209), span **08:xx–18:56**,
+with a large **dusk pond-work human cluster ~18:29–18:56**. Status breakdown: **33
+human, 23 no_animal, 20 unclassifiable, 10 identified.**
+
+**Human labels: 1 — 2184 `person`** (18:31, no_animal, sharp 11.4 above floor, pconf
+0.034, raw None) → a blurry human that slipped the gate into 🔍 REVIEW (known residual;
+REVIEW not main; **NOT backlog-#9-catchable** — pconf 0.034 ≪ 0.30, no `top_species_raw`).
+`loop.metrics` fp_rate 0.849 is MD-auto (n_md 49, fp_md 42/49); **fp_human 0/1 = 0.0**
+(person label not counted as an animal-FP). fp_claude 3/3 = my blank labels below. FN
+unmeasured.
+
+**NEW FINDING — "blank" predictions alert to the MAIN channel as `identified`.** Ids
+**2139 / 2143 / 2158** (10:52, 11:33, 14:31) are `status=identified`,
+`species_name=…;;;;;;blank`, conf **0.99**, pconf ≤0.10 — inspected all three frames:
+**empty pond, no animal.** They reach MAIN (not REVIEW: `is_review_detection` excludes
+IDENTIFIED) and render as `🚫 No animal (99%)` (`wildlife_system.py:483-485`). This is
+**long-standing, not new**: 50+ `blank`-species `identified` rows since 2026-06-09
+(~1/night), already baked into the measured baseline — Daniel has never flagged it, so
+low-nuisance, but it IS main-channel volume for empty frames. Adjudicated all 3 as
+**tier2 `false_positive`** (ground truth for a future experiment). **Backlog candidate
+(not opened — one-experiment-at-a-time, exp #8 active):** route `blank`-label ensemble
+predictions to NO_ANIMAL/REVIEW (or mute) instead of IDENTIFIED. Low FN risk (`blank`
+means the classifier itself asserts empty), code change, restart-gated — HELD like the
+others until it can be the sole active experiment and/or Daniel greenlights.
+
+**Mute-path adjudication (exp #8 core check): 1 firing, 0 concealed animals — and it
+muted a *person*.** 12 rows below the 11.0 floor tonight; 11 are HUMAN-status
+(suppressed as human — human gate precedes the blur mute, no concealment risk). The
+sole review-class mute-path firing is **2206** (18:52, no_animal, sharp 8.2, pconf
+0.05): inspected → a **person bent over at the pond** (only legs/back visible, so
+MegaDetector fired no person box → pconf 0.05, human gate missed it). The blur mute
+suppressed it anyway → **beneficial** (person muted, 0 animals concealed).
+
+**Leak-watch (exp #5 / backlog #9): 0 main-channel human leaks.** All 10 `identified`
+rows: 7 birds/animal (pconf ≤0.10, no `homo`), 3 blank empty-pond (above). The dusk
+human cluster (33 HUMAN) all correctly SUPPRESSED. Two persons slipped the human gate
+as no_animal — **2184→REVIEW** (above floor) and **2206→muted** (below floor) — neither
+reached MAIN, and **neither is backlog-#9-catchable** (both pconf ~0.03–0.05, raw None;
+back-view/legs-only frames MegaDetector under-scores and the classifier never says
+`homo`). This residual is a distinct failure mode from backlog #9's raw-classifier leak.
+
+**Decision: HOLD exp #8 (6th night) and backlog #9 — no greenlight, no deploy, nothing
+to roll back.** state.paused=false, no greenlight note arrived. Nothing forced a change:
+mute path concealed 0 animals (and caught a person), 0 main-channel leaks, 0
+human-confirmed FPs, 7 TP animal/bird alerts. New this tick: the blank→main-channel FP
+pattern is now documented + tier2-labeled as a fresh backlog candidate. Recommending
+Daniel greenlight the queued exp #8 / #9 fixes again in the verdict.

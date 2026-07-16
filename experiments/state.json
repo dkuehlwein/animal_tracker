@@ -73,46 +73,46 @@
   "history": [],
   "last_heartbeat_loopday": "2026-07-16",
   "last_metrics": {
-    "date": "2026-07-15",
+    "date": "2026-07-16",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.7404853135378618,
-      0.9546482066690264
+      0.7294575072380466,
+      0.9214758214915374
     ],
     "fp_claude_ci": [
-      0.0,
+      0.4385029682449546,
       1.0
     ],
-    "fp_claude_count": 0,
-    "fp_claude_rate": 0.0,
-    "fp_count": 31,
+    "fp_claude_count": 3,
+    "fp_claude_rate": 1.0,
+    "fp_count": 45,
     "fp_human_ci": [
       0.0,
-      0.4898908364545973
+      0.7934506856227626
     ],
     "fp_human_count": 0,
     "fp_human_rate": 0.0,
     "fp_md_ci": [
-      0.889744604539564,
-      1.0
+      0.7333229377608557,
+      0.9290357627959323
     ],
-    "fp_md_count": 31,
-    "fp_md_rate": 1.0,
-    "fp_rate": 0.8857142857142857,
+    "fp_md_count": 42,
+    "fp_md_rate": 0.8571428571428571,
+    "fp_rate": 0.8490566037735849,
     "fp_trustworthy": true,
-    "labeled_triggers": 35,
+    "labeled_triggers": 53,
     "n_cant_tell": 0,
-    "n_claude": 0,
-    "n_human": 4,
-    "n_md": 31,
-    "total_triggers": 69
+    "n_claude": 3,
+    "n_human": 1,
+    "n_md": 49,
+    "total_triggers": 86
   },
   "last_tick_completed_day": "2026-07-15",
-  "nightly_verdict": "Quiet day: 3 birds correctly alerted (you confirmed all three), zero person photos reached your main alerts, and the two garden-visit stretches (morning and mid-afternoon) were all correctly hidden. The one blurry frame the camera skipped was an empty pond, so nothing real was missed. One blurry person did slip into a REVIEW message (not your main alerts) - a known harmless leftover. No changes made. The two fixes I keep flagging - the dusk-miss fix and the tighter person filter - are still waiting on your OK; just reply if you want me to build them. The camera is still a bit soft-focus, so a focus check is still worthwhile when convenient.",
+  "nightly_verdict": "Busy evening with people working at the pond \u2014 all ~30 person captures were correctly kept out of your alerts, and the daytime birds were correctly flagged. One blurry person reached a REVIEW message and one blurry person-only frame was skipped (both harmless \u2014 no real animals missed). New find: occasionally an empty-pond shot posts a \u201cNo animal\u201d message to your main alerts (a long-standing minor quirk, ~once a day) \u2014 I logged it as a fix to queue. No changes tonight; the dusk-miss and tighter-person fixes still just need your OK.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 2123
+  "watermark": 2209
 }
