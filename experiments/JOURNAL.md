@@ -1258,3 +1258,24 @@ low-texture coverage gap to re-check before trusting a future threshold, and
 nightly adjudication of every `scene_gate_muted=1` burst once enabled
 (concealed animal = FN-veto → raise threshold above that frame's similarity
 or disable, same tick — mirrors the existing blur-mute adjudication duty).
+
+## 2026-07-18 — exp #8 SHIPPED (luma-gate the blur mute); commit 683f5f3
+First nightly tick after Daniel's 07-17 greenlight-hold abolition. Exp #8 (held 6
+nights for approval the protocol never required) shipped within the gates: FN-
+reducing (FN-veto n/a), modest in-channel REVIEW bump, sole active exp, paused=
+false, 28 human labels (not starved). CHANGE: blur-mute (is_blurry_review) now
+fires only when best-frame mean luma >= PERFORMANCE_BLUR_MUTE_MIN_LUMA (new, def
+70.0, BOUNDS[0,255]); dark below-floor no-animal bursts route to 🔍 REVIEW instead
+of silent mute. luma computed in _capture_and_select_best_frame (BGR→gray mean),
+FN-safe on missing luma. TDD 89/89 + 420 full-suite. Threshold 70 un-mutes the
+07-14 concealed blackbird (luma 67.8) but keeps daytime soft-focus (luma 71–81)
+muted. Restart-gated: pending_restart_at 2026-07-18T04:39 (pre-sunrise 05:39); no
+env delta so loop.deploy not run. Rollback = git revert 683f5f3 + restart.
+WINDOW ids 2210–2288 (wm 2209→2288, 79 trig): 51 human / 19 identified / 5 unclass
+/ 4 no_animal. Blur-mute fired 0× (0 concealed). Leak-watch 0 main leaks (all 19
+identified = bird/animal, 0 homo raw, pconf ≤0.026; 51 HUMAN all suppressed).
+Human labels 28: 14 animal + 3 animal_wrong_id (ALL on identified TP rows → 0 FN
+into review-class), 10 fp, 1 person (2244 REVIEW residual). fp_human 10/28=0.357
+(vs 0.85 MD-auto). Blank→main recurred: 2211/2214 (ens=;animal raw=;blank ~0.50)
+labeled fp — but 2212/2213 same raw=;blank labeled animal_wrong_id (real animal),
+so blank-raw ≠ reliably-empty; blank→REVIEW backlog candidate stays parked (1-exp).

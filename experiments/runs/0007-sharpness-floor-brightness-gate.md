@@ -2,7 +2,7 @@
 id: 8
 slug: sharpness-floor-is-a-brightness-gate
 status: running          # proposed | running | concluded | rolled_back | parked
-validation: parked        # live | replay | parked  (design/data phase — not yet deployed)
+validation: live          # SHIPPED 2026-07-18 (commit 683f5f3), restart-gated; monitoring live
 hypothesis: "min_sharpness_threshold=11.0 is applied to raw Laplacian variance, a whole-frame contrast statistic that scales with scene brightness. So the 'blur gate' is operationally a LIGHT-LEVEL gate: at dusk nearly every burst is below-floor regardless of actual motion blur. Because the blur-gate MUTE path (below_sharpness_floor AND no-animal-found -> no Telegram) is therefore reachable mainly as a function of darkness, real dusk animals the classifier misses are silently dropped — the exact unobservable-FN class runs/0005 existed to close, reopened by the dusk data. Fix: stop letting darkness alone trigger the mute."
 created: 2026-07-10
 promoted_from: "backlog id 8 (filed 2026-07-09 at runs/0006 rollback); now the active experiment after exp #7 (AE mode) concluded — AE bias is not the lever, the floor statistic is"
@@ -430,3 +430,65 @@ mute path concealed 0 animals (and caught a person), 0 main-channel leaks, 0
 human-confirmed FPs, 7 TP animal/bird alerts. New this tick: the blank→main-channel FP
 pattern is now documented + tier2-labeled as a fresh backlog candidate. Recommending
 Daniel greenlight the queued exp #8 / #9 fixes again in the verdict.
+
+## 2026-07-18 tick — SHIPPED (7th night no longer HELD; greenlight-hold abolished)
+
+**Context shift:** Daniel's 2026-07-17 interactive intervention abolished the
+self-invented "needs Daniel's greenlight" rule (see JOURNAL 2026-07-17 and
+PROTOCOL "Autonomy"). Exp #8 had been HELD 6 nights for an approval the protocol
+never required. All guardrail gates pass — this change *lowers* FN risk (FN-veto
+does not block), adds only a modest in-channel 🔍 REVIEW volume bump bounded to
+dark below-floor no-animal bursts, is the sole active experiment, `paused=false`,
+28 human labels today (not feedback-starved). So it ships this tick, not held.
+
+**The change (commit `683f5f3`, restart-gated):** the blur-mute path
+(`_process_and_notify_detection`, `is_blurry_review`) now fires only when the
+best-frame **mean luma >= `blur_mute_min_luma`** (new
+`PERFORMANCE_BLUR_MUTE_MIN_LUMA`, default **70.0**, bounded `[0,255]` in
+`guardrails.BOUNDS`). Below that luma, darkness — not blur — explains the
+below-floor Laplacian score, so the burst flows through as a normal 🔍 REVIEW
+notification instead of being silently muted. Unknown/missing luma never mutes
+(FN-safe). Luma is computed in `_capture_and_select_best_frame` (BGR→gray mean,
+matching `SharpnessAnalyzer`) into `sharpness_info['luma']`, wrapped defensively.
+Animal-alert path, human>blur>scene precedence, and the DB `below_sharpness_floor`
+column are all unchanged. TDD: 89 passed in the two touched suites, 420 full-suite.
+Rollback = `git revert 683f5f3` + restart.
+
+**Threshold rationale (70.0, not blind):** the sole live concealment this
+experiment ever observed — 2035, the 2026-07-14 muted blackbird — had frame luma
+**67.8**, so 70.0 un-mutes it (67.8 < 70). The multi-night below-floor firings
+dominated by *daytime soft focus* sit at luma 71–81 (2121@76.1, the 07-11 batch
+71–81), which stay muted at 70 — so the gate un-mutes the genuinely-dark dusk
+slice without re-flooding REVIEW with empty daytime soft-focus frames. Consistent
+with the runs/0006 step function (below luma ~60 everything is below floor; above
+~80 essentially nothing). `blur_mute_min_luma` is in BOUNDS so the loop can retune
+it live if monitoring shows the split is wrong.
+
+**Deploy:** code change → `pending_restart_at` stamped 2026-07-18T04:39 local
+(~60 min pre-sunrise 05:39); `apply_pending_deploy` restarts wildlife-camera at
+that window, reloading the committed code. No env delta (70.0 is the code
+default), so `loop.deploy` was not run.
+
+**This window's adjudication (ids 2210–2288, watermark 2209→2288, 79 triggers,
+span 2026-07-17 12:xx–dusk):** status 51 human / 19 identified / 5 unclassifiable
+/ 4 no_animal. **Blur-mute path fired 0×** (zero below-floor review-class rows) →
+0 concealed animals; the ship carries no new FN evidence tonight but closes the
+demonstrated 07-14 class. **Leak-watch (exp #5 / backlog #9): 0 main-channel
+human leaks** — all 19 `identified` rows are bird/animal, `homo` in 0 raw
+top-1s, pconf ≤ 0.026; the large human cluster (51 HUMAN rows) all correctly
+suppressed. **Human labels: 28** — 14 `animal` + 3 `animal_wrong_id` (ALL on
+`identified` TP rows → zero classifier-recall FN into review-class this window),
+10 `false_positive`, 1 `person` (2244, no_animal, above floor → 🔍 REVIEW residual,
+not main). `fp_human 10/28 = 0.357` (vs 0.85 MD-auto yesterday — real human FP is
+far lower). **Post-ship monitoring duty (next ticks):** watch dark
+(`luma < 70`) below-floor no-animal bursts now routing to 🔍 REVIEW — confirm the
+volume bump stays small and that any real animal previously concealed now surfaces;
+retune `blur_mute_min_luma` within BOUNDS if the split misbehaves.
+
+**Blank→main FP pattern recurred (still parked):** 2211/2214 (`ens=;animal`,
+`raw=;blank`, conf ~0.50) reached MAIN as `identified` and Daniel labeled both
+`false_positive` — the long-standing empty-pond-as-"animal" nuisance documented
+2026-07-16. Nuance this window: 2212/2213 have the *same* `raw=;blank` but were
+labeled `animal_wrong_id` (a real animal), so `blank` raw ≠ reliably-empty — a
+future blank→REVIEW routing experiment must not blindly mute all blank-raw rows.
+Remains a backlog candidate, not opened (one-experiment-at-a-time; #8 active).

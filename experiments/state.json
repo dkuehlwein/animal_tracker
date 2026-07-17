@@ -55,7 +55,7 @@
       "id": 8,
       "slug": "sharpness-floor-is-a-brightness-gate",
       "status": "running",
-      "validation": "parked"
+      "validation": "live"
     },
     {
       "hypothesis": "PROPOSED 2026-07-13 (exp #5 leak-watch first hit). The human/privacy gate leaked a person's photo to the MAIN channel: id 1988 (07-13 19:50) status=identified, ensemble species_name generic ';;;;;;animal' (conf 0.72 -> notifies, Best-guess line would read 'human 59%'), because (1) MegaDetector person box 0.10 < human_detection_confidence 0.30, and (2) the ensemble rolled the classifier's homo-sapiens top-1 up to a generic 'animal' label with no 'homo' taxon segment, so both existing gate paths missed it. Fix: also fire DetectionStatus.HUMAN when the RAW classifier top-1 (top_species_raw / metadata['top_classifier_prediction']) contains a 'homo' taxon AND the ensemble did not confidently ID a specific animal (generic/blank/no-cv/review-class), so a confident species ID is never overridden. Specificity across the WHOLE DB: top_species_raw~homo occurs on exactly 2 rows (1852, 1988), both actual humans, 0 real animals -> catches both with 0 observed false-suppression; FN risk negligible on evidence. Code change (no env knob reaches it); subagent-driven TDD, commit separately w/ exp id, restart-gated. HELD for Daniel's explicit OK because it modifies the privacy-suppression gate (his strongest product lever) and FN is formally unmeasured. See runs/0007 'CROSS-CUTTING FINDING' 2026-07-13.",
@@ -110,9 +110,9 @@
     "n_md": 0,
     "total_triggers": 79
   },
-  "last_tick_completed_day": "2026-07-16",
-  "nightly_verdict": "Busy evening with people working at the pond \u2014 all ~30 person captures were correctly kept out of your alerts, and the daytime birds were correctly flagged. One blurry person reached a REVIEW message and one blurry person-only frame was skipped (both harmless \u2014 no real animals missed). New find: occasionally an empty-pond shot posts a \u201cNo animal\u201d message to your main alerts (a long-standing minor quirk, ~once a day) \u2014 I logged it as a fix to queue. No changes tonight; the dusk-miss and tighter-person fixes still just need your OK.",
+  "last_tick_completed_day": "2026-07-17",
+  "nightly_verdict": "Shipped the long-queued dusk-miss fix tonight: the camera will no longer silently skip a possible animal just because a shot is dark \u2014 dark low-detail shots now come through as a REVIEW note instead of being dropped (takes effect at the pre-sunrise restart). Quiet, healthy night otherwise \u2014 no people photos leaked to your alerts, birds correctly flagged, and about a third of triggers were empty-scene false alarms as usual.",
   "paused": false,
-  "pending_restart_at": null,
+  "pending_restart_at": "2026-07-18T04:39:00+02:00",
   "watermark": 2288
 }
