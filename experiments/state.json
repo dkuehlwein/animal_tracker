@@ -71,48 +71,48 @@
   "best_known_good": {},
   "deployed": {},
   "history": [],
-  "last_heartbeat_loopday": "2026-07-16",
+  "last_heartbeat_loopday": "2026-07-17",
   "last_metrics": {
-    "date": "2026-07-16",
+    "date": "2026-07-17",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.7294575072380466,
-      0.9214758214915374
+      0.2070582950773768,
+      0.5416969348557219
     ],
     "fp_claude_ci": [
-      0.4385029682449546,
+      0.0,
       1.0
     ],
-    "fp_claude_count": 3,
-    "fp_claude_rate": 1.0,
-    "fp_count": 45,
+    "fp_claude_count": 0,
+    "fp_claude_rate": 0.0,
+    "fp_count": 10,
     "fp_human_ci": [
-      0.0,
-      0.7934506856227626
+      0.2070582950773768,
+      0.5416969348557219
     ],
-    "fp_human_count": 0,
-    "fp_human_rate": 0.0,
+    "fp_human_count": 10,
+    "fp_human_rate": 0.35714285714285715,
     "fp_md_ci": [
-      0.7333229377608557,
-      0.9290357627959323
+      0.0,
+      1.0
     ],
-    "fp_md_count": 42,
-    "fp_md_rate": 0.8571428571428571,
-    "fp_rate": 0.8490566037735849,
+    "fp_md_count": 0,
+    "fp_md_rate": 0.0,
+    "fp_rate": 0.35714285714285715,
     "fp_trustworthy": true,
-    "labeled_triggers": 53,
+    "labeled_triggers": 28,
     "n_cant_tell": 0,
-    "n_claude": 3,
-    "n_human": 1,
-    "n_md": 49,
-    "total_triggers": 86
+    "n_claude": 0,
+    "n_human": 28,
+    "n_md": 0,
+    "total_triggers": 79
   },
   "last_tick_completed_day": "2026-07-16",
   "nightly_verdict": "Busy evening with people working at the pond \u2014 all ~30 person captures were correctly kept out of your alerts, and the daytime birds were correctly flagged. One blurry person reached a REVIEW message and one blurry person-only frame was skipped (both harmless \u2014 no real animals missed). New find: occasionally an empty-pond shot posts a \u201cNo animal\u201d message to your main alerts (a long-standing minor quirk, ~once a day) \u2014 I logged it as a fix to queue. No changes tonight; the dusk-miss and tighter-person fixes still just need your OK.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 2209
+  "watermark": 2288
 }
