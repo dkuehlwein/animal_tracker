@@ -330,5 +330,64 @@ def test_logs_dir_property_follows_log_dir_override(monkeypatch):
     assert StorageConfig().logs_dir == Path("custom/log/path")
 
 
+class TestSceneGateConfig:
+    """Scene-unchanged gate config knobs (Task 3, feat/scene-gate)."""
+
+    def test_defaults(self):
+        from config import PerformanceConfig
+        config = PerformanceConfig()
+        # Task 5 (offline validation, 2026-07-17): disabled by default — the
+        # labeled corpus had zero on-disk animal-labeled review-class frames
+        # to validate a threshold against. See scripts/validate_scene_gate.py
+        # and .superpowers/sdd/task-5-report.md.
+        assert config.scene_gate_enabled is False
+        assert config.scene_gate_similarity_threshold == 0.97
+        assert config.scene_gate_ref_count == 3
+        assert config.scene_gate_ref_max_age_hours == 6.0
+
+    def test_scene_gate_enabled_env_override(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_SCENE_GATE_ENABLED", "false")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).scene_gate_enabled is False
+
+    def test_scene_gate_similarity_threshold_env_override(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD", "0.9")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).scene_gate_similarity_threshold == 0.9
+
+    def test_scene_gate_ref_count_env_override(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_SCENE_GATE_REF_COUNT", "5")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).scene_gate_ref_count == 5
+
+    def test_scene_gate_ref_max_age_hours_env_override(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_SCENE_GATE_REF_MAX_AGE_HOURS", "12.5")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).scene_gate_ref_max_age_hours == 12.5
+
+    def test_similarity_threshold_rejects_below_bound(self, monkeypatch):
+        # BOUNDS["PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD"] = (0.80, 1.0)
+        monkeypatch.setenv("PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD", "0.5")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+    def test_similarity_threshold_rejects_above_bound(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD", "1.5")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+    def test_similarity_threshold_accepts_lower_bound(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD", "0.80")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).scene_gate_similarity_threshold == 0.80
+
+    def test_similarity_threshold_accepts_upper_bound(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD", "1.0")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).scene_gate_similarity_threshold == 1.0
+
+
 if __name__ == '__main__':
     pytest.main([__file__])

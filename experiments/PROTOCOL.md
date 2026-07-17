@@ -136,6 +136,52 @@ protocol never required.)
 - Feedback-starved freeze: no human labels for 3 days → freeze, hold best_known_good.
 - One active experiment at a time. Respect `state.json.paused`.
 
+## Scene-gate ownership (2026-07-17)
+
+The scene-unchanged gate (`src/scene_gate.py`, review-class bursts muted when
+near-identical to a recent empty-scene reference) shipped **disabled**
+(`scene_gate_enabled=False`, threshold placeholder `0.97`) because Task 5's
+offline validation (`scripts/validate_scene_gate.py`) found zero human
+`animal`/`animal_wrong_id`-labeled review-class rows with a frame still on
+disk — the 17 such rows corpus-wide all predate the ~100-burst retention
+window, and the 53 on-disk review-class frames that do survive are
+daytime-only. Per the FN-veto acceptance rule, no threshold may be chosen
+with zero counter-evidence. This is a normal HOLD state, not a pending
+human approval — per the Autonomy section above, enabling it is the loop's
+call to make once the evidence exists, same as any other lever.
+
+**Enablement procedure** — on any tick where new human `animal`/
+`animal_wrong_id` labels exist on review-class rows whose frames are still
+on disk: re-run `PYTHONPATH=src uv run python scripts/validate_scene_gate.py`
+from repo root. If the animal-labeled bucket is non-empty and yields a safe
+threshold, deploy via `loop.deploy` with delta
+`{"PERFORMANCE_SCENE_GATE_ENABLED": 1, "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD": <T>}`
+(`PERFORMANCE_SCENE_GATE_ENABLED` is in `BOUNDS` in `src/loop/guardrails.py`
+purely so `loop.deploy` accepts it — it is a flag, not a range, and carries
+no config field-validator).
+
+**Threshold-selection rule (locked in — use this, don't re-derive it):**
+`T = max(similarity over human animal-labeled rows) + 0.02` safety margin,
+clamped to `BOUNDS["PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD"]` = `(0.80,
+1.0)`. Raising the threshold is always the safe direction (mutes fewer
+bursts), so when in doubt round up, not down. Before enabling, also re-check
+the low-texture diagnostic the validation script prints: the corpus scored in
+Task 5 was daytime-only, and flat/low-texture dusk frames can inflate
+similarity scores in a way daytime frames don't exercise — if the corpus
+re-run still lacks dusk/dark review-class frames, treat that as a coverage
+gap and weight the threshold conservatively (or hold) rather than trusting
+the number blindly.
+
+**Post-enable monitoring (nightly duty, same shape as the blur-mute path):**
+once `scene_gate_enabled=True`, adjudicate every `scene_gate_muted=1` burst
+from the tick's ingest window for a concealed animal, exactly like the
+blur-mute (`below_sharpness_floor`) path already gets adjudicated. A
+concealed animal in a `scene_gate_muted=1` burst is an FN-veto event —
+respond the same tick by raising `scene_gate_similarity_threshold` strictly
+above that frame's recorded `scene_similarity` (within bounds), or by
+disabling the gate (`PERFORMANCE_SCENE_GATE_ENABLED: 0`) if no in-bounds
+threshold would have prevented the mute. Do not defer this to "next tick."
+
 ## Anti-self-poisoning & self-skepticism
 - Ground truth is append-only; never rewrite `detection_feedback`, `gold/`, or prior
   `runs/` observations.

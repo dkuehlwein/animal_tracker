@@ -173,6 +173,34 @@ class PerformanceConfig(BaseSettings):
     timelapse_interval: float = 20.0  # seconds between saved frames
     timelapse_max_files: int = 10000  # ~2 days @ 20s; oldest pruned beyond this
 
+    # Scene-unchanged gate: mute captures whose burst frame is near-identical
+    # to a recent reference frame (empty-scene FP reduction; see scene_gate.py).
+    # Task 5 (offline validation, 2026-07-17): disabled by default. The
+    # labeled corpus has ZERO human 'animal'/'animal_wrong_id' review-class
+    # rows whose frame still exists on disk (all 17 predate the ~100-burst
+    # retention window vs. 53 on-disk review-class frames) — no threshold
+    # can be picked with any evidence it won't mute a real animal. Ship
+    # disabled until more labeled animal frames survive retention long
+    # enough to be replayed; see scripts/validate_scene_gate.py and
+    # .superpowers/sdd/task-5-report.md. Flip to True (with a threshold set
+    # from a re-run of the validation script) once that data exists.
+    scene_gate_enabled: bool = False
+    # Conservative placeholder — kept at 0.97 pending a validated default
+    # (see scene_gate_enabled note above).
+    scene_gate_similarity_threshold: float = 0.97
+    scene_gate_ref_count: int = 3
+    scene_gate_ref_max_age_hours: float = 6.0
+
+    @field_validator('scene_gate_similarity_threshold')
+    @classmethod
+    def validate_scene_gate_similarity_threshold_bounds(cls, v):
+        low, high = _BOUNDS["PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD"]
+        if not (low <= v <= high):
+            raise ValueError(
+                f"PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD={v} out of allowed bounds [{low}, {high}]"
+            )
+        return v
+
 
 class StorageConfig(BaseSettings):
     """Storage and file management configuration."""

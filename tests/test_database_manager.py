@@ -179,6 +179,37 @@ def test_log_detection_top_species_guess_defaults_null(tmp_path):
     assert row["top_species_score"] is None
 
 
+def test_log_detection_persists_scene_gate_fields(tmp_path):
+    """Task 2 (scene-unchanged gate): scene_similarity/scene_gate_muted
+    round-trip through log_detection so the gate's decision is auditable."""
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(
+        image_path="capture_4.jpg",
+        motion_area=1200,
+        scene_similarity=0.97,
+        scene_gate_muted=True,
+    )
+    assert det_id is not None
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?", (det_id,)).fetchone()
+
+    assert row["scene_similarity"] == pytest.approx(0.97)
+    assert row["scene_gate_muted"] == 1
+
+
+def test_log_detection_scene_gate_fields_default_null(tmp_path):
+    """Old call signature (no scene-gate kwargs) still works; new cols are NULL."""
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(image_path="c4.jpg", motion_area=10)
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?", (det_id,)).fetchone()
+    assert row["scene_similarity"] is None
+    assert row["scene_gate_muted"] is None
+
+
 def test_log_detection_backward_compatible(tmp_path):
     """Old call signature (no richer kwargs) still works; new cols are NULL."""
     db, db_path = _make_db(tmp_path)
@@ -332,3 +363,76 @@ def test_get_human_detections_older_than_excludes_non_human_row(tmp_path):
     rows = db.get_human_detections_older_than(cutoff)
 
     assert rows == []
+
+
+# ---------------------------------------------------------------------------
+# get_recent_review_detections (Task 2: scene-unchanged gate seed query)
+# ---------------------------------------------------------------------------
+
+def test_get_recent_review_detections_includes_no_animal_and_unclassifiable(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    id_no_animal = db.log_detection(
+        image_path="capture_na.jpg", motion_area=10, detection_status="no_animal"
+    )
+    id_unclassifiable = db.log_detection(
+        image_path="capture_unc.jpg", motion_area=10, detection_status="unclassifiable"
+    )
+    _age_row(db_path, id_no_animal, hours_ago=1)
+    _age_row(db_path, id_unclassifiable, hours_ago=2)
+
+    rows = db.get_recent_review_detections(limit=10, max_age_hours=24)
+
+    paths = [r[0] for r in rows]
+    assert "capture_na.jpg" in paths
+    assert "capture_unc.jpg" in paths
+    for _, ts in rows:
+        assert isinstance(ts, datetime)
+
+
+def test_get_recent_review_detections_excludes_human_and_identified(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    id_human = db.log_detection(
+        image_path="capture_human.jpg", motion_area=10, detection_status="human"
+    )
+    id_identified = db.log_detection(
+        image_path="capture_identified.jpg", motion_area=10, detection_status="identified"
+    )
+    _age_row(db_path, id_human, hours_ago=1)
+    _age_row(db_path, id_identified, hours_ago=1)
+
+    rows = db.get_recent_review_detections(limit=10, max_age_hours=24)
+
+    assert rows == []
+
+
+def test_get_recent_review_detections_excludes_outside_age_window(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    id_old = db.log_detection(
+        image_path="capture_old.jpg", motion_area=10, detection_status="no_animal"
+    )
+    _age_row(db_path, id_old, hours_ago=48)
+
+    rows = db.get_recent_review_detections(limit=10, max_age_hours=24)
+
+    assert rows == []
+
+
+def test_get_recent_review_detections_ordered_desc_and_limited(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    id_oldest = db.log_detection(
+        image_path="capture_oldest.jpg", motion_area=10, detection_status="no_animal"
+    )
+    id_middle = db.log_detection(
+        image_path="capture_middle.jpg", motion_area=10, detection_status="no_animal"
+    )
+    id_newest = db.log_detection(
+        image_path="capture_newest.jpg", motion_area=10, detection_status="no_animal"
+    )
+    _age_row(db_path, id_oldest, hours_ago=3)
+    _age_row(db_path, id_middle, hours_ago=2)
+    _age_row(db_path, id_newest, hours_ago=1)
+
+    rows = db.get_recent_review_detections(limit=2, max_age_hours=24)
+
+    assert len(rows) == 2
+    assert [r[0] for r in rows] == ["capture_newest.jpg", "capture_middle.jpg"]

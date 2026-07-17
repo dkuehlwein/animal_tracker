@@ -26,6 +26,7 @@ from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnaly
 from feedback_protocol import build_feedback_keyboard
 from timelapse_writer import TimelapseWriter
 from data_models import DetectionStatus, is_review_detection, is_human_detection
+from scene_gate import SceneReferenceSet
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,29 @@ class WildlifeSystem:
         # Setup
         self.file_manager.ensure_directories()
         self.telegram_service.set_database_reference(self.database)
+
+        # Scene-unchanged gate (Task 4): rolling reference set of recent
+        # known-empty scenes, seeded from the DB at startup. Fail-open by
+        # construction — disabled config or a seeding error just leaves
+        # `scene_reference_set` at None/empty, which process_detection
+        # treats identically to "gate never mutes anything".
+        self.scene_reference_set: Optional[SceneReferenceSet] = None
+        if self.config.performance.scene_gate_enabled:
+            self.scene_reference_set = SceneReferenceSet(
+                max_refs=self.config.performance.scene_gate_ref_count,
+                max_age_hours=self.config.performance.scene_gate_ref_max_age_hours,
+            )
+            try:
+                rows = self.database.get_recent_review_detections(
+                    self.config.performance.scene_gate_ref_count,
+                    self.config.performance.scene_gate_ref_max_age_hours,
+                )
+                self.scene_reference_set.seed(rows)
+            except Exception as e:
+                logger.warning(
+                    f"Scene-gate: failed to seed reference set at startup "
+                    f"(continuing with an empty reference set): {e}"
+                )
 
         # State variables
         self.last_frame_time = 0
@@ -221,6 +245,30 @@ class WildlifeSystem:
                 top_classifier_prediction.get('score') if top_classifier_prediction else None
             )
 
+            # Task 4 (scene-unchanged gate): only evaluated for review-class
+            # statuses (no_animal/unclassifiable) when the gate is enabled —
+            # everything else (IDENTIFIED/HUMAN/ERROR) leaves both fields
+            # None, which is the same "gate never mutes" behaviour as today.
+            # A mute requires an affirmatively computed similarity >=
+            # threshold; None never mutes (fail-open).
+            scene_similarity = None
+            scene_gate_muted = None
+            if (self.config.performance.scene_gate_enabled
+                    and self.scene_reference_set is not None
+                    and is_review_detection(species_result.status)):
+                scene_similarity = self.scene_reference_set.best_similarity(image_path, timestamp)
+                scene_gate_muted = (
+                    scene_similarity is not None
+                    and scene_similarity >= self.config.performance.scene_gate_similarity_threshold
+                )
+                # Reference-set update happens after the mute decision above,
+                # and includes muted bursts — a muted burst IS a recently
+                # confirmed empty scene, so it's exactly the kind of frame
+                # future comparisons should be checked against. HUMAN and
+                # IDENTIFIED/ERROR statuses never reach this branch, so they
+                # never become references.
+                self.scene_reference_set.add(image_path, timestamp)
+
             # Log to database (richer Phase-1 fields included)
             detection_id = self.database.log_detection(
                 image_path=image_path,
@@ -243,6 +291,8 @@ class WildlifeSystem:
                 person_confidence=person_confidence,
                 top_species_raw=top_species_raw,
                 top_species_score=top_species_score,
+                scene_similarity=scene_similarity,
+                scene_gate_muted=scene_gate_muted,
             )
 
             logger.info(f"Detection {detection_id} logged: {species_result.species_name} "
@@ -261,6 +311,8 @@ class WildlifeSystem:
                 'metadata': species_result.metadata,  # Include classification metadata
                 'detection_id': detection_id,  # For feedback-button callback_data
                 'detection_status': species_result.status,
+                'scene_similarity': scene_similarity,
+                'scene_gate_muted': scene_gate_muted,
             }
 
             return result_dict, timestamp
@@ -660,6 +712,19 @@ class WildlifeSystem:
             and sharpness_info.get('below_sharpness_floor')
             and is_review_detection(species_result.get('detection_status'))
         )
+        # Scene-unchanged gate (Task 4): process_detection only ever sets
+        # scene_gate_muted for review-class statuses, but the
+        # is_review_detection check here is kept as defense-in-depth (same
+        # pattern as is_blurry_review above) rather than trusting that
+        # invariant blindly. Precedence: human gate first, blur gate second,
+        # scene gate third — a below-floor OR HUMAN burst gets exactly one
+        # suppression log regardless of what the scene gate would have said.
+        is_scene_unchanged_review = (
+            not is_human
+            and not is_blurry_review
+            and bool(species_result.get('scene_gate_muted'))
+            and is_review_detection(species_result.get('detection_status'))
+        )
         if is_human:
             logger.info(
                 f"[HUMAN-GATE] Suppressing notification for detection "
@@ -670,6 +735,14 @@ class WildlifeSystem:
                 f"[BLUR] Suppressing notification for detection "
                 f"{species_result.get('detection_id')} "
                 f"(sharpness={sharpness_info.get('sharpness_score'):.1f}, no animal found)"
+            )
+        elif is_scene_unchanged_review:
+            logger.info(
+                f"[SCENE-GATE] Suppressing notification for detection "
+                f"{species_result.get('detection_id')} "
+                f"(similarity={species_result.get('scene_similarity'):.3f} >= "
+                f"threshold={self.config.performance.scene_gate_similarity_threshold:.3f}, "
+                f"no animal found)"
             )
         else:
             # Annotated image: combined motion overlay + MegaDetector

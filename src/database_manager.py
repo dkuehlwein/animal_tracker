@@ -1,6 +1,6 @@
 import sqlite3
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
 from config import Config
@@ -41,6 +41,13 @@ class DatabaseManager:
         # notification caption both see the more specific guess.
         "top_species_raw": "TEXT",
         "top_species_score": "REAL",
+        # Task 2 (scene-unchanged gate): the frame comparator's similarity
+        # score against the rolling empty-scene reference set, and whether
+        # that score crossed the mute threshold — persisted so the gate's
+        # decision is auditable and the nightly tuning loop can attribute
+        # muted volume to it.
+        "scene_similarity": "REAL",
+        "scene_gate_muted": "BOOLEAN",
     }
 
     def init_database(self):
@@ -143,7 +150,8 @@ class DatabaseManager:
                      gate_would_suppress=None, background_drift=None,
                      detection_status=None, sharpness_score=None,
                      below_sharpness_floor=None, person_confidence=None,
-                     top_species_raw=None, top_species_score=None) -> Optional[int]:
+                     top_species_raw=None, top_species_score=None,
+                     scene_similarity=None, scene_gate_muted=None) -> Optional[int]:
         """Log a detection event to the database.
 
         The trailing keyword arguments are the Phase-1 richer-logging fields
@@ -153,7 +161,10 @@ class DatabaseManager:
         observability fields (already computed upstream, now persisted).
         `top_species_raw`/`top_species_score` are Task 3's: the classifier's
         raw top-1 prediction label/score, distinct from the (possibly
-        rolled-up) ensemble `species_name`.
+        rolled-up) ensemble `species_name`. `scene_similarity`/
+        `scene_gate_muted` are Task 2's: the scene-unchanged gate's
+        comparator score against the empty-scene reference set and whether
+        it crossed the mute threshold.
         """
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -189,6 +200,8 @@ class DatabaseManager:
                     "person_confidence": person_confidence,
                     "top_species_raw": top_species_raw,
                     "top_species_score": top_species_score,
+                    "scene_similarity": scene_similarity,
+                    "scene_gate_muted": scene_gate_muted,
                 }
                 columns = ", ".join(values)
                 placeholders = ", ".join("?" * len(values))
@@ -381,6 +394,38 @@ class DatabaseManager:
             raise DatabaseOperationError(f"Failed to get human detections: {e}") from e
         except Exception as e:
             raise DatabaseError(f"Unexpected error getting human detections: {e}") from e
+
+    def get_recent_review_detections(self, limit: int, max_age_hours: float) -> List[tuple]:
+        """Return (image_path, timestamp) for recent review-class detections.
+
+        Used to seed the scene-unchanged gate's rolling empty-scene reference
+        set: review-class rows (`detection_status` in `no_animal` or
+        `unclassifiable` — i.e. no animal was found) within the last
+        `max_age_hours`, newest first, capped at `limit`. Modeled on
+        `get_human_detections_older_than`; `timestamp` is stored as a local
+        wall-clock string in "%Y-%m-%d %H:%M:%S" format, so a plain string
+        comparison against a cutoff formatted the same way is correct here.
+        """
+        cutoff_str = (datetime.now() - timedelta(hours=max_age_hours)).strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT image_path, timestamp
+                    FROM detections
+                    WHERE detection_status IN ('no_animal', 'unclassifiable')
+                      AND timestamp >= ?
+                    ORDER BY timestamp DESC
+                    LIMIT ?
+                ''', (cutoff_str, limit))
+                return [
+                    (row[0], datetime.strptime(row[1], "%Y-%m-%d %H:%M:%S"))
+                    for row in cursor.fetchall()
+                ]
+        except sqlite3.Error as e:
+            raise DatabaseOperationError(f"Failed to get recent review detections: {e}") from e
+        except Exception as e:
+            raise DatabaseError(f"Unexpected error getting recent review detections: {e}") from e
 
     def is_first_detection_today(self, species_name):
         """Check if this is the first detection of this species today"""
