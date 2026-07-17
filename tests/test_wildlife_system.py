@@ -11,7 +11,7 @@ import sqlite3
 import sys
 from datetime import datetime
 from types import SimpleNamespace
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock, AsyncMock, ANY
 
 import numpy as np
 import pytest
@@ -651,6 +651,221 @@ async def test_blurry_human_suppressed_via_human_gate_single_log(system, tmp_pat
     gate_logs = [r.message for r in caplog.records if "HUMAN-GATE" in r.message or "[BLUR]" in r.message]
     assert len(gate_logs) == 1
     assert "HUMAN-GATE" in gate_logs[0]
+
+
+@pytest.mark.asyncio
+async def test_scene_unchanged_review_suppresses_notification(system, tmp_path, caplog):
+    """Task 4 (a): a review-class burst whose similarity to a recent
+    reference is >= threshold is muted — no Telegram send, a [SCENE-GATE]
+    log line, and the DB row records scene_gate_muted + the similarity.
+    """
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    system.scene_reference_set.best_similarity = MagicMock(return_value=0.99)
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    telegram.send_detection_notification.assert_not_called()
+    telegram.send_document.assert_not_called()
+    system.cleanup_old_images.assert_called_once()
+    assert any("[SCENE-GATE]" in r.message for r in caplog.records)
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row is not None
+    assert row['scene_gate_muted'] == 1
+    assert row['scene_similarity'] == pytest.approx(0.99)
+
+
+@pytest.mark.asyncio
+async def test_scene_below_threshold_still_notifies(system, tmp_path):
+    """Task 4 (b): a review-class burst whose similarity is below threshold
+    is not muted by the scene gate — it still notifies (REVIEW-prefixed, as
+    today).
+    """
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    system.scene_reference_set.best_similarity = MagicMock(return_value=0.5)
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    system.cleanup_old_images.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_scene_gate_never_touches_identified_animal(system, tmp_path):
+    """Task 4 (c): an IDENTIFIED animal frame near-identical to a reference
+    still notifies — the scene gate only ever evaluates review-class
+    statuses, so best_similarity must not even be consulted.
+    """
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification(True, boxes=[{'confidence': 0.7}])
+    )
+    system.scene_reference_set.best_similarity = MagicMock(return_value=0.99)
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    system.scene_reference_set.best_similarity.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_scene_gate_would_match_human_suppressed_via_human_gate_single_log(system, tmp_path, caplog):
+    """Task 4 (d): a HUMAN burst that would match the scene is suppressed by
+    the human gate, not the scene gate — precedence, single log line, and
+    the scene gate never evaluates a HUMAN status.
+    """
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(return_value=_identification_human())
+    system.scene_reference_set.best_similarity = MagicMock(return_value=0.99)
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    system.cleanup_old_images.assert_called_once()
+    system.scene_reference_set.best_similarity.assert_not_called()
+
+    gate_logs = [
+        r.message for r in caplog.records
+        if "HUMAN-GATE" in r.message or "[BLUR]" in r.message or "[SCENE-GATE]" in r.message
+    ]
+    assert len(gate_logs) == 1
+    assert "HUMAN-GATE" in gate_logs[0]
+
+
+@pytest.mark.asyncio
+async def test_scene_gate_would_match_blurry_review_blur_wins_single_log(system, tmp_path, caplog):
+    """Task 4 (e): a blurry review-class burst that would also match the
+    scene is suppressed via the blur gate — precedence, single log line.
+    """
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    system.scene_reference_set.best_similarity = MagicMock(return_value=0.99)
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(
+            img, 5000, sharpness_info=_below_floor_sharpness_info()
+        )
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    system.cleanup_old_images.assert_called_once()
+
+    gate_logs = [
+        r.message for r in caplog.records
+        if "HUMAN-GATE" in r.message or "[BLUR]" in r.message or "[SCENE-GATE]" in r.message
+    ]
+    assert len(gate_logs) == 1
+    assert "[BLUR]" in gate_logs[0]
+
+
+@pytest.mark.asyncio
+async def test_scene_gate_no_references_fails_open(system, tmp_path):
+    """Task 4 (f): no references seeded (fresh reference set, nothing added
+    yet) — best_similarity naturally returns None, so the gate never mutes
+    and the review-class burst notifies as it does today.
+    """
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    system.cleanup_old_images.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_scene_gate_disabled_via_config_fails_open(system, tmp_path):
+    """Task 4 (g): scene_gate_enabled=False — behavior identical to today
+    even if the (unused) comparator would have matched.
+    """
+    system.config.performance.scene_gate_enabled = False
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    system.scene_reference_set.best_similarity = MagicMock(return_value=0.99)
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    system.scene_reference_set.best_similarity.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_scene_gate_reference_set_update_review_yes_human_no(system, tmp_path):
+    """Task 4 (h): a review-class detection joins the reference set for the
+    next call; a HUMAN detection never does.
+    """
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.scene_reference_set.add = MagicMock()
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    await system._process_and_notify_detection(img, 5000)
+    system.scene_reference_set.add.assert_called_once_with(img, ANY)
+
+    system.scene_reference_set.add.reset_mock()
+    system.species_identifier.identify_species = MagicMock(return_value=_identification_human())
+    await system._process_and_notify_detection(img, 5000)
+    system.scene_reference_set.add.assert_not_called()
 
 
 def test_capture_and_select_best_frame_below_floor_returns_path_not_none(system, tmp_path, monkeypatch):
