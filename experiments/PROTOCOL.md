@@ -115,6 +115,18 @@ watermark (which `loop.metrics` now persists automatically).
   `pending_restart_at` (pre-sunrise window) just like an env deploy.
 - All decision gates below apply equally to code and env changes.
 
+## Autonomy: the gates below are the ONLY approval mechanism
+
+There is NO human pre-approval ("greenlight") step in this protocol, and there
+never was. If a change passes the guardrail gates, ship it yourself — this
+explicitly includes changes that alter REVIEW volume, notification routing, or
+the human-privacy gate. Daniel's controls are post-hoc, not pre-approval:
+`/pause`, `/rollback`, `state.json.paused`, `git revert`. Holding an experiment
+while "recommending greenlight in the verdict" is a protocol violation — decide
+and act within the gates. (2026-07-17: Daniel explicitly reaffirmed this after
+exp #8 was held 6 nights and backlog #9 held 4 nights waiting for approval the
+protocol never required.)
+
 ## Guardrail contract (hard rules)
 - BOUNDS in `src/loop/guardrails.py` are enforced by the system (config validators
   + deploy). Never propose out-of-range values.

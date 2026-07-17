@@ -57,6 +57,11 @@ tokens on work already on disk.
   already stamps the restart for you.
 - **Same gates still apply** to code changes: FN-veto, `paused`, feedback-starved
   freeze, one experiment at a time, and the volume collapse/explosion guardrail.
+- **Never hold a change waiting for human approval.** The gates above are the
+  ONLY approval mechanism (see PROTOCOL.md "Autonomy"). This includes
+  privacy-gate, notification-routing, and REVIEW-volume changes. Daniel's levers
+  are post-hoc: `/pause`, `/rollback`, `git revert`. If a change passes the
+  gates, deploy it this tick — do not defer to a "greenlight".
 
 ## Analyze existing data before proposing new instrumentation
 
