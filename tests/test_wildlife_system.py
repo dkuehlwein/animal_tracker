@@ -26,6 +26,12 @@ def system(monkeypatch, tmp_path):
     monkeypatch.setenv('TELEGRAM_CHAT_ID', 'test_chat')
     monkeypatch.setenv('MOTION_WARMUP_SECONDS', '0')
     monkeypatch.setenv('PERFORMANCE_ENABLE_TIMELAPSE', 'false')
+    # Task 4 scene-gate tests below assume system.scene_reference_set is a
+    # real (non-None) SceneReferenceSet. Force this independently of
+    # PerformanceConfig's production default (Task 5, 2026-07-17, flipped
+    # scene_gate_enabled's default to False) so this fixture's behavior
+    # doesn't drift if that default changes again.
+    monkeypatch.setenv('PERFORMANCE_SCENE_GATE_ENABLED', 'true')
     for mod in ('wildlife_system', 'config'):
         sys.modules.pop(mod, None)
 

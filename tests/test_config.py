@@ -336,7 +336,11 @@ class TestSceneGateConfig:
     def test_defaults(self):
         from config import PerformanceConfig
         config = PerformanceConfig()
-        assert config.scene_gate_enabled is True
+        # Task 5 (offline validation, 2026-07-17): disabled by default — the
+        # labeled corpus had zero on-disk animal-labeled review-class frames
+        # to validate a threshold against. See scripts/validate_scene_gate.py
+        # and .superpowers/sdd/task-5-report.md.
+        assert config.scene_gate_enabled is False
         assert config.scene_gate_similarity_threshold == 0.97
         assert config.scene_gate_ref_count == 3
         assert config.scene_gate_ref_max_age_hours == 6.0
