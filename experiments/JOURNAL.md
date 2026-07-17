@@ -1224,3 +1224,37 @@ changes included; Daniel's levers are post-hoc (`/pause`, `/rollback`, `git
 revert`). All queued items — exp #8 luma-gate, backlog #9 raw-homo human-gate
 fix, blank→main routing — are cleared to proceed under normal sequencing
 (one experiment at a time still applies; the loop picks the order).
+
+## 2026-07-17 — scene-unchanged gate shipped (interactive session, Daniel + Claude)
+
+Built and merged to `feat/scene-gate` (commits `53e9bd6` frame comparator +
+rolling empty-scene reference set, `20720c7` `scene_similarity`/
+`scene_gate_muted` DB columns + review-detection seed query, `29ca2f3` config
+knobs + guardrail bounds, `8a59f95` mute wiring in `wildlife_system.py`
+(review-class only, precedence Human > Blur > Scene, single suppression log),
+`47708b8` offline validation script `scripts/validate_scene_gate.py` +
+threshold-selection logic). A second independent mute path alongside the
+Blur Gate: review-class bursts whose best frame scores similarity >= a
+threshold against a rolling 3-frame/6h reference set of recent empty-scene
+review-class frames are DB-logged but not sent to Telegram.
+
+**Ships disabled** (`scene_gate_enabled=False`, threshold left at placeholder
+0.97). Task 5's offline replay found the human animal-labeled bucket EMPTY
+among on-disk frames: 17 human `animal`/`animal_wrong_id` labels exist on
+review-class rows corpus-wide, but all predate the ~100-burst image
+retention window; the 53 review-class frames that do survive on disk are
+daytime-only (2026-07-15 15:58–2026-07-16 18:52). Per the spec's FN-veto
+acceptance rule (never pick a threshold with zero counter-evidence that it
+won't mute a real animal), no threshold could be validated tonight — gate
+ships off rather than guessing.
+
+Enablement and post-enable monitoring are handed to the nightly loop, not
+held for a human greenlight — consistent with the Autonomy intervention
+earlier today. New PROTOCOL.md section "Scene-gate ownership (2026-07-17)"
+covers: re-running `validate_scene_gate.py` as new on-disk animal labels
+accrue, the locked threshold rule (`T = max(animal-labeled similarity) +
+0.02`, clamped to `[0.80, 1.0]`, round up when uncertain), the daytime-only
+low-texture coverage gap to re-check before trusting a future threshold, and
+nightly adjudication of every `scene_gate_muted=1` burst once enabled
+(concealed animal = FN-veto → raise threshold above that frame's similarity
+or disable, same tick — mirrors the existing blur-mute adjudication duty).

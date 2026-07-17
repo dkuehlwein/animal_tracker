@@ -23,6 +23,11 @@ BOUNDS: dict[str, tuple[float, float]] = {
     "MOTION_MIN_COLOR_VARIANCE": (0.0, 2000.0),
     "SPECIES_UNKNOWN_SPECIES_THRESHOLD": (0.3, 0.95),
     "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD": (0.80, 1.0),
+    # Boolean flag, not a range — present only so loop.deploy is allowed to
+    # flip it (deploy rejects keys not in BOUNDS). No config field_validator
+    # consumes this entry; booleans don't range-check. See Task 6 /
+    # experiments/PROTOCOL.md "Scene-gate ownership".
+    "PERFORMANCE_SCENE_GATE_ENABLED": (0, 1),
 }
 
 FEEDBACK_STARVED_DAYS = 3
