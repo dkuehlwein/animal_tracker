@@ -28,6 +28,7 @@ BOUNDS: dict[str, tuple[float, float]] = {
     # consumes this entry; booleans don't range-check. See Task 6 /
     # experiments/PROTOCOL.md "Scene-gate ownership".
     "PERFORMANCE_SCENE_GATE_ENABLED": (0, 1),
+    "PERFORMANCE_BLUR_MUTE_MIN_LUMA": (0.0, 255.0),
 }
 
 FEEDBACK_STARVED_DAYS = 3

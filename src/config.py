@@ -191,6 +191,12 @@ class PerformanceConfig(BaseSettings):
     scene_gate_ref_count: int = 3
     scene_gate_ref_max_age_hours: float = 6.0
 
+    # Blur-mute (below-floor + no-animal) only fires when best-frame mean
+    # luma >= this; below it, darkness (not blur) explains the low score,
+    # so the burst flows to REVIEW instead of being muted (exp #8,
+    # FN-safe — see 2026-07-14 muted dusk blackbird, frame luma 67.8).
+    blur_mute_min_luma: float = 70.0
+
     @field_validator('scene_gate_similarity_threshold')
     @classmethod
     def validate_scene_gate_similarity_threshold_bounds(cls, v):
@@ -198,6 +204,16 @@ class PerformanceConfig(BaseSettings):
         if not (low <= v <= high):
             raise ValueError(
                 f"PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD={v} out of allowed bounds [{low}, {high}]"
+            )
+        return v
+
+    @field_validator('blur_mute_min_luma')
+    @classmethod
+    def validate_blur_mute_min_luma_bounds(cls, v):
+        low, high = _BOUNDS["PERFORMANCE_BLUR_MUTE_MIN_LUMA"]
+        if not (low <= v <= high):
+            raise ValueError(
+                f"PERFORMANCE_BLUR_MUTE_MIN_LUMA={v} out of allowed bounds [{low}, {high}]"
             )
         return v
 

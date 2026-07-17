@@ -389,5 +389,33 @@ class TestSceneGateConfig:
         assert PerformanceConfig(_env_file=None).scene_gate_similarity_threshold == 1.0
 
 
+class TestBlurMuteMinLumaConfig:
+    """Blur-mute luma gate (exp #8, sharpness-floor-is-a-brightness-gate):
+    the blur-mute path should only fire in adequate light, since raw
+    Laplacian variance is confounded by scene brightness at dusk."""
+
+    def test_default(self):
+        from config import PerformanceConfig
+        assert PerformanceConfig().blur_mute_min_luma == 70.0
+
+    def test_env_override(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_BLUR_MUTE_MIN_LUMA", "55")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).blur_mute_min_luma == 55.0
+
+    def test_rejects_out_of_bounds(self, monkeypatch):
+        # BOUNDS["PERFORMANCE_BLUR_MUTE_MIN_LUMA"] = (0.0, 255.0)
+        monkeypatch.setenv("PERFORMANCE_BLUR_MUTE_MIN_LUMA", "300")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+    def test_rejects_below_bound(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_BLUR_MUTE_MIN_LUMA", "-5")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+
 if __name__ == '__main__':
     pytest.main([__file__])

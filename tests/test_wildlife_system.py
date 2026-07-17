@@ -523,8 +523,11 @@ async def test_human_detection_notifies_when_flag_disabled(system, tmp_path):
     system.cleanup_old_images.assert_called_once()
 
 
-def _below_floor_sharpness_info(score=8.6):
-    return {
+_OMIT = object()
+
+
+def _below_floor_sharpness_info(score=8.6, luma=80.0):
+    info = {
         'sharpness_score': score,
         'selected_frame_index': 0,
         'frame_count': 5,
@@ -533,6 +536,9 @@ def _below_floor_sharpness_info(score=8.6):
         'below_sharpness_floor': True,
         'all_frame_paths': [],
     }
+    if luma is not _OMIT:
+        info['luma'] = luma
+    return info
 
 
 def _above_floor_sharpness_info(score=25.0):
@@ -625,6 +631,57 @@ async def test_sharp_no_animal_still_notifies_unchanged(system, tmp_path):
 
     await system._process_and_notify_detection(
         img, 5000, sharpness_info=_above_floor_sharpness_info()
+    )
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    system.cleanup_old_images.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_dark_blurry_no_animal_notifies_not_muted(system, tmp_path):
+    """exp #8 (sharpness-floor-is-a-brightness-gate): a below-floor,
+    no-animal burst captured at dusk (luma below blur_mute_min_luma) must
+    NOT be muted — darkness, not blur, explains the low sharpness score,
+    so it flows through as a normal REVIEW notification instead of being
+    silently dropped (this is the FN the fix targets: a real dusk animal
+    the classifier missed would otherwise vanish with no trace).
+    """
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(
+        img, 5000, sharpness_info=_below_floor_sharpness_info(luma=50.0)
+    )
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    system.cleanup_old_images.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_blurry_no_animal_missing_luma_notifies(system, tmp_path):
+    """FN-safe fallback: if luma couldn't be computed (missing/None), the
+    blur-mute must NOT fire — unknown light level defaults to notifying,
+    never to silent suppression.
+    """
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(
+        img, 5000, sharpness_info=_below_floor_sharpness_info(luma=_OMIT)
     )
 
     assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
@@ -932,6 +989,37 @@ def test_capture_and_select_best_frame_above_floor_flag_false(system, tmp_path, 
     assert path == saved_paths[0]
     assert info['below_sharpness_floor'] is False
     assert info['meets_threshold'] is True
+
+
+def test_capture_and_select_best_frame_populates_luma(system, tmp_path, monkeypatch):
+    """exp #8: sharpness_info must carry a numeric 'luma' (mean best-frame
+    brightness) so the blur-mute gate can tell darkness apart from real
+    blur.
+    """
+    import wildlife_system
+
+    fake_frame = np.full((10, 10, 3), 100, dtype=np.uint8)
+    system.camera.capture_burst_frames = MagicMock(return_value=[fake_frame] * 3)
+    image_dir = system.config.storage.image_dir
+    image_dir.mkdir(parents=True, exist_ok=True)
+    saved_paths = [image_dir / f"capture_z_frame{i}.jpg" for i in range(1, 4)]
+    for p in saved_paths:
+        p.write_bytes(b"fake")
+    system.camera.save_burst_frames = MagicMock(return_value=saved_paths)
+
+    score = system.config.performance.min_sharpness_threshold + 10.0
+    monkeypatch.setattr(
+        wildlife_system.SharpnessAnalyzer,
+        "select_sharpest_frame",
+        staticmethod(lambda *a, **k: (fake_frame, 0, score, [score] * 3)),
+    )
+
+    path, info = system._capture_and_select_best_frame()
+
+    assert path == saved_paths[0]
+    assert 'luma' in info
+    assert isinstance(info['luma'], float)
+    assert info['luma'] > 0
 
 
 @pytest.mark.asyncio

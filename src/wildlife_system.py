@@ -10,6 +10,8 @@ import logging
 import logging.handlers
 import os
 import time
+
+import cv2
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -411,6 +413,26 @@ class WildlifeSystem:
                        f"selected frame {selected_index + 1}/{len(frames)} "
                        f"(sharpness: {best_score:.1f})")
 
+            # Mean grayscale luma of the best frame (exp #8,
+            # sharpness-floor-is-a-brightness-gate): raw Laplacian variance
+            # is confounded by scene brightness — at dusk nearly every frame
+            # scores below the sharpness floor regardless of actual blur.
+            # Computed here (not in the blur-mute check) so it's available
+            # in the notification layer without recomputing. Uses the same
+            # BGR->gray conversion as SharpnessAnalyzer.calculate_sharpness
+            # for consistency. Wrapped defensively: a failure must never
+            # break burst capture, and None is treated as "unknown" (FN-safe
+            # — the mute gate below never fires on unknown luma).
+            try:
+                if best_frame.ndim == 3:
+                    gray = cv2.cvtColor(best_frame, cv2.COLOR_BGR2GRAY)
+                else:
+                    gray = best_frame
+                luma = float(gray.mean())
+            except Exception as e:
+                logger.error(f"Error computing best-frame luma: {e}")
+                luma = None
+
             # Build sharpness info dict for notification
             sharpness_info = {
                 'sharpness_score': best_score,
@@ -419,7 +441,8 @@ class WildlifeSystem:
                 'all_scores': all_scores,
                 'meets_threshold': best_score >= self.config.performance.min_sharpness_threshold,
                 'below_sharpness_floor': below_sharpness_floor,
-                'all_frame_paths': saved_paths  # Include all saved paths for reference
+                'all_frame_paths': saved_paths,  # Include all saved paths for reference
+                'luma': luma,
             }
 
             return best_frame_path, sharpness_info
@@ -706,11 +729,24 @@ class WildlifeSystem:
         # precedence so a blurry human gets exactly one suppression log.
         is_human = (self.config.performance.suppress_human_alerts
                     and is_human_detection(species_result.get('detection_status')))
+        # Luma gate (exp #8, sharpness-floor-is-a-brightness-gate): the
+        # sharpness floor is a raw Laplacian-variance statistic that's
+        # confounded by scene brightness — at dusk almost every frame scores
+        # below floor regardless of real blur, so muting on floor alone can
+        # silently drop a real animal the classifier missed. Only mute when
+        # luma is known AND bright enough that below-floor plausibly means
+        # actual blur; unknown/missing luma defaults to NOT muting (FN-safe).
+        best_frame_luma = sharpness_info.get('luma') if sharpness_info else None
+        luma_supports_blur_mute = (
+            best_frame_luma is not None
+            and best_frame_luma >= self.config.performance.blur_mute_min_luma
+        )
         is_blurry_review = (
             not is_human
             and bool(sharpness_info)
             and sharpness_info.get('below_sharpness_floor')
             and is_review_detection(species_result.get('detection_status'))
+            and luma_supports_blur_mute
         )
         # Scene-unchanged gate (Task 4): process_detection only ever sets
         # scene_gate_muted for review-class statuses, but the
@@ -734,7 +770,8 @@ class WildlifeSystem:
             logger.info(
                 f"[BLUR] Suppressing notification for detection "
                 f"{species_result.get('detection_id')} "
-                f"(sharpness={sharpness_info.get('sharpness_score'):.1f}, no animal found)"
+                f"(sharpness={sharpness_info.get('sharpness_score'):.1f}, "
+                f"luma={best_frame_luma:.1f}, no animal found)"
             )
         elif is_scene_unchanged_review:
             logger.info(
