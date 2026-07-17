@@ -173,6 +173,25 @@ class PerformanceConfig(BaseSettings):
     timelapse_interval: float = 20.0  # seconds between saved frames
     timelapse_max_files: int = 10000  # ~2 days @ 20s; oldest pruned beyond this
 
+    # Scene-unchanged gate: mute captures whose burst frame is near-identical
+    # to a recent reference frame (empty-scene FP reduction; see scene_gate.py).
+    scene_gate_enabled: bool = True
+    # Conservative placeholder — Task 5's offline validation sets the real
+    # default; 0.97 mutes almost nothing until then.
+    scene_gate_similarity_threshold: float = 0.97
+    scene_gate_ref_count: int = 3
+    scene_gate_ref_max_age_hours: float = 6.0
+
+    @field_validator('scene_gate_similarity_threshold')
+    @classmethod
+    def validate_scene_gate_similarity_threshold_bounds(cls, v):
+        low, high = _BOUNDS["PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD"]
+        if not (low <= v <= high):
+            raise ValueError(
+                f"PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD={v} out of allowed bounds [{low}, {high}]"
+            )
+        return v
+
 
 class StorageConfig(BaseSettings):
     """Storage and file management configuration."""
