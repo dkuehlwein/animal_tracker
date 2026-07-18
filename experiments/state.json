@@ -71,16 +71,16 @@
   "best_known_good": {},
   "deployed": {},
   "history": [],
-  "last_heartbeat_loopday": "2026-07-17",
+  "last_heartbeat_loopday": "2026-07-18",
   "last_metrics": {
-    "date": "2026-07-17",
+    "date": "2026-07-18",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.2070582950773768,
-      0.5416969348557219
+      0.2307242812760128,
+      0.882379225767352
     ],
     "fp_claude_ci": [
       0.0,
@@ -88,31 +88,31 @@
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 10,
+    "fp_count": 3,
     "fp_human_ci": [
-      0.2070582950773768,
-      0.5416969348557219
-    ],
-    "fp_human_count": 10,
-    "fp_human_rate": 0.35714285714285715,
-    "fp_md_ci": [
       0.0,
-      1.0
+      0.7934506856227626
     ],
-    "fp_md_count": 0,
-    "fp_md_rate": 0.0,
-    "fp_rate": 0.35714285714285715,
+    "fp_human_count": 0,
+    "fp_human_rate": 0.0,
+    "fp_md_ci": [
+      0.30064184258240184,
+      0.9544127391902995
+    ],
+    "fp_md_count": 3,
+    "fp_md_rate": 0.75,
+    "fp_rate": 0.6,
     "fp_trustworthy": true,
-    "labeled_triggers": 28,
+    "labeled_triggers": 5,
     "n_cant_tell": 0,
     "n_claude": 0,
-    "n_human": 28,
-    "n_md": 0,
-    "total_triggers": 79
+    "n_human": 1,
+    "n_md": 4,
+    "total_triggers": 12
   },
   "last_tick_completed_day": "2026-07-17",
   "nightly_verdict": "Shipped the long-queued dusk-miss fix tonight: the camera will no longer silently skip a possible animal just because a shot is dark \u2014 dark low-detail shots now come through as a REVIEW note instead of being dropped (takes effect at the pre-sunrise restart). Quiet, healthy night otherwise \u2014 no people photos leaked to your alerts, birds correctly flagged, and about a third of triggers were empty-scene false alarms as usual.",
   "paused": false,
   "pending_restart_at": "2026-07-18T04:39:00+02:00",
-  "watermark": 2288
+  "watermark": 2300
 }
