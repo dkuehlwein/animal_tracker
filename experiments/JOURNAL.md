@@ -1279,3 +1279,24 @@ into review-class), 10 fp, 1 person (2244 REVIEW residual). fp_human 10/28=0.357
 (vs 0.85 MD-auto). Blank→main recurred: 2211/2214 (ens=;animal raw=;blank ~0.50)
 labeled fp — but 2212/2213 same raw=;blank labeled animal_wrong_id (real animal),
 so blank-raw ≠ reliably-empty; blank→REVIEW backlog candidate stays parked (1-exp).
+
+## 2026-07-18 (night tick) — exp #8 night 1 live; quiet day; deploy-timer window bug
+Exp #8 (`683f5f3`, 2026-07-17 23:59:38) went LIVE via a MANUAL camera restart at
+2026-07-18 09:35:45 (Daniel — 7 HUMAN rows 09:29–09:35 + camera_preview.py edits),
+NOT the deploy path. Startup confirmed new config; `blur_mute_min_luma=70.0` loads.
+**Deploy-timer bug:** prev tick stamped `pending_restart_at=04:39` but
+`wildlife-deploy.timer` fires at **03:30** → at 03:30 `04:39 > now` = "not due yet",
+stamp never cleared, deploy would have slipped to 07-19 03:30 absent the manual
+restart. Cleared the stale stamp (→None; code already live). CONVENTION FIX for
+future deploys: stamp `pending_restart_at <= 03:30` (the timer's fire time), not the
+04:39 "60-min-pre-sunrise" value — a stamp in (03:30, sunrise) misses same-morning.
+WINDOW ids 2289–2300 (wm 2288→2300, 12 trig, all morning 07:22–09:35; motion_area=0
+after → 0 dusk captures): 7 human / 4 no_animal / 1 identified. **Mute-path fired 0×,
+0 concealed animals** (sole below-floor row 2294 = HUMAN, suppressed by human gate;
+2289 above floor at 12.87). Exp #8's target (dark luma<70 below-floor no-animal→REVIEW)
+UNEXERCISED tonight (quiet daytime-only). **Leak-watch 0 main leaks** — 7 HUMAN all
+suppressed; 2289 (no_animal, pconf 0.055, raw None) Daniel-labeled `person` → 🔍 REVIEW
+residual (not MAIN, not backlog-#9-catchable). **fp_human 0/1=0.0** (2289 person; fp_rate
+0.6 is MD-auto n_md 4). No FN (2290 identified=TP bird; no animal-label on review-class).
+Volume 12 vs 42 baseline = quiet garden (env, not suppression) → no rollback. Scene gate
+stays disabled (no review-class animal-label w/ frame). CONTINUE exp #8 (night 1); #9 parked.

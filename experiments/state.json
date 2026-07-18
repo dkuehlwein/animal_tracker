@@ -110,9 +110,9 @@
     "n_md": 4,
     "total_triggers": 12
   },
-  "last_tick_completed_day": "2026-07-17",
-  "nightly_verdict": "Shipped the long-queued dusk-miss fix tonight: the camera will no longer silently skip a possible animal just because a shot is dark \u2014 dark low-detail shots now come through as a REVIEW note instead of being dropped (takes effect at the pre-sunrise restart). Quiet, healthy night otherwise \u2014 no people photos leaked to your alerts, birds correctly flagged, and about a third of triggers were empty-scene false alarms as usual.",
+  "last_tick_completed_day": "2026-07-18",
+  "nightly_verdict": "Quiet garden day \u2014 only 12 triggers, all in the morning, and nothing at dusk. The dark-shot fix from last night is now running live (the camera restarted mid-morning and picked it up); no people photos reached your alerts, one bird was correctly flagged, and no animals were missed.",
   "paused": false,
-  "pending_restart_at": "2026-07-18T04:39:00+02:00",
+  "pending_restart_at": null,
   "watermark": 2300
 }

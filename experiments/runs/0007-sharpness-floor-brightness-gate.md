@@ -492,3 +492,70 @@ retune `blur_mute_min_luma` within BOUNDS if the split misbehaves.
 labeled `animal_wrong_id` (a real animal), so `blank` raw ≠ reliably-empty — a
 future blank→REVIEW routing experiment must not blindly mute all blank-raw rows.
 Remains a backlog candidate, not opened (one-experiment-at-a-time; #8 active).
+
+## Observations — 2026-07-18 tick (exp #8 FIRST NIGHT LIVE; deploy applied via manual restart; timer-window bug found)
+
+**Deploy confirmation — exp #8 is LIVE.** Commit `683f5f3` (2026-07-17 23:59:38)
+went live when `wildlife-camera.service` restarted **2026-07-18 09:35:45** (systemd
+`Started`; startup log loaded new config, `blur_mute_min_luma=70.0` confirmed via
+`Config()`). The restart was a **manual `systemctl restart`** (Daniel — the 09:29–
+09:35 window held 7 HUMAN-status rows = a person physically in the garden, and
+`camera_preview.py` has ongoing local edits), **not** the deploy path:
+`wildlife-deploy.service` never ran today (empty journal).
+
+**Deploy-timer window bug (found, recorded, self-resolved this time).** The previous
+tick stamped `pending_restart_at = 2026-07-18T04:39` (intended ~60 min pre-sunrise
+05:39), but **`wildlife-deploy.timer` fires at 03:30 daily** (last run 2026-07-18
+03:30:08). At 03:30 `apply_pending_deploy` saw `04:39 > 03:30` → "not due yet" → did
+nothing and left the stamp uncleared. Absent the manual 09:35 restart, exp #8 would
+have sat undeployed until the **next** 03:30 (07-19) — a full-day delay. The code was
+live anyway via the manual restart, so I **cleared the stale stamp** (`pending_
+restart_at → None`) to reflect reality and avoid a redundant 07-19 restart.
+**Convention fix for all future deploys (env or code): stamp `pending_restart_at`
+at a time the 03:30 timer will catch — i.e. `<= 03:30` (next morning's timer run),
+NOT the 04:39 "60-min-pre-sunrise" value.** A stamp in (03:30, sunrise) misses the
+same-morning window. Noted in JOURNAL + memory.
+
+**Window ids 2289–2300 (watermark 2288→2300, 12 triggers) — a quiet daytime-only
+day.** Camera monitored to sunset (log: "Sunset transition — 12 detections today")
+but motion_area sat at 0 from ~09:35 to 21:35; all 12 triggers are morning
+(07:22–09:35). Status split: **7 HUMAN, 4 no_animal, 1 identified.** No dusk/dark
+captures at all → exp #8's target case (dark `luma<70` below-floor no-animal routing
+to 🔍 REVIEW) was **not exercised tonight.** Monitoring continues; need dusk nights.
+
+**Mute-path adjudication (exp #8 core check): 0 firings, 0 concealed animals.**
+Only one row fell below the 11.0 floor — **2294** (09:29, sharp 8.42) — and it is
+**HUMAN-status** (pconf 0.55), suppressed by the human gate, which precedes the blur
+mute. **2289** (no_animal) is *above* floor (12.87). So zero review-class below-floor
+rows → the blur-mute path fired 0× and the new luma-gate had nothing to act on.
+
+**Leak-watch (exp #5 / backlog #9): 0 main-channel human leaks.** The 7 HUMAN rows
+(2294–2300, 09:29–09:35, pconf up to 0.79) were all correctly SUPPRESSED (2297 caught
+despite pconf 0.11 → homo/ensemble path). **2289** (07:22, no_animal, pconf **0.055**,
+`top_species_raw=None`) is Daniel-labeled `person` and reached the **🔍 REVIEW** channel
+(no_animal status), **not MAIN** — the same known blurry-no-detection-human residual as
+07-14 (2007/2009) / 07-15 (2095) / 07-16 (2184). It is **NOT backlog-#9-catchable**
+(pconf 0.055 ≪ 0.30, no `homo` taxon in raw top-1), so backlog #9's raw-classifier
+override would not touch it. `top_classifier_prediction` was None/parseless here.
+
+**FP / FN.** `loop.metrics`: total 12, labeled 5, `fp_rate 0.6` — but that is tier-1
+MegaDetector auto-labels (`n_md 4`, `fp_md 3/4`); the sole **human** label is 2289
+`person` → **`fp_human 0/1 = 0.0`, zero human-confirmed animal-FPs.** No FN: the one
+identified row (2290, tier-1 `animal`) alerted correctly; no `animal`/`animal_wrong_id`
+human label landed on any review-class row.
+
+**Volume note (not a guardrail trip):** 12 triggers vs baseline 42 is low, but it is
+**environmental** — logs show motion_area=0 for ~12 hours, a genuinely still garden —
+not a suppression artifact. Exp #8 only *re-routes* dark below-floor no-animal bursts
+to REVIEW; it removes no triggers. Nothing was muted into oblivion. No rollback.
+
+**Scene gate (disabled):** no review-class row carried a human `animal`/`animal_wrong_id`
+label with a frame on disk this window → no enablement trigger; stays disabled.
+
+**Decision: CONTINUE exp #8 (running, live night 1) — no deploy, no rollback.** The
+ship carries no new FN evidence tonight (target case unexercised, quiet day) but the
+gate is confirmed live and behaved correctly (0 firings, 0 leaks, 0 human FP, 1 TP
+bird). Post-ship monitoring duty stands: on the next dusk night, adjudicate every
+`luma<70` below-floor no-animal burst now routing to REVIEW and confirm (a) the volume
+bump stays small and (b) any concealed animal now surfaces; retune `blur_mute_min_luma`
+within BOUNDS if the split misbehaves. One active experiment; backlog #9 stays parked.
