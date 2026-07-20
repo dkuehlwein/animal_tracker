@@ -110,7 +110,7 @@
     "n_md": 82,
     "total_triggers": 229
   },
-  "last_tick_completed_day": "2026-07-18",
+  "last_tick_completed_day": "2026-07-20",
   "nightly_verdict": "Busy two days (last night's tick didn't run, so this covers both) \u2014 229 triggers, over half of them people doing yard work, all correctly kept off your alerts. The dark-shot fix got its first real dusk test and passed cleanly: two birds correctly flagged, no people leaked to your alerts, and no animals missed.",
   "paused": false,
   "pending_restart_at": null,
