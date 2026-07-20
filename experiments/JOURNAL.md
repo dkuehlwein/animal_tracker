@@ -1300,3 +1300,20 @@ residual (not MAIN, not backlog-#9-catchable). **fp_human 0/1=0.0** (2289 person
 0.6 is MD-auto n_md 4). No FN (2290 identified=TP bird; no animal-label on review-class).
 Volume 12 vs 42 baseline = quiet garden (env, not suppression) → no rollback. Scene gate
 stays disabled (no review-class animal-label w/ frame). CONTINUE exp #8 (night 1); #9 parked.
+
+## 2026-07-20 (night tick) — exp #8 first real dusk exercise, FN-veto clean; high-vol env
+Two loop-days (07-19 tick never completed). WINDOW ids 2301–2529 (wm 2300→2529, 229
+trig, 07-19 07:35→07-20 20:32): 126 human / 92 no_animal / 9 unclass / 2 identified.
+**Exp #8 mute-path FN-veto CLEAN:** 24 below-floor rows, 20 HUMAN (human-gate precedence
+correct). Review-class below-floor = 2301 (frame purged), 2482 (unclass, motion 274189 =
+near-black full-frame occlusion during 16:xx human block, no animal), 2513 (19:41 dusk
+no_animal lap 9.67 = exp #8 target: pond/garden empty scene, no concealed animal). 2 dusk
+birds 2511/2512 ABOVE floor (18.9/15.5) → identified → MAIN (blur gate did NOT mute them).
+Design intent held on first real dusk exposure. **Leak-watch 0 main leaks:** only 2
+identified = birds (pconf ≤0.058), 0 homo raw anywhere → backlog #9 unexercised. 2400
+(no_animal pconf 0.275 raw None) Daniel-labeled person → 🔍 REVIEW residual, not MAIN, not
+#9-catchable. **FP/FN:** fp_rate 0.97 (MD-auto fp_md 80/82); human truth fp_human 20/21=
+0.95 (20 fp + 1 person, all REVIEW-channel by design). **0 FN** (no animal-label on any
+review-class row). Volume 114/night vs 42 baseline = environmental (55% HUMAN yard-work +
+summer daytime garden), exp #8 removes no triggers → no rollback. Scene gate stays disabled
+(0 review-class animal-labeled frame). CONTINUE exp #8 (running); #9 parked. wm→2529.

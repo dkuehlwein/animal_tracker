@@ -111,7 +111,7 @@
     "total_triggers": 229
   },
   "last_tick_completed_day": "2026-07-18",
-  "nightly_verdict": "Quiet garden day \u2014 only 12 triggers, all in the morning, and nothing at dusk. The dark-shot fix from last night is now running live (the camera restarted mid-morning and picked it up); no people photos reached your alerts, one bird was correctly flagged, and no animals were missed.",
+  "nightly_verdict": "Busy two days (last night's tick didn't run, so this covers both) \u2014 229 triggers, over half of them people doing yard work, all correctly kept off your alerts. The dark-shot fix got its first real dusk test and passed cleanly: two birds correctly flagged, no people leaked to your alerts, and no animals missed.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 2529

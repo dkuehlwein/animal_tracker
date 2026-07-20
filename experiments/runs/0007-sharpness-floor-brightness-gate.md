@@ -559,3 +559,56 @@ bird). Post-ship monitoring duty stands: on the next dusk night, adjudicate ever
 `luma<70` below-floor no-animal burst now routing to REVIEW and confirm (a) the volume
 bump stays small and (b) any concealed animal now surfaces; retune `blur_mute_min_luma`
 within BOUNDS if the split misbehaves. One active experiment; backlog #9 stays parked.
+
+## 2026-07-20 (night tick) — exp #8 first real dusk exercise; clean; high-volume env
+
+Covers **two loop-days** (07-19 tick never completed; last stamp 07-18) — window ids
+**2301–2529** (wm 2300→2529, 229 trig), spanning 2026-07-19 07:35 → 07-20 20:32.
+Status split: **126 HUMAN / 92 no_animal / 9 unclassifiable / 2 identified.** Heavy
+human activity (126 rows, mostly 11–17h) — garden/yard work over two days, not a
+suppression artifact. 20:xx block (16 rows) = evening motion.
+
+**Mute-path adjudication (exp #8 core check): FN-veto CLEAN.** 24 below-floor rows;
+20 are **HUMAN-status** (suppressed by the human gate, which precedes the blur mute —
+correct precedence). Review-class below-floor rows = **2301** (no_animal, lap 10.1,
+frame purged by retention — human-labeled fp), **2482** (unclassifiable, lap 2.43),
+**2513** (no_animal, lap 9.67 — **19:41 dusk**, exp #8's exact target case). Frames on
+disk for 2482/2513 adjudicated visually:
+- **2513** (dusk no_animal): pond/garden scene, slightly soft, **no animal**. Genuine
+  empty-scene dusk FP — the mute-path target behaved correctly (no concealed animal).
+- **2482** (unclassifiable, motion_area **274189**): near-black full-frame occlusion
+  during the heavy 16:xx human block — a dark object filling the lens, **no animal**.
+  Human-adjacent occlusion, not concealed wildlife.
+→ **0 concealed animals in muted bursts.** The 2 dusk birds (2511 17:41, 2512 17:45)
+scored **above** floor (18.9 / 15.5), were `identified` (aves;bird), and correctly
+alerted to MAIN — the blur gate did **not** wrongly mute them. Exp #8's design intent
+(dark below-floor no-animal → REVIEW; animals & above-floor birds → alert) held on its
+first real dusk exposure.
+
+**Leak-watch (exp #5 / backlog #9): 0 main-channel human leaks.** Only 2 `identified`
+rows (2511/2512), both real birds, pconf ≤0.058, `top_species_raw`=aves;bird. **Zero
+`homo` raw anywhere in the window** → backlog #9's raw-classifier override unexercised,
+no leak for it to catch. The 126 HUMAN rows all suppressed. Sole non-fp human label:
+**2400** (no_animal, pconf **0.275**, raw None) Daniel-labeled `person` → reached 🔍
+REVIEW (no_animal status), **not MAIN** — the known sub-0.30 blurry-no-detection-human
+residual (cf. 2289 last tick), NOT backlog-#9-catchable (no homo raw, pconf < 0.30).
+
+**FP / FN.** `loop.metrics`: total 229, labeled 103, `fp_rate 0.97` — headline
+inflated by tier-1 MD auto-labels (`fp_md 80/82`). **Human truth:** `fp_human 20/21 =
+0.95` (20 fp + 1 person on review-class rows; all 🔍 REVIEW, none MAIN). High but this
+is REVIEW-channel volume, the by-design tolerated path (exp #1). **No FN:** zero human
+`animal`/`animal_wrong_id` labels on any review-class row across the whole window; both
+identified birds alerted correctly.
+
+**Volume (not a guardrail trip):** 229 over 2 nights ≈ 114/night vs baseline 42 =
+elevated, but **environmental** — 55% (126/229) are HUMAN-status yard-work captures +
+summer daytime garden movement. Exp #8 re-routes; it removes no triggers. No rollback.
+
+**Scene gate (disabled):** zero review-class rows carried a human `animal`/
+`animal_wrong_id` label with a frame on disk → no enablement trigger; stays disabled.
+
+**Decision: CONTINUE exp #8 (running) — no deploy, no rollback.** First real dusk
+exercise passed cleanly: gate live, 0 concealed-animal FN, 0 main leaks, 2 TP birds
+correctly routed to MAIN, 1 dusk empty-scene correctly a mute-path candidate. One more
+dusk-heavy night would let me conclude with a volume-bump measurement; holding as
+running. One active experiment; backlog #9 parked.
