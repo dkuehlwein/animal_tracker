@@ -71,16 +71,16 @@
   "best_known_good": {},
   "deployed": {},
   "history": [],
-  "last_heartbeat_loopday": "2026-07-18",
+  "last_heartbeat_loopday": "2026-07-20",
   "last_metrics": {
-    "date": "2026-07-18",
+    "date": "2026-07-20",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.2307242812760128,
-      0.882379225767352
+      0.9178416343391798,
+      0.9900456321833555
     ],
     "fp_claude_ci": [
       0.0,
@@ -88,31 +88,31 @@
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 3,
+    "fp_count": 100,
     "fp_human_ci": [
-      0.0,
-      0.7934506856227626
+      0.7733063992587743,
+      0.9915440121901737
     ],
-    "fp_human_count": 0,
-    "fp_human_rate": 0.0,
+    "fp_human_count": 20,
+    "fp_human_rate": 0.9523809523809523,
     "fp_md_ci": [
-      0.30064184258240184,
-      0.9544127391902995
+      0.9153662160893606,
+      0.9932856296688367
     ],
-    "fp_md_count": 3,
-    "fp_md_rate": 0.75,
-    "fp_rate": 0.6,
+    "fp_md_count": 80,
+    "fp_md_rate": 0.975609756097561,
+    "fp_rate": 0.970873786407767,
     "fp_trustworthy": true,
-    "labeled_triggers": 5,
+    "labeled_triggers": 103,
     "n_cant_tell": 0,
     "n_claude": 0,
-    "n_human": 1,
-    "n_md": 4,
-    "total_triggers": 12
+    "n_human": 21,
+    "n_md": 82,
+    "total_triggers": 229
   },
   "last_tick_completed_day": "2026-07-18",
   "nightly_verdict": "Quiet garden day \u2014 only 12 triggers, all in the morning, and nothing at dusk. The dark-shot fix from last night is now running live (the camera restarted mid-morning and picked it up); no people photos reached your alerts, one bird was correctly flagged, and no animals were missed.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 2300
+  "watermark": 2529
 }
