@@ -185,6 +185,43 @@ class SpeciesIdentifier:
             processing_time=processing_time
         )
 
+        # Extract top predictions / raw classifier top-1 prediction now (moved
+        # up from below the animal branch) so the human/privacy gate can
+        # inspect the raw top-1 label — see the raw-classifier homo-leak
+        # trigger just below. The later metadata dict still reads
+        # top_predictions / top_classifier_prediction from here.
+        classifications = pred.get('classifications', {})
+        top_predictions = []
+        top_classifier_prediction = None
+
+        if isinstance(classifications, dict) and 'classes' in classifications and 'scores' in classifications:
+            classes = classifications.get('classes', [])
+            scores = classifications.get('scores', [])
+            top_predictions = [
+                {'label': cls, 'score': score}
+                for cls, score in zip(classes, scores)
+            ][:self.config.species.return_top_k]
+
+            # Extract top classifier prediction (before geofence/rollup)
+            if classes and scores:
+                top_classifier_prediction = {
+                    'label': classes[0],
+                    'score': scores[0]
+                }
+        elif isinstance(classifications, list):
+            top_predictions = classifications[:self.config.species.return_top_k]
+            if classifications:
+                # Normalize the legacy list shape to the {'label', 'score'}
+                # contract; a non-dict entry carries no usable label/score
+                # pair, so leave None rather than leak a raw value that would
+                # crash downstream .get() callers (never-crash constraint).
+                first = classifications[0]
+                if isinstance(first, dict) and first.get('label') is not None:
+                    top_classifier_prediction = {
+                        'label': first.get('label'),
+                        'score': first.get('score', 0.0),
+                    }
+
         # ------------------------------------------------------------------
         # Human/privacy gate — evaluated before the animal branch so a frame
         # with both a person and a confident animal still routes to HUMAN.
@@ -200,19 +237,51 @@ class SpeciesIdentifier:
             segment == 'homo' for segment in ensemble_prediction.split(';')
         )
 
+        # Raw-classifier homo leak (exp #9): the ensemble sometimes rolls a
+        # homo-sapiens RAW classifier top-1 up into a generic/blank/
+        # unclassifiable label that itself contains no 'homo' segment, while
+        # the MegaDetector person box is sub-threshold — so neither existing
+        # trigger fires and a person's photo escapes suppression. This only
+        # fires when the ensemble did NOT confidently name a specific animal
+        # (non-empty genus + species), so a confident, specific animal ID is
+        # never overridden.
+        raw_top1_label = ''
+        if isinstance(top_classifier_prediction, dict):
+            raw_top1_label = top_classifier_prediction.get('label') or ''
+        is_raw_homo_taxon = any(
+            segment == 'homo' for segment in raw_top1_label.split(';')
+        )
+        ensemble_is_specific_animal = self._is_specific_animal_taxon(ensemble_prediction)
+        raw_homo_leak = is_raw_homo_taxon and not ensemble_is_specific_animal
+
         human_gate_fired = (
             max_person_conf >= self.config.species.human_detection_confidence
             or is_homo_taxon
+            or raw_homo_leak
         )
 
         if human_gate_fired:
-            human_confidence = (
-                max_person_conf if max_person_conf >= self.config.species.human_detection_confidence else pred.get('prediction_score', 0.0)
-            )
-            logger.info(
-                f"Human detected (person_conf={max_person_conf:.2f}, "
-                f"homo_taxon={is_homo_taxon}, processing: {processing_time:.2f}s)"
-            )
+            if max_person_conf >= self.config.species.human_detection_confidence:
+                human_confidence = max_person_conf
+                logger.info(
+                    f"Human detected (person_conf={max_person_conf:.2f}, "
+                    f"homo_taxon={is_homo_taxon}, processing: {processing_time:.2f}s)"
+                )
+            elif is_homo_taxon:
+                human_confidence = pred.get('prediction_score', 0.0)
+                logger.info(
+                    f"Human detected (person_conf={max_person_conf:.2f}, "
+                    f"homo_taxon={is_homo_taxon}, processing: {processing_time:.2f}s)"
+                )
+            else:
+                # Fired solely via the raw-classifier homo leak.
+                human_confidence = (top_classifier_prediction or {}).get('score', 0.0)
+                logger.info(
+                    f"Human detected via raw-classifier homo leak "
+                    f"(raw_top1={raw_top1_label!r}, score={human_confidence:.2f}, "
+                    f"ensemble={ensemble_prediction!r}, processing: {processing_time:.2f}s)"
+                )
+
             return IdentificationResult(
                 species_name='human',
                 confidence=human_confidence,
@@ -249,38 +318,8 @@ class SpeciesIdentifier:
         final_confidence = pred.get('prediction_score', 0.0)
         prediction_source = pred.get('prediction_source', 'unknown')
 
-        # Extract top predictions for metadata
-        classifications = pred.get('classifications', {})
-        top_predictions = []
-        top_classifier_prediction = None
-
-        if isinstance(classifications, dict) and 'classes' in classifications and 'scores' in classifications:
-            classes = classifications.get('classes', [])
-            scores = classifications.get('scores', [])
-            top_predictions = [
-                {'label': cls, 'score': score}
-                for cls, score in zip(classes, scores)
-            ][:self.config.species.return_top_k]
-
-            # Extract top classifier prediction (before geofence/rollup)
-            if classes and scores:
-                top_classifier_prediction = {
-                    'label': classes[0],
-                    'score': scores[0]
-                }
-        elif isinstance(classifications, list):
-            top_predictions = classifications[:self.config.species.return_top_k]
-            if classifications:
-                # Normalize the legacy list shape to the {'label', 'score'}
-                # contract; a non-dict entry carries no usable label/score
-                # pair, so leave None rather than leak a raw value that would
-                # crash downstream .get() callers (never-crash constraint).
-                first = classifications[0]
-                if isinstance(first, dict) and first.get('label') is not None:
-                    top_classifier_prediction = {
-                        'label': first.get('label'),
-                        'score': first.get('score', 0.0),
-                    }
+        # (top_predictions / top_classifier_prediction were already extracted
+        # above, ahead of the human/privacy gate.)
 
         # Find best geofenced species-level prediction using model's geofence
         best_geofenced_species = self._find_best_geofenced_species(
@@ -350,6 +389,22 @@ class SpeciesIdentifier:
             animals_detected=True,
             status=DetectionStatus.IDENTIFIED,
         )
+
+    @staticmethod
+    def _is_specific_animal_taxon(taxonomy_label: str) -> bool:
+        """True only when a SpeciesNet semicolon taxonomy label names a
+        specific animal — i.e. both its genus and species segments are
+        non-empty — rather than a generic rollup (e.g. ``;;;;;;animal``,
+        ``aves;;;;;bird``), a blank prediction, or an unclassifiable
+        sentinel. Mirrors the genericness check in
+        ``WildlifeSystem._best_guess_line``, used here to guard the
+        raw-classifier homo-leak trigger so it never overrides a confident,
+        specific animal identification.
+        """
+        parts = (taxonomy_label or '').split(';')
+        genus = parts[-3].strip() if len(parts) >= 3 else ''
+        species = parts[-2].strip() if len(parts) >= 2 else ''
+        return bool(genus and species)
 
     def _create_error_response(self, start_time, reason, detection_result=None):
         """Create standardized error response."""

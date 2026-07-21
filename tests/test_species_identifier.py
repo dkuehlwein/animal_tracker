@@ -402,4 +402,136 @@ def test_top_classifier_prediction_none_when_no_classifications(tmp_path):
         classifications={},
     )
     assert result.metadata is not None
+
+
+# ===========================================================================
+# Exp #9: raw-classifier homo leak. The ensemble sometimes rolls a
+# homo-sapiens RAW classifier top-1 up into a generic/blank/unclassifiable
+# label that itself contains no 'homo' segment, while the MegaDetector
+# person box is sub-threshold. Both existing gate paths (person-box,
+# ensemble-homo-taxon) miss it. A third trigger fires HUMAN when the raw
+# top-1 is homo AND the ensemble did not confidently name a specific animal
+# -- it must never override a confident, specific animal ID.
+# ===========================================================================
+
+def test_raw_classifier_homo_leak_generic_animal_rollup_sets_human(tmp_path):
+    """Raw top-1 homo + generic ';;;;;;animal' ensemble + sub-threshold
+    person box (0.1 < 0.3 default) -> HUMAN (DB id 1988 pattern)."""
+    from data_models import DetectionStatus
+
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "person", "conf": 0.1, "bbox": [0, 0, 1, 1]}],
+        prediction=";;;;;;animal",
+        prediction_score=0.55,
+        classifications={
+            "classes": ["e3954aac;mammalia;primates;hominidae;homo;sapiens;human"],
+            "scores": [0.573],
+        },
+    )
+    assert result.status == DetectionStatus.HUMAN
+    assert result.species_name == "human"
+    # Confidence should reflect the signal that actually fired the gate (the
+    # raw classifier's homo score), not the weak person-box or ensemble score.
+    assert result.confidence == 0.573
+    assert result.metadata is not None
+    assert result.metadata["person_confidence"] == 0.1
+    assert "privacy gate" in (result.fallback_reason or "").lower()
+
+
+def test_raw_classifier_homo_leak_unclassifiable_ensemble_sets_human(tmp_path):
+    """Raw top-1 homo + unclassifiable/blank ensemble, no person box at all
+    -> HUMAN (DB id 2548 pattern)."""
+    from data_models import DetectionStatus
+
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "animal", "conf": 0.9, "bbox": [0, 0, 1, 1]}],
+        prediction="unclassifiable",
+        prediction_score=0.0,
+        classifications={
+            "classes": ["e3954aac;mammalia;primates;hominidae;homo;sapiens;human"],
+            "scores": [0.573],
+        },
+    )
+    assert result.status == DetectionStatus.HUMAN
+    assert result.species_name == "human"
+    assert result.confidence == 0.573
+
+
+def test_raw_classifier_homo_leak_does_not_override_confident_specific_animal(tmp_path):
+    """Raw top-1 homo BUT the ensemble confidently names a specific animal
+    (genus+species both non-empty) -> must remain the animal ID, never
+    overridden to HUMAN. This is the critical never-false-suppress guard."""
+    from data_models import DetectionStatus
+
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "animal", "conf": 0.9, "bbox": [0, 0, 1, 1]}],
+        prediction="abc;mammalia;carnivora;canidae;vulpes;vulpes;Red Fox",
+        prediction_score=0.9,
+        classifications={
+            "classes": ["e3954aac;mammalia;primates;hominidae;homo;sapiens;human"],
+            "scores": [0.573],
+        },
+    )
+    assert result.status == DetectionStatus.IDENTIFIED
+    assert result.species_name == "abc;mammalia;carnivora;canidae;vulpes;vulpes;Red Fox"
+
+
+def test_non_homo_raw_classifier_top1_with_generic_ensemble_not_human(tmp_path):
+    """Raw top-1 is a non-homo animal + generic ensemble rollup -> unchanged
+    behavior, NOT human (guards against the new trigger being over-broad)."""
+    from data_models import DetectionStatus
+
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "animal", "conf": 0.9, "bbox": [0, 0, 1, 1]}],
+        prediction="aves;;;;;bird",
+        prediction_score=0.8,
+        classifications={
+            "classes": ["def;aves;passeriformes;turdidae;turdus;merula;eurasian blackbird"],
+            "scores": [0.34],
+        },
+    )
+    assert result.status != DetectionStatus.HUMAN
+
+
+def test_raw_classifier_homo_leak_malformed_legacy_list_classifications_no_crash(tmp_path):
+    """Legacy list-shaped classifications with a non-dict first entry must
+    degrade to 'no raw-homo trigger' rather than raising, and must not
+    spuriously fire HUMAN."""
+    from data_models import DetectionStatus
+
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "animal", "conf": 0.9, "bbox": [0, 0, 1, 1]}],
+        prediction=";;;;;;animal",
+        prediction_score=0.5,
+        classifications=["e3954aac;mammalia;primates;hominidae;homo;sapiens;human"],
+    )
+    assert result.status != DetectionStatus.HUMAN
+    assert result.metadata is not None
+    assert result.metadata["top_classifier_prediction"] is None
+
+
+def test_raw_classifier_homo_leak_none_classifications_no_crash(tmp_path):
+    """classifications missing entirely (defaults to {}) -> no crash, no
+    spurious HUMAN, top_classifier_prediction stays None."""
+    from data_models import DetectionStatus
+
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "animal", "conf": 0.9, "bbox": [0, 0, 1, 1]}],
+        prediction=";;;;;;animal",
+        prediction_score=0.5,
+        classifications=None,
+    )
+    assert result.status != DetectionStatus.HUMAN
     assert result.metadata["top_classifier_prediction"] is None
