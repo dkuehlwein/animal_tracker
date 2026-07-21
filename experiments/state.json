@@ -1,5 +1,5 @@
 {
-  "active_experiment_id": 8,
+  "active_experiment_id": 9,
   "backlog": [
     {
       "hypothesis": "CONCLUDED 2026-06-15 (keep). Same-channel \ud83d\udd0d REVIEW prefix on status\u2208{NO_ANIMAL,UNCLASSIFIABLE} flags 99% of FP at 0 FN; live since 06-12, location-agnostic. Second-channel routing is OUT per Daniel (no 2nd channel \u2014 adds overhead, won't click two). See runs/0001 + LEARNINGS.",
@@ -51,18 +51,18 @@
       "validation": "live"
     },
     {
-      "hypothesis": "ROOT CAUSE behind exp #6/#5. min_sharpness_threshold=11.0 is applied to raw Laplacian variance, a whole-frame contrast statistic, so it functions as a SCENE-BRIGHTNESS gate, not a blur gate. Measured on 470 pre-deploy frames (AE=normal, multi-day): P(lap<11.0) = 0% for luma>=80, 71% for luma 60-80, 100% for luma<40. Consequence: at dusk nearly every burst is 'below floor' regardless of actual motion blur, so the blur-gate mute path (below-floor AND no animal found -> no Telegram) is reachable mainly as a function of light level. Fix candidates: (a) brightness- normalized sharpness (lap/gray_var) as the floor statistic, (b) make the floor luma-dependent, (c) drop the mute path and rely on the REVIEW prefix. Needs a code change, not an env knob.",
+      "hypothesis": "CONCLUDED 2026-07-21 (KEEP, live). ROOT CAUSE behind exp #6/#5: min_sharpness_threshold=11.0 on raw Laplacian variance is a SCENE-BRIGHTNESS gate, not a blur gate (P(lap<11.0)=0% luma>=80, 71% luma 60-80, 100% luma<40 over 470 frames), so at dusk the blur-gate mute path fires as a function of darkness. Fix (c/b hybrid) SHIPPED 2026-07-18 commit 683f5f3: blur_mute_min_luma=70.0 — below-floor no-animal review-class bursts are only muted when luma>=70; when luma<70 (genuinely dark) they flow to REVIEW instead of being silently muted, closing the unobservable-dusk-FN class. Validated over two dusk-heavy nights (07-20, 07-21), both FN-veto CLEAN (0 concealed animals across 14 adjudicated review-class muted/un-muted frames). 07-21 volume bump quantified: 9/12 below-floor no-animal dusk frames luma<70 -> un-muted to REVIEW (all true-negative empty scenes), 3 muted; ~9 extra REVIEW msgs/dusk-night, no guardrail trip. 0 MAIN leaks; dusk birds (incl. below-floor 2749) correctly routed to MAIN. Rollback = git revert 683f5f3 + restart, or raise the knob. See runs/0007.",
       "id": 8,
       "slug": "sharpness-floor-is-a-brightness-gate",
-      "status": "running",
+      "status": "concluded",
       "validation": "live"
     },
     {
-      "hypothesis": "PROPOSED 2026-07-13 (exp #5 leak-watch first hit). The human/privacy gate leaked a person's photo to the MAIN channel: id 1988 (07-13 19:50) status=identified, ensemble species_name generic ';;;;;;animal' (conf 0.72 -> notifies, Best-guess line would read 'human 59%'), because (1) MegaDetector person box 0.10 < human_detection_confidence 0.30, and (2) the ensemble rolled the classifier's homo-sapiens top-1 up to a generic 'animal' label with no 'homo' taxon segment, so both existing gate paths missed it. Fix: also fire DetectionStatus.HUMAN when the RAW classifier top-1 (top_species_raw / metadata['top_classifier_prediction']) contains a 'homo' taxon AND the ensemble did not confidently ID a specific animal (generic/blank/no-cv/review-class), so a confident species ID is never overridden. Specificity across the WHOLE DB: top_species_raw~homo occurs on exactly 2 rows (1852, 1988), both actual humans, 0 real animals -> catches both with 0 observed false-suppression; FN risk negligible on evidence. Code change (no env knob reaches it); subagent-driven TDD, commit separately w/ exp id, restart-gated. HELD for Daniel's explicit OK because it modifies the privacy-suppression gate (his strongest product lever) and FN is formally unmeasured. See runs/0007 'CROSS-CUTTING FINDING' 2026-07-13.",
+      "hypothesis": "ACTIVATED + SHIPPED 2026-07-21 (commit c366087, restart-gated), running/live. The human/privacy gate missed persons where (1) the MegaDetector person box <0.30 AND (2) the ensemble rolled the classifier's homo-sapiens RAW top-1 up into a generic/unclassifiable/blank label with no 'homo' segment -> both existing paths missed it (id 1988 07-13 -> MAIN as generic ';;;;;;animal' conf 0.72; id 2548 07-21 -> REVIEW as unclassifiable, raw score 0.573). Fix: added a third human-gate trigger — fire DetectionStatus.HUMAN when the RAW top-1 label has a 'homo' segment AND the ensemble is NOT a confident specific animal (guarded by _is_specific_animal_taxon: both genus+species segments non-empty, mirrors _best_guess_line), so a confident specific ID is never overridden; never-crash on malformed/legacy classifications. Specificity DB-wide: homo raw top-1 on exactly 3 rows (1852, 1988, 2548), all confirmed humans, 0 real animals -> FN risk negligible. Gates cleared (FN-veto, volume, one-experiment, not paused). Activation of a long-parked item under PROTOCOL.md Autonomy (no greenlight step; privacy-gate changes explicitly in-scope). 426 tests pass. Goes live at 07-22 restart; leak-watch continues as verification. See runs/0008.",
       "id": 9,
       "slug": "human-gate-raw-classifier-leak",
-      "status": "proposed",
-      "validation": "parked"
+      "status": "running",
+      "validation": "live"
     }
   ],
   "baselines": {
@@ -111,8 +111,8 @@
     "total_triggers": 221
   },
   "last_tick_completed_day": "2026-07-20",
-  "nightly_verdict": "Busy two days (last night's tick didn't run, so this covers both) \u2014 229 triggers, over half of them people doing yard work, all correctly kept off your alerts. The dark-shot fix got its first real dusk test and passed cleanly: two birds correctly flagged, no people leaked to your alerts, and no animals missed.",
+  "nightly_verdict": "Another busy garden day (221 triggers, mostly yard work and summer movement) with a clean dusk test \u2014 three birds correctly flagged, no people leaked to your alerts, no animals missed. The dark-shot fix has now passed two dusk nights running, so I've locked it in; I also shipped a small fix so a person the AI mislabels as a generic 'animal' now gets hidden like other people (goes live at tomorrow's restart).",
   "paused": false,
-  "pending_restart_at": null,
+  "pending_restart_at": "2026-07-22T03:29:00+02:00",
   "watermark": 2750
 }

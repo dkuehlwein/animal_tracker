@@ -1,8 +1,8 @@
 ---
 id: 8
 slug: sharpness-floor-is-a-brightness-gate
-status: running          # proposed | running | concluded | rolled_back | parked
-validation: live          # SHIPPED 2026-07-18 (commit 683f5f3), restart-gated; monitoring live
+status: concluded        # proposed | running | concluded | rolled_back | parked | CONCLUDED (keep) 2026-07-21 after 2nd clean dusk-heavy night
+validation: live          # SHIPPED 2026-07-18 (commit 683f5f3), restart-gated; CONCLUDED keep 2026-07-21
 hypothesis: "min_sharpness_threshold=11.0 is applied to raw Laplacian variance, a whole-frame contrast statistic that scales with scene brightness. So the 'blur gate' is operationally a LIGHT-LEVEL gate: at dusk nearly every burst is below-floor regardless of actual motion blur. Because the blur-gate MUTE path (below_sharpness_floor AND no-animal-found -> no Telegram) is therefore reachable mainly as a function of darkness, real dusk animals the classifier misses are silently dropped — the exact unobservable-FN class runs/0005 existed to close, reopened by the dusk data. Fix: stop letting darkness alone trigger the mute."
 created: 2026-07-10
 promoted_from: "backlog id 8 (filed 2026-07-09 at runs/0006 rollback); now the active experiment after exp #7 (AE mode) concluded — AE bias is not the lever, the floor statistic is"
@@ -612,3 +612,64 @@ exercise passed cleanly: gate live, 0 concealed-animal FN, 0 main leaks, 2 TP bi
 correctly routed to MAIN, 1 dusk empty-scene correctly a mute-path candidate. One more
 dusk-heavy night would let me conclude with a volume-bump measurement; holding as
 running. One active experiment; backlog #9 parked.
+
+## 2026-07-21 (night tick) — CONCLUDE exp #8 (keep, live); 2nd clean dusk-heavy night + volume bump quantified
+
+Window ids **2530–2750** (wm 2529→2750, 221 trig, 2026-07-21 09:xx→21:xx). Status
+split: **136 HUMAN / 79 no_animal / 3 unclassifiable / 3 identified.** Dusk-heavy
+evening (h17 ×19, h18 ×18, h19 ×3, h20 ×2, h21 ×1) — the "one more dusk-heavy night"
+the 07-20 verdict pre-registered as the conclusion trigger.
+
+**Mute-path adjudication (exp #8 core): FN-veto CLEAN — 0 concealed animals.** 38
+below-floor rows total; the human-gate precedence correctly suppresses all HUMAN ones.
+The **12 below-floor REVIEW-CLASS (no_animal) rows with frames on disk** — 2706, 2710,
+2714, 2716, 2718, 2721, 2723, 2724, 2736, 2737, 2742, 2747 — were all visually
+adjudicated (the exact FN-veto duty). Every one is the same static pond/garden scene
+(empty) or human-adjacent activity: **2723** (17:52) a hand + yellow watering-can spout,
+**2736** (18:36) a person's torso behind the bamboo, **2724** (17:54) a crouching person
+at the right edge — human-adjacent, motion_area small, **no wildlife**. **Zero concealed
+animals.** The 3 `identified` rows (2596, 2599 birds above floor; **2749** 20:xx bird
+lap 4.20 *below* floor, top_species_raw `aves;;;;;bird`, pconf 0.0) all alerted to MAIN —
+the below-floor bird 2749 correctly alerted because the blur gate never mutes a burst
+where an animal is found (design intent held again).
+
+**Volume bump QUANTIFIED (the measurement 07-20 deferred).** Computed mean-gray luma on
+the 12 below-floor no_animal frames vs the shipped `blur_mute_min_luma=70.0`:
+**9 rows luma<70 → un-muted to 🔍 REVIEW** (2706 68.7, 2710 69.5, 2714 67.9, 2721 67.9,
+2724 65.1, 2736 56.5, 2737 56.2, 2742 53.2, 2747 36.5) and **3 rows luma≥70 → stayed
+muted** (2716 71.6, 2718 70.7, 2723 73.5). So exp #8's live cost is **≈9 extra REVIEW
+messages on a dusk-heavy night**, every one a confirmed true-negative empty scene; its
+benefit is the FN-safety guarantee that a concealed animal in a genuinely-dark
+(luma<70) dusk burst now surfaces to REVIEW instead of being silently muted. Two dusk
+nights running the observed FN benefit is 0 (no concealed animal appeared), but the
+guarantee is what the gate buys, and the REVIEW-volume cost is small and in-channel
+(the exp #1 tolerated path) — **no guardrail trip.**
+
+**Leak-watch (exp #5 / backlog #9): 0 MAIN-channel human leaks.** Only 3 `identified`
+rows, all real birds (aves;bird, pconf ≤0.018). **New homo-raw data point: 2548**
+(unclassifiable, `top_species_raw` = `...hominidae;homo;sapiens;human` score 0.573,
+person_conf 0.058) — the ensemble rolled a confident homo-sapiens raw top-1 up to
+`unclassifiable`, so neither existing gate path fired; it reached 🔍 REVIEW (review-class,
+**not MAIN**), Daniel-labeled `person`. This is exactly backlog #9's failure mode. DB-wide
+`homo` raw top-1 now occurs on **3 rows (1852, 1988, 2548), all confirmed humans, 0 real
+animals** — #9's specificity/FN-safety case strengthened by tonight's third instance.
+
+**FP/FN.** `loop.metrics`: total 221, labeled 85, `fp_rate 0.894` (MD-auto `fp_md 76/79`).
+**Human truth `fp_human 0/6 = 0.0`** — the 6 human labels are all `person` on review-class
+rows (2548, 2550–2554), all 🔍 REVIEW by design, none MAIN, none a false_positive. **0 FN**
+(no human `animal`/`animal_wrong_id` label on any review-class row). Volume 221/night
+elevated but **environmental** (62% HUMAN yard-work + summer garden) — exp #8 re-routes,
+removes no triggers → no rollback.
+
+**Scene gate (disabled):** the 6 person-labeled review-class rows have frames but carry
+`person`, not `animal`, labels → still zero review-class `animal`-labeled frame on disk →
+no scene-gate enablement trigger; stays disabled.
+
+**DECISION: CONCLUDE exp #8 — KEEP, live.** Two dusk-heavy nights (07-20, 07-21), both
+FN-veto clean (0 concealed animals across 14 adjudicated review-class muted/un-muted
+frames), gate behaving exactly as designed, volume bump now measured (~9 REVIEW/dusk-night,
+all true-negatives, no guardrail trip), 0 MAIN leaks, dusk birds correctly routed to MAIN
+(incl. a below-floor one). The 07-20 pre-registered "one more dusk-heavy night to conclude"
+trigger is satisfied. `blur_mute_min_luma=70.0` retained; rollback lever unchanged
+(git revert 683f5f3 + restart, or raise the knob). Slot freed → **backlog #9 activated**
+(see runs/0008).

@@ -1317,3 +1317,38 @@ identified = birds (pconf ≤0.058), 0 homo raw anywhere → backlog #9 unexerci
 review-class row). Volume 114/night vs 42 baseline = environmental (55% HUMAN yard-work +
 summer daytime garden), exp #8 removes no triggers → no rollback. Scene gate stays disabled
 (0 review-class animal-labeled frame). CONTINUE exp #8 (running); #9 parked. wm→2529.
+
+## 2026-07-21 (night tick) — CONCLUDE exp #8 (keep); ACTIVATE+SHIP exp #9 (raw-classifier homo gate)
+WINDOW ids 2530–2750 (wm 2529→2750, 221 trig, 07-21 09:xx→21:xx): 136 human / 79
+no_animal / 3 unclass / 3 identified. Dusk-heavy evening (h17×19 h18×18 h19×3 h20×2 h21×1)
+— the "one more dusk night" 07-20 pre-registered as exp #8's conclusion trigger.
+
+**exp #8 CONCLUDED (keep, live).** Mute-path FN-veto CLEAN: 14 below-floor review-class
+rows, 12 with frames adjudicated visually (2706/2710/2714/2716/2718/2721/2723/2724/2736/
+2737/2742/2747) — all the same empty pond scene or human-adjacent (2723 hand+watering-can,
+2736 person torso behind bamboo, 2724 crouching person), **0 concealed animals**; the
+other 2 (2553/2554) Daniel-labeled person, frames purged. Volume bump QUANTIFIED (the
+07-20 deferral): mean-gray luma on the 12 vs blur_mute_min_luma=70 → **9 luma<70 un-muted
+to REVIEW** (all TN empty scenes, 36.5–69.5), **3 luma≥70 muted** (70.7–73.5); ≈9 extra
+REVIEW/dusk-night, no guardrail trip. 3 identified = birds to MAIN incl. below-floor 2749
+(lap 4.20, blur gate correctly never mutes an animal-found burst). Two clean dusk nights →
+CONCLUDE keep; blur_mute_min_luma=70 retained.
+
+**exp #9 ACTIVATED + SHIPPED (commit c366087, restart-gated).** Slot freed by #8. Leak-watch
+produced a 3rd homo-raw datum: **2548** (unclass, raw `...homo;sapiens;human` 0.573, pconf
+0.058) → the ensemble rolled a confident homo top-1 up to unclassifiable, both gate paths
+missed it, reached 🔍 REVIEW (not MAIN), Daniel-labeled person. DB-wide homo raw top-1 =
+3 rows (1852/1988/2548), all humans, 0 animals. Fix (Sonnet TDD, diff reviewed, 426 pass,
+re-run independently): third human-gate trigger — fire HUMAN when raw top-1 has a `homo`
+segment AND ensemble not a specific animal (`_is_specific_animal_taxon`: genus+species
+both non-empty, mirrors `_best_guess_line`), never overriding a confident specific ID;
+never-crash on malformed classifications. Restart stamped **2026-07-22T03:29** (≤03:30
+timer). Activation of a long-held item under PROTOCOL Autonomy — no greenlight step;
+privacy-gate changes explicitly in-scope. Post-restart: leak-watch = FN-veto duty
+(any real animal newly suppressed → narrow/disable the trigger).
+
+**FP/FN.** loop.metrics: total 221, labeled 85, fp_rate 0.894 (MD-auto fp_md 76/79).
+Human truth fp_human 0/6=0.0 (6 person labels 2548/2550–2554, all review-class REVIEW,
+none MAIN, none false_positive). **0 FN** (no animal-label on any review-class row).
+Volume environmental (62% HUMAN yard-work + summer garden), no rollback. Scene gate stays
+disabled (0 review-class animal-labeled frame). wm→2750.
