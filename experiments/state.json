@@ -71,16 +71,16 @@
   "best_known_good": {},
   "deployed": {},
   "history": [],
-  "last_heartbeat_loopday": "2026-07-21",
+  "last_heartbeat_loopday": "2026-07-22",
   "last_metrics": {
-    "date": "2026-07-21",
+    "date": "2026-07-22",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.8108648139957895,
-      0.9432875928801936
+      0.933194403305581,
+      0.994760817934037
     ],
     "fp_claude_ci": [
       0.0,
@@ -88,31 +88,31 @@
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 76,
+    "fp_count": 103,
     "fp_human_ci": [
-      0.0,
-      0.3903342879021653
+      0.741511978067893,
+      0.9768411847029567
     ],
-    "fp_human_count": 0,
-    "fp_human_rate": 0.0,
+    "fp_human_count": 22,
+    "fp_human_rate": 0.9166666666666666,
     "fp_md_ci": [
-      0.8941993723231529,
-      0.9870019131105641
+      0.9547219145675847,
+      1.0
     ],
-    "fp_md_count": 76,
-    "fp_md_rate": 0.9620253164556962,
-    "fp_rate": 0.8941176470588236,
+    "fp_md_count": 81,
+    "fp_md_rate": 1.0,
+    "fp_rate": 0.9809523809523809,
     "fp_trustworthy": true,
-    "labeled_triggers": 85,
+    "labeled_triggers": 105,
     "n_cant_tell": 0,
     "n_claude": 0,
-    "n_human": 6,
-    "n_md": 79,
-    "total_triggers": 221
+    "n_human": 24,
+    "n_md": 81,
+    "total_triggers": 106
   },
   "last_tick_completed_day": "2026-07-21",
   "nightly_verdict": "Another busy garden day (221 triggers, mostly yard work and summer movement) with a clean dusk test \u2014 three birds correctly flagged, no people leaked to your alerts, no animals missed. The dark-shot fix has now passed two dusk nights running, so I've locked it in; I also shipped a small fix so a person the AI mislabels as a generic 'animal' now gets hidden like other people (goes live at tomorrow's restart).",
   "paused": false,
-  "pending_restart_at": "2026-07-22T03:29:00+02:00",
-  "watermark": 2750
+  "pending_restart_at": null,
+  "watermark": 2856
 }
