@@ -110,8 +110,8 @@
     "n_md": 81,
     "total_triggers": 106
   },
-  "last_tick_completed_day": "2026-07-21",
-  "nightly_verdict": "Another busy garden day (221 triggers, mostly yard work and summer movement) with a clean dusk test \u2014 three birds correctly flagged, no people leaked to your alerts, no animals missed. The dark-shot fix has now passed two dusk nights running, so I've locked it in; I also shipped a small fix so a person the AI mislabels as a generic 'animal' now gets hidden like other people (goes live at tomorrow's restart).",
+  "last_tick_completed_day": "2026-07-22",
+  "nightly_verdict": "Quieter day than yesterday (106 triggers vs 221, mostly daytime garden and yard movement) with a clean dusk: two birds correctly sent to your alerts, one person correctly hidden, no animals missed. The new fix that hides people the AI mislabels as a generic \u201canimal\u201d went live at this mornings restart and is now watching \u2014 nothing tripped it tonight, which is expected since it targets a rare case; no change deployed.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 2856

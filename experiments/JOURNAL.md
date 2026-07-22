@@ -1352,3 +1352,20 @@ Human truth fp_human 0/6=0.0 (6 person labels 2548/2550–2554, all review-class
 none MAIN, none false_positive). **0 FN** (no animal-label on any review-class row).
 Volume environmental (62% HUMAN yard-work + summer garden), no rollback. Scene gate stays
 disabled (0 review-class animal-labeled frame). wm→2750.
+
+## 2026-07-22 — exp #9 live night 1 (restart-verified), FN-veto clean, hold
+
+**Exp #9 (human-gate-raw-classifier-leak) LIVE.** wildlife-camera.service up 03:30 running
+HEAD 0a39b23 (contains fix c366087) → new raw-classifier homo gate active this loop-day.
+New path NOT exercised: 0 rows w/ homo raw top-1 in window (ids 2751–2856). Rarity as
+predicted. Leak-watch continues; no conclusion.
+**FN-veto CLEAN.** 1 HUMAN suppression (2855, 19:20) via existing person-box path
+(pconf 0.668), frame = person in foreground. 2 MAIN birds (2753 blackbird raw 0.48,
+2754 generic bird raw 0.33) correct, untouched by new gate. 9 below-floor no_animal dusk
+bursts all luma<70 → un-muted to REVIEW (exp #8 blur_mute_min_luma=70), 0 blur-muted →
+0 blur-mute FN risk. Adjudicated on-disk dusk frames (2851/2856) + 2855: empty scenes /
+person, no concealed animals.
+**FP/FN.** loop.metrics: total 106, labeled 105, fp_rate 0.981 (MD-auto fp_md 81/81=1.0).
+Human truth fp_human 22/24=0.917 (2 real animals = the MAIN birds). 0 FN. Volume 106
+(down from 221 yesterday), daytime yard/garden activity, no collapse/explosion, no rollback.
+Scene gate stays disabled (still 0 review-class animal-labeled frame on disk). wm→2856.

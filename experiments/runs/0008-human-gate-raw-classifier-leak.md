@@ -98,3 +98,25 @@ by disabling / narrowing the trigger). None expected on evidence.
 trigger (FN-veto — check any newly-HUMAN row that carries a specific animal raw top-1),
 and (b) the previously-leaking pattern (homo raw + generic ensemble + sub-0.30 person box)
 now routes to HUMAN, not MAIN/REVIEW.
+
+## Monitoring log (post-restart verification)
+
+### 2026-07-22 (night 1 live) — CLEAN, new path not exercised
+Restart confirmed: `wildlife-camera.service` came up 03:30 today running HEAD `0a39b23`
+(contains fix commit c366087), so exp #9 is live from the 07-22 loop-day. Ingest window
+ids 2751–2856 (106 triggers, daytime-heavy garden activity; night-window dusk 18–19h).
+
+- **(a) No real animal suppressed by the new trigger** — zero rows this window carry a
+  `homo` raw top-1, so `_is_raw_homo_taxon` never fired. No FN-veto event. The two MAIN
+  animal IDs (2753 common blackbird raw 0.48; 2754 generic `aves;;;;;bird` raw 0.33)
+  correctly routed to MAIN, untouched by the new gate (neither is a homo raw top-1).
+- **(b) One HUMAN suppression this window (id 2855, 19:20)** — caught by the *existing*
+  person-box path (`person_confidence=0.668 ≥ 0.30`), not the new raw-classifier path.
+  Frame confirms a person in foreground. So the new path had no positive to demonstrate
+  tonight — expected, since homo-raw-top-1 is a ~3-row-per-corpus rarity. Leak-watch
+  continues: the value shows up only on a future sub-0.30 person-box + homo-raw burst.
+
+FN-veto: **CLEAN**. All 9 below-floor no_animal dusk bursts had luma < 70 → un-muted to
+REVIEW under exp #8's `blur_mute_min_luma=70` (none blur-muted), so zero blur-mute FN
+risk. Adjudicated on-disk dusk frames (2851 luma 60.5, 2856 luma 28.3) + the human 2855:
+empty garden/pond scenes, no concealed animals. Scene gate still disabled.
