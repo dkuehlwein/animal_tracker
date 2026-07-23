@@ -110,8 +110,8 @@
     "n_md": 133,
     "total_triggers": 258
   },
-  "last_tick_completed_day": "2026-07-22",
-  "nightly_verdict": "Quieter day than yesterday (106 triggers vs 221, mostly daytime garden and yard movement) with a clean dusk: two birds correctly sent to your alerts, one person correctly hidden, no animals missed. The new fix that hides people the AI mislabels as a generic \u201canimal\u201d went live at this mornings restart and is now watching \u2014 nothing tripped it tonight, which is expected since it targets a rare case; no change deployed.",
+  "last_tick_completed_day": "2026-07-23",
+  "nightly_verdict": "Busy gardening day (258 triggers, most were people working in the yard, correctly hidden) with a clean dusk: five birds correctly sent to your alerts and no animals missed. No one labelled anything today, so the false-alarm number is the AI's own estimate rather than ground truth; nothing needed changing and no change was deployed.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 3114

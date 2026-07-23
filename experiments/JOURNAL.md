@@ -1369,3 +1369,19 @@ person, no concealed animals.
 Human truth fp_human 22/24=0.917 (2 real animals = the MAIN birds). 0 FN. Volume 106
 (down from 221 yesterday), daytime yard/garden activity, no collapse/explosion, no rollback.
 Scene gate stays disabled (still 0 review-class animal-labeled frame on disk). wm→2856.
+
+## 2026-07-23 — exp #9 live night 2, FN-veto clean, hold (no human labels)
+
+**Exp #9 (human-gate-raw-classifier-leak) LIVE, new path still not exercised.** Ingest
+ids 2857–3114 (258 triggers). 0 rows w/ homo raw top-1 → new raw-classifier gate never
+fired (2nd night; rarity as predicted). 5 MAIN birds (2930/2931/2964/2965 generic bird
+raw 0.34–0.48; 3111 corvus sp. raw 0.72 @20:02) correctly routed, untouched by gate.
+125 HUMAN suppressions all via existing person-box/homo-taxon paths (daytime gardening;
+late 3102 pconf 0.72, 3110 pconf 0.78 real people).
+**FN-veto CLEAN.** 13 below-floor dusk (h≥18) no_animal bursts all luma-dark → un-muted to
+REVIEW (exp #8), scene_gate NULL (disabled). Adjudicated darkest on-disk dusk frames
+(3105/3109/3114, 19:17–20:27): identical static pond/garden scene at falling light, empty,
+no concealed animals. Scene gate stays disabled (still 0 review-class animal-labeled frame).
+**FP/FN.** loop.metrics: total 258, labeled 133, fp_rate 0.962 — **all MD-auto, n_human=0**
+(no human labels tonight → fp_human & FN unmeasured). Volume 258 environmental (gardening +
+summer garden; vs 106/221 prior nights), no collapse/explosion, no rollback. wm→3114.

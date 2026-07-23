@@ -120,3 +120,26 @@ FN-veto: **CLEAN**. All 9 below-floor no_animal dusk bursts had luma < 70 → un
 REVIEW under exp #8's `blur_mute_min_luma=70` (none blur-muted), so zero blur-mute FN
 risk. Adjudicated on-disk dusk frames (2851 luma 60.5, 2856 luma 28.3) + the human 2855:
 empty garden/pond scenes, no concealed animals. Scene gate still disabled.
+
+### 2026-07-23 (night 2 live) — CLEAN, new path still not exercised
+Ingest window ids 2857–3114 (258 triggers, high-volume daytime gardening day: 125 HUMAN,
+126 no_animal, 2 unclassifiable, 5 identified). **No human labels tonight** (n_human=0), so
+fp_human/FN are unmeasured; the reported fp_rate 0.962 is entirely MegaDetector auto-label.
+
+- **(a) No real animal suppressed by the new trigger** — zero rows this window carry a
+  `homo` raw top-1, so `_is_raw_homo_taxon` never fired (second night the new path had no
+  positive — homo-raw-top-1 remains the predicted ~3-row-per-corpus rarity). No FN-veto
+  event. All 5 MAIN animal IDs are birds (2930/2931/2964/2965 generic `aves;;;;;bird`
+  raw 0.34–0.48; 3111 `corvus species` raw 0.72 @20:02 dusk) — raw top-1 is bird/corvid,
+  correctly untouched by the gate; `_is_specific_animal_taxon` / no-override confirmed.
+- **(b) 125 HUMAN suppressions** — all via the *existing* person-box / homo-taxon paths,
+  none via the new raw-classifier path (0 homo raw top-1 rows). Bulk is daytime yard work
+  (08:00–18:39, high person_confidence); late rows 3102 (18:39, pconf 0.72) and 3110
+  (20:00, pconf 0.78) are real people. No specific-animal raw top-1 on any HUMAN row.
+
+FN-veto: **CLEAN**. 13 below-floor dusk (h≥18) no_animal bursts, all luma-dark → un-muted
+to REVIEW under exp #8; scene_gate NULL throughout (disabled). Adjudicated darkest on-disk
+dusk frames (3105 19:17, 3109 19:58, 3114 20:27): all the identical static pond/garden
+scene at progressively lower light — empty, no concealed animals. Scene gate stays disabled
+(still 0 review-class animal-labeled frame on disk). Volume 258 environmental (gardening +
+summer garden), no collapse/explosion → no rollback. **Hold; leak-watch continues.**
