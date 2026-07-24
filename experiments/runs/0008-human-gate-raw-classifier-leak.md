@@ -143,3 +143,40 @@ dusk frames (3105 19:17, 3109 19:58, 3114 20:27): all the identical static pond/
 scene at progressively lower light — empty, no concealed animals. Scene gate stays disabled
 (still 0 review-class animal-labeled frame on disk). Volume 258 environmental (gardening +
 summer garden), no collapse/explosion → no rollback. **Hold; leak-watch continues.**
+
+### 2026-07-24 (night 3 live) — CLEAN, feedback-rich, new path still not exercised
+Ingest window ids 3115–3155 (41 triggers; volume right at baseline 42, down from the
+106/221/258 gardening-driven prior nights). **32 human labels tonight** (n_human=32) — the
+richest feedback night in the run: fp_human 28/32 = 0.875, FN still unmeasured but now
+directly checkable against human truth.
+
+- **(a) No real animal suppressed by the new trigger** — 0 rows this window carry a `homo`
+  raw top-1, so `_is_raw_homo_taxon` never fired (third night with no positive; homo-raw-top-1
+  stays the predicted ~3-row-per-corpus rarity). No FN-veto event. The 4 human `animal`/
+  `animal_wrong_id` labels are all genuine animals correctly handled: 3115 (07:26 bird
+  `aves;;;;;bird` raw 0.744 → MAIN) and 3117 (07:49 generic-ensemble, bird raw 0.433 → MAIN)
+  and 3155 (17:00 `common blackbird` raw 0.425 → MAIN) — raw top-1 is bird, `_is_specific_animal_taxon`
+  / no-override kept them off the gate. 3116 (07:26, below-floor no_animal, animal_wrong_id)
+  is the faint companion burst of the 3115 bird event → surfaced to REVIEW and human-corrected
+  (the bird itself reached MAIN via 3115); not a silent miss.
+- **(b) 9 HUMAN suppressions** — all via the *existing* person-box / ensemble-homo paths
+  (daytime yard work 14:36–15:42, pconf 0.03–0.936; 3146 pconf 0.03 fired via ensemble-homo,
+  not the new raw path). 0 leaked to MAIN. No specific-animal raw top-1 on any HUMAN row.
+
+FN-veto: **CLEAN**. 0 muted bursts this window — every non-HUMAN trigger was surfaced and
+human-labeled (nothing blur-muted or scene-muted to adjudicate); the 2 below-floor no_animal
+rows (3116, 3154) both reached REVIEW and were labeled. scene_gate NULL throughout (disabled).
+
+**Scene-gate PROTOCOL trigger fired (first time) — re-validated, stays disabled.** 3116 is
+the FIRST and ONLY on-disk review-class (`no_animal`) row carrying a human `animal_wrong_id`
+label in the whole corpus (the other 17 such rows all predate retention, on_disk=False —
+matches the run-0007 finding). Per the scene-gate enablement procedure I re-ran
+`scripts/validate_scene_gate.py`: full-corpus `human_animal` tally is now 18 (was 17, +3116),
+but the **scored** animal bucket is still n=0 — 3116 is the first review-class row of the
+morning and has no review-class reference frame within the 6h window, so it is unscoreable
+(the gate would fail open / never evaluate it anyway). No safe threshold derivable → script
+recommends `scene_gate_enabled=False`, unchanged. Precise reason upgraded from "no on-disk
+animal frame" to "the one on-disk animal frame is unscoreable (first-of-morning, no 6h ref)".
+
+**FP/FN.** loop.metrics: total 41, labeled 32, fp_rate 0.875 (human truth, fp_human 28/32).
+Volume 41 ≈ baseline 42, no collapse/explosion → no rollback. **Hold; leak-watch continues.**

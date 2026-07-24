@@ -110,8 +110,8 @@
     "n_md": 0,
     "total_triggers": 41
   },
-  "last_tick_completed_day": "2026-07-23",
-  "nightly_verdict": "Busy gardening day (258 triggers, most were people working in the yard, correctly hidden) with a clean dusk: five birds correctly sent to your alerts and no animals missed. No one labelled anything today, so the false-alarm number is the AI's own estimate rather than ground truth; nothing needed changing and no change was deployed.",
+  "last_tick_completed_day": "2026-07-24",
+  "nightly_verdict": "Quiet day back at normal levels (41 triggers) and your busiest feedback day yet \u2014 you labelled 32 of them, confirming the birds all reached your alerts, the people in the yard stayed hidden, and nothing was missed. No change deployed; one blurry morning bird frame let me re-check the scene-similarity mute I've been holding, but it still can't be safely switched on, so it stays off.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 3155

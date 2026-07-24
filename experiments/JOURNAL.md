@@ -1385,3 +1385,24 @@ no concealed animals. Scene gate stays disabled (still 0 review-class animal-lab
 **FP/FN.** loop.metrics: total 258, labeled 133, fp_rate 0.962 — **all MD-auto, n_human=0**
 (no human labels tonight → fp_human & FN unmeasured). Volume 258 environmental (gardening +
 summer garden; vs 106/221 prior nights), no collapse/explosion, no rollback. wm→3114.
+
+## 2026-07-24 — exp #9 live night 3, FN-veto clean, feedback-rich, hold
+
+**Exp #9 (human-gate-raw-classifier-leak) LIVE, new raw path still not exercised (night 3).**
+Ingest ids 3115–3155 (41 triggers, volume ≈ baseline 42, down from 106/221/258 gardening
+nights). 0 rows w/ homo raw top-1 → new raw-classifier gate never fired (rarity as predicted).
+9 HUMAN suppressions all via existing person-box/ensemble-homo paths (daytime yard work
+14:36–15:42, pconf 0.03–0.936; 3146 pconf 0.03 via ensemble-homo), 0 MAIN leaks. 4 human
+animal labels all genuine & correctly handled: 3115/3117 (07:26–07:49 birds → MAIN), 3155
+(17:00 common blackbird → MAIN), 3116 (faint no_animal companion of 3115 → REVIEW, corrected).
+**FN-veto CLEAN.** 0 muted bursts — every non-HUMAN trigger surfaced & human-labeled (nothing
+to adjudicate). scene_gate NULL (disabled).
+**Scene-gate PROTOCOL trigger fired first time — re-validated, stays disabled.** 3116 is the
+first & only on-disk review-class row with a human animal_wrong_id label corpus-wide (other 17
+predate retention). Re-ran validate_scene_gate.py: full-corpus human_animal now 18, but scored
+animal bucket still n=0 — 3116 is first review-class row of the morning, no ref frame in 6h
+window → unscoreable (gate would fail open anyway). No safe threshold → scene_gate_enabled=False
+unchanged (reason upgraded: "the one on-disk animal frame is unscoreable", not "none on disk").
+**FP/FN.** loop.metrics: total 41, labeled 32, fp_rate 0.875 — **human truth** (n_human=32,
+richest feedback night), fp_human 28/32. FN unmeasured but directly checked: 0 silent misses.
+Volume 41 ≈ baseline, no collapse/explosion, no rollback. wm→3155.
