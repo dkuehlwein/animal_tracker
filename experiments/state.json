@@ -110,8 +110,8 @@
     "n_md": 61,
     "total_triggers": 192
   },
-  "last_tick_completed_day": "2026-07-24",
-  "nightly_verdict": "Quiet day back at normal levels (41 triggers) and your busiest feedback day yet \u2014 you labelled 32 of them, confirming the birds all reached your alerts, the people in the yard stayed hidden, and nothing was missed. No change deployed; one blurry morning bird frame let me re-check the scene-similarity mute I've been holding, but it still can't be safely switched on, so it stays off.",
+  "last_tick_completed_day": "2026-07-25",
+  "nightly_verdict": "Busy gardening day \u2014 192 triggers, 131 of them people in the yard, all correctly kept silent with none leaking to your alerts. A few birds (including a dusk crow) reached your alerts correctly and nothing was missed; no labels from you today so this is my own check. No change deployed \u2014 holding steady.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 3347

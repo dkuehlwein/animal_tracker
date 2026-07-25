@@ -1406,3 +1406,21 @@ unchanged (reason upgraded: "the one on-disk animal frame is unscoreable", not "
 **FP/FN.** loop.metrics: total 41, labeled 32, fp_rate 0.875 — **human truth** (n_human=32,
 richest feedback night), fp_human 28/32. FN unmeasured but directly checked: 0 silent misses.
 Volume 41 ≈ baseline, no collapse/explosion, no rollback. wm→3155.
+
+## 2026-07-25 — exp #9 live night 4, FN-veto clean, high-volume gardening, MD-auto, hold
+
+**Exp #9 (human-gate-raw-classifier-leak) LIVE, new raw path still not exercised (night 4).**
+Ingest ids 3156–3347 (192 triggers — busy summer-gardening day: 131 HUMAN, 5 identified,
+53 no_animal, 3 unclassifiable; vs 41 baseline-ish prior night). 0 rows w/ homo raw top-1 →
+new raw-classifier gate never fired (rarity as predicted, 4th consecutive night). 131 HUMAN
+suppressions all via existing person-box/ensemble-homo paths (daytime yard work ~14:47–16:49,
+pconf 0.01–0.89), 0 MAIN leaks. Animals 3342/3343 (16:55/17:01 birds) + 3346 (18:55 dusk
+corvid, below-floor, real black bird on ground) all → MAIN correctly.
+**FN-veto CLEAN.** 0 scene-muted (gate disabled). 3347 (18:57 dusk no_animal, luma 59<70,
+below-floor) un-muted to REVIEW per exp #8 (same falling-light pond scene as 3346, bird at
+far-left edge — observable, not silently muted). No concealed animals in any muted burst.
+**Scene gate stays disabled** — tonight's animals all identified→MAIN (not review-class), so
+no new scoreable review-class animal frame; enablement precondition still unmet, no re-run.
+**FP/FN.** loop.metrics: total 192, labeled 61, fp_rate 0.918 — **all MD-auto, n_human=0**
+(no human labels tonight → fp_human & FN unmeasured). Volume 192 within observed environmental
+range (41/106/221/258 recent nights), no collapse/explosion, no rollback. wm→3347.

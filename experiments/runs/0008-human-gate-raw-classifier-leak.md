@@ -180,3 +180,34 @@ animal frame" to "the one on-disk animal frame is unscoreable (first-of-morning,
 
 **FP/FN.** loop.metrics: total 41, labeled 32, fp_rate 0.875 (human truth, fp_human 28/32).
 Volume 41 ≈ baseline 42, no collapse/explosion → no rollback. **Hold; leak-watch continues.**
+
+### 2026-07-25 (night 4 live) — CLEAN, high-volume gardening, MD-auto, new path still unexercised
+Ingest window ids 3156–3347 (192 triggers; a busy summer-gardening day — 131 HUMAN, 5
+identified, 53 no_animal, 3 unclassifiable). **0 human labels tonight** (n_human=0) →
+MD-auto night, fp_human & FN unmeasured (same posture as nights 07-22/07-23).
+
+- **(a) No real animal suppressed by the new trigger** — 0 rows this window carry a `homo`
+  raw top-1, so `_is_raw_homo_taxon` never fired (fourth night with no positive; homo-raw-top-1
+  remains the predicted ~3-row-per-corpus rarity). No FN-veto event.
+- **(b) 131 HUMAN suppressions** — all via the *existing* person-box / ensemble-homo paths
+  (daytime yard work ~14:47–16:49, pconf spanning 0.01–0.89; several low-pconf rows fired via
+  ensemble-homo). 0 leaked to MAIN. No specific-animal raw top-1 on any HUMAN row.
+- **Animals correctly routed to MAIN** — 3342/3343 (16:55/17:01, `aves;;;;;bird`, luma 76–78,
+  above floor) and 3346 (18:55 dusk, `corvus species`, luma 60, below-floor) all reached MAIN.
+  Visually adjudicated 3346: a real black bird sits on the ground bottom-left of the dusk
+  scene → correct animal→MAIN even below the sharpness floor (exp #6/#8 behaviour).
+
+FN-veto: **CLEAN**. 0 scene-muted bursts (gate disabled). The one below-floor `no_animal`
+review-class row, 3347 (18:57 dusk, luma 59 < blur_mute_min_luma 70), was **un-muted to
+REVIEW** per exp #8 — same falling-light pond scene as 3346, bird now at the far-left frame
+edge; surfaced (observable), not silently muted. No concealed animal in any muted burst.
+scene_gate NULL throughout.
+
+**Scene gate stays disabled.** Tonight's animals were all `identified`→MAIN, none were
+review-class, so no new scoreable review-class animal-labeled frame appeared — the enablement
+precondition (a scoreable review-class animal frame on disk) is still unmet. No re-run needed.
+
+**FP/FN.** loop.metrics: total 192, labeled 61, fp_rate 0.918 (all MD-auto, n_human=0; FN
+unmeasured). Volume 192 is a high gardening day, within the observed environmental range
+(41 / 106 / 221 / 258 on recent nights), no collapse/explosion → no rollback. **Hold;
+leak-watch continues.**
