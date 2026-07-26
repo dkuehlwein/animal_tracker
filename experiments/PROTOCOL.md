@@ -136,7 +136,11 @@ protocol never required.)
 - Feedback-starved freeze: no human labels for 3 days → freeze, hold best_known_good.
 - One active experiment at a time. Respect `state.json.paused`.
 
-## Scene-gate ownership (2026-07-17)
+## Scene-gate ownership (2026-07-17, overridden 2026-07-26)
+
+> **STATUS: ENABLED at T=0.97 since 2026-07-26 by human override.** The HOLD
+> described in the next two paragraphs is HISTORY — read the "SUPERSEDED
+> 2026-07-26" block below before acting on anything in this section.
 
 The scene-unchanged gate (`src/scene_gate.py`, review-class bursts muted when
 near-identical to a recent empty-scene reference) shipped **disabled**
@@ -160,7 +164,38 @@ threshold, deploy via `loop.deploy` with delta
 purely so `loop.deploy` accepts it — it is a flag, not a range, and carries
 no config field-validator).
 
-**Threshold-selection rule (locked in — use this, don't re-derive it):**
+**SUPERSEDED 2026-07-26 — human override, gate is now ENABLED at T=0.97.**
+Daniel directed enabling the scene gate despite the empty animal-labeled
+bucket, as an explicit accepted-risk decision to cut REVIEW volume (paired
+with the review-sampling gate deployed the same day). This overrides the
+FN-veto HOLD above and the threshold-selection rule below — **do not
+re-derive the threshold, and do not disable the gate on the grounds that
+the animal bucket is empty.** That condition is known, permanent for now
+(all animal-labeled review rows corpus-wide predate image retention), and
+has already been ruled on by a human.
+
+Threshold rationale, for the record: a fresh validator re-run on 2026-07-26
+scored 35 on-disk review-class frames (still all `unlabeled`; buckets
+`human_animal`/`human_fp` both n=0), distribution min 0.7376 / median 0.9534
+/ max 0.9793. `T=0.97` mutes 6/35 = 17% and sits just under the observed
+ceiling, so only near-identical frames are muted. It is the pre-registered
+placeholder, not an invented number.
+
+The **post-enable monitoring duty below still applies in full** and is now
+the primary safety net in place of the missing pre-validation: adjudicate
+every `scene_gate_muted=1` burst each tick, and treat a concealed animal as
+an FN-veto event exactly as described. Raising `T` remains in-bounds and is
+the preferred response; disabling the gate is still permitted if no in-bounds
+`T` would have prevented the mute — but only on such positive evidence of a
+real muted animal, never on absence-of-evidence.
+
+Caveat the loop must account for: the review-sampling gate deployed the same
+day cuts human label supply (and therefore FN detection power) roughly 4x —
+see "Review sampling" below. Do not read the resulting label scarcity as a
+feedback-starved freeze unless genuinely zero human labels arrive for 3 days.
+
+**Threshold-selection rule (SUPERSEDED — retained for history; see override
+above before applying):**
 `T = max(similarity over human animal-labeled rows) + 0.02` safety margin,
 clamped to `BOUNDS["PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD"]` = `(0.80,
 1.0)`. Raising the threshold is always the safe direction (mutes fewer
@@ -181,6 +216,32 @@ respond the same tick by raising `scene_gate_similarity_threshold` strictly
 above that frame's recorded `scene_similarity` (within bounds), or by
 disabling the gate (`PERFORMANCE_SCENE_GATE_ENABLED: 0`) if no in-bounds
 threshold would have prevented the mute. Do not defer this to "next tick."
+
+## Review sampling (2026-07-26, Daniel's call)
+
+`PERFORMANCE_REVIEW_SAMPLE_RATE` (default `0.25`, in `BOUNDS`) sends only a
+deterministic ~1/4 sample of review-class bursts that survive the mute gates
+to Telegram. Precedence: Human > Blur > Scene > Sampling. Suppressed bursts
+are still species-ID'd and DB-logged with `review_sampled_out=1`; nothing is
+lost from the corpus, only from Daniel's inbox.
+
+Motivation (measured 2026-07-12..26): 679 review-class bursts, ~44 REVIEW
+messages/night, 128 human labels, and only **4** false negatives — roughly
+one real catch per 155 REVIEW pings. Daniel judged that ratio not worth the
+notification load.
+
+Rules for the loop:
+- This is a **notification-volume lever, not an FP lever.** It changes what
+  Daniel sees, never what is captured or logged. Do not credit a sampling
+  change with an `fp_rate` improvement — `fp_rate` is label-conditioned and
+  unaffected by construction.
+- Raising the rate back toward 1.0 is the correct response to genuine FN
+  evidence (a real animal found in a sampled-out burst), and is in-bounds.
+  It is NOT a valid response to merely having fewer labels — that shrinkage
+  is the intended effect, not a malfunction.
+- Sampled-out rows are unlabelled-because-unsent. Keep them out of the
+  "not yet labelled" backlog line (`loop.report` already separates them);
+  never treat them as unlabelled-because-Daniel-ignored-them.
 
 ## Anti-self-poisoning & self-skepticism
 - Ground truth is append-only; never rewrite `detection_feedback`, `gold/`, or prior

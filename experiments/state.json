@@ -69,18 +69,27 @@
     "volume_per_night": 42
   },
   "best_known_good": {},
-  "deployed": {},
-  "history": [],
-  "last_heartbeat_loopday": "2026-07-25",
+  "deployed": {
+    "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.25,
+    "PERFORMANCE_SCENE_GATE_ENABLED": 1,
+    "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD": 0.97
+  },
+  "history": [
+    {
+      "config": {},
+      "replaced_at": "2026-07-26T11:19:04+02:00"
+    }
+  ],
+  "last_heartbeat_loopday": "2026-07-26",
   "last_metrics": {
-    "date": "2026-07-25",
+    "date": "2026-07-26",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.8220533819707465,
-      0.9644804333931265
+      0.8740493794422576,
+      0.9956814684310874
     ],
     "fp_claude_ci": [
       0.0,
@@ -88,31 +97,32 @@
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 56,
+    "fp_count": 40,
     "fp_human_ci": [
-      0.0,
+      0.6853129557584889,
+      0.9872777847521093
+    ],
+    "fp_human_count": 13,
+    "fp_human_rate": 0.9285714285714286,
+    "fp_md_ci": [
+      0.8754449702581328,
       1.0
     ],
-    "fp_human_count": 0,
-    "fp_human_rate": 0.0,
-    "fp_md_ci": [
-      0.8220533819707465,
-      0.9644804333931265
-    ],
-    "fp_md_count": 56,
-    "fp_md_rate": 0.9180327868852459,
-    "fp_rate": 0.9180327868852459,
+    "fp_md_count": 27,
+    "fp_md_rate": 1.0,
+    "fp_rate": 0.975609756097561,
     "fp_trustworthy": true,
-    "labeled_triggers": 61,
+    "labeled_triggers": 41,
     "n_cant_tell": 0,
     "n_claude": 0,
-    "n_human": 0,
-    "n_md": 61,
-    "total_triggers": 192
+    "n_human": 14,
+    "n_md": 27,
+    "n_sampled_out": 22,
+    "total_triggers": 43
   },
   "last_tick_completed_day": "2026-07-25",
   "nightly_verdict": "Busy gardening day \u2014 192 triggers, 131 of them people in the yard, all correctly kept silent with none leaking to your alerts. A few birds (including a dusk crow) reached your alerts correctly and nothing was missed; no labels from you today so this is my own check. No change deployed \u2014 holding steady.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 3347
+  "watermark": 3390
 }
