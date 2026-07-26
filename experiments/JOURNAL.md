@@ -1424,3 +1424,45 @@ no new scoreable review-class animal frame; enablement precondition still unmet,
 **FP/FN.** loop.metrics: total 192, labeled 61, fp_rate 0.918 — **all MD-auto, n_human=0**
 (no human labels tonight → fp_human & FN unmeasured). Volume 192 within observed environmental
 range (41/106/221/258 recent nights), no collapse/explosion, no rollback. wm→3347.
+
+## 2026-07-26 — scene-gate + review-sampling night 1; FN found in a sampled-out burst → rate 0.25→0.50
+
+**Exp #9 (human-gate-raw-classifier-leak) LIVE night 5; run 0009 (review-volume-reduction,
+human-directed, non-slot) night 1 post-deploy.** Deploy went live at the 11:19 restart, so
+the window is partial: ids 3348–3390 (43 triggers), 3348–3354 pre-restart (gate cols NULL),
+3355–3390 gated. 0 rows w/ homo raw top-1 → exp #9's new raw-classifier gate still not
+exercised (5th night). 2 HUMAN suppressions (09:11/09:12, pconf 0.01/0.51), 0 MAIN leaks.
+
+**Volume.** 35 review-class post-restart: 13 sent, 22 sampled out (realized 37% vs configured
+0.25; n=35, z≈1.7, noise). Scene gate muted 1/35 = 2.9%, well under the 17% the validator
+predicted at T=0.97 — tonight's ssim distribution runs lower than the 07-25/26 daytime corpus
+(only 3364 hit 0.9701, next 0.9567). ~13 REVIEW sends/day vs ~44 baseline: volume goal met,
+almost entirely by sampling, barely by the scene gate.
+
+**Scene-gate duty CLEAN.** Sole muted burst 3364 (14:11:40, ssim 0.9701, no_animal), all 5
+frames inspected: wind-moved bamboo + blue hose nozzle/water stream, no animal. T=0.97 stands.
+
+**Sampled-out duty — ONE REAL ANIMAL, pre-registered exit criterion FIRED.** All 22
+review_sampled_out=1 bursts inspected (frames on disk). 21 empty (wind/vegetation, incl. dusk
+3387/3388/3389). **3382 (17:13:26, unclassifiable) is an unambiguous common blackbird across
+all 5 frames** — ssim 0.8755, scene_gate_muted=0, so the SAMPLING gate suppressed it, not the
+scene gate; raw top-1 `aves;;;;;bird` @0.41 rolled up to unclassifiable. Mitigation, recorded
+so severity isn't overstated: same bird as 3381 (17:11:49, identified common blackbird @0.81 →
+MAIN, human-labelled `animal`). A duplicate sighting, not a lost one.
+**Action: PERFORMANCE_REVIEW_SAMPLE_RATE 0.25→0.50** via loop.deploy, restart stamped
+2026-07-27T03:25+02:00 (before the 03:30 timer). Full revert to 1.0 rejected as over-correction
+on n=1 whose animal reached MAIN anyway; 0.50 halves sampling FN exposure, keeps volume ~2.5x
+under baseline. **Escalation pre-registered: a 2nd real animal in a sampled-out burst → 1.0
+(retire the gate).** Gates: FN-veto n/a (change lowers FN risk), volume normal, 14 human labels
+(not starved), not paused, in BOUNDS [0,1].
+**Rejected: a `top_species_raw`-based sampling exemption.** Only 9/796 review-class rows since
+07-09 carry a non-blank raw label (cheap, 1.1%), but 2 are humans, 2 noise-grade exotics, and
+all 10 human-confirmed animal labels on review-class rows since 07-09 have raw NULL or `blank`
+— including the 4 FNs that motivated run 0009. Fits tonight's case, misses the historical FN
+class → overfitting to n=1. Backlog candidate, not shipped.
+
+**FP/FN.** loop.metrics: total 43, labeled 41, fp_rate 0.976 [0.874,0.996]; n_human=14 (13 FP +
+1 animal on 3381), n_md=27, n_sampled_out=22. Label supply did NOT collapse under sampling (14
+vs 0 the night before), and every human label landed on a row that was actually sent — sampling
+gate and feedback path agree. fp_rate unaffected by either gate, as predicted. Volume 43 ≈
+baseline 42, no collapse/explosion, no rollback. wm→3390.

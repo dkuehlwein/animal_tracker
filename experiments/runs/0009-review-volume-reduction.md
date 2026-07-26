@@ -125,4 +125,76 @@ adjudicable via `review_sampled_out=1`.
 
 ## Observations
 
-_(pending first night post-deploy)_
+### 2026-07-26 — night 1 post-deploy. Exit criterion FIRED: real animal in a sampled-out burst → rate 0.25 → 0.50
+
+Deploy went live at the **11:19 CEST camera restart** (not the usual pre-sunrise
+window — this was a same-day human-directed change), so tonight's window is
+partial: ids 3348–3390 (43 triggers), of which 3348–3354 predate the restart
+(`scene_similarity` NULL, `review_sampled_out` NULL) and 3355–3390 are the first
+gated rows.
+
+**Volume.** 35 review-class rows post-restart; 13 sent, 22 sampled out (realized
+send rate 37% vs the configured 0.25 — n=35, within binomial noise, z≈1.7). Scene
+gate muted exactly **1/35 (2.9%)**, far below the validator's predicted 17% at
+T=0.97: tonight's similarity distribution runs lower than the 07-25/26 daytime
+corpus it was scored on (only 3364 reached 0.9701; next highest 0.9567). Net
+REVIEW sends ≈13 for the day vs the ~44/night baseline — the volume goal was met,
+by sampling far more than by the scene gate.
+
+**Scene-gate adjudication (the standing duty) — CLEAN.** One muted burst, id 3364
+(14:11:40, `scene_similarity` 0.9701, `no_animal`). All 5 burst frames inspected:
+wind-moved bamboo plus the blue hose nozzle/water stream at the pond edge, no
+animal at any scale. No FN-veto event; **T=0.97 stands unchanged.**
+
+**Sampled-out adjudication — ONE REAL ANIMAL. Pre-registered trigger fired.**
+All 22 `review_sampled_out=1` bursts inspected (all frames still on disk).
+21 are empty garden scenes (wind on bamboo/vegetation, incl. the three dusk
+rows 3387/3388/3389). The exception:
+
+> **id 3382, 2026-07-26 17:13:26, `unclassifiable`** — a **common blackbird**,
+> unambiguous across all 5 burst frames (standing on the stone at the left pond
+> edge, walking between frames). `scene_similarity` 0.8755, `scene_gate_muted=0`
+> — **the scene gate did not cause this**; `review_sampled_out=1` did.
+> Raw classifier top-1 was `aves;;;;;bird` @ 0.41, rolled up by the ensemble to
+> unclassifiable. Frame: `data/images/capture_20260726_171314_frame5.jpg`.
+
+Mitigating fact, recorded so the severity is not overstated: this is the **same
+bird** as id 3381 (17:11:49), which was `identified` as common blackbird @ 0.81,
+routed to MAIN, and human-labelled `animal` tonight. Daniel did not miss this
+animal — he saw it two minutes earlier on the primary channel. 3382 is a
+duplicate sighting, not a lost one.
+
+**Action taken (this tick): `PERFORMANCE_REVIEW_SAMPLE_RATE` 0.25 → 0.50**, via
+`loop.deploy`, restart stamped `2026-07-27T03:25+02:00` (before the 03:30
+`wildlife-deploy.timer`). Reasoning:
+
+- The exit criterion above is explicit and pre-registered — "a real animal found
+  in a `review_sampled_out=1` burst" — and it fired on night 1. Honoring a
+  pre-registered trigger is not optional, and the duplicate-of-MAIN mitigation is
+  a reason to size the response, not to skip it.
+- A full revert to 1.0 would over-correct: it discards Daniel's entire stated
+  goal on the strength of n=1 whose animal was independently surfaced anyway.
+  0.50 halves sampling-attributable FN exposure while keeping REVIEW volume
+  roughly 2.5x below the pre-change baseline.
+- **Escalation rule for the next ticks:** a second real animal in a sampled-out
+  burst → go straight to 1.0 (i.e. retire the sampling gate). Two independent
+  hits would mean the 0.6%/burst historical FN rate that motivated the change is
+  wrong for the current season, not that we got unlucky.
+
+**Considered and rejected: a targeted `top_species_raw` exemption.** Since 3382
+carried a non-blank animal raw top-1 (`bird` @ 0.41), exempting such rows from
+sampling looked like a cheap precision fix — only 9/796 review-class rows since
+07-09 have a non-blank raw label (1.1% volume cost). Rejected on coverage: of
+those 9, two are humans, two are noise-grade exotics (crimson rosella @ 0.13,
+wild boar @ 0.09), and — decisively — **all 10 human-confirmed animal labels on
+review-class rows since 07-09 have raw = NULL or `blank`**, including the four
+FNs that motivated this whole experiment. The signal fits tonight's single case
+and misses the historical FN class entirely; shipping it would be overfitting to
+n=1. Left as a backlog candidate, not deployed.
+
+**FP.** 43 triggers, 41 labelled, fp_rate 0.976 [0.874, 0.996]; human tier
+n=14 (13 FP + 1 animal), MD-auto n=27. Label supply did **not** collapse under
+sampling — 14 human labels vs 0 the previous night — and every human-labelled row
+was one that was actually sent (`review_sampled_out=0` or MAIN), confirming the
+sampling gate and the feedback path agree. As predicted, `fp_rate` moved only
+with the scene, not because of either gate.

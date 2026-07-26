@@ -63,6 +63,13 @@
       "slug": "human-gate-raw-classifier-leak",
       "status": "running",
       "validation": "live"
+    },
+    {
+      "hypothesis": "CANDIDATE, not shipped (considered + rejected 2026-07-26, see runs/0009 night-1 observations). Exempt review-class bursts whose top_species_raw last segment is a non-blank animal label from the review-sampling gate, so classifier-says-bird rows always reach Telegram. Cheap (9/796 review-class rows since 07-09 = 1.1% volume). Rejected on coverage: of those 9, 2 are humans and 2 noise-grade exotics (crimson rosella 0.13, wild boar 0.09), and all 10 human-confirmed animal labels on review-class rows since 07-09 have raw NULL or 'blank' \u2014 including the 4 FNs that motivated run 0009. Fits the single 3382 case, misses the historical FN class. Revisit only if a 2nd non-blank-raw FN appears.",
+      "id": 10,
+      "slug": "raw-top1-sampling-exemption",
+      "status": "parked",
+      "validation": "parked"
     }
   ],
   "baselines": {
@@ -70,7 +77,7 @@
   },
   "best_known_good": {},
   "deployed": {
-    "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.25,
+    "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.5,
     "PERFORMANCE_SCENE_GATE_ENABLED": 1,
     "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD": 0.97
   },
@@ -78,6 +85,14 @@
     {
       "config": {},
       "replaced_at": "2026-07-26T11:19:04+02:00"
+    },
+    {
+      "config": {
+        "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.25,
+        "PERFORMANCE_SCENE_GATE_ENABLED": 1,
+        "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD": 0.97
+      },
+      "replaced_at": "2026-07-27T03:25:00+02:00"
     }
   ],
   "last_heartbeat_loopday": "2026-07-26",
@@ -120,9 +135,9 @@
     "n_sampled_out": 22,
     "total_triggers": 43
   },
-  "last_tick_completed_day": "2026-07-25",
-  "nightly_verdict": "Busy gardening day \u2014 192 triggers, 131 of them people in the yard, all correctly kept silent with none leaking to your alerts. A few birds (including a dusk crow) reached your alerts correctly and nothing was missed; no labels from you today so this is my own check. No change deployed \u2014 holding steady.",
+  "last_tick_completed_day": "2026-07-26",
+  "nightly_verdict": "First night with the new quiet-mode filters: REVIEW alerts dropped from ~44 to 13 and you still labelled 14. But my check of the silenced ones found a real blackbird among them, so I've turned the filter back up (sending half instead of a quarter) \u2014 you saw that same bird on your main alerts anyway.",
   "paused": false,
-  "pending_restart_at": null,
+  "pending_restart_at": "2026-07-27T03:25:00+02:00",
   "watermark": 3390
 }
