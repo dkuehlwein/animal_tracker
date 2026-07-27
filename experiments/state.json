@@ -95,16 +95,16 @@
       "replaced_at": "2026-07-27T03:25:00+02:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-07-26",
+  "last_heartbeat_loopday": "2026-07-27",
   "last_metrics": {
-    "date": "2026-07-26",
+    "date": "2026-07-27",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.8740493794422576,
-      0.9956814684310874
+      0.9264588050529105,
+      0.9942074931355945
     ],
     "fp_claude_ci": [
       0.0,
@@ -112,32 +112,32 @@
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 40,
+    "fp_count": 93,
     "fp_human_ci": [
-      0.6853129557584889,
-      0.9872777847521093
+      0.7803541984972431,
+      0.9808787338305667
     ],
-    "fp_human_count": 13,
-    "fp_human_rate": 0.9285714285714286,
+    "fp_human_count": 27,
+    "fp_human_rate": 0.9310344827586207,
     "fp_md_ci": [
-      0.8754449702581328,
+      0.9449974429864586,
       1.0
     ],
-    "fp_md_count": 27,
+    "fp_md_count": 66,
     "fp_md_rate": 1.0,
-    "fp_rate": 0.975609756097561,
+    "fp_rate": 0.9789473684210527,
     "fp_trustworthy": true,
-    "labeled_triggers": 41,
+    "labeled_triggers": 95,
     "n_cant_tell": 0,
     "n_claude": 0,
-    "n_human": 14,
-    "n_md": 27,
-    "n_sampled_out": 22,
-    "total_triggers": 43
+    "n_human": 29,
+    "n_md": 66,
+    "n_sampled_out": 36,
+    "total_triggers": 217
   },
   "last_tick_completed_day": "2026-07-26",
   "nightly_verdict": "First night with the new quiet-mode filters: REVIEW alerts dropped from ~44 to 13 and you still labelled 14. But my check of the silenced ones found a real blackbird among them, so I've turned the filter back up (sending half instead of a quarter) \u2014 you saw that same bird on your main alerts anyway.",
   "paused": false,
-  "pending_restart_at": "2026-07-27T03:25:00+02:00",
-  "watermark": 3390
+  "pending_restart_at": null,
+  "watermark": 3607
 }
