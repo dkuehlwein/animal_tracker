@@ -1466,3 +1466,69 @@ class → overfitting to n=1. Backlog candidate, not shipped.
 vs 0 the night before), and every human label landed on a row that was actually sent — sampling
 gate and feedback path agree. fp_rate unaffected by either gate, as predicted. Volume 43 ≈
 baseline 42, no collapse/explosion, no rollback. wm→3390.
+
+## 2026-07-27 — exp #9 CONCLUDED (keep); exp #11 (human-proximity-review-leak) SHIPPED
+
+**Night.** 217 triggers (122 human, 89 no_animal, 4 unclassifiable, 2 identified) — a
+full-day gardening scene, same class as 07-25 (192) and 07-23 (258). 95 labelled, fp_rate
+0.979 [0.926, 0.994]; n_human=29 (27 fp + 1 animal + 1 person), n_md=66, n_sampled_out=36.
+Label supply healthy at sample rate 0.50 (29 vs 14 the night before). wm→3607.
+
+**Standing duties.** Scene gate: **0 muted bursts** in 93 review-class rows — similarity
+tops out at 0.948, all under T=0.97; two nights in, the gate has muted 1 burst total and
+essentially all REVIEW-volume reduction is coming from sampling. Recorded, not acted on
+(PROTOCOL 07-26 override: don't re-derive T; lowering it is the unsafe direction).
+Sampled-out: 36 rows, **19 still had frames and all 19 were inspected** (motion-boxed
+contact sheets) — wind on bamboo, hose/water stream, a static yellow object at the pond
+rim; no animals, no people. The 07-26 escalation (2nd real animal in a sampled-out burst
+→ rate 1.0) did NOT fire; rate stays 0.50. **17 of the 36 had already lost their frames
+to retention** — see the max_images change below.
+
+**THE FINDING: a fourth human-gate leak path.** id 3554 carried a human `person` label on
+a `no_animal` row — a REVIEW notification that showed Daniel a person. Frames confirm it:
+legs + torso at ~1m, filling the left third. `person_confidence` 0.041 with
+`detection_count=0` — MegaDetector found no person box **at all**, ensemble `no_animal`,
+`top_species_raw` NULL. All three human-gate triggers (person box ≥0.30, ensemble `homo`,
+exp #9's raw `homo`) are structurally blind to close-up / motion-blurred PARTIAL bodies.
+Checking every sent review-class row within 120s of a human burst (5 rows, frames on disk):
+**3 of 5 are people** (3544 arm, 3553 torso+arm, 3554 legs; 3580/3607 empty). Two of the
+three were labelled `false_positive` — to Daniel a person photo and a leaf photo are both
+"nothing there", so **the label stream systematically understates this leak**; only the DB
+shows it.
+
+**Action: exp #11 shipped, commit `50aa451`, live at the 07-28T03:25 restart.**
+`human_proximity_window_seconds=120` (`PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS`, BOUNDS
+[0,600], 0=off): review-class bursts within 120s of the last HUMAN-status detection are
+still species-ID'd and DB-logged (new `human_proximity_muted` column) but not sent.
+Precedence now Human > **Human-Proximity** > Blur > Scene > Sampling, one suppression log
+per burst; last-human timestamp seeded from the DB at startup; fails open. 474 tests pass.
+**FN-veto cleared by measurement, not assumption** — this is the evidence the scene gate
+never had: of the 12 human-labelled animal/animal_wrong_id review-class rows since the
+human gate went live (07-08), **0 fall within 120s of a preceding human burst**; nearest is
+329s (2.7x margin) while the three leaks sit at 76/79/108s. 300s would also cost 0/12 but
+with only 10% margin → 120s is the evidence-supported window, not the maximal one. Cost:
+118/902 = 13% of review-class bursts since 07-08. Exit criteria + nightly adjudication duty
+pre-registered in runs/0010.
+
+**exp #9 CONCLUDED (KEEP, live).** Six nights, raw-homo trigger never fired (0 rows — its
+measured base rate is 3 rows corpus-wide), zero regressions, 0 MAIN leaks, 122 correct
+HUMAN suppressions tonight. Rare-event insurance behaving as predicted. Slot passes to #11.
+
+**Infrastructure: `PERFORMANCE_MAX_IMAGES` 100 → 300** (added to BOUNDS, deployed). At 217
+triggers/day the ~100-burst retention window is ~5 hours, and the loop could not adjudicate
+17 of its own 36 sampled-out bursts (nor check whether the MAIN-channel FP 3483 was a
+person). 300 bursts ≈ 850MB vs 8.6GB free. No detection/notification behaviour change.
+
+**Guardrail note: the volume baseline was stale, not the volume.** 217/42 = 5.17x tripped
+`check_volume`'s explosion rule. Rollback NOT performed, on cause: every deployed lever is
+notification-layer (scene gate, sample rate, proximity window) and none can change capture
+volume; 122 of 217 triggers are confirmed human bursts. Trailing 7-day counts are
+221/106/258/41/192/43/217 → `baselines.volume_per_night` updated **42 → 192** so the
+guardrail tracks the current season instead of firing on every ordinary busy day.
+
+**Hygiene.** The Review Sampling Gate (exp #9 / run 0009, deployed 07-26) had been running
+live from an **uncommitted working tree**; it is committed in `50aa451` together with the
+proximity gate (same files, not separable by hunk). Consequence recorded: `git revert` of
+that commit would undo both — per-gate rollback is the env lever
+(`PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS=0`, `PERFORMANCE_REVIEW_SAMPLE_RATE=1.0`),
+not git.

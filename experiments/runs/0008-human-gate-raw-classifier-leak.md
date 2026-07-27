@@ -211,3 +211,31 @@ precondition (a scoreable review-class animal frame on disk) is still unmet. No 
 unmeasured). Volume 192 is a high gardening day, within the observed environmental range
 (41 / 106 / 221 / 258 on recent nights), no collapse/explosion → no rollback. **Hold;
 leak-watch continues.**
+
+---
+
+## Resolution — CONCLUDED 2026-07-27 (KEEP, live)
+
+Six nights live (07-22 .. 07-27). The raw-`homo` trigger itself never fired: 0
+rows in the whole window carry a `homo` raw top-1, which is exactly the measured
+base rate that justified it (3 rows corpus-wide, all confirmed humans). It is
+insurance against a rare, high-cost event, and "unexercised" is the expected
+outcome, not a failure. **Zero regressions**: no real animal was ever suppressed
+by it, and no HUMAN row carried a specific-animal raw top-1 that the
+`_is_specific_animal_taxon` guard had to protect.
+
+The gate as a whole worked hard: 122 HUMAN suppressions tonight alone (873
+corpus-wide), 0 MAIN leaks across all six nights.
+
+**KEEP.** The change stays live; the slot passes to exp #11.
+
+**But the gate is not complete**, and the successor experiment says why. Tonight
+produced three confirmed *person-in-REVIEW* leaks (ids 3544, 3553, 3554) via a
+**fourth** path this experiment does not address: extreme close-up /
+motion-blurred **partial** bodies score ~0.02–0.15 person confidence with no
+MegaDetector box at all, the ensemble says `no_animal`, and the raw top-1 is
+NULL — so none of the three triggers (person box ≥ 0.30, ensemble `homo`, raw
+`homo`) can see them. That is a different failure mode from this experiment's
+"ensemble rolled a confident homo top-1 into a generic label", not a regression
+of it. Carried forward as exp #11 (`runs/0010-human-proximity-review-leak.md`),
+which mutes review-class bursts within 120 s of a HUMAN-status burst.
