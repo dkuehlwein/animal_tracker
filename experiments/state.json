@@ -2,7 +2,7 @@
   "active_experiment_id": 11,
   "backlog": [
     {
-      "hypothesis": "CONCLUDED 2026-06-15 (keep). Same-channel 🔍 REVIEW prefix on status∈{NO_ANIMAL,UNCLASSIFIABLE} flags 99% of FP at 0 FN; live since 06-12, location-agnostic. Second-channel routing is OUT per Daniel (no 2nd channel — adds overhead, won't click two). See runs/0001 + LEARNINGS.",
+      "hypothesis": "CONCLUDED 2026-06-15 (keep). Same-channel \ud83d\udd0d REVIEW prefix on status\u2208{NO_ANIMAL,UNCLASSIFIABLE} flags 99% of FP at 0 FN; live since 06-12, location-agnostic. Second-channel routing is OUT per Daniel (no 2nd channel \u2014 adds overhead, won't click two). See runs/0001 + LEARNINGS.",
       "id": 1,
       "slug": "notification-gate-live",
       "status": "concluded",
@@ -16,7 +16,7 @@
       "validation": "parked"
     },
     {
-      "hypothesis": "CONCLUDED 2026-06-17 (not viable in current scene). In-tick spatial diagnostic (diff burst frames → motion centroid, 70 labeled detections w/ frames on disk: 18 real-animal incl wrong_species, 52 FP). FP and animal motion centroids are spatially ENTANGLED — both center-weighted (median ~0.5/0.5). NO edge band removes FP without removing a comparable-or-greater share of animals: left15% catches 8%FP vs 17%animals (hurts animals MORE), right15% 12%FP vs 11%animals (wash), top15% 10%FP vs 11%animals (wash), bottom15% 0 animals but only 1/52 FP (negligible). No zero-observed-FN ROI exists → FN-veto stands on data, not assumption. Reinforces exp #4 (motion knobs don't separate FP from animal) + exp #1 (notification-layer REVIEW prefix is the right architecture, not trigger-side suppression). See JOURNAL 2026-06-17.",
+      "hypothesis": "CONCLUDED 2026-06-17 (not viable in current scene). In-tick spatial diagnostic (diff burst frames \u2192 motion centroid, 70 labeled detections w/ frames on disk: 18 real-animal incl wrong_species, 52 FP). FP and animal motion centroids are spatially ENTANGLED \u2014 both center-weighted (median ~0.5/0.5). NO edge band removes FP without removing a comparable-or-greater share of animals: left15% catches 8%FP vs 17%animals (hurts animals MORE), right15% 12%FP vs 11%animals (wash), top15% 10%FP vs 11%animals (wash), bottom15% 0 animals but only 1/52 FP (negligible). No zero-observed-FN ROI exists \u2192 FN-veto stands on data, not assumption. Reinforces exp #4 (motion knobs don't separate FP from animal) + exp #1 (notification-layer REVIEW prefix is the right architecture, not trigger-side suppression). See JOURNAL 2026-06-17.",
       "id": 3,
       "slug": "roi-masking",
       "status": "concluded",
@@ -30,53 +30,53 @@
       "validation": "live"
     },
     {
-      "hypothesis": "CONCLUDED 2026-07-07 (shipped). Daniel's product/privacy call: SUPPRESS human alerts entirely (no Telegram, not REVIEW-tagged); saved photos of HUMAN-status detections kept 48h then purged, DB row kept as metadata-only. Fix shipped as a MegaDetector person-gate (human_detection_confidence>=0.3) OR homo-taxon check, evaluated before the animal branch — broader than the originally-proposed taxon-only REVIEW-tag fix, since most human captures are blurry NO_ANIMAL/UNCLASSIFIABLE frames never tagged 'homo'. New config: SPECIES_HUMAN_DETECTION_CONFIDENCE, PERFORMANCE_SUPPRESS_HUMAN_ALERTS, PERFORMANCE_HUMAN_RETENTION_HOURS; new DetectionStatus.HUMAN. Shipped on branch fix/human-gate-blur-gate. Leak-watch continues post-deploy as verification. See runs/0004 Resolution + JOURNAL 2026-07-08.",
+      "hypothesis": "CONCLUDED 2026-07-07 (shipped). Daniel's product/privacy call: SUPPRESS human alerts entirely (no Telegram, not REVIEW-tagged); saved photos of HUMAN-status detections kept 48h then purged, DB row kept as metadata-only. Fix shipped as a MegaDetector person-gate (human_detection_confidence>=0.3) OR homo-taxon check, evaluated before the animal branch \u2014 broader than the originally-proposed taxon-only REVIEW-tag fix, since most human captures are blurry NO_ANIMAL/UNCLASSIFIABLE frames never tagged 'homo'. New config: SPECIES_HUMAN_DETECTION_CONFIDENCE, PERFORMANCE_SUPPRESS_HUMAN_ALERTS, PERFORMANCE_HUMAN_RETENTION_HOURS; new DetectionStatus.HUMAN. Shipped on branch fix/human-gate-blur-gate. Leak-watch continues post-deploy as verification. See runs/0004 Resolution + JOURNAL 2026-07-08.",
       "id": 5,
       "slug": "human-main-channel-leak",
       "status": "concluded",
       "validation": "live"
     },
     {
-      "hypothesis": "CONCLUDED 2026-07-07 (shipped). The sharpness floor (min_sharpness_threshold=11.0) in _capture_and_select_best_frame silently discarded low-light/dusk captures (return None,None before DB logging or notification), causing unrecorded false negatives — e.g. the 07-07 ~19:10 pond bird detected 17x across 4 captured bursts, never logged. Fix: below-floor bursts now always get species ID + a DB row; alert if an animal is found (even blurry), mute (DB-log only, no Telegram) if not, so REVIEW volume does not rise. fn_risk down, fp_rate unchanged. Shipped on branch fix/human-gate-blur-gate. See runs/0005 + JOURNAL 2026-07-08.",
+      "hypothesis": "CONCLUDED 2026-07-07 (shipped). The sharpness floor (min_sharpness_threshold=11.0) in _capture_and_select_best_frame silently discarded low-light/dusk captures (return None,None before DB logging or notification), causing unrecorded false negatives \u2014 e.g. the 07-07 ~19:10 pond bird detected 17x across 4 captured bursts, never logged. Fix: below-floor bursts now always get species ID + a DB row; alert if an animal is found (even blurry), mute (DB-log only, no Telegram) if not, so REVIEW volume does not rise. fn_risk down, fp_rate unchanged. Shipped on branch fix/human-gate-blur-gate. See runs/0005 + JOURNAL 2026-07-08.",
       "id": 6,
       "slug": "blur-gate-false-negative",
       "status": "concluded",
       "validation": "live"
     },
     {
-      "hypothesis": "ROLLED BACK 2026-07-09 (same day as ship). AE=short was meant to raise dusk sharpness_score above the 11.0 floor. Measurement on saved frames shows it CANNOT: sharpness_score is Laplacian variance, which scales with frame contrast/brightness; AE=short lowers luma by construction (19h matched-hour: luma 68.9->52.0), so it pushes MORE bursts below the floor, not fewer. Run 0006's own pre-registered 'midday regression => reconsider' trigger also fired (16h lap 19.18->15.07). FN unmeasured + plausible FN rise via the below-floor+no-animal mute path => FN-veto => reverted to AE=normal. Reopened as running to collect the matched-hour 17-19h AE=normal baseline that was never captured. CONCLUDED 2026-07-10: AE=normal dusk baseline now in (07-10 17-18h sharpness 6.9-9.4) and is indistinguishable from AE=short (07-09 17-18h 7.8-8.6) — both below the 11.0 floor. AE mode is not the lever; the floor statistic is (backlog id 8, now active). AE=normal retained. See runs/0006.",
+      "hypothesis": "ROLLED BACK 2026-07-09 (same day as ship). AE=short was meant to raise dusk sharpness_score above the 11.0 floor. Measurement on saved frames shows it CANNOT: sharpness_score is Laplacian variance, which scales with frame contrast/brightness; AE=short lowers luma by construction (19h matched-hour: luma 68.9->52.0), so it pushes MORE bursts below the floor, not fewer. Run 0006's own pre-registered 'midday regression => reconsider' trigger also fired (16h lap 19.18->15.07). FN unmeasured + plausible FN rise via the below-floor+no-animal mute path => FN-veto => reverted to AE=normal. Reopened as running to collect the matched-hour 17-19h AE=normal baseline that was never captured. CONCLUDED 2026-07-10: AE=normal dusk baseline now in (07-10 17-18h sharpness 6.9-9.4) and is indistinguishable from AE=short (07-09 17-18h 7.8-8.6) \u2014 both below the 11.0 floor. AE mode is not the lever; the floor statistic is (backlog id 8, now active). AE=normal retained. See runs/0006.",
       "id": 7,
       "slug": "dusk-short-exposure",
       "status": "concluded",
       "validation": "live"
     },
     {
-      "hypothesis": "CONCLUDED 2026-07-21 (KEEP, live). ROOT CAUSE behind exp #6/#5: min_sharpness_threshold=11.0 on raw Laplacian variance is a SCENE-BRIGHTNESS gate, not a blur gate (P(lap<11.0)=0% luma>=80, 71% luma 60-80, 100% luma<40 over 470 frames), so at dusk the blur-gate mute path fires as a function of darkness. Fix (c/b hybrid) SHIPPED 2026-07-18 commit 683f5f3: blur_mute_min_luma=70.0 — below-floor no-animal review-class bursts are only muted when luma>=70; when luma<70 (genuinely dark) they flow to REVIEW instead of being silently muted, closing the unobservable-dusk-FN class. Validated over two dusk-heavy nights (07-20, 07-21), both FN-veto CLEAN (0 concealed animals across 14 adjudicated review-class muted/un-muted frames). 07-21 volume bump quantified: 9/12 below-floor no-animal dusk frames luma<70 -> un-muted to REVIEW (all true-negative empty scenes), 3 muted; ~9 extra REVIEW msgs/dusk-night, no guardrail trip. 0 MAIN leaks; dusk birds (incl. below-floor 2749) correctly routed to MAIN. Rollback = git revert 683f5f3 + restart, or raise the knob. See runs/0007.",
+      "hypothesis": "CONCLUDED 2026-07-21 (KEEP, live). ROOT CAUSE behind exp #6/#5: min_sharpness_threshold=11.0 on raw Laplacian variance is a SCENE-BRIGHTNESS gate, not a blur gate (P(lap<11.0)=0% luma>=80, 71% luma 60-80, 100% luma<40 over 470 frames), so at dusk the blur-gate mute path fires as a function of darkness. Fix (c/b hybrid) SHIPPED 2026-07-18 commit 683f5f3: blur_mute_min_luma=70.0 \u2014 below-floor no-animal review-class bursts are only muted when luma>=70; when luma<70 (genuinely dark) they flow to REVIEW instead of being silently muted, closing the unobservable-dusk-FN class. Validated over two dusk-heavy nights (07-20, 07-21), both FN-veto CLEAN (0 concealed animals across 14 adjudicated review-class muted/un-muted frames). 07-21 volume bump quantified: 9/12 below-floor no-animal dusk frames luma<70 -> un-muted to REVIEW (all true-negative empty scenes), 3 muted; ~9 extra REVIEW msgs/dusk-night, no guardrail trip. 0 MAIN leaks; dusk birds (incl. below-floor 2749) correctly routed to MAIN. Rollback = git revert 683f5f3 + restart, or raise the knob. See runs/0007.",
       "id": 8,
       "slug": "sharpness-floor-is-a-brightness-gate",
       "status": "concluded",
       "validation": "live"
     },
     {
-      "hypothesis": "CONCLUDED 2026-07-27 (KEEP, live). Six nights live (07-22..27). The new raw-homo top-1 trigger never fired (0 rows carry a homo raw top-1 in the window) — exactly the measured base rate that justified it (3 rows corpus-wide, all confirmed humans); it is rare-event insurance, and unexercised is the expected outcome. Zero regressions: no real animal suppressed, no HUMAN row with a specific-animal raw top-1. Gate as a whole: 122 HUMAN suppressions on 07-27 alone, 0 MAIN leaks across all six nights. NOT complete though — 07-27 found a FOURTH leak path this fix does not cover (close-up/motion-blurred PARTIAL bodies: no MegaDetector box at all, pc 0.02-0.15, ensemble no_animal, raw NULL → person photos sent as REVIEW; ids 3544/3553/3554). Carried forward as exp #11. See runs/0008 Resolution.",
+      "hypothesis": "CONCLUDED 2026-07-27 (KEEP, live). Six nights live (07-22..27). The new raw-homo top-1 trigger never fired (0 rows carry a homo raw top-1 in the window) \u2014 exactly the measured base rate that justified it (3 rows corpus-wide, all confirmed humans); it is rare-event insurance, and unexercised is the expected outcome. Zero regressions: no real animal suppressed, no HUMAN row with a specific-animal raw top-1. Gate as a whole: 122 HUMAN suppressions on 07-27 alone, 0 MAIN leaks across all six nights. NOT complete though \u2014 07-27 found a FOURTH leak path this fix does not cover (close-up/motion-blurred PARTIAL bodies: no MegaDetector box at all, pc 0.02-0.15, ensemble no_animal, raw NULL \u2192 person photos sent as REVIEW; ids 3544/3553/3554). Carried forward as exp #11. See runs/0008 Resolution.",
       "id": 9,
       "slug": "human-gate-raw-classifier-leak",
       "status": "concluded",
       "validation": "live"
     },
     {
-      "hypothesis": "CANDIDATE, not shipped (considered + rejected 2026-07-26, see runs/0009 night-1 observations). Exempt review-class bursts whose top_species_raw last segment is a non-blank animal label from the review-sampling gate, so classifier-says-bird rows always reach Telegram. Cheap (9/796 review-class rows since 07-09 = 1.1% volume). Rejected on coverage: of those 9, 2 are humans and 2 noise-grade exotics (crimson rosella 0.13, wild boar 0.09), and all 10 human-confirmed animal labels on review-class rows since 07-09 have raw NULL or 'blank' — including the 4 FNs that motivated run 0009. Fits the single 3382 case, misses the historical FN class. Revisit only if a 2nd non-blank-raw FN appears.",
+      "hypothesis": "CANDIDATE, not shipped (considered + rejected 2026-07-26, see runs/0009 night-1 observations). Exempt review-class bursts whose top_species_raw last segment is a non-blank animal label from the review-sampling gate, so classifier-says-bird rows always reach Telegram. Cheap (9/796 review-class rows since 07-09 = 1.1% volume). Rejected on coverage: of those 9, 2 are humans and 2 noise-grade exotics (crimson rosella 0.13, wild boar 0.09), and all 10 human-confirmed animal labels on review-class rows since 07-09 have raw NULL or 'blank' \u2014 including the 4 FNs that motivated run 0009. Fits the single 3382 case, misses the historical FN class. Revisit only if a 2nd non-blank-raw FN appears.",
       "id": 10,
       "slug": "raw-top1-sampling-exemption",
       "status": "parked",
       "validation": "parked"
     },
     {
+      "hypothesis": "ACTIVATED + SHIPPED 2026-07-27 (commit 50aa451, restart-gated 07-28T03:25), running/live. Fourth human-gate leak path: MegaDetector finds NO person box on extreme close-up / motion-blurred PARTIAL human bodies (pc 0.02-0.15, detection_count 0), the ensemble says no_animal and raw top-1 is NULL, so all three existing triggers are blind and the person's photo is sent as a REVIEW notification (3 confirmed on 07-27: ids 3544, 3553, 3554 \u2014 note 2 of the 3 were human-labelled false_positive, so the label stream understates this leak). Fix: mute (Telegram only; still species-ID'd + DB-logged with new human_proximity_muted column) review-class bursts landing within human_proximity_window_seconds (120, env PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS, BOUNDS [0,600], 0=off) of the last HUMAN-status detection. Precedence: Human > Human-Proximity > Blur > Scene > Sampling. FN-veto cleared BY MEASUREMENT, not assumption: 0 of the 12 human-labelled animal/animal_wrong_id review-class rows since the human gate went live (2026-07-08) fall within 120s of a preceding human burst; nearest is 329s (2.7x margin), while the 3 leaks sit at 76-108s. Cost 118/902 = 13% of review-class bursts since 07-08. 474 tests pass. Nightly duty: adjudicate every human_proximity_muted=1 burst. Rollback: window=0 + restart. See runs/0010.",
       "id": 11,
       "slug": "human-proximity-review-leak",
       "status": "running",
-      "validation": "live",
-      "hypothesis": "ACTIVATED + SHIPPED 2026-07-27 (commit 50aa451, restart-gated 07-28T03:25), running/live. Fourth human-gate leak path: MegaDetector finds NO person box on extreme close-up / motion-blurred PARTIAL human bodies (pc 0.02-0.15, detection_count 0), the ensemble says no_animal and raw top-1 is NULL, so all three existing triggers are blind and the person's photo is sent as a REVIEW notification (3 confirmed on 07-27: ids 3544, 3553, 3554 — note 2 of the 3 were human-labelled false_positive, so the label stream understates this leak). Fix: mute (Telegram only; still species-ID'd + DB-logged with new human_proximity_muted column) review-class bursts landing within human_proximity_window_seconds (120, env PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS, BOUNDS [0,600], 0=off) of the last HUMAN-status detection. Precedence: Human > Human-Proximity > Blur > Scene > Sampling. FN-veto cleared BY MEASUREMENT, not assumption: 0 of the 12 human-labelled animal/animal_wrong_id review-class rows since the human gate went live (2026-07-08) fall within 120s of a preceding human burst; nearest is 329s (2.7x margin), while the 3 leaks sit at 76-108s. Cost 118/902 = 13% of review-class bursts since 07-08. 474 tests pass. Nightly duty: adjudicate every human_proximity_muted=1 burst. Rollback: window=0 + restart. See runs/0010."
+      "validation": "live"
     }
   ],
   "baselines": {
@@ -152,8 +152,8 @@
     "n_sampled_out": 36,
     "total_triggers": 217
   },
-  "last_tick_completed_day": "2026-07-26",
-  "nightly_verdict": "Busy gardening day — 217 triggers, 122 of them people. Three of the REVIEW alerts you got were actually close-up photos of a person that the privacy filter couldn't recognise as human, so I shipped a fix: from tomorrow, review alerts within two minutes of a confirmed person are held back. It costs no missed animals — I checked every animal you've ever flagged in that channel and none were near a person.",
+  "last_tick_completed_day": "2026-07-27",
+  "nightly_verdict": "Busy gardening day \u2014 217 triggers, 122 of them people. Three of the REVIEW alerts you got were actually close-up photos of a person that the privacy filter couldn't recognise as human, so I shipped a fix: from tomorrow, review alerts within two minutes of a confirmed person are held back. It costs no missed animals \u2014 I checked every animal you've ever flagged in that channel and none were near a person.",
   "paused": false,
   "pending_restart_at": "2026-07-28T03:25:00+02:00",
   "watermark": 3607
