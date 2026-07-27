@@ -48,6 +48,20 @@ class DatabaseManager:
         # muted volume to it.
         "scene_similarity": "REAL",
         "scene_gate_muted": "BOOLEAN",
+        # REVIEW-channel sampling gate: True when a review-class burst was
+        # sampled OUT of Telegram notification, False when review-class and
+        # sampled in, NULL when the status isn't review-class (or the gate
+        # never evaluated it). Written via a follow-up UPDATE, not the
+        # initial INSERT — see update_review_sampled_out below.
+        "review_sampled_out": "BOOLEAN",
+        # Human-proximity mute gate: True when a review-class burst landed
+        # within human_proximity_window_seconds of the most recent
+        # HUMAN-status detection, False when review-class and outside the
+        # window, NULL when the status isn't review-class (or the gate never
+        # evaluated it). Same NULL-for-non-review-class convention as
+        # scene_gate_muted; unlike review_sampled_out this is written on the
+        # initial INSERT (no detection_id dependency).
+        "human_proximity_muted": "BOOLEAN",
     }
 
     def init_database(self):
@@ -151,7 +165,8 @@ class DatabaseManager:
                      detection_status=None, sharpness_score=None,
                      below_sharpness_floor=None, person_confidence=None,
                      top_species_raw=None, top_species_score=None,
-                     scene_similarity=None, scene_gate_muted=None) -> Optional[int]:
+                     scene_similarity=None, scene_gate_muted=None,
+                     review_sampled_out=None, human_proximity_muted=None) -> Optional[int]:
         """Log a detection event to the database.
 
         The trailing keyword arguments are the Phase-1 richer-logging fields
@@ -164,7 +179,14 @@ class DatabaseManager:
         rolled-up) ensemble `species_name`. `scene_similarity`/
         `scene_gate_muted` are Task 2's: the scene-unchanged gate's
         comparator score against the empty-scene reference set and whether
-        it crossed the mute threshold.
+        it crossed the mute threshold. `review_sampled_out` is the
+        REVIEW-channel sampling gate's decision; callers normally leave it
+        None here (the detection id it's keyed on doesn't exist until this
+        INSERT returns) and set it afterwards via update_review_sampled_out.
+        `human_proximity_muted` is the human-proximity mute gate's decision
+        (True/False for review-class bursts, None otherwise) — unlike
+        `review_sampled_out` it doesn't depend on this row's own id, so it's
+        set directly on the initial INSERT.
         """
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -202,6 +224,8 @@ class DatabaseManager:
                     "top_species_score": top_species_score,
                     "scene_similarity": scene_similarity,
                     "scene_gate_muted": scene_gate_muted,
+                    "review_sampled_out": review_sampled_out,
+                    "human_proximity_muted": human_proximity_muted,
                 }
                 columns = ", ".join(values)
                 placeholders = ", ".join("?" * len(values))
@@ -231,6 +255,29 @@ class DatabaseManager:
             raise DatabaseOperationError(f"Failed to log detection: {e}") from e
         except Exception as e:
             raise DatabaseError(f"Unexpected error logging detection: {e}") from e
+
+    def update_review_sampled_out(self, detection_id: int, sampled_out: bool) -> None:
+        """Set review_sampled_out on an already-inserted detection row.
+
+        The REVIEW-channel sampling decision (see
+        wildlife_system.is_review_sampled_out) is deterministic on
+        detection_id, but detection_id — the autoincrement primary key — only
+        exists once log_detection's INSERT has returned, so it can't be
+        included in the original INSERT the way the other observability
+        columns are. This is a small, targeted follow-up UPDATE instead.
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE detections SET review_sampled_out = ? WHERE id = ?",
+                    (sampled_out, detection_id),
+                )
+                conn.commit()
+        except sqlite3.Error as e:
+            raise DatabaseOperationError(f"Failed to update review_sampled_out: {e}") from e
+        except Exception as e:
+            raise DatabaseError(f"Unexpected error updating review_sampled_out: {e}") from e
 
     # Human-tap labels map to these canonical strings (see feedback_protocol.py,
     # the single source of truth for wire codes; this tuple must cover every
@@ -426,6 +473,35 @@ class DatabaseManager:
             raise DatabaseOperationError(f"Failed to get recent review detections: {e}") from e
         except Exception as e:
             raise DatabaseError(f"Unexpected error getting recent review detections: {e}") from e
+
+    def get_last_human_detection_time(self) -> Optional[datetime]:
+        """Return the timestamp of the most recent HUMAN-status detection, or
+        None if there is none.
+
+        Used to seed the human-proximity mute gate's in-memory state
+        (`WildlifeSystem._last_human_detection_at`) at startup, so a restart
+        doesn't lose the look-back window. Modeled on
+        `get_recent_review_detections`; `timestamp` is stored as a local
+        wall-clock string in "%Y-%m-%d %H:%M:%S" format.
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT timestamp
+                    FROM detections
+                    WHERE detection_status = 'human'
+                    ORDER BY timestamp DESC
+                    LIMIT 1
+                ''')
+                row = cursor.fetchone()
+                if row is None:
+                    return None
+                return datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
+        except sqlite3.Error as e:
+            raise DatabaseOperationError(f"Failed to get last human detection time: {e}") from e
+        except Exception as e:
+            raise DatabaseError(f"Unexpected error getting last human detection time: {e}") from e
 
     def is_first_detection_today(self, species_name):
         """Check if this is the first detection of this species today"""

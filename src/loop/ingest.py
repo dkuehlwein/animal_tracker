@@ -104,7 +104,7 @@ def reconcile(db: DatabaseManager, since_id: int) -> list[dict]:
             """
             SELECT id, animals_detected, detection_status, motion_area, contour_count,
                    largest_contour_area, foreground_pixel_count, hour_of_day,
-                   gate_would_suppress
+                   gate_would_suppress, review_sampled_out
             FROM detections
             WHERE id > ?
             ORDER BY id ASC
@@ -150,6 +150,16 @@ def reconcile(db: DatabaseManager, since_id: int) -> list[dict]:
                     "hour_of_day": _coerce_int(d["hour_of_day"]),
                     "gate_would_suppress": bool(d["gate_would_suppress"])
                     if d["gate_would_suppress"] is not None
+                    else None,
+                    # REVIEW-sampling gate (wildlife_system.is_review_sampled_out):
+                    # True means this review-class row was muted for
+                    # notification-volume reasons and never reached Telegram,
+                    # so no human ever had a chance to label it. NULL for
+                    # non-review-class rows and rows logged before the gate
+                    # existed. Consumed by metrics.compute_metrics so those
+                    # rows don't inflate the "not yet labelled" backlog.
+                    "review_sampled_out": bool(d["review_sampled_out"])
+                    if d["review_sampled_out"] is not None
                     else None,
                 }
             )

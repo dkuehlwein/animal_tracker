@@ -29,6 +29,18 @@ BOUNDS: dict[str, tuple[float, float]] = {
     # experiments/PROTOCOL.md "Scene-gate ownership".
     "PERFORMANCE_SCENE_GATE_ENABLED": (0, 1),
     "PERFORMANCE_BLUR_MUTE_MIN_LUMA": (0.0, 255.0),
+    # REVIEW-channel sampling gate: fraction of surviving review-class
+    # bursts actually sent to Telegram. 1.0 = send everything (rollback
+    # lever); 0.0 = send nothing.
+    "PERFORMANCE_REVIEW_SAMPLE_RATE": (0.0, 1.0),
+    # Human-proximity mute gate: look-back window (seconds) after the most
+    # recent HUMAN-status detection during which review-class bursts are
+    # muted. 0.0 = disabled (rollback lever).
+    "PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS": (0.0, 600.0),
+    # Burst image retention (Change 2, 2026-07-27): raised from the 100
+    # default so the nightly tuning loop can still visually adjudicate its
+    # own muted/sampled-out bursts on busy days.
+    "PERFORMANCE_MAX_IMAGES": (50, 500),
 }
 
 FEEDBACK_STARVED_DAYS = 3

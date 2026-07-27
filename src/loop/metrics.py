@@ -167,6 +167,17 @@ def compute_metrics(rows: list[dict], fn_audit: Optional[dict]) -> dict:
 
     n_cant_tell = tier["n_cant_tell"]
 
+    # REVIEW-sampling gate (wildlife_system.is_review_sampled_out): rows
+    # muted for notification-volume reasons only — still species-ID'd,
+    # DB-logged, and tier1-auto-labelled, but never sent to Telegram, so no
+    # human ever had a chance to label them. Counted directly off the raw
+    # rows (not the tier-precedence partition above) since
+    # review_sampled_out is a DB flag, not a label, and per spec this must
+    # NOT alter fp_rate or the per-tier buckets. Surfaced the same way as
+    # n_cant_tell: report.render_summary gives it its own line and excludes
+    # it from the "not yet labelled" remainder (unsent, not unlabelled).
+    n_sampled_out = sum(1 for r in rows if r.get("review_sampled_out") is True)
+
     return {
         "labeled_triggers": len(labeled),
         "total_triggers": total_triggers,
@@ -198,6 +209,9 @@ def compute_metrics(rows: list[dict], fn_audit: Optional[dict]) -> dict:
         # from _CSV_FIELDS: this is a report-surfacing concern, not a
         # trend-tracked metric.
         "n_cant_tell": n_cant_tell,
+        # Same treatment as n_cant_tell above (own report line, excluded
+        # from the CSV trend schema) — see the comment where it's computed.
+        "n_sampled_out": n_sampled_out,
     }
 
 

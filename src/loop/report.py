@@ -103,9 +103,20 @@ def render_summary(metrics: dict, state: dict, active_experiment: dict) -> str:
     if n_cant_tell > 0:
         lines.append(f"• Can't tell (unusable image): {n_cant_tell}")
 
+    # REVIEW-sampling gate (wildlife_system.is_review_sampled_out): these
+    # review-class rows were muted for notification-volume reasons only and
+    # never reached Telegram, so no human ever saw them to label. Surfaced
+    # distinctly, same as cant_tell above, so they don't read as "nobody
+    # looked at these" in the remainder line below — they were never sent,
+    # not skipped.
+    n_sampled_out = metrics.get("n_sampled_out", 0)
+    if n_sampled_out > 0:
+        lines.append(f"• Not sent (review sampling): {n_sampled_out}")
+
     # Remainder: images not yet labelled by any tier (cant_tell rows were
-    # labelled — just unusable — so they're excluded here too).
-    remainder = total - (n_human + n_claude + n_md + n_cant_tell)
+    # labelled — just unusable — and sampled-out rows were never sent for a
+    # human to label — so both are excluded here too).
+    remainder = total - (n_human + n_claude + n_md + n_cant_tell + n_sampled_out)
     if remainder > 0:
         lines.append(f"• Not yet labelled: {remainder}")
 

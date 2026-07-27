@@ -82,7 +82,9 @@ class TestPerformanceConfig:
         """Test valid performance configuration."""
         config = PerformanceConfig()
         assert config.memory_threshold == 0.8
-        assert config.max_images == 100
+        # Change 2 (2026-07-27): raised from 100 so the nightly tuning loop
+        # can still visually adjudicate muted/sampled-out bursts on busy days.
+        assert config.max_images == 300
 
 
 class TestStorageConfig:
@@ -415,6 +417,55 @@ class TestBlurMuteMinLumaConfig:
         from config import PerformanceConfig
         with pytest.raises(ValidationError):
             PerformanceConfig(_env_file=None)
+
+
+class TestHumanProximityWindowConfig:
+    """Human-proximity mute gate config knob (2026-07-27, leaked-close-up-human
+    fix): mute review-class bursts within N seconds of a HUMAN-status
+    detection."""
+
+    def test_default(self):
+        from config import PerformanceConfig
+        assert PerformanceConfig().human_proximity_window_seconds == 120.0
+
+    def test_env_override(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS", "60")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).human_proximity_window_seconds == 60.0
+
+    def test_zero_disables_gate_is_a_valid_value(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS", "0")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).human_proximity_window_seconds == 0.0
+
+    def test_rejects_out_of_bounds(self, monkeypatch):
+        # BOUNDS["PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS"] = (0.0, 600.0)
+        monkeypatch.setenv("PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS", "700")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+    def test_rejects_below_bound(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS", "-1")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+    def test_accepts_upper_bound(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS", "600")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).human_proximity_window_seconds == 600.0
+
+
+class TestMaxImagesDefault:
+    """Change 2 (2026-07-27): burst image retention raised from 100 to 300 —
+    on a busy day the old default deleted frames within hours, so the
+    nightly tuning loop could no longer visually adjudicate its own
+    muted/sampled-out bursts."""
+
+    def test_default_is_300(self):
+        from config import PerformanceConfig
+        assert PerformanceConfig().max_images == 300
 
 
 if __name__ == '__main__':

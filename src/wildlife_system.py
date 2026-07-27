@@ -6,6 +6,7 @@ Combines motion detection, species identification, database logging, and Telegra
 
 import asyncio
 import functools
+import hashlib
 import logging
 import logging.handlers
 import os
@@ -31,6 +32,38 @@ from data_models import DetectionStatus, is_review_detection, is_human_detection
 from scene_gate import SceneReferenceSet
 
 logger = logging.getLogger(__name__)
+
+
+def _review_sample_fraction(detection_id) -> float:
+    """Deterministic pseudo-random fraction in [0, 1) derived from a stable
+    hash of `detection_id`.
+
+    Deliberately NOT Python's builtin hash() — that's randomised per-process
+    via PYTHONHASHSEED, so the same detection_id would sample differently
+    across runs. sha256 keeps this reproducible and unit-testable: the same
+    id always maps to the same fraction.
+    """
+    digest = hashlib.sha256(str(detection_id).encode()).digest()
+    as_int = int.from_bytes(digest[:8], byteorder="big", signed=False)
+    return as_int / 2 ** 64
+
+
+def is_review_sampled_out(detection_id, sample_rate: float) -> bool:
+    """REVIEW-channel sampling gate: decide whether a review-class detection
+    should be sampled OUT of (i.e. not sent to) Telegram.
+
+    Deterministic given detection_id (see _review_sample_fraction) — the
+    same burst always lands on the same side of the gate. Fail-open: a
+    missing detection_id (e.g. the DB write itself failed) always sends,
+    same FN-safe default as the luma gate uses for unknown light levels.
+    """
+    if detection_id is None:
+        return False
+    if sample_rate >= 1.0:
+        return False
+    if sample_rate <= 0.0:
+        return True
+    return _review_sample_fraction(detection_id) >= sample_rate
 
 
 class WildlifeSystem:
@@ -85,6 +118,20 @@ class WildlifeSystem:
                     f"Scene-gate: failed to seed reference set at startup "
                     f"(continuing with an empty reference set): {e}"
                 )
+
+        # Human-proximity mute gate: timestamp of the most recent
+        # HUMAN-status detection, seeded from the DB so a restart doesn't
+        # lose the look-back window. Fail-open by construction — a seeding
+        # error just leaves this at None, which process_detection treats
+        # identically to "no prior human detection" (gate never mutes).
+        self._last_human_detection_at: Optional[datetime] = None
+        try:
+            self._last_human_detection_at = self.database.get_last_human_detection_time()
+        except Exception as e:
+            logger.warning(
+                f"Human-proximity gate: failed to seed last-human timestamp at "
+                f"startup (continuing with no prior human detection): {e}"
+            )
 
         # State variables
         self.last_frame_time = 0
@@ -271,6 +318,33 @@ class WildlifeSystem:
                 # never become references.
                 self.scene_reference_set.add(image_path, timestamp)
 
+            # Human-proximity mute gate: mute review-class bursts that land
+            # shortly after a HUMAN-status detection (extreme close-up /
+            # motion-blurred partial human bodies can score too low on
+            # MegaDetector's person confidence to trip the Human/Privacy Gate
+            # itself — see PerformanceConfig.human_proximity_window_seconds).
+            # Only evaluated for review-class statuses, same None-for-
+            # everything-else convention as scene_gate_muted. Wrapped
+            # defensively — any error here must never block a notification,
+            # so it fails open to "not muted".
+            human_proximity_muted = None
+            if is_review_detection(species_result.status):
+                try:
+                    window = self.config.performance.human_proximity_window_seconds
+                    last_human = self._last_human_detection_at
+                    human_proximity_muted = bool(
+                        window > 0
+                        and last_human is not None
+                        and 0 <= (timestamp - last_human).total_seconds() <= window
+                    )
+                except Exception as e:
+                    logger.error(f"Error computing human-proximity gate: {e}")
+                    human_proximity_muted = False
+            elif is_human_detection(species_result.status):
+                # Track the most recent HUMAN-status detection so the NEXT
+                # review-class burst can be measured against it.
+                self._last_human_detection_at = timestamp
+
             # Log to database (richer Phase-1 fields included)
             detection_id = self.database.log_detection(
                 image_path=image_path,
@@ -295,10 +369,27 @@ class WildlifeSystem:
                 top_species_score=top_species_score,
                 scene_similarity=scene_similarity,
                 scene_gate_muted=scene_gate_muted,
+                human_proximity_muted=human_proximity_muted,
             )
 
             logger.info(f"Detection {detection_id} logged: {species_result.species_name} "
                         f"(total time: {species_result.processing_time:.2f}s, motion: {motion_area} pixels)")
+
+            # REVIEW-channel sampling gate: only a configurable fraction of
+            # review-class bursts are actually sent to Telegram (everything
+            # is still species-ID'd and DB-logged above, unconditionally).
+            # The decision is pure/deterministic on detection_id, so it's
+            # computed here where detection_id and status are both known —
+            # but detection_id only exists once log_detection's INSERT above
+            # has returned, so it can't be part of that INSERT and is
+            # persisted via a small follow-up UPDATE instead.
+            review_sampled_out = None
+            if is_review_detection(species_result.status):
+                review_sampled_out = is_review_sampled_out(
+                    detection_id, self.config.performance.review_sample_rate
+                )
+                if detection_id is not None:
+                    self.database.update_review_sampled_out(detection_id, review_sampled_out)
 
             # Convert IdentificationResult to dict for compatibility
             result_dict = {
@@ -315,6 +406,8 @@ class WildlifeSystem:
                 'detection_status': species_result.status,
                 'scene_similarity': scene_similarity,
                 'scene_gate_muted': scene_gate_muted,
+                'review_sampled_out': review_sampled_out,
+                'human_proximity_muted': human_proximity_muted,
             }
 
             return result_dict, timestamp
@@ -729,6 +822,16 @@ class WildlifeSystem:
         # precedence so a blurry human gets exactly one suppression log.
         is_human = (self.config.performance.suppress_human_alerts
                     and is_human_detection(species_result.get('detection_status')))
+        # Human-proximity mute gate: process_detection already computed and
+        # DB-persisted human_proximity_muted for every review-class burst
+        # that reaches here. Precedence: right after the Human/Privacy Gate,
+        # before Blur/Scene/Sampling — a burst that gate would already
+        # suppress (e.g. HUMAN itself) must not also produce this log.
+        is_human_proximity_review = (
+            not is_human
+            and bool(species_result.get('human_proximity_muted'))
+            and is_review_detection(species_result.get('detection_status'))
+        )
         # Luma gate (exp #8, sharpness-floor-is-a-brightness-gate): the
         # sharpness floor is a raw Laplacian-variance statistic that's
         # confounded by scene brightness — at dusk almost every frame scores
@@ -743,6 +846,7 @@ class WildlifeSystem:
         )
         is_blurry_review = (
             not is_human
+            and not is_human_proximity_review
             and bool(sharpness_info)
             and sharpness_info.get('below_sharpness_floor')
             and is_review_detection(species_result.get('detection_status'))
@@ -752,19 +856,45 @@ class WildlifeSystem:
         # scene_gate_muted for review-class statuses, but the
         # is_review_detection check here is kept as defense-in-depth (same
         # pattern as is_blurry_review above) rather than trusting that
-        # invariant blindly. Precedence: human gate first, blur gate second,
-        # scene gate third — a below-floor OR HUMAN burst gets exactly one
-        # suppression log regardless of what the scene gate would have said.
+        # invariant blindly. Precedence: human gate first, human-proximity
+        # gate second, blur gate third, scene gate fourth — a below-floor OR
+        # HUMAN OR human-proximity-muted burst gets exactly one suppression
+        # log regardless of what the scene gate would have said.
         is_scene_unchanged_review = (
             not is_human
+            and not is_human_proximity_review
             and not is_blurry_review
             and bool(species_result.get('scene_gate_muted'))
+            and is_review_detection(species_result.get('detection_status'))
+        )
+        # REVIEW-sampling gate (last in precedence): process_detection
+        # already computed and DB-persisted review_sampled_out for every
+        # review-class burst that reaches here (see the follow-up UPDATE in
+        # process_detection). This is a pure notification-volume lever, not
+        # a quality gate — the burst is still species-ID'd and DB-logged
+        # regardless. It must come last, after Human/Proximity/Blur/Scene, so
+        # a burst that any of those gates would already suppress still
+        # produces exactly ONE suppression log instead of a second, redundant
+        # one.
+        is_sampled_out_review = (
+            not is_human
+            and not is_human_proximity_review
+            and not is_blurry_review
+            and not is_scene_unchanged_review
+            and bool(species_result.get('review_sampled_out'))
             and is_review_detection(species_result.get('detection_status'))
         )
         if is_human:
             logger.info(
                 f"[HUMAN-GATE] Suppressing notification for detection "
                 f"{species_result.get('detection_id')} (status=human)"
+            )
+        elif is_human_proximity_review:
+            logger.info(
+                f"[HUMAN-PROXIMITY] Suppressing notification for detection "
+                f"{species_result.get('detection_id')} "
+                f"(within {self.config.performance.human_proximity_window_seconds:.0f}s "
+                f"of last human detection, no animal found)"
             )
         elif is_blurry_review:
             logger.info(
@@ -780,6 +910,12 @@ class WildlifeSystem:
                 f"(similarity={species_result.get('scene_similarity'):.3f} >= "
                 f"threshold={self.config.performance.scene_gate_similarity_threshold:.3f}, "
                 f"no animal found)"
+            )
+        elif is_sampled_out_review:
+            logger.info(
+                f"[REVIEW-SAMPLE] Suppressing notification for detection "
+                f"{species_result.get('detection_id')} "
+                f"(sampled out, rate={self.config.performance.review_sample_rate:.3f})"
             )
         else:
             # Annotated image: combined motion overlay + MegaDetector

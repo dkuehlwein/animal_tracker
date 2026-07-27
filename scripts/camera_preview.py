@@ -7,6 +7,7 @@ Access at http://<raspberry-pi-ip>:8000
 
 import io
 import logging
+import os
 import socketserver
 from http import server
 from threading import Condition
@@ -14,6 +15,16 @@ from threading import Condition
 from picamera2 import Picamera2
 from picamera2.encoders import JpegEncoder
 from picamera2.outputs import FileOutput
+
+# Stream tuning (env-overridable). Defaults are sized to fit a weak/slow Wi-Fi
+# uplink: a full-HD, uncapped MJPEG stream is tens of Mbit/s and saturates a
+# marginal link, causing severe lag/bufferbloat. 720p @ 10fps @ q70 is ~3-5
+# Mbit/s and stays sharp enough for focus/positioning. Bump these if the link
+# is good (e.g. on Ethernet): PREVIEW_WIDTH/HEIGHT, PREVIEW_FPS, PREVIEW_QUALITY.
+PREVIEW_WIDTH = int(os.environ.get("PREVIEW_WIDTH", "1280"))
+PREVIEW_HEIGHT = int(os.environ.get("PREVIEW_HEIGHT", "720"))
+PREVIEW_FPS = int(os.environ.get("PREVIEW_FPS", "10"))
+PREVIEW_QUALITY = int(os.environ.get("PREVIEW_QUALITY", "70"))
 
 PAGE = """\
 <html>
@@ -107,12 +118,16 @@ class StreamingServer(socketserver.ThreadingMixIn, server.HTTPServer):
     allow_reuse_address = True
     daemon_threads = True
 
-# Initialize camera with high resolution for focus checking
+# Initialize camera. Resolution/framerate are capped to fit the Wi-Fi uplink
+# (see PREVIEW_* above) so the MJPEG stream stays smooth on a marginal link.
 picam2 = Picamera2()
-# Use full HD resolution so you can check focus clearly
-picam2.configure(picam2.create_video_configuration(main={"size": (1920, 1080)}))
+picam2.configure(picam2.create_video_configuration(
+    main={"size": (PREVIEW_WIDTH, PREVIEW_HEIGHT)},
+    controls={"FrameRate": PREVIEW_FPS},
+    buffer_count=2,  # smaller buffer = lower capture-to-display latency
+))
 output = StreamingOutput()
-picam2.start_recording(JpegEncoder(), FileOutput(output))
+picam2.start_recording(JpegEncoder(q=PREVIEW_QUALITY), FileOutput(output))
 
 try:
     address = ('', 8000)

@@ -128,3 +128,28 @@ def test_blob_row_is_json_serialisable(db):
 
     target = next(r for r in parsed["rows"] if r["detection_id"] == row_id)
     assert target["foreground_pixel_count"] == 4960
+
+
+def test_reconcile_round_trips_review_sampled_out_true(db):
+    did = _add_detection(db, animals_detected=False)
+    db.update_review_sampled_out(did, True)
+    rows = ingest.reconcile(db, since_id=0)
+    row = next(r for r in rows if r["detection_id"] == did)
+    assert row["review_sampled_out"] is True
+
+
+def test_reconcile_round_trips_review_sampled_out_false(db):
+    did = _add_detection(db, animals_detected=False)
+    db.update_review_sampled_out(did, False)
+    rows = ingest.reconcile(db, since_id=0)
+    row = next(r for r in rows if r["detection_id"] == did)
+    assert row["review_sampled_out"] is False
+
+
+def test_reconcile_review_sampled_out_null_when_never_set(db):
+    """A row whose review_sampled_out was never updated (e.g. IDENTIFIED
+    status, or a pre-feature row) stays NULL, not False."""
+    did = _add_detection(db, animals_detected=True)
+    rows = ingest.reconcile(db, since_id=0)
+    row = next(r for r in rows if r["detection_id"] == did)
+    assert row["review_sampled_out"] is None

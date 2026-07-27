@@ -151,7 +151,7 @@ class PerformanceConfig(BaseSettings):
     cooldown_period: float = 30.0
     memory_threshold: float = 0.8
     processing_timeout: float = 30.0
-    max_images: int = 100
+    max_images: int = 300
     idle_sleep: float = 0.05
     cooldown_sleep: float = 0.1
     error_sleep: float = 5.0
@@ -197,6 +197,27 @@ class PerformanceConfig(BaseSettings):
     # FN-safe — see 2026-07-14 muted dusk blackbird, frame luma 67.8).
     blur_mute_min_luma: float = 70.0
 
+    # REVIEW-channel sampling gate: only this fraction of review-class
+    # (NO_ANIMAL/UNCLASSIFIABLE) bursts that survive the Human/Blur/Scene
+    # mute gates are actually sent to Telegram — everything is still
+    # species-ID'd and DB-logged regardless (see
+    # wildlife_system.is_review_sampled_out). 1.0 = send everything
+    # (rollback lever); 0.0 = send nothing.
+    review_sample_rate: float = 0.25
+
+    # Human-proximity mute gate: mute review-class (NO_ANIMAL/UNCLASSIFIABLE)
+    # bursts that land within this many seconds after the most recent
+    # HUMAN-status detection. MegaDetector scores extreme close-up /
+    # motion-blurred partial human bodies at ~0.02-0.15 person confidence, so
+    # such bursts slip past the Human/Privacy Gate as no_animal and leak a
+    # recognizable person to REVIEW (2026-07-27, detection ids 3544/3553/3554,
+    # each 76-108s after a correctly-classified human burst). Validated
+    # against all 12 human-labelled animal/animal_wrong_id review-class rows
+    # since the human gate went live (2026-07-08): the closest is 329s from a
+    # preceding human-status burst, so a 120s window costs zero known false
+    # negatives. 0.0 disables the gate (rollback lever).
+    human_proximity_window_seconds: float = 120.0
+
     @field_validator('scene_gate_similarity_threshold')
     @classmethod
     def validate_scene_gate_similarity_threshold_bounds(cls, v):
@@ -214,6 +235,26 @@ class PerformanceConfig(BaseSettings):
         if not (low <= v <= high):
             raise ValueError(
                 f"PERFORMANCE_BLUR_MUTE_MIN_LUMA={v} out of allowed bounds [{low}, {high}]"
+            )
+        return v
+
+    @field_validator('review_sample_rate')
+    @classmethod
+    def validate_review_sample_rate_bounds(cls, v):
+        low, high = _BOUNDS["PERFORMANCE_REVIEW_SAMPLE_RATE"]
+        if not (low <= v <= high):
+            raise ValueError(
+                f"PERFORMANCE_REVIEW_SAMPLE_RATE={v} out of allowed bounds [{low}, {high}]"
+            )
+        return v
+
+    @field_validator('human_proximity_window_seconds')
+    @classmethod
+    def validate_human_proximity_window_seconds_bounds(cls, v):
+        low, high = _BOUNDS["PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS"]
+        if not (low <= v <= high):
+            raise ValueError(
+                f"PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS={v} out of allowed bounds [{low}, {high}]"
             )
         return v
 

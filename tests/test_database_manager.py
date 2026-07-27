@@ -210,6 +210,40 @@ def test_log_detection_scene_gate_fields_default_null(tmp_path):
     assert row["scene_gate_muted"] is None
 
 
+def test_log_detection_review_sampled_out_default_null(tmp_path):
+    """Old call signature (no review_sampled_out kwarg) still works; new
+    column is NULL."""
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(image_path="c5.jpg", motion_area=10)
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?", (det_id,)).fetchone()
+    assert row["review_sampled_out"] is None
+
+
+def test_update_review_sampled_out_true_roundtrip(tmp_path):
+    """REVIEW-sampling gate: update_review_sampled_out(True) persists as 1,
+    matching the follow-up-UPDATE pattern (detection_id only exists after
+    the initial INSERT returns, see wildlife_system.process_detection)."""
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(image_path="c6.jpg", motion_area=10)
+    db.update_review_sampled_out(det_id, True)
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?", (det_id,)).fetchone()
+    assert row["review_sampled_out"] == 1
+
+
+def test_update_review_sampled_out_false_roundtrip(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(image_path="c7.jpg", motion_area=10)
+    db.update_review_sampled_out(det_id, False)
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?", (det_id,)).fetchone()
+    assert row["review_sampled_out"] == 0
+
+
 def test_log_detection_backward_compatible(tmp_path):
     """Old call signature (no richer kwargs) still works; new cols are NULL."""
     db, db_path = _make_db(tmp_path)
@@ -436,3 +470,82 @@ def test_get_recent_review_detections_ordered_desc_and_limited(tmp_path):
 
     assert len(rows) == 2
     assert [r[0] for r in rows] == ["capture_newest.jpg", "capture_middle.jpg"]
+
+
+# ---------------------------------------------------------------------------
+# human_proximity_muted column + get_last_human_detection_time
+# (Human-Proximity Mute Gate, 2026-07-27)
+# ---------------------------------------------------------------------------
+
+def test_log_detection_persists_human_proximity_muted_true(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(
+        image_path="capture_hp1.jpg",
+        motion_area=1200,
+        human_proximity_muted=True,
+    )
+    assert det_id is not None
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?", (det_id,)).fetchone()
+
+    assert row["human_proximity_muted"] == 1
+
+
+def test_log_detection_persists_human_proximity_muted_false(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(
+        image_path="capture_hp2.jpg",
+        motion_area=1200,
+        human_proximity_muted=False,
+    )
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?", (det_id,)).fetchone()
+
+    assert row["human_proximity_muted"] == 0
+
+
+def test_log_detection_human_proximity_muted_default_null(tmp_path):
+    """Old call signature (no human_proximity_muted kwarg) still works; new
+    column is NULL."""
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(image_path="capture_hp3.jpg", motion_area=10)
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?", (det_id,)).fetchone()
+    assert row["human_proximity_muted"] is None
+
+
+def test_get_last_human_detection_time_returns_most_recent_human_row(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    id_older = db.log_detection(
+        image_path="capture_older_human.jpg", motion_area=10, detection_status="human"
+    )
+    id_newer = db.log_detection(
+        image_path="capture_newer_human.jpg", motion_area=10, detection_status="human"
+    )
+    _age_row(db_path, id_older, hours_ago=2)
+    newer_ts = _age_row(db_path, id_newer, hours_ago=1)
+
+    result = db.get_last_human_detection_time()
+
+    assert result == datetime.strptime(newer_ts, "%Y-%m-%d %H:%M:%S")
+
+
+def test_get_last_human_detection_time_ignores_non_human_rows(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    id_animal = db.log_detection(
+        image_path="capture_animal.jpg", motion_area=10, detection_status="identified"
+    )
+    _age_row(db_path, id_animal, hours_ago=1)
+
+    result = db.get_last_human_detection_time()
+
+    assert result is None
+
+
+def test_get_last_human_detection_time_no_rows_returns_none(tmp_path):
+    db, _ = _make_db(tmp_path)
+    assert db.get_last_human_detection_time() is None

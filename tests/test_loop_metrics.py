@@ -511,7 +511,7 @@ def test_metrics_main_watermark_no_op_on_no_data_tick(tmp_path, monkeypatch):
 # Per-tier FP partition: human / Claude (tier2) / MegaDetector (tier1)
 # ---------------------------------------------------------------------------
 
-def _row(human=None, tier2=None, tier1=None):
+def _row(human=None, tier2=None, tier1=None, review_sampled_out=None):
     """Build a minimal ingest row with the tier-label fields."""
     reconciled = human or tier2 or tier1
     return {
@@ -520,6 +520,7 @@ def _row(human=None, tier2=None, tier1=None):
         "tier1": tier1,
         "reconciled_label": reconciled,
         "detection_status": "no_animal",
+        "review_sampled_out": review_sampled_out,
     }
 
 
@@ -717,6 +718,41 @@ def test_compute_metrics_n_cant_tell_zero_when_none():
     rows = [_row(human="animal"), _row(tier1="false_positive")]
     m = metrics.compute_metrics(rows, fn_audit=None)
     assert m["n_cant_tell"] == 0
+
+
+def test_compute_metrics_n_sampled_out_counted():
+    """n_sampled_out counts rows with review_sampled_out=True, regardless of
+    tier-label state — it's a DB flag, not a label."""
+    rows = [
+        _row(tier1="false_positive", review_sampled_out=True),
+        _row(tier1="false_positive", review_sampled_out=True),
+        _row(tier1="false_positive", review_sampled_out=False),
+        _row(human="animal", review_sampled_out=None),
+        _row(tier1="animal"),  # no review_sampled_out key at all
+    ]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_sampled_out"] == 2
+
+
+def test_compute_metrics_n_sampled_out_zero_when_none():
+    """n_sampled_out is 0 when no row has review_sampled_out=True."""
+    rows = [_row(human="animal"), _row(tier1="false_positive", review_sampled_out=False)]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_sampled_out"] == 0
+
+
+def test_compute_metrics_n_sampled_out_does_not_affect_fp_or_tiers():
+    """Sampled-out rows still flow through fp_rate and the per-tier buckets
+    unchanged — the sampling flag is purely a report-surfacing concern."""
+    rows = [
+        _row(tier1="false_positive", review_sampled_out=True),
+        _row(tier1="animal", review_sampled_out=True),
+        _row(human="animal"),
+    ]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_md"] == 2  # both sampled-out rows still land in the md bucket
+    assert m["labeled_triggers"] == 3
+    assert m["fp_count"] == 1
 
 
 def test_csv_append_backward_compat(tmp_path):
