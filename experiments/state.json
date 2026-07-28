@@ -164,7 +164,7 @@
     "n_sampled_out": 26,
     "total_triggers": 174
   },
-  "last_tick_completed_day": "2026-07-27",
+  "last_tick_completed_day": "2026-07-28",
   "nightly_verdict": "Two of today's review alerts turned out to be close-up photos of people that the privacy filter can't recognise as human, so I widened the hold-back after a confirmed person from 2 to 4 minutes and added a rule that holds review alerts while the garden has been busy with people. Both were checked against every animal you've ever flagged and cost zero missed animals; no animals were hidden by any filter today.",
   "paused": false,
   "pending_restart_at": "2026-07-29T03:25:00+02:00",
