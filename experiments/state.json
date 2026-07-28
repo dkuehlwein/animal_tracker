@@ -84,7 +84,9 @@
   },
   "best_known_good": {},
   "deployed": {
-    "PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS": 120,
+    "PERFORMANCE_HUMAN_DENSITY_COUNT": 8,
+    "PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS": 1800,
+    "PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS": 240,
     "PERFORMANCE_MAX_IMAGES": 300,
     "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.5,
     "PERFORMANCE_SCENE_GATE_ENABLED": 1,
@@ -110,6 +112,16 @@
         "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD": 0.97
       },
       "replaced_at": "2026-07-28T03:25:00+02:00"
+    },
+    {
+      "config": {
+        "PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS": 120,
+        "PERFORMANCE_MAX_IMAGES": 300,
+        "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.5,
+        "PERFORMANCE_SCENE_GATE_ENABLED": 1,
+        "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD": 0.97
+      },
+      "replaced_at": "2026-07-29T03:25:00+02:00"
     }
   ],
   "last_heartbeat_loopday": "2026-07-28",
@@ -153,8 +165,8 @@
     "total_triggers": 174
   },
   "last_tick_completed_day": "2026-07-27",
-  "nightly_verdict": "Busy gardening day \u2014 217 triggers, 122 of them people. Three of the REVIEW alerts you got were actually close-up photos of a person that the privacy filter couldn't recognise as human, so I shipped a fix: from tomorrow, review alerts within two minutes of a confirmed person are held back. It costs no missed animals \u2014 I checked every animal you've ever flagged in that channel and none were near a person.",
+  "nightly_verdict": "Two of today's review alerts turned out to be close-up photos of people that the privacy filter can't recognise as human, so I widened the hold-back after a confirmed person from 2 to 4 minutes and added a rule that holds review alerts while the garden has been busy with people. Both were checked against every animal you've ever flagged and cost zero missed animals; no animals were hidden by any filter today.",
   "paused": false,
-  "pending_restart_at": null,
+  "pending_restart_at": "2026-07-29T03:25:00+02:00",
   "watermark": 3781
 }

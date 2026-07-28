@@ -1532,3 +1532,22 @@ proximity gate (same files, not separable by hunk). Consequence recorded: `git r
 that commit would undo both — per-gate rollback is the env lever
 (`PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS=0`, `PERFORMANCE_REVIEW_SAMPLE_RATE=1.0`),
 not git.
+- 2026-07-28 — Loop tick, exp #11 night 1. 174 triggers (119 human), fp_rate 0.982
+  [0.904, 0.997] over 55 labelled (human n=2 only — mute gates are shrinking label
+  supply as intended, not a freeze). All 54 review-class bursts had frames on disk
+  (last tick's max_images 100→300 working). **All three standing duties clean of
+  animals**: 22 human-proximity mutes, 3 scene-gate mutes (sim 0.971–0.980, all
+  bamboo), 26 sampled-out. MAIN: one catch, 3608 domestic cat @ 0.993 below the
+  sharpness floor, human-labelled `animal`. **But the proximity gate is too narrow**:
+  16 review-class bursts visibly contained a person; 11 were muted, and 5 escaped at
+  gaps of 123/169/307/432/732 s — **two of them (3691, 3711) were SENT to REVIEW**,
+  two more spared only by the sampling coin-flip. Person-confidence is NOT a usable
+  lever (leaked child 0.24 vs a real bird 0.215 and tonight's cat 0.197 → FN-veto).
+  Shipped instead, both FN-clean at 0/12 over 956 review rows since 07-08: window
+  120→240 s (37 % margin to the nearest animal row at 329 s) **and** a new OR-ed
+  human-density condition (>= 8 HUMAN bursts in the trailing 1800 s; max density on
+  any animal-labelled row is 5) — code commit `13fe10d`, 498 tests pass, restart
+  stamped 07-29T03:25. Combined rule mutes 25 % of review-class bursts and would have
+  caught 3 of tonight's 5 escapes. Residual recorded honestly: 3691 (child in the
+  hammock, 732 s gap, density 2) is closed by neither change and needs an image-side
+  mechanism, not a temporal one. See runs/0010.

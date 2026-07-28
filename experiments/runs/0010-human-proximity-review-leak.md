@@ -167,3 +167,155 @@ it was a person could not be checked — another data point for the retention bu
 fired with `person_confidence < 0.30` via the ensemble `homo` path. Exp #9's
 raw-top-1 `homo` trigger was again not exercised (0 rows) — 6 nights live, still
 unexercised, which matches its measured base rate of 3 rows corpus-wide.
+
+---
+
+## Observations — night 1 (2026-07-28)
+
+174 triggers (119 human, 52 no_animal, 2 unclassifiable, 1 identified). `fp_rate`
+0.982 [0.904, 0.997] over 55 labelled; human tier n=2 only (see "label supply"
+below), MD-auto n=53, 26 sampled out. Volume 174 vs baseline 192 — no guardrail
+trip. All 54 review-class bursts still had frames on disk (the `max_images`
+100→300 bump from last tick did exactly its job; last night 17/36 were already
+gone).
+
+### Standing duties — all three discharged, all clean of animals
+
+- **Human-proximity duty (new, exp #11's own)**: all **22** `human_proximity_muted=1`
+  bursts adjudicated frame-by-frame. **Zero concealed animals** → no FN-veto event.
+  Nine of the 22 contained a clearly recognisable person (legs, torso, a hand at
+  30 cm, a child walking through frame, a head of hair filling the bottom edge) at
+  `person_confidence` 0.00–0.27 — i.e. the gate is not merely cheap insurance, it
+  suppressed nine person photos that the privacy gate itself could not see.
+- **Scene-gate duty**: 3 `scene_gate_muted=1` bursts (3654 sim 0.972, 3662 0.971,
+  3688 0.980). All three are bamboo/vegetation in an empty garden. Clean.
+- **Sampled-out duty**: all 26 inspected. No animals. Two (3671, 3716) contained a
+  recognisable person — see below; that is a privacy near-miss, not an FN.
+
+### MAIN channel
+
+One `identified` row: **3608** (07:25, domestic cat @ 0.993, sharpness 6.77 →
+below the 11.0 floor). Correctly routed to MAIN and human-labelled `animal` — the
+exp #6/#8 below-floor-animal-still-alerts path working as designed on a real catch.
+No MAIN leaks.
+
+### The finding: the 120 s window is too short, and two person photos were sent
+
+Sixteen review-class bursts tonight visibly contain a person. Their gap to the
+preceding HUMAN-status burst:
+
+| id | time | pc | gap to prev human | outcome |
+|---|---|---|---|---|
+| 3728 | 17:52 | 0.02 | 30 s | muted (prox) |
+| 3739 | 17:59 | 0.08 | 31 s | muted (prox) |
+| 3673 | 15:17 | 0.17 | 32 s | muted (prox) |
+| 3710 | 16:59 | 0.00 | 42 s | muted (prox) |
+| 3693 | 16:25 | 0.02 | 51 s | muted (prox) |
+| 3619 | 11:52 | 0.19 | 58 s | muted (prox) |
+| 3636 | 12:11 | 0.03 | 60 s | muted (prox) |
+| 3690 | 16:12 | 0.03 | 62 s | muted (prox) |
+| 3630 | 12:02 | 0.10 | 69 s | muted (prox) |
+| 3699 | 16:37 | 0.11 | 70 s | muted (prox) |
+| 3704 | 16:50 | 0.27 | 108 s | muted (prox) |
+| **3671** | 15:15 | 0.03 | **123 s** | escaped gate; not sent only because sampling dropped it |
+| **3716** | 17:21 | 0.00 | **169 s** | escaped gate; not sent only because sampling dropped it |
+| **3676** | 15:22 | 0.03 | **307 s** | escaped gate; sampled out |
+| **3711** | 17:05 | 0.00 | **432 s** | **SENT to REVIEW — person leak** |
+| **3691** | 16:23 | 0.24 | **732 s** | **SENT to REVIEW — person leak** |
+
+Two person photos reached Daniel's phone, and two more were spared only by the
+sampling coin-flip (at rate 0.50 the expected leak from those two is one more
+message). 3671 missed the gate by **3 seconds**.
+
+### Lever 1 rejected by measurement: lowering the person-confidence threshold
+
+3691 carries `person_confidence` **0.24** — MegaDetector *did* box the child, just
+under the 0.30 gate. Tempting, and wrong: over all human-labelled `animal`/
+`animal_wrong_id` rows since 07-08, the highest `person_confidence` on a **real
+animal** is **0.215** (row 1871, a bird), and tonight's cat 3608 sits at **0.197**.
+Any threshold low enough to catch 3691 (≤0.24) would suppress a real bird outright
+— the human gate suppresses *entirely*, no REVIEW fallback. The person and animal
+`person_confidence` distributions overlap in exactly the band that matters.
+**FN-veto: rejected.** 0.25 would be FN-free (0/127 identified rows) but catches
+nothing. Recorded as a closed door, not a pending idea.
+
+### Lever 2 shipped: widen the window, and add an OR-ed "garden is occupied" condition
+
+Two changes to the same gate, both cleared by direct measurement against the 12
+human-labelled `animal`/`animal_wrong_id` review-class rows since 2026-07-08:
+
+**(a) `human_proximity_window_seconds` 120 → 240** (env delta). Cost **0 of 12**;
+nearest animal row is 329 s from a preceding human burst, a 37 % margin. 300 s
+would also cost 0/12 but leaves only 10 %, so 240 s is the evidence-supported
+choice, same reasoning that picked 120 s last tick. Catches 3671 and 3716.
+
+**(b) New human-density condition** (code change): mute a review-class burst when
+`>= human_density_count` (8) HUMAN-status detections fall in the preceding
+`human_density_window_seconds` (1800). Rationale: 3711 and 3691 sit 432 s and
+732 s past the last human burst — beyond *any* in-bounds window — yet both are in
+the middle of an afternoon of gardening. Density measures "someone is in the
+garden right now", which is the actual latent variable; the last-human gap is only
+a proxy for it. Sweep over all 956 review-class rows since 07-08:
+
+| rule | mutes | FN cost | catches |
+|---|---|---|---|
+| W=120 (current) | 15 % | 0/12 | — |
+| W=240 | 20 % | 0/12 | 3671, 3716 |
+| density M=900 K=5 | 13 % | 0/12 | 3671, 3676, 3711 |
+| density M=1800 K=5 | 23 % | **1/12** | +3716 |
+| **density M=1800 K=8** | 14 % | 0/12 | 3711, 3716 |
+| **W=240 OR density(1800, 8)** | **25 %** | **0/12** | **3671, 3711, 3716** |
+
+The combined rule's FN margins: 329 s vs the 240 s window (37 %), and a maximum
+human-density of **5** on any animal-labelled row vs the threshold of 8 (3 bursts
+of headroom). Tonight it would mute 28 of 54 review-class bursts instead of 22.
+Notification-layer only — nothing changes about capture, species ID or DB logging.
+
+**Residual, stated plainly:** 3691 (the child in the hammock, 732 s gap, density 2)
+is closed by *neither* change and is not reachable by the person-confidence lever
+either. The leak class is reduced, not eliminated. If a third mechanism is needed,
+it will have to be image-side, not temporal.
+
+### Label supply
+
+Only 2 human labels tonight (3608 `animal`, 3609 `false_positive`) against 29 last
+night. Not a feedback-starved freeze (that needs 3 consecutive days at zero), and
+the expected direction given the mute gates now suppress 22 + 26 of 54 review-class
+bursts. Watch it: if the corpus goes fully unlabelled the loop loses its FN
+detection power, and the correct response is raising `review_sample_rate`, not
+loosening a privacy gate.
+
+### Shipped tonight (2026-07-28)
+
+- **Env delta** via `loop.deploy`: `PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS`
+  **120 → 240**; `PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS=1800`,
+  `PERFORMANCE_HUMAN_DENSITY_COUNT=8` (both new, added to `BOUNDS` as
+  `(0.0, 7200.0)` and `(0, 100)`).
+- **Code change** commit **`13fe10d`** — the density condition OR-ed onto the
+  existing proximity gate. Same `human_proximity_muted` column (no schema
+  change), same `[HUMAN-PROXIMITY]` log line (now naming `window` vs `density`),
+  same precedence, fails open. Recent HUMAN timestamps are held in memory in a
+  pruned rolling list, seeded at startup from a new
+  `DatabaseManager.get_recent_human_detection_times()`, so a restart doesn't
+  reopen an in-progress occupancy streak. **498 tests pass** (474 + 24 new).
+- Restart stamped `2026-07-29T03:25:00+02:00` (pre-sunrise, before the 03:30
+  deploy timer).
+
+Rollback levers, independent of each other and of git:
+`PERFORMANCE_HUMAN_DENSITY_COUNT=0` disables only the density condition;
+`PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS=0` disables the whole gate.
+
+### Gates cleared for tonight's change
+- **FN-veto**: cleared by direct measurement (0/12, 37 % gap margin and 3 bursts
+  of density margin) — not by assumption.
+- **Volume**: 174 vs baseline 192; the change is notification-layer only.
+- **Feedback-starved freeze**: 2 human labels tonight, not zero, and not 3 days.
+- **One experiment at a time**: this is exp #11's own mechanism, not a new slot.
+- Not paused.
+
+### Exit criteria — updated
+Unchanged in shape (5 nights, >= 3 muted bursts adjudicated clean, no new
+person-in-REVIEW leak), with the clock **restarted tonight** since the gate's
+rule changed. Additional pre-registered trigger: if a night produces a
+*density*-muted burst containing a real animal, drop `human_density_count` back
+above that burst's observed density (in-bounds) or to `0`.
