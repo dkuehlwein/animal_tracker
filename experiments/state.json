@@ -112,16 +112,16 @@
       "replaced_at": "2026-07-28T03:25:00+02:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-07-27",
+  "last_heartbeat_loopday": "2026-07-28",
   "last_metrics": {
-    "date": "2026-07-27",
+    "date": "2026-07-28",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.9264588050529105,
-      0.9942074931355945
+      0.903942239378376,
+      0.9967832195451589
     ],
     "fp_claude_ci": [
       0.0,
@@ -129,32 +129,32 @@
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 93,
+    "fp_count": 54,
     "fp_human_ci": [
-      0.7803541984972431,
-      0.9808787338305667
+      0.09453120573423074,
+      0.9054687942657693
     ],
-    "fp_human_count": 27,
-    "fp_human_rate": 0.9310344827586207,
+    "fp_human_count": 1,
+    "fp_human_rate": 0.5,
     "fp_md_ci": [
-      0.9449974429864586,
+      0.932418011423458,
       1.0
     ],
-    "fp_md_count": 66,
+    "fp_md_count": 53,
     "fp_md_rate": 1.0,
-    "fp_rate": 0.9789473684210527,
+    "fp_rate": 0.9818181818181818,
     "fp_trustworthy": true,
-    "labeled_triggers": 95,
+    "labeled_triggers": 55,
     "n_cant_tell": 0,
     "n_claude": 0,
-    "n_human": 29,
-    "n_md": 66,
-    "n_sampled_out": 36,
-    "total_triggers": 217
+    "n_human": 2,
+    "n_md": 53,
+    "n_sampled_out": 26,
+    "total_triggers": 174
   },
   "last_tick_completed_day": "2026-07-27",
   "nightly_verdict": "Busy gardening day \u2014 217 triggers, 122 of them people. Three of the REVIEW alerts you got were actually close-up photos of a person that the privacy filter couldn't recognise as human, so I shipped a fix: from tomorrow, review alerts within two minutes of a confirmed person are held back. It costs no missed animals \u2014 I checked every animal you've ever flagged in that channel and none were near a person.",
   "paused": false,
-  "pending_restart_at": "2026-07-28T03:25:00+02:00",
-  "watermark": 3607
+  "pending_restart_at": null,
+  "watermark": 3781
 }
