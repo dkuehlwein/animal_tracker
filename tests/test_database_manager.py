@@ -549,3 +549,59 @@ def test_get_last_human_detection_time_ignores_non_human_rows(tmp_path):
 def test_get_last_human_detection_time_no_rows_returns_none(tmp_path):
     db, _ = _make_db(tmp_path)
     assert db.get_last_human_detection_time() is None
+
+
+# ---------------------------------------------------------------------------
+# get_recent_human_detection_times (human-density condition, exp #11
+# extension, 2026-07-28)
+# ---------------------------------------------------------------------------
+
+def test_get_recent_human_detection_times_includes_rows_since_cutoff(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    id_a = db.log_detection(
+        image_path="capture_h1.jpg", motion_area=10, detection_status="human"
+    )
+    id_b = db.log_detection(
+        image_path="capture_h2.jpg", motion_area=10, detection_status="human"
+    )
+    ts_a = _age_row(db_path, id_a, hours_ago=1)
+    ts_b = _age_row(db_path, id_b, hours_ago=0.5)
+
+    since = datetime.now() - timedelta(hours=2)
+    result = db.get_recent_human_detection_times(since)
+
+    assert result == [
+        datetime.strptime(ts_a, "%Y-%m-%d %H:%M:%S"),
+        datetime.strptime(ts_b, "%Y-%m-%d %H:%M:%S"),
+    ]
+
+
+def test_get_recent_human_detection_times_excludes_rows_before_cutoff(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    id_old = db.log_detection(
+        image_path="capture_h_old.jpg", motion_area=10, detection_status="human"
+    )
+    _age_row(db_path, id_old, hours_ago=3)
+
+    since = datetime.now() - timedelta(hours=1)
+    result = db.get_recent_human_detection_times(since)
+
+    assert result == []
+
+
+def test_get_recent_human_detection_times_excludes_non_human_rows(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    id_animal = db.log_detection(
+        image_path="capture_animal2.jpg", motion_area=10, detection_status="identified"
+    )
+    _age_row(db_path, id_animal, hours_ago=0.1)
+
+    since = datetime.now() - timedelta(hours=1)
+    result = db.get_recent_human_detection_times(since)
+
+    assert result == []
+
+
+def test_get_recent_human_detection_times_no_rows_returns_empty_list(tmp_path):
+    db, _ = _make_db(tmp_path)
+    assert db.get_recent_human_detection_times(datetime.now() - timedelta(hours=1)) == []

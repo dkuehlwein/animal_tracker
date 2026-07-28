@@ -457,6 +457,62 @@ class TestHumanProximityWindowConfig:
         assert PerformanceConfig(_env_file=None).human_proximity_window_seconds == 600.0
 
 
+class TestHumanDensityConfig:
+    """Human-density condition (exp #11 mechanism extension, 2026-07-28):
+    OR-ed onto the human-proximity gate to catch leaks that fall OUTSIDE the
+    window condition during a long human-occupied session (measured gaps of
+    432s/732s past the last human burst during a gardening day)."""
+
+    def test_window_default(self):
+        from config import PerformanceConfig
+        assert PerformanceConfig().human_density_window_seconds == 1800.0
+
+    def test_count_default(self):
+        from config import PerformanceConfig
+        assert PerformanceConfig().human_density_count == 8
+
+    def test_window_env_override(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS", "900")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).human_density_window_seconds == 900.0
+
+    def test_count_env_override(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_HUMAN_DENSITY_COUNT", "4")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).human_density_count == 4
+
+    def test_count_zero_disables_condition_is_a_valid_value(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_HUMAN_DENSITY_COUNT", "0")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).human_density_count == 0
+
+    def test_window_rejects_out_of_bounds(self, monkeypatch):
+        # BOUNDS["PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS"] = (0.0, 7200.0)
+        monkeypatch.setenv("PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS", "7300")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+    def test_window_rejects_below_bound(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS", "-1")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+    def test_count_rejects_out_of_bounds(self, monkeypatch):
+        # BOUNDS["PERFORMANCE_HUMAN_DENSITY_COUNT"] = (0, 100)
+        monkeypatch.setenv("PERFORMANCE_HUMAN_DENSITY_COUNT", "101")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+    def test_count_rejects_below_bound(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_HUMAN_DENSITY_COUNT", "-1")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+
 class TestMaxImagesDefault:
     """Change 2 (2026-07-27): burst image retention raised from 100 to 300 —
     on a busy day the old default deleted frames within hours, so the

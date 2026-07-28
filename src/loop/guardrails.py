@@ -37,6 +37,16 @@ BOUNDS: dict[str, tuple[float, float]] = {
     # recent HUMAN-status detection during which review-class bursts are
     # muted. 0.0 = disabled (rollback lever).
     "PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS": (0.0, 600.0),
+    # Human-density condition (2026-07-28, exp #11 extension): OR-ed onto the
+    # human-proximity gate above to catch leaks that fall OUTSIDE the
+    # look-back window during a long human-occupied session (e.g. gardening;
+    # measured gaps of 432s/732s past the last human burst). Mutes a
+    # review-class burst when at least PERFORMANCE_HUMAN_DENSITY_COUNT
+    # HUMAN-status detections occurred in the trailing
+    # PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS. 0 count = disabled (rollback
+    # lever).
+    "PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS": (0.0, 7200.0),
+    "PERFORMANCE_HUMAN_DENSITY_COUNT": (0, 100),
     # Burst image retention (Change 2, 2026-07-27): raised from the 100
     # default so the nightly tuning loop can still visually adjudicate its
     # own muted/sampled-out bursts on busy days.

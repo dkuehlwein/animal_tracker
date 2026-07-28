@@ -13,9 +13,9 @@ import os
 import time
 
 import cv2
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 from concurrent.futures import ThreadPoolExecutor
 
 from config import Config
@@ -133,6 +133,29 @@ class WildlifeSystem:
                 f"startup (continuing with no prior human detection): {e}"
             )
 
+        # Human-density condition (exp #11 extension, 2026-07-28): rolling
+        # list of recent HUMAN-status detection timestamps, OR-ed onto the
+        # window condition above to catch leaks that fall OUTSIDE the
+        # look-back window during a long human-occupied session (measured
+        # gaps of 432s/732s past the last human burst during a gardening
+        # day). Seeded from the DB so a restart doesn't lose an in-progress
+        # streak; fails open exactly like the seeding above — a seeding
+        # error just leaves this empty, which is the same as "no recent
+        # human detections" (gate never mutes on density alone).
+        self._recent_human_detection_times: List[datetime] = []
+        try:
+            since = datetime.now() - timedelta(
+                seconds=self.config.performance.human_density_window_seconds
+            )
+            self._recent_human_detection_times = (
+                self.database.get_recent_human_detection_times(since)
+            )
+        except Exception as e:
+            logger.warning(
+                f"Human-density gate: failed to seed recent-human timestamps "
+                f"at startup (continuing with an empty list): {e}"
+            )
+
         # State variables
         self.last_frame_time = 0
         self.last_detection_time = 0
@@ -219,6 +242,22 @@ class WildlifeSystem:
         except Exception as e:
             logger.error(f"Error in cleanup: {e}", exc_info=True)
     
+    def _count_recent_human_detections(self, reference_time: datetime) -> int:
+        """Prune `self._recent_human_detection_times` to entries within
+        `human_density_window_seconds` of `reference_time` (so the list
+        cannot grow unbounded) and return the surviving count.
+
+        Used by both the density condition's mute decision and by
+        `process_detection`'s HUMAN-status bookkeeping (to prune eagerly on
+        append, not just at the next review-class evaluation).
+        """
+        window = self.config.performance.human_density_window_seconds
+        self._recent_human_detection_times = [
+            t for t in self._recent_human_detection_times
+            if 0 <= (reference_time - t).total_seconds() <= window
+        ]
+        return len(self._recent_human_detection_times)
+
     def process_detection(self, image_path: Path, motion_area: int,
                           motion_result=None, sharpness_info: Optional[dict] = None) -> tuple:
         """Process a detection with two-stage species identification and database logging.
@@ -323,27 +362,53 @@ class WildlifeSystem:
             # motion-blurred partial human bodies can score too low on
             # MegaDetector's person confidence to trip the Human/Privacy Gate
             # itself — see PerformanceConfig.human_proximity_window_seconds).
-            # Only evaluated for review-class statuses, same None-for-
-            # everything-else convention as scene_gate_muted. Wrapped
-            # defensively — any error here must never block a notification,
-            # so it fails open to "not muted".
+            # Extended (exp #11, 2026-07-28) with a second, OR-ed "garden is
+            # occupied" density condition: leaks were found OUTSIDE the
+            # look-back window (gaps of 432s/732s) during a long gardening
+            # session, so a burst is also muted when
+            # human_density_count-or-more HUMAN-status detections occurred
+            # in the trailing human_density_window_seconds. Only evaluated
+            # for review-class statuses, same None-for-everything-else
+            # convention as scene_gate_muted. Wrapped defensively — any error
+            # here must never block a notification, so it fails open to "not
+            # muted". `human_proximity_mute_reason` ('window'/'density') is
+            # not persisted to the DB (same human_proximity_muted column as
+            # before) — it only drives which reason the suppression log
+            # below reports.
             human_proximity_muted = None
+            human_proximity_mute_reason = None
             if is_review_detection(species_result.status):
                 try:
                     window = self.config.performance.human_proximity_window_seconds
                     last_human = self._last_human_detection_at
-                    human_proximity_muted = bool(
+                    window_muted = bool(
                         window > 0
                         and last_human is not None
                         and 0 <= (timestamp - last_human).total_seconds() <= window
                     )
+
+                    density_count_threshold = self.config.performance.human_density_count
+                    recent_human_count = self._count_recent_human_detections(timestamp)
+                    density_muted = bool(
+                        density_count_threshold > 0
+                        and recent_human_count >= density_count_threshold
+                    )
+
+                    human_proximity_muted = window_muted or density_muted
+                    if human_proximity_muted:
+                        human_proximity_mute_reason = "window" if window_muted else "density"
                 except Exception as e:
                     logger.error(f"Error computing human-proximity gate: {e}")
                     human_proximity_muted = False
+                    human_proximity_mute_reason = None
             elif is_human_detection(species_result.status):
-                # Track the most recent HUMAN-status detection so the NEXT
+                # Track the most recent HUMAN-status detection (both the
+                # single timestamp used by the window condition and the
+                # rolling list used by the density condition) so the NEXT
                 # review-class burst can be measured against it.
                 self._last_human_detection_at = timestamp
+                self._recent_human_detection_times.append(timestamp)
+                self._count_recent_human_detections(timestamp)  # prune now, not just at use
 
             # Log to database (richer Phase-1 fields included)
             detection_id = self.database.log_detection(
@@ -408,6 +473,7 @@ class WildlifeSystem:
                 'scene_gate_muted': scene_gate_muted,
                 'review_sampled_out': review_sampled_out,
                 'human_proximity_muted': human_proximity_muted,
+                'human_proximity_mute_reason': human_proximity_mute_reason,
             }
 
             return result_dict, timestamp
@@ -890,11 +956,23 @@ class WildlifeSystem:
                 f"{species_result.get('detection_id')} (status=human)"
             )
         elif is_human_proximity_review:
+            mute_reason = species_result.get('human_proximity_mute_reason') or "window"
+            if mute_reason == "density":
+                reason_detail = (
+                    f"reason=density: >= {self.config.performance.human_density_count} "
+                    f"human detections in the last "
+                    f"{self.config.performance.human_density_window_seconds:.0f}s"
+                )
+            else:
+                reason_detail = (
+                    f"reason=window: within "
+                    f"{self.config.performance.human_proximity_window_seconds:.0f}s "
+                    f"of last human detection"
+                )
             logger.info(
                 f"[HUMAN-PROXIMITY] Suppressing notification for detection "
                 f"{species_result.get('detection_id')} "
-                f"(within {self.config.performance.human_proximity_window_seconds:.0f}s "
-                f"of last human detection, no animal found)"
+                f"({reason_detail}, no animal found)"
             )
         elif is_blurry_review:
             logger.info(

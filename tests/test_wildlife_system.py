@@ -1518,6 +1518,311 @@ async def test_human_proximity_wins_over_sampling_single_log(system, tmp_path, c
     assert "[HUMAN-PROXIMITY]" in gate_logs[0]
 
 
+# ---------------------------------------------------------------------------
+# Human-density condition (exp #11 mechanism extension, 2026-07-28): OR-ed
+# onto the human-proximity gate above. Tonight's adjudication found
+# recognizable-person review-class bursts OUTSIDE the window condition
+# (gaps of 432s/732s past the last human burst) during a long gardening
+# session — this condition mutes instead when the garden has been
+# "occupied" (>= human_density_count HUMAN-status detections in the
+# trailing human_density_window_seconds), regardless of how long ago the
+# MOST RECENT one was.
+# ---------------------------------------------------------------------------
+
+def _seed_recent_humans(system, count, spacing_seconds=60, end_offset_seconds=500):
+    """Populate system._recent_human_detection_times with `count` timestamps,
+    the most recent `end_offset_seconds` in the past (outside the default
+    120s window condition), spaced `spacing_seconds` apart before that."""
+    now = datetime.now()
+    latest = now - timedelta(seconds=end_offset_seconds)
+    times = [latest - timedelta(seconds=spacing_seconds * i) for i in range(count)]
+    times.reverse()
+    system._recent_human_detection_times = times
+    system._last_human_detection_at = times[-1] if times else None
+    return times
+
+
+@pytest.mark.asyncio
+async def test_human_density_mute_at_threshold(system, tmp_path, caplog):
+    """Exactly human_density_count HUMAN detections in the trailing window
+    mutes via the density condition, even though the most recent one is well
+    outside the (default 120s) window condition."""
+    system.config.performance.human_density_count = 8
+    system.config.performance.human_density_window_seconds = 1800.0
+    _seed_recent_humans(system, count=8, end_offset_seconds=500)
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    system.cleanup_old_images.assert_called_once()
+    gate_logs = [r.message for r in caplog.records if "[HUMAN-PROXIMITY]" in r.message]
+    assert len(gate_logs) == 1
+    assert "density" in gate_logs[0]
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['human_proximity_muted'] == 1
+
+
+@pytest.mark.asyncio
+async def test_human_density_no_mute_below_threshold(system, tmp_path):
+    """One fewer than human_density_count, and the last human is outside the
+    window condition — no mute from either condition."""
+    system.config.performance.human_density_count = 8
+    system.config.performance.human_density_window_seconds = 1800.0
+    _seed_recent_humans(system, count=7, end_offset_seconds=500)
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['human_proximity_muted'] == 0
+
+
+@pytest.mark.asyncio
+async def test_window_condition_alone_still_mutes_regression(system, tmp_path, caplog):
+    """Regression: the plain window condition (no density streak at all)
+    still mutes on its own, reported as 'window' in the log line."""
+    system._last_human_detection_at = datetime.now() - timedelta(seconds=60)
+    system._recent_human_detection_times = [system._last_human_detection_at]
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    gate_logs = [r.message for r in caplog.records if "[HUMAN-PROXIMITY]" in r.message]
+    assert len(gate_logs) == 1
+    assert "window" in gate_logs[0]
+    assert "density" not in gate_logs[0]
+
+
+@pytest.mark.asyncio
+async def test_human_density_mutes_when_last_human_gap_exceeds_window(system, tmp_path):
+    """The measured failure mode: last HUMAN-status detection is 432s ago
+    (well outside the 120s window condition), but the garden has been
+    occupied (density condition) — still muted."""
+    system.config.performance.human_density_count = 8
+    system.config.performance.human_density_window_seconds = 1800.0
+    _seed_recent_humans(system, count=8, end_offset_seconds=432)
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_human_density_count_zero_disables_density_condition(system, tmp_path):
+    """PERFORMANCE_HUMAN_DENSITY_COUNT=0 disables the density condition (the
+    rollback lever) even with a long occupied-garden streak — window
+    condition (out of range here) doesn't mute either, so it notifies."""
+    system.config.performance.human_density_count = 0
+    system.config.performance.human_density_window_seconds = 1800.0
+    _seed_recent_humans(system, count=20, end_offset_seconds=500)
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+
+
+def test_human_density_pruning_drops_out_of_window_timestamps(system):
+    """_count_recent_human_detections prunes entries older than
+    human_density_window_seconds relative to the reference time."""
+    system.config.performance.human_density_window_seconds = 1800.0
+    now = datetime.now()
+    system._recent_human_detection_times = [
+        now - timedelta(seconds=100),   # inside window
+        now - timedelta(seconds=1000),  # inside window
+        now - timedelta(seconds=2000),  # outside window -> pruned
+    ]
+
+    count = system._count_recent_human_detections(now)
+
+    assert count == 2
+    assert len(system._recent_human_detection_times) == 2
+    assert all(
+        (now - t).total_seconds() <= 1800.0
+        for t in system._recent_human_detection_times
+    )
+
+
+def test_human_status_updates_recent_human_detection_times(system):
+    """Processing a HUMAN-status burst appends to the density-condition
+    list, not just the single last-human timestamp."""
+    assert system._recent_human_detection_times == []
+    system.species_identifier.identify_species = MagicMock(return_value=_identification_human())
+    _, human_ts = system.process_detection("capture.jpg", 5000, None)
+    assert system._recent_human_detection_times == [human_ts]
+
+
+def test_recent_human_detection_times_seeded_at_startup(monkeypatch, tmp_path):
+    """WildlifeSystem seeds self._recent_human_detection_times from the DB at
+    startup, same pattern as _last_human_detection_at."""
+    monkeypatch.setenv('TELEGRAM_BOT_TOKEN', 'test_token')
+    monkeypatch.setenv('TELEGRAM_CHAT_ID', 'test_chat')
+    monkeypatch.setenv('MOTION_WARMUP_SECONDS', '0')
+    monkeypatch.setenv('PERFORMANCE_ENABLE_TIMELAPSE', 'false')
+    monkeypatch.setenv('PERFORMANCE_SCENE_GATE_ENABLED', 'true')
+    monkeypatch.setenv('PERFORMANCE_REVIEW_SAMPLE_RATE', '1.0')
+    for mod in ('wildlife_system', 'config'):
+        sys.modules.pop(mod, None)
+
+    from wildlife_system import WildlifeSystem
+    from database_manager import DatabaseManager
+
+    seeded_times = [datetime.now() - timedelta(seconds=30)]
+
+    class _FakeDB:
+        def get_last_human_detection_time(self):
+            return seeded_times[0]
+
+        def get_recent_human_detection_times(self, since):
+            return list(seeded_times)
+
+    # Patch DatabaseManager construction so __init__'s seeding calls hit our
+    # fake instead of a real (fresh, empty) DB.
+    monkeypatch.setattr(
+        'wildlife_system.DatabaseManager', lambda config: _FakeDB()
+    )
+
+    sys_obj = WildlifeSystem()
+
+    assert sys_obj._recent_human_detection_times == seeded_times
+
+
+def test_recent_human_detection_times_seeding_db_error_fails_open(monkeypatch):
+    """A DB error while seeding the density-condition list must not crash
+    startup — it just leaves the list empty (same fail-open pattern as the
+    single-timestamp seeding above)."""
+    monkeypatch.setenv('TELEGRAM_BOT_TOKEN', 'test_token')
+    monkeypatch.setenv('TELEGRAM_CHAT_ID', 'test_chat')
+    monkeypatch.setenv('MOTION_WARMUP_SECONDS', '0')
+    monkeypatch.setenv('PERFORMANCE_ENABLE_TIMELAPSE', 'false')
+    monkeypatch.setenv('PERFORMANCE_SCENE_GATE_ENABLED', 'true')
+    monkeypatch.setenv('PERFORMANCE_REVIEW_SAMPLE_RATE', '1.0')
+    for mod in ('wildlife_system', 'config'):
+        sys.modules.pop(mod, None)
+
+    from wildlife_system import WildlifeSystem
+
+    class _FakeDB:
+        def get_last_human_detection_time(self):
+            return None
+
+        def get_recent_human_detection_times(self, since):
+            raise RuntimeError("db is on fire")
+
+    monkeypatch.setattr(
+        'wildlife_system.DatabaseManager', lambda config: _FakeDB()
+    )
+
+    sys_obj = WildlifeSystem()
+
+    assert sys_obj._recent_human_detection_times == []
+
+
+@pytest.mark.asyncio
+async def test_human_density_non_review_status_unaffected(system, tmp_path):
+    """Precedence/scope check: an IDENTIFIED animal result is never touched
+    by the density condition, even with a long occupied-garden streak — it
+    always notifies, and human_proximity_muted stays NULL (defense-in-depth,
+    same as the window-condition test above)."""
+    _seed_recent_humans(system, count=20, end_offset_seconds=10)
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification(True, boxes=[{'confidence': 0.7}])
+    )
+
+    result, _ = system.process_detection("capture.jpg", 5000, None)
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?",
+                           (result['detection_id'],)).fetchone()
+    assert row['human_proximity_muted'] is None
+
+
+@pytest.mark.asyncio
+async def test_human_density_precedence_unchanged_vs_human_gate(system, tmp_path, caplog):
+    """A HUMAN-status burst is still suppressed by the human gate itself,
+    not double-attributed to the density condition, even with a long
+    occupied-garden streak already recorded — single suppression log."""
+    _seed_recent_humans(system, count=20, end_offset_seconds=10)
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(return_value=_identification_human())
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+
+    gate_logs = [
+        r.message for r in caplog.records
+        if "HUMAN-GATE" in r.message or "[HUMAN-PROXIMITY]" in r.message
+        or "[BLUR]" in r.message or "[SCENE-GATE]" in r.message
+        or "[REVIEW-SAMPLE]" in r.message
+    ]
+    assert len(gate_logs) == 1
+    assert "HUMAN-GATE" in gate_logs[0]
+
+
 @pytest.mark.asyncio
 async def test_cooldown_keeps_feeding_motion_detector(monkeypatch):
     """During post-detection cooldown the loop must keep calling

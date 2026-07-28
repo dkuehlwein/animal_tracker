@@ -218,6 +218,20 @@ class PerformanceConfig(BaseSettings):
     # negatives. 0.0 disables the gate (rollback lever).
     human_proximity_window_seconds: float = 120.0
 
+    # Human-density condition (2026-07-28, exp #11 mechanism extension):
+    # OR-ed onto the human-proximity gate above. Tonight's adjudication found
+    # recognizable-person review-class bursts OUTSIDE the proximity window
+    # (gaps of 432s and 732s past the last human burst) during a long
+    # gardening session — a single "time since last human" window can't catch
+    # a garden that stays occupied longer than the window. This condition
+    # mutes instead when at least `human_density_count` HUMAN-status
+    # detections occurred in the trailing `human_density_window_seconds`
+    # ("the garden is occupied", not just "a human was just here").
+    # `human_density_count=0` disables this condition (rollback lever); the
+    # existing window condition is untouched and still fires on its own.
+    human_density_window_seconds: float = 1800.0
+    human_density_count: int = 8
+
     @field_validator('scene_gate_similarity_threshold')
     @classmethod
     def validate_scene_gate_similarity_threshold_bounds(cls, v):
@@ -255,6 +269,26 @@ class PerformanceConfig(BaseSettings):
         if not (low <= v <= high):
             raise ValueError(
                 f"PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS={v} out of allowed bounds [{low}, {high}]"
+            )
+        return v
+
+    @field_validator('human_density_window_seconds')
+    @classmethod
+    def validate_human_density_window_seconds_bounds(cls, v):
+        low, high = _BOUNDS["PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS"]
+        if not (low <= v <= high):
+            raise ValueError(
+                f"PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS={v} out of allowed bounds [{low}, {high}]"
+            )
+        return v
+
+    @field_validator('human_density_count')
+    @classmethod
+    def validate_human_density_count_bounds(cls, v):
+        low, high = _BOUNDS["PERFORMANCE_HUMAN_DENSITY_COUNT"]
+        if not (low <= v <= high):
+            raise ValueError(
+                f"PERFORMANCE_HUMAN_DENSITY_COUNT={v} out of allowed bounds [{low}, {high}]"
             )
         return v
 

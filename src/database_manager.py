@@ -503,6 +503,37 @@ class DatabaseManager:
         except Exception as e:
             raise DatabaseError(f"Unexpected error getting last human detection time: {e}") from e
 
+    def get_recent_human_detection_times(self, since: datetime) -> List[datetime]:
+        """Return timestamps of all HUMAN-status detections at/after `since`.
+
+        Used to seed the human-density condition's in-memory state
+        (`WildlifeSystem._recent_human_detection_times`) at startup, so a
+        restart doesn't lose track of an in-progress "garden is occupied"
+        streak. Modeled on `get_last_human_detection_time`; `timestamp` is
+        stored as a local wall-clock string in "%Y-%m-%d %H:%M:%S" format, so
+        a plain string comparison against a cutoff formatted the same way is
+        correct here. Returns oldest-first (no particular ordering is
+        required by callers, but this matches insertion order).
+        """
+        since_str = since.strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT timestamp
+                    FROM detections
+                    WHERE detection_status = 'human' AND timestamp >= ?
+                    ORDER BY timestamp ASC
+                ''', (since_str,))
+                return [
+                    datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
+                    for row in cursor.fetchall()
+                ]
+        except sqlite3.Error as e:
+            raise DatabaseOperationError(f"Failed to get recent human detection times: {e}") from e
+        except Exception as e:
+            raise DatabaseError(f"Unexpected error getting recent human detection times: {e}") from e
+
     def is_first_detection_today(self, species_name):
         """Check if this is the first detection of this species today"""
         today = datetime.now().strftime('%Y-%m-%d')
