@@ -1551,3 +1551,25 @@ not git.
   caught 3 of tonight's 5 escapes. Residual recorded honestly: 3691 (child in the
   hammock, 732 s gap, density 2) is closed by neither change and needs an image-side
   mechanism, not a temporal one. See runs/0010.
+- 2026-07-29 — Loop tick, exp #11 night 2 (first night of the widened rule; the 22:00
+  tick died on an API 529, this is the 00:00 resume). Quiet day: 56 triggers (23 human,
+  32 review-class, 1 identified), fp_rate 0.970 [0.847, 0.995] over 33 labelled, human
+  tier n=10 — label supply recovered from last night's 2. Volume 56 vs baseline 192 is
+  **not** a collapse trip: 41- and 43-trigger days sit in the same trailing window and
+  every deployed lever is notification-layer. **The new rule is live and both conditions
+  fired** (verified in wildlife.log, not inferred): 9 `[HUMAN-PROXIMITY]` mutes = 8
+  `reason=window` (240 s) + 1 `reason=density` (3828, 11 human bursts in 1800 s, gap
+  1 028 s). 6 of the 9 are mutes the old 120 s window would have missed. **All four
+  standing duties clean of animals**: 9 proximity mutes (2 of them real people — 3812
+  torso in a striped shirt, 3824 a head of hair at 30 cm, both invisible to the privacy
+  gate at pc 0.10/0.08), 4 scene-gate mutes (sim 0.973–0.977, the gate's busiest night,
+  all sunlit bamboo), 18 sampled-out, 0 below-floor review-class. MAIN: one catch, 3802
+  bird @ 0.730 human-labelled `animal`; 23 HUMAN suppressions, 0 MAIN leaks. **Zero
+  recognisable person photos reached REVIEW** (07-28: two) — the improvement the rule
+  was shipped for, though 23 vs 119 human bursts makes it weak evidence. **New residual,
+  structural not tunable**: 3829 (sent, labelled false_positive) carries a close-range
+  motion smear 75 s *before* the visit's first HUMAN burst — a backward-looking gate can
+  never mute the leading edge of a visit. Adjudicated not recognisable → no privacy harm,
+  no change deployed; recorded as backlog #12 (deferred-send buffer: hold a review-class
+  send ~120 s, cancel if a HUMAN burst arrives). KEEP, exp #11 stays running, night 2 of
+  5. No deploy, no restart stamped. See runs/0010.

@@ -77,6 +77,13 @@
       "slug": "human-proximity-review-leak",
       "status": "running",
       "validation": "live"
+    },
+    {
+      "hypothesis": "CANDIDATE, not shipped (2026-07-29, see runs/0010 night-2 observations). The human-proximity gate is causal/backward-looking, so the LEADING EDGE of a human visit can never be muted: 3829 (15:32:34, sent to REVIEW) carries a close-range motion smear 75 s BEFORE the visit's first HUMAN-status burst (3830), with the previous human burst 1909 s earlier and trailing density 0. No in-bounds window or density threshold reaches it. The only mechanism shape that would: defer the Telegram send of a review-class burst by ~120 s and cancel it if a HUMAN-status detection lands in the meantime (a small async hold buffer in notification dispatch, fail-open = send on any error). Parked because the single observed instance is an UNRECOGNISABLE blur smear (no face/body part/individual), i.e. no privacy harm to respond to, and it would add latency to every REVIEW alert. Promote if a RECOGNISABLE person photo is sent on the leading edge of a visit (before the first HUMAN burst).",
+      "id": 12,
+      "slug": "review-send-deferral",
+      "status": "parked",
+      "validation": "parked"
     }
   ],
   "baselines": {
@@ -164,8 +171,8 @@
     "n_sampled_out": 18,
     "total_triggers": 56
   },
-  "last_tick_completed_day": "2026-07-28",
-  "nightly_verdict": "Two of today's review alerts turned out to be close-up photos of people that the privacy filter can't recognise as human, so I widened the hold-back after a confirmed person from 2 to 4 minutes and added a rule that holds review alerts while the garden has been busy with people. Both were checked against every animal you've ever flagged and cost zero missed animals; no animals were hidden by any filter today.",
+  "last_tick_completed_day": "2026-07-29",
+  "nightly_verdict": "Quiet day in the garden \u2014 56 triggers, and only 9 review alerts actually reached you, all of them empty-scene false alarms. The new person hold-back worked: two close-up photos of people were held back, no animals were hidden by any filter, and the one bird that showed up came through to you.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 3837

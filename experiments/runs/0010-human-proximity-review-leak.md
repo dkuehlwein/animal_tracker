@@ -319,3 +319,103 @@ person-in-REVIEW leak), with the clock **restarted tonight** since the gate's
 rule changed. Additional pre-registered trigger: if a night produces a
 *density*-muted burst containing a real animal, drop `human_density_count` back
 above that burst's observed density (in-bounds) or to `0`.
+
+---
+
+## Observations — night 2 (2026-07-29): first night of the widened+density rule
+
+56 triggers (23 human, 32 no_animal, 1 identified) — a quiet day, camera active
+08:50–19:36. `fp_rate` 0.970 [0.847, 0.995] over 33 labelled; human tier n=10
+(9 `false_positive` + 1 `animal`), MD-auto n=23, 18 sampled out. Volume 56 vs
+baseline 192: **not** a collapse trip — the trailing window contains 41 and 43
+trigger days (07-24, 07-26) and the deployed set is notification-layer only, so
+no lever the loop controls can reduce capture volume. All 32 review-class bursts
+still had frames on disk.
+
+### The rule shipped last tick is live and both new conditions fired
+
+Verified in `data/logs/wildlife.log`, not inferred: 9 `[HUMAN-PROXIMITY]` lines,
+**8 `reason=window` (240 s) + 1 `reason=density`** (3828, `>= 8 human detections
+in the last 1800s`). Live config confirmed `prox_window=240.0`,
+`density_window=1800.0`, `density_count=8`.
+
+Attribution against the old 120 s rule — 6 of tonight's 9 mutes are new:
+
+| id | time | gap to prev human | density(1800 s) | muted by | old W=120? |
+|---|---|---|---|---|---|
+| 3785 | 09:30 | 174 s | 1 | window | no |
+| 3786 | 09:31 | 211 s | 1 | window | no |
+| 3807 | 14:33 | 140 s | 4 | window | no |
+| 3808 | 14:34 | 209 s | 4 | window | no |
+| 3812 | 14:44 | 55 s | 7 | window | yes |
+| 3814 | 14:46 | 70 s | 8 | window (+density) | yes |
+| 3824 | 14:54 | 30 s | 18 | window | yes |
+| 3825 | 14:56 | 150 s | 18 | window (+density) | no |
+| 3828 | 15:17 | 1 028 s | 11 | **density only** | no |
+
+The density condition earned exactly one exclusive mute on its first night —
+low, but it is insurance against long-occupancy afternoons, and 07-28 (density
+up to 18 here vs a max of 5 on any animal-labelled row) is the case it exists
+for. Mute share 9/32 = 28 %, in line with the predicted 25 %.
+
+### Standing duties — all four discharged, all clean of animals
+
+- **Human-proximity duty**: all 9 muted bursts adjudicated frame-by-frame.
+  **Zero concealed animals.** Two contained a person and were correctly
+  suppressed: **3812** (torso in a blue striped shirt entering top-right,
+  `pc=0.10`) and **3824** (a head of blond hair filling the bottom-left corner
+  at ~30 cm, `pc=0.08`) — both invisible to the privacy gate itself, both caught
+  by the 240 s window. The other 7 are empty garden.
+- **Scene-gate duty**: 4 `scene_gate_muted=1` bursts, the gate's busiest night
+  so far (3786 sim 0.9746, 3788 0.9771, 3789 0.9730, 3801 0.9727). All four are
+  sunlit bamboo in an empty garden. Clean → no FN-veto event, T stays 0.97.
+  (3786 is also proximity-muted; proximity wins the log, as designed.)
+- **Sampled-out duty**: all 18 inspected. No animals, no people.
+- **Blur-mute duty**: 0 below-floor review-class bursts (the one below-floor row,
+  3836 at 19:35, is HUMAN-status — suppressed by the privacy gate, precedence
+  correct).
+
+### MAIN channel — one catch, no leaks
+
+**3802** (14:26, ensemble `aves;;;;;bird` 0.730, raw top-1 `bird` 0.649,
+sharpness 24.6) → MAIN, human-labelled `animal`. Frames show a dark bird at the
+pond edge by the red bucket. 23 HUMAN suppressions, **0 MAIN leaks**, and no
+HUMAN-status row carrying a specific-animal raw top-1.
+
+### Zero recognisable person photos reached REVIEW tonight
+
+Nine review-class bursts survived all four gates and were sent; all nine are
+empty garden, all nine human-labelled `false_positive`. Compare 07-28: two
+recognisable person photos sent. That is the improvement the widened rule was
+shipped for, though tonight's much lower human traffic (23 vs 119 human bursts)
+means it is weak evidence, not proof.
+
+### New residual: the gate is causal, so the *leading edge* of a visit is blind
+
+**3829** (15:32:34, sent to REVIEW, human-labelled `false_positive`) carries a
+heavily motion-blurred pale vertical band (220 × 591 px, frame-right, gone in
+frames 2–5) that is almost certainly a person passing within ~1 m of the lens.
+It was not muted because it *precedes* the visit's first HUMAN-status burst
+(3830 at 15:33:49) by **75 s**; the previous human burst was 1 909 s earlier and
+the trailing density was 0. **No backward-looking rule can ever mute it** — this
+is a structural blind spot of the mechanism, not a threshold that is set wrong.
+
+Adjudicated: the smear is **not recognisable** as a person (no face, no body
+part, no identifiable individual), so there is no privacy harm to respond to and
+**no change is warranted tonight**. Recorded as backlog **#12** (deferred-send
+buffer for review-class notifications: hold the Telegram send ~120 s and cancel
+it if a HUMAN-status burst arrives in the meantime — the only mechanism shape
+that closes a causal blind spot). Parked, not shipped: one unrecognisable
+instance is not evidence for adding send latency to every REVIEW alert, and exp
+#11 still occupies the active slot.
+
+For the record, 3831 (15:38, also sent) was checked for the same reason (282 s
+past a human burst) — its changed region is a thin pale stem/blade of grass, not
+a person.
+
+### Decision — KEEP, exp #11 stays running (night 2 of 5)
+
+No change deployed, no `pending_restart_at` stamped. Exit criteria unchanged:
+5 nights, >= 3 muted bursts adjudicated clean per night, no new person-in-REVIEW
+leak. Night 2 satisfies all three (9 mutes, clean, zero leaks). Label supply
+recovered to 10 human labels — not starved.
