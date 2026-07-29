@@ -124,16 +124,16 @@
       "replaced_at": "2026-07-29T03:25:00+02:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-07-28",
+  "last_heartbeat_loopday": "2026-07-29",
   "last_metrics": {
-    "date": "2026-07-28",
+    "date": "2026-07-30",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.903942239378376,
-      0.9967832195451589
+      0.846812746178811,
+      0.9946305894631283
     ],
     "fp_claude_ci": [
       0.0,
@@ -141,32 +141,32 @@
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 54,
+    "fp_count": 32,
     "fp_human_ci": [
-      0.09453120573423074,
-      0.9054687942657693
+      0.5958499732047615,
+      0.9821237869049271
     ],
-    "fp_human_count": 1,
-    "fp_human_rate": 0.5,
+    "fp_human_count": 9,
+    "fp_human_rate": 0.9,
     "fp_md_ci": [
-      0.932418011423458,
+      0.8568833815495731,
       1.0
     ],
-    "fp_md_count": 53,
+    "fp_md_count": 23,
     "fp_md_rate": 1.0,
-    "fp_rate": 0.9818181818181818,
+    "fp_rate": 0.9696969696969697,
     "fp_trustworthy": true,
-    "labeled_triggers": 55,
+    "labeled_triggers": 33,
     "n_cant_tell": 0,
     "n_claude": 0,
-    "n_human": 2,
-    "n_md": 53,
-    "n_sampled_out": 26,
-    "total_triggers": 174
+    "n_human": 10,
+    "n_md": 23,
+    "n_sampled_out": 18,
+    "total_triggers": 56
   },
   "last_tick_completed_day": "2026-07-28",
   "nightly_verdict": "Two of today's review alerts turned out to be close-up photos of people that the privacy filter can't recognise as human, so I widened the hold-back after a confirmed person from 2 to 4 minutes and added a rule that holds review alerts while the garden has been busy with people. Both were checked against every animal you've ever flagged and cost zero missed animals; no animals were hidden by any filter today.",
   "paused": false,
-  "pending_restart_at": "2026-07-29T03:25:00+02:00",
-  "watermark": 3781
+  "pending_restart_at": null,
+  "watermark": 3837
 }
