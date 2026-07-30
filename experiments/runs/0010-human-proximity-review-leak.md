@@ -419,3 +419,87 @@ No change deployed, no `pending_restart_at` stamped. Exit criteria unchanged:
 5 nights, >= 3 muted bursts adjudicated clean per night, no new person-in-REVIEW
 leak. Night 2 satisfies all three (9 mutes, clean, zero leaks). Label supply
 recovered to 10 human labels — not starved.
+
+---
+
+## Observations — night 3 (2026-07-30): the density condition earns its keep
+
+47 triggers (16 human, 30 no_animal, 1 identified), camera active 07:16–19:33.
+`fp_rate` 0.968 [0.838, 0.994] over 31 labelled; human tier n=10 (9
+`false_positive` + 1 `animal`), MD-auto n=21, 12 sampled out. **Zero false
+negatives**: the single non-FP human label is 3855, an `identified` row that
+went to MAIN correctly. Volume 47 vs baseline 192 is again **not** a collapse
+trip — the trailing window holds 41/43/56-trigger days, and every deployed
+lever is notification-layer, so none of them can suppress a capture.
+
+### The density condition muted a real person the window would have missed
+
+Four `[HUMAN-PROXIMITY]` lines in `data/logs/wildlife.log` (verified, not
+inferred): **3 `reason=window` + 1 `reason=density`**.
+
+| id | time | gap to prev human | density(1800 s) | muted by | contents |
+|---|---|---|---|---|---|
+| 3870 | 15:24:55 | 89 s | 2 | window | empty garden |
+| 3877 | 15:41:55 | **675 s** | **8** | **density** | **person, close-up** |
+| 3881 | 16:26:20 | 44 s | 2 | window | empty garden |
+| 3882 | 16:27:28 | 112 s | 2 | window | empty garden |
+
+**3877 is the result this experiment was widened for.** It is a close-up
+partial body — bare legs, dark shorts, a striped shirt and a hand, filling the
+upper half of the frame at ~1 m, heavily motion-blurred. MegaDetector scored it
+`pc=0.071`, far under the 0.3 privacy gate, and the ensemble called it
+`no_animal`: all three older human-gate triggers were blind to it. The 240 s
+window was also blind — the previous HUMAN burst was **675 s** earlier, 2.8x
+outside it. Only the density condition (8 HUMAN bursts in the trailing 1800 s,
+exactly at the threshold) caught it. Under the pre-widening 120 s rule this
+photo would have been sent to Daniel as a REVIEW alert.
+
+**FN-veto: clean.** All 4 muted bursts adjudicated frame-by-frame; the 3
+window-muted ones are empty sunlit garden, and the density-muted one is the
+person above. Zero concealed animals. The pre-registered density-specific
+trigger (a *density*-muted burst containing a real animal → drop
+`human_density_count`) did **not** fire.
+
+### Other duties
+
+- **Scene-gate duty**: 0 `scene_gate_muted=1` bursts. Similarities over the 26
+  scored review-class rows ran 0.684–0.947, all under T=0.97, so the gate was
+  inert tonight. No FN-veto event; T stays 0.97 (raising is the only safe
+  direction and nothing asks for it).
+- **Blur-mute duty**: 0 muted. Six below-floor rows; the four review-class ones
+  (3851/3852 luma 60/59, 3853/3854 luma 15) all sit under `blur_mute_min_luma`
+  =70 and were therefore **un-muted to REVIEW** — the exp #8 brightness fix
+  behaving exactly as designed on a dark, stormy afternoon. Adjudicated: empty.
+- **Sampled-out duty**: 12 rows, spot-checked, no animals and no people.
+- **MAIN channel**: 16 HUMAN suppressions, **0 leaks**. One catch — **3855**
+  (13:46, ensemble `corvus species` 0.691) is a genuine corvid silhouette on the
+  pond stone in near-darkness (luma 16.3, sharpness 4.0, well below the floor).
+  Below-floor + animal ⇒ alert: exp #6/#8 routing confirmed on live evidence.
+
+### Backlog #12 recurs — second instance, still not promotable
+
+**3867** (15:22:03, sent to REVIEW) is the leading-edge blind spot again: its
+best frame carries a dark/blue motion smear cut off at the extreme left edge,
+almost certainly the same person arriving, **51 s before** the visit's first
+HUMAN burst (3868 at 15:22:54). Frames 1–3 of the burst are empty; only the
+sent frame 5 has it. The previous human burst was ~7.5 h earlier and trailing
+density 0, so neither condition could fire — as established on 07-29, **no
+backward-looking rule can mute the leading edge of a visit.**
+
+Adjudicated **not recognisable** (no face, no identifiable body part or
+individual) — same verdict as 3829 on 07-29. Backlog #12's promotion criterion
+(a *recognisable* person photo sent on the leading edge) is therefore still
+unmet, and #12 stays parked. What is new is the **rate**: 2 instances in 2
+nights, i.e. this blind spot fires roughly once per human-visit day. Recorded
+so a future tick can weigh recurrence, not just severity — but recurrence of a
+harmless smear is not grounds for adding ~120 s of latency to every REVIEW
+alert.
+
+### Decision — KEEP, exp #11 stays running (night 3 of 5)
+
+No change deployed, no `pending_restart_at` stamped. Exit criteria (5 nights,
+>= 3 muted bursts adjudicated clean per night, no new person-in-REVIEW leak):
+night 3 satisfies all three — 4 mutes, clean, and the one person who did reach
+REVIEW was an unrecognisable smear via the known causal blind spot, not a gate
+failure. Label supply 10 human labels — not starved. Two nights to go before
+the widened rule can be concluded.

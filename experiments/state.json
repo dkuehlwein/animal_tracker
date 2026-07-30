@@ -79,7 +79,7 @@
       "validation": "live"
     },
     {
-      "hypothesis": "CANDIDATE, not shipped (2026-07-29, see runs/0010 night-2 observations). The human-proximity gate is causal/backward-looking, so the LEADING EDGE of a human visit can never be muted: 3829 (15:32:34, sent to REVIEW) carries a close-range motion smear 75 s BEFORE the visit's first HUMAN-status burst (3830), with the previous human burst 1909 s earlier and trailing density 0. No in-bounds window or density threshold reaches it. The only mechanism shape that would: defer the Telegram send of a review-class burst by ~120 s and cancel it if a HUMAN-status detection lands in the meantime (a small async hold buffer in notification dispatch, fail-open = send on any error). Parked because the single observed instance is an UNRECOGNISABLE blur smear (no face/body part/individual), i.e. no privacy harm to respond to, and it would add latency to every REVIEW alert. Promote if a RECOGNISABLE person photo is sent on the leading edge of a visit (before the first HUMAN burst).",
+      "hypothesis": "CANDIDATE, not shipped (2026-07-29, see runs/0010 night-2 observations). The human-proximity gate is causal/backward-looking, so the LEADING EDGE of a human visit can never be muted: 3829 (15:32:34, sent to REVIEW) carries a close-range motion smear 75 s BEFORE the visit's first HUMAN-status burst (3830), with the previous human burst 1909 s earlier and trailing density 0. No in-bounds window or density threshold reaches it. The only mechanism shape that would: defer the Telegram send of a review-class burst by ~120 s and cancel it if a HUMAN-status detection lands in the meantime (a small async hold buffer in notification dispatch, fail-open = send on any error). Parked because the single observed instance is an UNRECOGNISABLE blur smear (no face/body part/individual), i.e. no privacy harm to respond to, and it would add latency to every REVIEW alert. Promote if a RECOGNISABLE person photo is sent on the leading edge of a visit (before the first HUMAN burst). RECURRENCE 2026-07-30 (night 3): second instance, 3867 at 15:22:03 sent to REVIEW with a dark/blue edge smear 51 s before the visit's first HUMAN burst (3868); previous human ~7.5 h earlier, density 0, so again unreachable by any backward-looking rule. Also adjudicated NOT recognisable -> criterion still unmet, stays parked. Rate so far: 2 instances in 2 nights (~once per human-visit day) -- recurrence of a harmless smear is not grounds for adding ~120 s latency to every REVIEW alert; only recognisability promotes this.",
       "id": 12,
       "slug": "review-send-deferral",
       "status": "parked",
@@ -171,8 +171,8 @@
     "n_sampled_out": 12,
     "total_triggers": 47
   },
-  "last_tick_completed_day": "2026-07-29",
-  "nightly_verdict": "Quiet day in the garden \u2014 56 triggers, and only 9 review alerts actually reached you, all of them empty-scene false alarms. The new person hold-back worked: two close-up photos of people were held back, no animals were hidden by any filter, and the one bird that showed up came through to you.",
+  "last_tick_completed_day": "2026-07-30",
+  "nightly_verdict": "Quiet day, 47 triggers, and the new person filter proved its worth: a close-up photo of someone in the garden was held back only because the camera had seen people repeatedly that half-hour -- the older rule would have sent it to you. Nothing was hidden that shouldn't be, no animals missed, and the one bird tonight (a crow at dusk, almost too dark to see) still reached you.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 3884

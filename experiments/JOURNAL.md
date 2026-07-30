@@ -1573,3 +1573,35 @@ not git.
   no change deployed; recorded as backlog #12 (deferred-send buffer: hold a review-class
   send ~120 s, cancel if a HUMAN burst arrives). KEEP, exp #11 stays running, night 2 of
   5. No deploy, no restart stamped. See runs/0010.
+
+## 2026-07-30 — exp #11 night 3: density condition catches a real person leak
+
+47 triggers (16 human, 30 review-class, 1 identified). fp_rate 0.968 [0.838, 0.994]
+over 31 labelled (human n=10: 9 fp + 1 animal), 12 sampled out, **0 FN**. Volume 47 vs
+baseline 192 — not a collapse (trailing window has 41/43/56-trigger days; all deployed
+levers are notification-layer and cannot suppress a capture).
+
+**The widened rule paid off tonight.** 4 [HUMAN-PROXIMITY] mutes, log-verified as 3
+`reason=window` + 1 `reason=density`. The density one, **3877**, is a close-up partial
+body (legs, shorts, striped shirt, hand at ~1 m, motion-blurred) that MegaDetector scored
+`pc=0.071` and the ensemble called `no_animal` — blind to all three older human-gate
+triggers, and **675 s** past the last HUMAN burst so blind to the 240 s window too. Only
+the density condition (8 HUMAN bursts in 1800 s, exactly at threshold) caught it. Under
+the pre-widening 120 s rule this photo would have been sent to Daniel.
+
+FN-veto clean: all 4 mutes adjudicated, 3 empty garden + the person, zero concealed
+animals; the pre-registered density-specific trigger did not fire. Other duties: scene
+gate inert (0 mutes, sims 0.684–0.947 all under T=0.97); blur gate 0 mutes — all four
+below-floor review-class rows had luma < 70 and were un-muted to REVIEW, the exp #8
+brightness fix working on a dark stormy afternoon; 12 sampled-out rows clean; 16 HUMAN
+suppressions, 0 MAIN leaks. One catch: **3855**, a genuine corvid in near-darkness
+(luma 16.3, sharpness 4.0, below floor) correctly alerted to MAIN — exp #6/#8 routing
+confirmed live.
+
+Backlog #12 recurred: **3867** (15:22:03) sent to REVIEW carries an edge smear 51 s
+*before* the visit's first HUMAN burst, previous human ~7.5 h earlier. Adjudicated not
+recognisable, same as 3829 — promotion criterion still unmet, stays parked. Noted the
+rate though: 2 instances in 2 nights, ~once per human-visit day.
+
+KEEP, exp #11 stays running, **night 3 of 5**. No deploy, no restart stamped. See
+runs/0010.
