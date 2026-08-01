@@ -503,3 +503,135 @@ night 3 satisfies all three — 4 mutes, clean, and the one person who did reach
 REVIEW was an unrecognisable smear via the known causal blind spot, not a gate
 failure. Label supply 10 human labels — not starved. Two nights to go before
 the widened rule can be concluded.
+
+---
+
+## Observations — night 4 (2026-08-01, covering 07-31 + 08-01): backlog #12 promoted and shipped
+
+The 07-31 tick did not run (no session), so this tick's ingest window spans two
+loop-days: ids 3885–4162, **278 triggers** (169 human, 107 review-class, 2
+identified). `fp_rate` 0.982 [0.936, 0.995] over 109 labelled; human tier n=5
+(all `false_positive`), MD-auto n=104, 54 sampled out, **0 false negatives** —
+no human `animal`/`animal_wrong_id` label landed on a review-class row, and the
+2 `identified` rows (3925/3926, `aves` 0.689/0.936, 08-01 10:15) went to MAIN.
+139 triggers/night vs baseline 192 — no volume trip. 08-01 was the busiest human
+day on record: **161 HUMAN-status suppressions in one day**, 0 MAIN leaks.
+
+### Standing duties — all four clean
+
+- **Human-proximity duty**: **53** `human_proximity_muted=1` bursts, every one
+  adjudicated frame-by-frame. **Zero concealed animals.** Six are unambiguous
+  people the privacy gate could not see: 3897 (a child standing in the garden,
+  pc=0.000), 4029 (dark close-up body filling the left half), 4051 (blue shirt
+  at ~0.5 m), 4059 (a hand and forearm), 4147 (a leg and foot), 4149 (arm, hand
+  and part of a head). Exactly the leak class exp #11 exists for, muted as
+  designed. The rest are empty sunlit garden.
+- **Scene-gate duty**: 1 row scored `scene_gate_muted=1` (3943, sim 0.970) but
+  the proximity gate took precedence, so the scene gate muted nothing on its
+  own. Adjudicated: empty. Sims over the 105 scored rows ran 0.557–0.970. T
+  stays 0.97.
+- **Blur-mute duty**: **0 muted.** 13 below-floor review-class rows, all with
+  luma 33.5–61.1 (< the 70.0 `blur_mute_min_luma` floor), so all were un-muted
+  to REVIEW — exp #8's brightness fix behaving as designed across a dusk run.
+  Adjudicated: empty.
+- **Sampled-out duty**: 29 rows contact-sheeted, no animals, no people.
+
+### The leak: 3909 — a recognisable face sent to REVIEW on the leading edge
+
+**3908** (07-31 18:21:58) and **3909** (18:22:42) were both sent to REVIEW as
+`no_animal`. The visit's first HUMAN-status burst is **3910 at 18:24:03** — 125 s
+and **81 s** after them. The previous human burst was 11 553 s (3.2 h) earlier
+and trailing density 0, so neither the 240 s window nor the density condition
+could fire. This is backlog #12's blind spot for the **third** night running
+(3829 at 75 s on 07-29, 3867 at 51 s on 07-30).
+
+What changed tonight is **severity**, which was #12's stated promotion criterion.
+3909's burst frames 3, 4 and 5 show a person's head and face in profile at close
+range under a blue cap — **plainly recognisable**, not a smear. (The frame that
+actually went to Telegram was the sharpest one, frame 2, which is a motion smear;
+that is why Daniel labelled 3909 `false_positive` while he had labelled the
+07-30 instance `person`. His `person` label on 3867 is itself evidence that the
+sent frame can read as a person to a human.) 3908, by contrast, is empty garden.
+
+Two distinct harms follow from one misclassification, and they need two fixes:
+
+1. **Notification**: a person burst is sent to Daniel's REVIEW channel.
+2. **Retention**: because the burst is `no_animal`, not `human`, its recognisable
+   frames are kept under the ordinary ~300-burst rotation instead of the 48 h
+   human-photo purge. Every one of tonight's 6 muted-but-real-person bursts sits
+   on disk under that same wrong policy — the mute protects the inbox, not the
+   disk.
+
+### Shipped — exp #11 mechanism extension (code change, restart-gated)
+
+Both parts, deliberately with independent rollback levers.
+
+**Part A — Deferred REVIEW Send Gate (cancel-on-human).** A review-class burst
+that survives every existing gate no longer sends immediately: the annotated
+image is built synchronously (it depends on `self.last_motion_frame`, which
+mutates on the next loop iteration), then a background asyncio task sleeps
+`review_defer_seconds` (**240 s**, env `PERFORMANCE_REVIEW_DEFER_SECONDS`,
+BOUNDS [0, 600], 0 = off) and cancels the send if a HUMAN-status detection landed
+in the meantime (`burst < last_human <= burst + window`), logging `[REVIEW-DEFER]`
+and persisting the mute through the existing `human_proximity_muted` column via a
+follow-up UPDATE. The detection loop never awaits it; pending tasks are cancelled
+on shutdown; MAIN/animal sends are never deferred; any exception sends
+(fail-open), and `asyncio.CancelledError` deliberately propagates so a shutdown
+cancel is not mistaken for an error.
+
+**FN-veto cleared by measurement, not assumption** (same method as night 1): of
+the 12 human-labelled `animal`/`animal_wrong_id` review-class rows since the human
+gate went live 2026-07-08, the closest sits **1 846 s** before the next HUMAN
+burst — **7.7x** the 240 s window. Zero known false negatives. Cost: 12 of the 68
+review-class bursts actually sent since 07-28 would have been cancelled (**18%**,
+~1–2 alerts/night), and all three known leading-edge leaks (3829, 3867, 3909) are
+in that set. Latency cost is ~0 in practice: Daniel labels in batches hours after
+capture (07-31: bursts from 14:36 and 16:24 labelled together at 18:23).
+
+**Part B — retention purge for human-adjacent review bursts.** The 48 h privacy
+purge now also deletes the photos of review-class bursts within
+`human_retention_proximity_seconds` (**240 s**, env
+`PERFORMANCE_HUMAN_RETENTION_PROXIMITY_SECONDS`, BOUNDS [0, 3600], 0 = off) of a
+HUMAN-status detection, **in either direction** — the purge runs ≥48 h after
+capture, so unlike a notification gate it may legitimately look forward in time.
+DB rows are kept as metadata-only records, exactly as for HUMAN rows.
+
+Implementation note worth keeping: the first version expressed adjacency as a
+correlated SQL `EXISTS` with `strftime('%s', …)` on both sides. Measured on the
+live DB (4 162 rows, 279 matches) it took **3.9 s per call**, and
+`purge_human_bursts()` runs from `cleanup_old_images()` after *every* detection;
+a `JOIN … datetime(h.timestamp, '±240 seconds')` rewrite still took 1.6 s. Final
+version does two indexed queries and matches with `bisect` in Python: **~40 ms**,
+same 279 matches. Perf regressions of this shape are invisible in the test suite
+and only show up against the real corpus — measure before shipping anything that
+runs in the detection hot path.
+
+Accepted cost of Part B, recorded deliberately: bursts adjacent to a human visit
+lose their frames 48 h after capture, so a *missed* tick (like 07-31) plus a late
+adjudication could purge frames before this loop ever looks at them. Judged
+acceptable — the FN class it could hide (an animal in frame while a person is
+active within 240 s) is the least likely one, and the DB row plus every gate flag
+survives.
+
+Tests: **529 passed, 0 failed**. That includes fixing a failure this tick
+inherited: `test_human_proximity_no_mute_outside_window` had been failing since
+the 2026-07-29 deploy of `window=240`, because production's
+`experiments/deployed_config.env` leaks into the suite through the
+config-module-reload gap documented in `tests/conftest.py` — the test places a
+burst 200 s after a human detection and expects no mute under the 120 s *code*
+default. The `system` fixture now pins the proximity/density env knobs, same
+pattern as `PERFORMANCE_REVIEW_SAMPLE_RATE`. Worth noting as a loop-hygiene
+lesson: **a deployed env delta can silently break the test suite the loop relies
+on for validation**, and nothing surfaced it for three nights. Commit: `424265d`.
+
+### Decision — KEEP, exp #11 stays running (night 4 of 5)
+
+Exit criteria (5 nights, >= 3 muted bursts adjudicated clean per night, no new
+person-in-REVIEW leak): nights 4 satisfies the first two decisively (53 mutes,
+all clean) and fails the third — 3909 is a genuine new leak, via the known causal
+blind spot rather than a gate failure, and it is fixed this tick. Backlog **#12
+is now promoted and shipped**, folded into exp #11 as a mechanism extension
+rather than opened as a separate experiment (same root cause, same gate family,
+same column; precedent: the density condition on night 1). `pending_restart_at`
+stamped 2026-08-02T03:25 so both parts go live with the pre-sunrise restart.
+Label supply 5 human labels this window — not starved.

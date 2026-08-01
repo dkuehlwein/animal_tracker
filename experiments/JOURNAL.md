@@ -1605,3 +1605,57 @@ rate though: 2 instances in 2 nights, ~once per human-visit day.
 
 KEEP, exp #11 stays running, **night 3 of 5**. No deploy, no restart stamped. See
 runs/0010.
+
+## 2026-08-01 — exp #11 night 4: backlog #12 promoted + shipped (leading-edge leak closed)
+
+Two loop-days in one tick (the 07-31 tick never ran): ids 3885–4162, **278 triggers**
+(169 human, 107 review-class, 2 identified). fp_rate 0.982 [0.936, 0.995] over 109
+labelled (human n=5, all fp), 54 sampled out, **0 FN**; both `identified` rows
+(3925/3926, aves 0.689/0.936) went to MAIN. 139 triggers/night vs baseline 192 — no
+volume trip. 08-01 is the busiest human day on record: **161 HUMAN suppressions, 0 MAIN
+leaks**.
+
+**All four standing duties clean of animals**: 53 proximity mutes adjudicated
+frame-by-frame (6 are unmistakable people the privacy gate could not see — 3897 a child
+standing in the garden at pc=0.000, 4029/4051/4059/4147/4149 close-up torso, shirt, hand,
+leg, arm+head — exactly the leak class exp #11 exists for); scene gate muted nothing on
+its own (1 row at sim 0.970 lost precedence to the proximity gate); blur gate 0 mutes (13
+below-floor rows, luma 33–61, all under the 70 floor → un-muted to REVIEW, exp #8 working);
+29 sampled-out rows clean.
+
+**The leak, and why it promoted backlog #12.** 3909 (07-31 18:22:42) was sent to REVIEW
+as `no_animal` **81 s before** the visit's first HUMAN burst (3910), previous human 3.2 h
+earlier, density 0 — the leading-edge blind spot for the third night running (3829/75 s,
+3867/51 s). What changed is severity: frames 3–5 of 3909 show a person's face in profile
+at close range under a blue cap, **plainly recognisable**, which was #12's stated
+promotion criterion. (The frame that actually went to Telegram was the sharpest one, a
+smear — which is why Daniel labelled 3909 `false_positive` but labelled the 07-30 instance
+`person`.)
+
+**Shipped as an exp #11 mechanism extension** (commit `424265d`, restart-gated
+08-02T03:25), two parts with independent rollback levers. **A — Deferred REVIEW Send Gate**:
+a surviving review-class send is held `review_defer_seconds`=240 in a background task and
+cancelled if a HUMAN detection lands inside the window (`[REVIEW-DEFER]`, mute persisted in
+the existing `human_proximity_muted` column). Loop never awaits it; MAIN/animal never
+deferred; fails open. **FN-veto cleared by measurement**: of the 12 human-labelled animal
+review-class rows since 07-08, the closest sits **1846 s** before the next HUMAN burst —
+7.7x the window — so zero known FN; cost 12/68 = 18% of review-class bursts sent since
+07-28, and all three known leading-edge leaks are in that set. **B — symmetric retention
+purge**: the 48 h human-photo purge now also covers review-class bursts within 240 s of a
+HUMAN detection *in either direction* (the purge runs 48 h later, so it may look forward),
+closing the second harm — a misclassified person burst kept recognisable frames for the
+full ~300-burst rotation.
+
+Two engineering notes worth carrying forward. (1) The first implementation expressed
+adjacency as a correlated SQL `EXISTS`/`strftime` subquery: **3.9 s per call** on the live
+4162-row DB, and `purge_human_bursts()` runs after *every* detection. Rewritten as two
+indexed queries + a `bisect` match in Python: **~40 ms**. Hot-path perf regressions are
+invisible to the test suite — measure against the real corpus. (2)
+`test_human_proximity_no_mute_outside_window` had been failing since the 07-29 deploy of
+`window=240`, because `experiments/deployed_config.env` leaks into the suite through the
+config-reload gap in `tests/conftest.py`. **A deployed env delta can silently break the
+loop's own validation suite**, and nothing surfaced it for three nights; fixture now pins
+the knobs. 529 tests pass.
+
+KEEP, exp #11 stays running, night 4 of 5. `pending_restart_at` stamped 2026-08-02T03:25.
+See runs/0010.
