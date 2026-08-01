@@ -131,16 +131,16 @@
       "replaced_at": "2026-07-29T03:25:00+02:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-07-30",
+  "last_heartbeat_loopday": "2026-08-01",
   "last_metrics": {
-    "date": "2026-07-30",
+    "date": "2026-08-01",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.838058948352751,
-      0.9942827784745831
+      0.9355554243500118,
+      0.9949536376326568
     ],
     "fp_claude_ci": [
       0.0,
@@ -148,32 +148,32 @@
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 30,
+    "fp_count": 107,
     "fp_human_ci": [
-      0.5958499732047615,
-      0.9821237869049271
-    ],
-    "fp_human_count": 9,
-    "fp_human_rate": 0.9,
-    "fp_md_ci": [
-      0.8453609810751531,
+      0.5655175352168251,
       1.0
     ],
-    "fp_md_count": 21,
-    "fp_md_rate": 1.0,
-    "fp_rate": 0.967741935483871,
+    "fp_human_count": 5,
+    "fp_human_rate": 1.0,
+    "fp_md_ci": [
+      0.9325768708423217,
+      0.9947102884149359
+    ],
+    "fp_md_count": 102,
+    "fp_md_rate": 0.9807692307692307,
+    "fp_rate": 0.981651376146789,
     "fp_trustworthy": true,
-    "labeled_triggers": 31,
+    "labeled_triggers": 109,
     "n_cant_tell": 0,
     "n_claude": 0,
-    "n_human": 10,
-    "n_md": 21,
-    "n_sampled_out": 12,
-    "total_triggers": 47
+    "n_human": 5,
+    "n_md": 104,
+    "n_sampled_out": 54,
+    "total_triggers": 278
   },
   "last_tick_completed_day": "2026-07-30",
   "nightly_verdict": "Quiet day, 47 triggers, and the new person filter proved its worth: a close-up photo of someone in the garden was held back only because the camera had seen people repeatedly that half-hour -- the older rule would have sent it to you. Nothing was hidden that shouldn't be, no animals missed, and the one bird tonight (a crow at dusk, almost too dark to see) still reached you.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 3884
+  "watermark": 4162
 }
