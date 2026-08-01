@@ -244,6 +244,29 @@ def test_update_review_sampled_out_false_roundtrip(tmp_path):
     assert row["review_sampled_out"] == 0
 
 
+def test_update_human_proximity_muted_true_roundtrip(tmp_path):
+    """Leading-edge fix (2026-07-31): the deferred REVIEW-send gate persists
+    a cancel-on-human decision via this follow-up UPDATE, modeled exactly on
+    update_review_sampled_out above."""
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(image_path="c8.jpg", motion_area=10)
+    db.update_human_proximity_muted(det_id, True)
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?", (det_id,)).fetchone()
+    assert row["human_proximity_muted"] == 1
+
+
+def test_update_human_proximity_muted_false_roundtrip(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(image_path="c9.jpg", motion_area=10, human_proximity_muted=True)
+    db.update_human_proximity_muted(det_id, False)
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?", (det_id,)).fetchone()
+    assert row["human_proximity_muted"] == 0
+
+
 def test_log_detection_backward_compatible(tmp_path):
     """Old call signature (no richer kwargs) still works; new cols are NULL."""
     db, db_path = _make_db(tmp_path)
@@ -395,6 +418,195 @@ def test_get_human_detections_older_than_excludes_non_human_row(tmp_path):
 
     cutoff = datetime.now() - timedelta(hours=48)
     rows = db.get_human_detections_older_than(cutoff)
+
+    assert rows == []
+
+
+# ---------------------------------------------------------------------------
+# get_human_adjacent_review_detections (leading-edge fix, 2026-07-31): a
+# symmetric look-around companion to get_human_detections_older_than, used
+# by the Task 3 privacy purge to also catch review-class (no_animal/
+# unclassifiable) bursts that really contain a person but were
+# misclassified — the human-proximity mute gate only looks BACKWARD from a
+# HUMAN burst, so a burst just BEFORE the first HUMAN burst of a visit can
+# leak a recognisable face and then survive the full image retention
+# window. "Adjacent" is measured in seconds via SQLite's strftime('%s', ...)
+# differencing, not the lexicographic string cutoff comparison used
+# elsewhere — nearby-in-time isn't a lexicographic property.
+# ---------------------------------------------------------------------------
+
+def test_get_human_adjacent_review_detections_includes_row_before_human(tmp_path):
+    """The leading-edge case this fix targets: a review-class row shortly
+    BEFORE a HUMAN-status row is adjacent and included."""
+    db, db_path = _make_db(tmp_path)
+    review_id = db.log_detection(
+        image_path="capture_review1_frame1.jpg", motion_area=10, detection_status="no_animal"
+    )
+    human_id = db.log_detection(
+        image_path="capture_human1.jpg", motion_area=10, detection_status="human"
+    )
+    # Review row 100s BEFORE the human row (more hours_ago = further in the past).
+    review_ts = _age_row(db_path, review_id, hours_ago=49 + 100 / 3600)
+    _age_row(db_path, human_id, hours_ago=49)
+
+    cutoff = datetime.now() - timedelta(hours=48)
+    rows = db.get_human_adjacent_review_detections(cutoff, window_seconds=240)
+
+    assert rows == [(review_id, "capture_review1_frame1.jpg", review_ts)]
+
+
+def test_get_human_adjacent_review_detections_includes_row_after_human(tmp_path):
+    """Symmetry check: a review-class row shortly AFTER a HUMAN-status row
+    (the direction the existing backward-looking proximity gate already
+    covers at write-time) is also adjacent and included by this purge-time
+    query."""
+    db, db_path = _make_db(tmp_path)
+    human_id = db.log_detection(
+        image_path="capture_human2.jpg", motion_area=10, detection_status="human"
+    )
+    review_id = db.log_detection(
+        image_path="capture_review2_frame1.jpg", motion_area=10, detection_status="no_animal"
+    )
+    _age_row(db_path, human_id, hours_ago=49 + 100 / 3600)
+    review_ts = _age_row(db_path, review_id, hours_ago=49)
+
+    cutoff = datetime.now() - timedelta(hours=48)
+    rows = db.get_human_adjacent_review_detections(cutoff, window_seconds=240)
+
+    assert rows == [(review_id, "capture_review2_frame1.jpg", review_ts)]
+
+
+def test_get_human_adjacent_review_detections_excludes_non_adjacent_row(tmp_path):
+    """A review-class row well outside the look-around window (500s, vs a
+    240s window) is excluded."""
+    db, db_path = _make_db(tmp_path)
+    human_id = db.log_detection(
+        image_path="capture_human3.jpg", motion_area=10, detection_status="human"
+    )
+    review_id = db.log_detection(
+        image_path="capture_review3_frame1.jpg", motion_area=10, detection_status="no_animal"
+    )
+    _age_row(db_path, human_id, hours_ago=49)
+    _age_row(db_path, review_id, hours_ago=49 + 500 / 3600)
+
+    cutoff = datetime.now() - timedelta(hours=48)
+    rows = db.get_human_adjacent_review_detections(cutoff, window_seconds=240)
+
+    assert rows == []
+
+
+def test_get_human_adjacent_review_detections_excludes_rows_newer_than_cutoff(tmp_path):
+    """An adjacent pair that's too recent (inside the cutoff, e.g. still
+    within human_retention_hours) is not yet purge-eligible."""
+    db, db_path = _make_db(tmp_path)
+    human_id = db.log_detection(
+        image_path="capture_human4.jpg", motion_area=10, detection_status="human"
+    )
+    review_id = db.log_detection(
+        image_path="capture_review4_frame1.jpg", motion_area=10, detection_status="no_animal"
+    )
+    _age_row(db_path, human_id, hours_ago=1)
+    _age_row(db_path, review_id, hours_ago=1 + 50 / 3600)
+
+    cutoff = datetime.now() - timedelta(hours=48)
+    rows = db.get_human_adjacent_review_detections(cutoff, window_seconds=240)
+
+    assert rows == []
+
+
+def test_get_human_adjacent_review_detections_zero_window_returns_empty(tmp_path):
+    """window_seconds<=0 disables this query entirely (the rollback lever),
+    even for an otherwise-perfectly-adjacent, old-enough pair."""
+    db, db_path = _make_db(tmp_path)
+    human_id = db.log_detection(
+        image_path="capture_human5.jpg", motion_area=10, detection_status="human"
+    )
+    review_id = db.log_detection(
+        image_path="capture_review5_frame1.jpg", motion_area=10, detection_status="no_animal"
+    )
+    _age_row(db_path, human_id, hours_ago=49)
+    _age_row(db_path, review_id, hours_ago=49)
+
+    cutoff = datetime.now() - timedelta(hours=48)
+    rows = db.get_human_adjacent_review_detections(cutoff, window_seconds=0)
+
+    assert rows == []
+
+
+def test_get_human_adjacent_review_detections_skips_malformed_human_timestamp(tmp_path):
+    """Perf rewrite (2026-08-01): the adjacency match now happens in Python
+    (bisect over parsed HUMAN timestamps), not a SQL strftime EXISTS
+    subquery — a malformed HUMAN-status timestamp must be skipped during
+    parsing, never raise, and never spuriously match anything."""
+    db, db_path = _make_db(tmp_path)
+    bad_human_id = db.log_detection(
+        image_path="capture_human_bad.jpg", motion_area=10, detection_status="human"
+    )
+    review_id = db.log_detection(
+        image_path="capture_review_bad1_frame1.jpg", motion_area=10, detection_status="no_animal"
+    )
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "UPDATE detections SET timestamp = ? WHERE id = ?",
+            ("not-a-timestamp", bad_human_id),
+        )
+        conn.commit()
+    _age_row(db_path, review_id, hours_ago=49)
+
+    cutoff = datetime.now() - timedelta(hours=48)
+    rows = db.get_human_adjacent_review_detections(cutoff, window_seconds=240)  # must not raise
+
+    assert rows == []
+
+
+def test_get_human_adjacent_review_detections_skips_malformed_review_timestamp(tmp_path):
+    """A malformed review-row timestamp that still slips past the SQL
+    cutoff-range query (invalid but lexicographically 'old'-looking) must
+    be skipped during Python-side parsing, not raise — and a separate,
+    well-formed adjacent pair must still be matched correctly alongside
+    it."""
+    db, db_path = _make_db(tmp_path)
+    human_id = db.log_detection(
+        image_path="capture_human_ok.jpg", motion_area=10, detection_status="human"
+    )
+    good_review_id = db.log_detection(
+        image_path="capture_review_ok_frame1.jpg", motion_area=10, detection_status="no_animal"
+    )
+    bad_review_id = db.log_detection(
+        image_path="capture_review_bad2_frame1.jpg", motion_area=10, detection_status="no_animal"
+    )
+
+    _age_row(db_path, human_id, hours_ago=49)
+    good_ts = _age_row(db_path, good_review_id, hours_ago=49 + 100 / 3600)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "UPDATE detections SET timestamp = ? WHERE id = ?",
+            ("2020-13-45 99:99:99", bad_review_id),
+        )
+        conn.commit()
+
+    cutoff = datetime.now() - timedelta(hours=48)
+    rows = db.get_human_adjacent_review_detections(cutoff, window_seconds=240)  # must not raise
+
+    assert rows == [(good_review_id, "capture_review_ok_frame1.jpg", good_ts)]
+
+
+def test_get_human_adjacent_review_detections_excludes_identified_row(tmp_path):
+    """Defense-in-depth: an IDENTIFIED (non-review-class) row adjacent to a
+    HUMAN row is never returned — only no_animal/unclassifiable rows are
+    purge-eligible via this path."""
+    db, db_path = _make_db(tmp_path)
+    human_id = db.log_detection(
+        image_path="capture_human6.jpg", motion_area=10, detection_status="human"
+    )
+    animal_id = db.log_detection(
+        image_path="capture_animal6.jpg", motion_area=10, detection_status="identified"
+    )
+    _age_row(db_path, human_id, hours_ago=49)
+    _age_row(db_path, animal_id, hours_ago=49 + 10 / 3600)
+
+    cutoff = datetime.now() - timedelta(hours=48)
+    rows = db.get_human_adjacent_review_detections(cutoff, window_seconds=240)
 
     assert rows == []
 

@@ -156,6 +156,16 @@ class WildlifeSystem:
                 f"at startup (continuing with an empty list): {e}"
             )
 
+        # Deferred REVIEW send / cancel-on-human gate (leading-edge fix,
+        # 2026-07-31): background asyncio tasks created by
+        # _schedule_deferred_review_send, tracked so run()'s shutdown path
+        # can cancel them cleanly instead of leaving dangling tasks or
+        # "Task was destroyed but it is pending" warnings on stop/restart.
+        # Entries are added on creation and discarded automatically via
+        # add_done_callback once a task finishes (sent, cancelled, or
+        # errored) — this set is never iterated for anything but shutdown.
+        self._pending_review_tasks: set = set()
+
         # State variables
         self.last_frame_time = 0
         self.last_detection_time = 0
@@ -1045,9 +1055,31 @@ class WildlifeSystem:
             # Attach the full-res original as a document only when a detection
             # box exists (i.e. an actual animal detection), not for FP motion.
             document_path = image_path if species_boxes else None
-            await self.send_notification(species_result, motion_area, timestamp,
-                                        image_path, annotated_path,
-                                        document_path=document_path)
+
+            # Deferred REVIEW send / cancel-on-human gate (leading-edge fix,
+            # 2026-07-31): only review-class (no_animal/unclassifiable)
+            # bursts that reach this final branch — i.e. survived every
+            # earlier gate above — are eligible. The human-proximity gate
+            # (above) is backward-looking only: it mutes a review-class
+            # burst that lands AFTER a HUMAN-status detection, but can never
+            # catch the LEADING EDGE of a visit (burst 3909, 2026-07-31,
+            # sent to REVIEW 81s BEFORE the first HUMAN burst, with a
+            # recognisable face in its saved frames). Rather than block the
+            # main detection loop, the annotated image is already built
+            # above (synchronously, from self.last_motion_frame /
+            # self.last_motion_result — which mutate on the NEXT loop
+            # iteration) and every value the deferred send needs is now a
+            # plain local variable, safe to hand to a background task.
+            if (self.config.performance.review_defer_seconds > 0
+                    and is_review_detection(species_result.get('detection_status'))):
+                self._schedule_deferred_review_send(
+                    species_result, motion_area, timestamp,
+                    image_path, annotated_path, document_path
+                )
+            else:
+                await self.send_notification(species_result, motion_area, timestamp,
+                                            image_path, annotated_path,
+                                            document_path=document_path)
 
         # Cleanup old images (now only when needed, not in hot path)
         # Only cleanup after successful detection to avoid overhead
@@ -1056,6 +1088,82 @@ class WildlifeSystem:
         # Log system status after large detections
         if motion_area > self.config.motion.motion_threshold * 2:
             self.system_monitor.log_system_status()
+
+    def _schedule_deferred_review_send(self, species_result: dict, motion_area: int,
+                                        timestamp: datetime, image_path: Path,
+                                        annotated_path: Optional[Path],
+                                        document_path: Optional[Path]) -> None:
+        """Fire off a background task that delays a review-class Telegram
+        send by `review_defer_seconds`, cancelling it if a HUMAN-status
+        detection lands within that window (see `_deferred_review_send`).
+
+        Deliberately NOT awaited here — `_process_and_notify_detection` must
+        not block the main detection loop for up to `review_defer_seconds`.
+        The task is tracked in `self._pending_review_tasks` (added here,
+        discarded automatically on completion via `add_done_callback`) so
+        `run()`'s shutdown path can cancel any still-pending sends instead of
+        leaving them dangling across a stop/restart.
+        """
+        task = asyncio.create_task(
+            self._deferred_review_send(
+                species_result, motion_area, timestamp,
+                image_path, annotated_path, document_path
+            )
+        )
+        self._pending_review_tasks.add(task)
+        task.add_done_callback(self._pending_review_tasks.discard)
+
+    async def _deferred_review_send(self, species_result: dict, motion_area: int,
+                                     timestamp: datetime, image_path: Path,
+                                     annotated_path: Optional[Path],
+                                     document_path: Optional[Path]) -> None:
+        """Sleep `review_defer_seconds`, then either cancel or send.
+
+        Cancels the send when a HUMAN-status detection has landed AFTER this
+        burst but still within the defer window
+        (``burst_timestamp < last_human_at <= burst_timestamp + review_defer_seconds``)
+        — the leading-edge counterpart to the (backward-looking)
+        human-proximity mute gate in `process_detection`. On cancel, persists
+        the mute via `update_human_proximity_muted` so the DB row matches
+        what actually happened (same convention as a normal proximity mute).
+
+        FAIL-OPEN by construction: any exception here (scheduling already
+        happened by the time this runs; sleeping, the human check, or the DB
+        update could still fail) is caught and results in the notification
+        being SENT, never silently dropped — a bug in this gate must never
+        cost a real detection. A deliberate cancellation of this task itself
+        (e.g. system shutdown) raises asyncio.CancelledError, which is a
+        BaseException, not Exception — it propagates past the except clause
+        below untouched, so a shutdown never triggers a spurious send.
+        """
+        detection_id = species_result.get('detection_id')
+        should_cancel = False
+        try:
+            await asyncio.sleep(self.config.performance.review_defer_seconds)
+
+            last_human = self._last_human_detection_at
+            window = timedelta(seconds=self.config.performance.review_defer_seconds)
+            if last_human is not None and timestamp < last_human <= timestamp + window:
+                should_cancel = True
+                gap_seconds = (last_human - timestamp).total_seconds()
+                logger.info(
+                    f"[REVIEW-DEFER] Suppressing notification for detection "
+                    f"{detection_id} (human detected {gap_seconds:.0f}s after "
+                    f"burst, no animal found)"
+                )
+                if detection_id is not None:
+                    self.database.update_human_proximity_muted(detection_id, True)
+        except Exception as e:
+            logger.error(
+                f"Error in deferred REVIEW send for detection {detection_id} "
+                f"(sending anyway, fail-open): {e}", exc_info=True
+            )
+            should_cancel = False
+
+        if not should_cancel:
+            await self.send_notification(species_result, motion_area, timestamp,
+                                        image_path, annotated_path,
+                                        document_path=document_path)
 
     async def run(self):
         """Main loop for wildlife detection system"""
@@ -1262,6 +1370,21 @@ class WildlifeSystem:
             finally:
                 # Cleanup on exit
                 logger.info("Cleaning up resources...")
+                # Cancel any deferred REVIEW-send tasks still waiting out
+                # their review_defer_seconds window — a stop/restart must
+                # not leave them dangling (they'd otherwise fire minutes
+                # later against a torn-down telegram_service/database, or
+                # just log an unretrieved-exception warning at process
+                # exit). Snapshot into a list first: task.cancel() doesn't
+                # complete synchronously, so add_done_callback's discard
+                # only fires once the loop gets to run the gather below —
+                # iterating the live set at that point would raise "Set
+                # changed size during iteration".
+                pending_review_tasks = list(self._pending_review_tasks)
+                for task in pending_review_tasks:
+                    task.cancel()
+                if pending_review_tasks:
+                    await asyncio.gather(*pending_review_tasks, return_exceptions=True)
                 self.executor.shutdown(wait=True, cancel_futures=True)
 
 

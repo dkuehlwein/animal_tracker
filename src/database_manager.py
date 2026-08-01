@@ -1,3 +1,4 @@
+import bisect
 import sqlite3
 import logging
 from datetime import datetime, timedelta
@@ -279,6 +280,30 @@ class DatabaseManager:
         except Exception as e:
             raise DatabaseError(f"Unexpected error updating review_sampled_out: {e}") from e
 
+    def update_human_proximity_muted(self, detection_id: int, muted: bool) -> None:
+        """Set human_proximity_muted on an already-inserted detection row.
+
+        Modeled exactly on update_review_sampled_out: used by the deferred
+        REVIEW-send gate (wildlife_system._deferred_review_send) to persist
+        a cancel-on-human decision that's only known after the defer window
+        has elapsed — unlike the synchronous human_proximity_muted value
+        process_detection sets on the initial INSERT (which only looks
+        BACKWARD from a prior HUMAN detection), this is the LEADING-EDGE
+        case: a HUMAN-status detection landed shortly AFTER this burst.
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE detections SET human_proximity_muted = ? WHERE id = ?",
+                    (muted, detection_id),
+                )
+                conn.commit()
+        except sqlite3.Error as e:
+            raise DatabaseOperationError(f"Failed to update human_proximity_muted: {e}") from e
+        except Exception as e:
+            raise DatabaseError(f"Unexpected error updating human_proximity_muted: {e}") from e
+
     # Human-tap labels map to these canonical strings (see feedback_protocol.py,
     # the single source of truth for wire codes; this tuple must cover every
     # CODE_TO_LABEL value, including legacy wrong_species, which is parse-only
@@ -441,6 +466,119 @@ class DatabaseManager:
             raise DatabaseOperationError(f"Failed to get human detections: {e}") from e
         except Exception as e:
             raise DatabaseError(f"Unexpected error getting human detections: {e}") from e
+
+    def get_human_adjacent_review_detections(self, cutoff: datetime,
+                                              window_seconds: float) -> List[tuple]:
+        """Return (id, image_path, timestamp) for review-class rows that sit
+        within `window_seconds` of a HUMAN-status detection, in EITHER
+        direction, and are older than `cutoff`.
+
+        Extends the Task 3 privacy purge (get_human_detections_older_than) to
+        catch review-class (no_animal/unclassifiable) bursts that really
+        contain a person but were misclassified: the human-proximity mute
+        gate only looks BACKWARD from a HUMAN burst, so a burst just BEFORE
+        the first HUMAN burst of a visit can leak a recognisable face to
+        REVIEW and then sit on disk for the full ~300-burst rotation (see
+        the 2026-07-31 fix, burst 3909, leaked 81s before the visit's first
+        HUMAN burst). Modeled on get_human_detections_older_than; `timestamp`
+        is stored as a local wall-clock string in "%Y-%m-%d %H:%M:%S" format.
+
+        Perf note (2026-08-01): this was originally a single SQL query using
+        a correlated EXISTS subquery with strftime('%s', ...) on both sides
+        — SQLite can't use any index for that (it re-parses every timestamp
+        pair), measured at 3.9s on the real 4162-row/279-match production DB.
+        A JOIN + datetime(...,'+/-N seconds') rewrite still measured ~1.6s.
+        Since purge_human_bursts() (and so this query) runs from
+        cleanup_old_images() after every single detection on a Pi that's
+        also running SpeciesNet inference, the match is now done in Python
+        instead: two flat, indexed queries (the review-row range predicate
+        uses idx_detections_timestamp; the HUMAN-row query has no WHERE and
+        needs no index) followed by a single bisect per review row against
+        the sorted, once-parsed list of HUMAN timestamps — O(R log H)
+        instead of O(R * H) string/date reparsing in SQL.
+
+        Malformed/NULL timestamp strings (in either query's rows) are
+        skipped defensively during parsing rather than raising — a single
+        bad row must not blow up the whole purge sweep. Returns []  when
+        window_seconds <= 0 (disabled, the rollback lever) without touching
+        the DB.
+        """
+        if window_seconds <= 0:
+            return []
+        cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                # Indexed range predicate (idx_detections_timestamp) — no
+                # per-row string reparsing, unlike the old EXISTS subquery.
+                cursor.execute('''
+                    SELECT id, image_path, timestamp
+                    FROM detections
+                    WHERE detection_status IN ('no_animal', 'unclassifiable')
+                      AND timestamp < ?
+                ''', (cutoff_str,))
+                review_rows = cursor.fetchall()
+
+                # All HUMAN-status timestamps, parsed and sorted once so
+                # every review row's nearest match is a single bisect away.
+                cursor.execute('''
+                    SELECT timestamp
+                    FROM detections
+                    WHERE detection_status = 'human'
+                    ORDER BY timestamp ASC
+                ''')
+                human_ts_rows = cursor.fetchall()
+
+            human_times = []
+            for (ts_str,) in human_ts_rows:
+                try:
+                    human_times.append(
+                        datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
+                    )
+                except (TypeError, ValueError):
+                    # Malformed/NULL HUMAN timestamp — skip, don't crash the
+                    # whole purge sweep over one bad row.
+                    continue
+            human_times.sort()
+
+            if not human_times:
+                return []
+
+            matches = []
+            for row_id, image_path, ts_str in review_rows:
+                try:
+                    review_time = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
+                except (TypeError, ValueError):
+                    # Malformed/NULL review-row timestamp — skip, same
+                    # fail-safe as above.
+                    continue
+
+                # The nearest HUMAN timestamp to review_time is always the
+                # insertion point or its immediate predecessor in the
+                # sorted list — no need to scan every HUMAN timestamp.
+                idx = bisect.bisect_left(human_times, review_time)
+                is_adjacent = False
+                if idx < len(human_times):
+                    is_adjacent = abs(
+                        (human_times[idx] - review_time).total_seconds()
+                    ) <= window_seconds
+                if not is_adjacent and idx > 0:
+                    is_adjacent = abs(
+                        (human_times[idx - 1] - review_time).total_seconds()
+                    ) <= window_seconds
+
+                if is_adjacent:
+                    matches.append((row_id, image_path, ts_str))
+
+            return matches
+        except sqlite3.Error as e:
+            raise DatabaseOperationError(
+                f"Failed to get human-adjacent review detections: {e}"
+            ) from e
+        except Exception as e:
+            raise DatabaseError(
+                f"Unexpected error getting human-adjacent review detections: {e}"
+            ) from e
 
     def get_recent_review_detections(self, limit: int, max_age_hours: float) -> List[tuple]:
         """Return (image_path, timestamp) for recent review-class detections.

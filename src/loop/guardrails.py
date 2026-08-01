@@ -51,6 +51,19 @@ BOUNDS: dict[str, tuple[float, float]] = {
     # default so the nightly tuning loop can still visually adjudicate its
     # own muted/sampled-out bursts on busy days.
     "PERFORMANCE_MAX_IMAGES": (50, 500),
+    # Leading-edge fix (2026-07-31, burst 3909 leaked a face 81s before the
+    # visit's first HUMAN burst): the human-proximity gate is
+    # backward-looking only, so a deferred-send-with-cancel-on-human gate
+    # delays a review-class Telegram send by this many seconds and cancels
+    # it if a HUMAN-status detection lands within the window. 0 = disabled
+    # (rollback lever) — reviews send immediately, as before this fix.
+    "PERFORMANCE_REVIEW_DEFER_SECONDS": (0.0, 600.0),
+    # Same fix, storage side: symmetric look-around window (seconds) used
+    # by the retention purge to also delete photos of no_animal/
+    # unclassifiable bursts that sit within this many seconds of a
+    # HUMAN-status detection (before OR after), not just HUMAN-status
+    # bursts themselves. 0 = disabled (rollback lever).
+    "PERFORMANCE_HUMAN_RETENTION_PROXIMITY_SECONDS": (0.0, 3600.0),
 }
 
 FEEDBACK_STARVED_DAYS = 3

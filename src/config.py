@@ -232,6 +232,51 @@ class PerformanceConfig(BaseSettings):
     human_density_window_seconds: float = 1800.0
     human_density_count: int = 8
 
+    # Leading-edge fix (2026-07-31): the human-proximity gate above is
+    # backward-looking only (it mutes AFTER a HUMAN-status detection), so it
+    # can never catch the LEADING EDGE of a human visit — burst 3909
+    # (2026-07-31, 18:22:42) was sent to REVIEW as no_animal 81s BEFORE the
+    # visit's first HUMAN burst (18:24:03), with a clearly recognisable face
+    # in its saved frames (two prior instances: 75s, 51s gaps). Rather than
+    # holding every review-class burst hostage indefinitely, delay its
+    # Telegram send by this many seconds; if a HUMAN-status detection lands
+    # within that window, cancel the send instead (see
+    # wildlife_system._deferred_review_send). 0.0 disables deferral
+    # (rollback lever) — reviews send immediately, as before this fix.
+    review_defer_seconds: float = 240.0
+
+    # Same fix, storage side (Part B): today only detection_status='human'
+    # bursts get their photos purged after human_retention_hours. A
+    # review-class burst that really contains a person (misclassified as
+    # no_animal, e.g. the leading-edge leak above) keeps recognisable frames
+    # on disk for the full ~300-burst rotation otherwise. Extends the
+    # purge SYMMETRICALLY in time — a no_animal/unclassifiable burst within
+    # this many seconds of a HUMAN-status detection (before OR after) is
+    # purged the same way (see resource_manager.StorageManager.purge_human_bursts
+    # and database_manager.get_human_adjacent_review_detections). 0.0
+    # disables (rollback lever).
+    human_retention_proximity_seconds: float = 240.0
+
+    @field_validator('review_defer_seconds')
+    @classmethod
+    def validate_review_defer_seconds_bounds(cls, v):
+        low, high = _BOUNDS["PERFORMANCE_REVIEW_DEFER_SECONDS"]
+        if not (low <= v <= high):
+            raise ValueError(
+                f"PERFORMANCE_REVIEW_DEFER_SECONDS={v} out of allowed bounds [{low}, {high}]"
+            )
+        return v
+
+    @field_validator('human_retention_proximity_seconds')
+    @classmethod
+    def validate_human_retention_proximity_seconds_bounds(cls, v):
+        low, high = _BOUNDS["PERFORMANCE_HUMAN_RETENTION_PROXIMITY_SECONDS"]
+        if not (low <= v <= high):
+            raise ValueError(
+                f"PERFORMANCE_HUMAN_RETENTION_PROXIMITY_SECONDS={v} out of allowed bounds [{low}, {high}]"
+            )
+        return v
+
     @field_validator('scene_gate_similarity_threshold')
     @classmethod
     def validate_scene_gate_similarity_threshold_bounds(cls, v):

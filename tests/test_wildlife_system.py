@@ -42,6 +42,23 @@ def system(monkeypatch, tmp_path):
     # PERFORMANCE_SCENE_GATE_ENABLED above; sampling-gate tests override
     # system.config.performance.review_sample_rate directly per-test.
     monkeypatch.setenv('PERFORMANCE_REVIEW_SAMPLE_RATE', '1.0')
+    # Deferred REVIEW send / cancel-on-human gate (2026-07-31 leading-edge
+    # fix): default review_defer_seconds=240 would turn every pre-existing
+    # "review-class burst notifies immediately" assertion below into a
+    # scheduled-but-not-yet-sent background task instead. Force disabled
+    # (0 = send immediately, as before this fix) as this fixture's default;
+    # the deferral tests below override
+    # system.config.performance.review_defer_seconds directly per-test.
+    monkeypatch.setenv('PERFORMANCE_REVIEW_DEFER_SECONDS', '0')
+    # Pin the human-proximity gate to its CODE defaults. Without this the
+    # tests inherit whatever the loop last deployed via
+    # experiments/deployed_config.env (a documented config-module-reload gap,
+    # see tests/conftest.py) — the 2026-07-29 deploy of window=240 silently
+    # broke test_human_proximity_no_mute_outside_window, which places a burst
+    # 200s after a human detection and expects no mute under the 120s default.
+    monkeypatch.setenv('PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS', '120')
+    monkeypatch.setenv('PERFORMANCE_HUMAN_DENSITY_COUNT', '8')
+    monkeypatch.setenv('PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS', '1800')
     for mod in ('wildlife_system', 'config'):
         sys.modules.pop(mod, None)
 
@@ -1821,6 +1838,218 @@ async def test_human_density_precedence_unchanged_vs_human_gate(system, tmp_path
     ]
     assert len(gate_logs) == 1
     assert "HUMAN-GATE" in gate_logs[0]
+
+
+# ---------------------------------------------------------------------------
+# Deferred REVIEW send / cancel-on-human gate (leading-edge fix, 2026-07-31):
+# the human-proximity gate above is backward-looking only — it mutes a
+# review-class burst that lands AFTER a HUMAN-status detection, but can
+# never catch the LEADING EDGE of a visit. Burst 3909 (2026-07-31, 18:22:42)
+# was sent to REVIEW as no_animal 81s BEFORE the visit's first HUMAN burst
+# (18:24:03), with a clearly recognisable face in its saved frames (two
+# prior instances: 75s, 51s gaps). review_defer_seconds > 0 delays a
+# review-class send; if a HUMAN-status detection lands within that window,
+# the send is cancelled instead (see wildlife_system._deferred_review_send).
+# ---------------------------------------------------------------------------
+
+def _spy_process_detection(system):
+    """Wrap system.process_detection so the real pipeline still runs (DB
+    write, status, detection_id) but the exact full-precision timestamp it
+    returns is captured. The deferred-send tests below need to place
+    _last_human_detection_at a few milliseconds relative to the burst's own
+    timestamp — the DB's stored timestamp only has whole-second resolution
+    (see database_manager.log_detection), which isn't precise enough to do
+    that race-free, so we capture the in-memory datetime object directly
+    instead of round-tripping through the DB.
+    """
+    original = system.process_detection
+    captured = {}
+
+    def _spy(*args, **kwargs):
+        result, ts = original(*args, **kwargs)
+        captured['timestamp'] = ts
+        captured['detection_id'] = result.get('detection_id')
+        return result, ts
+
+    system.process_detection = MagicMock(side_effect=_spy)
+    return captured
+
+
+@pytest.mark.asyncio
+async def test_review_defer_schedules_task_not_immediate_send(system, tmp_path):
+    """A review-class burst with review_defer_seconds > 0 is scheduled as a
+    background task instead of sending synchronously — the main detection
+    loop (_process_and_notify_detection) must not block on the defer
+    window."""
+    system.config.performance.review_defer_seconds = 5.0
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    assert len(system._pending_review_tasks) == 1
+    system.cleanup_old_images.assert_called_once()
+
+    # Clean up the still-sleeping background task rather than leaking it
+    # past this test.
+    task = next(iter(system._pending_review_tasks))
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+
+@pytest.mark.asyncio
+async def test_review_defer_sends_when_no_human_lands_in_window(system, tmp_path):
+    """No HUMAN-status detection lands during the defer window — the review
+    send goes out once the deferred task runs its course."""
+    system.config.performance.review_defer_seconds = 0.01
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+    assert len(system._pending_review_tasks) == 1
+    task = next(iter(system._pending_review_tasks))
+    await task
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+
+
+@pytest.mark.asyncio
+async def test_review_defer_cancels_when_human_lands_in_window(system, tmp_path, caplog):
+    """A HUMAN-status detection landing just after the burst, inside the
+    defer window, cancels the send, logs [REVIEW-DEFER], and persists
+    human_proximity_muted=1 — the leading-edge counterpart to the
+    backward-looking proximity gate tested above."""
+    system.config.performance.review_defer_seconds = 0.01
+    captured = _spy_process_detection(system)
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+    assert len(system._pending_review_tasks) == 1
+
+    # A HUMAN-status detection lands 1ms after this burst — comfortably
+    # inside the 10ms defer window configured above, regardless of how long
+    # the real asyncio.sleep(0.01) below actually takes wall-clock-wise.
+    system._last_human_detection_at = captured['timestamp'] + timedelta(milliseconds=1)
+
+    task = next(iter(system._pending_review_tasks))
+    with caplog.at_level("INFO"):
+        await task
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    assert any("[REVIEW-DEFER]" in r.message for r in caplog.records)
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM detections WHERE id = ?", (captured['detection_id'],)
+        ).fetchone()
+    assert row['human_proximity_muted'] == 1
+
+
+@pytest.mark.asyncio
+async def test_review_defer_disabled_sends_immediately(system, tmp_path):
+    """review_defer_seconds == 0 (the rollback lever) preserves pre-fix
+    behaviour exactly: the review send happens immediately in-line, no
+    background task is scheduled at all."""
+    system.config.performance.review_defer_seconds = 0.0
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    assert len(system._pending_review_tasks) == 0
+
+
+@pytest.mark.asyncio
+async def test_review_defer_never_applies_to_animal_detection(system, tmp_path):
+    """A non-review (IDENTIFIED animal) detection is never deferred, even
+    with a large review_defer_seconds configured — it always sends
+    immediately, matching the "only review-class" scope of this gate."""
+    system.config.performance.review_defer_seconds = 240.0
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification(True, boxes=[{'confidence': 0.7}])
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    assert len(system._pending_review_tasks) == 0
+
+
+@pytest.mark.asyncio
+async def test_review_defer_fail_open_on_internal_error(system, tmp_path, caplog):
+    """Any exception inside the deferral wrapper (here: the DB persistence
+    step itself raising, with a human otherwise landing inside the window)
+    must still result in the notification being sent — fail-open, never a
+    silently dropped detection."""
+    system.config.performance.review_defer_seconds = 0.01
+    captured = _spy_process_detection(system)
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+    assert len(system._pending_review_tasks) == 1
+
+    # Human lands inside the window (would normally cancel the send)...
+    system._last_human_detection_at = captured['timestamp'] + timedelta(milliseconds=1)
+    # ...but persisting that decision is broken.
+    system.database.update_human_proximity_muted = MagicMock(
+        side_effect=RuntimeError("db is on fire")
+    )
+
+    task = next(iter(system._pending_review_tasks))
+    with caplog.at_level("ERROR"):
+        await task
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    assert any("Error in deferred REVIEW send" in r.message for r in caplog.records)
 
 
 @pytest.mark.asyncio

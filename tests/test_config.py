@@ -513,6 +513,81 @@ class TestHumanDensityConfig:
             PerformanceConfig(_env_file=None)
 
 
+class TestReviewDeferSecondsConfig:
+    """Leading-edge fix (2026-07-31): deferred REVIEW send with
+    cancel-on-human, so a review-class burst just BEFORE the first
+    HUMAN-status burst of a visit doesn't leak a face to Telegram."""
+
+    def test_default(self):
+        from config import PerformanceConfig
+        assert PerformanceConfig().review_defer_seconds == 240.0
+
+    def test_env_override(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_REVIEW_DEFER_SECONDS", "60")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).review_defer_seconds == 60.0
+
+    def test_zero_disables_deferral_is_a_valid_value(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_REVIEW_DEFER_SECONDS", "0")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).review_defer_seconds == 0.0
+
+    def test_rejects_out_of_bounds(self, monkeypatch):
+        # BOUNDS["PERFORMANCE_REVIEW_DEFER_SECONDS"] = (0.0, 600.0)
+        monkeypatch.setenv("PERFORMANCE_REVIEW_DEFER_SECONDS", "700")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+    def test_rejects_below_bound(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_REVIEW_DEFER_SECONDS", "-1")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+    def test_accepts_upper_bound(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_REVIEW_DEFER_SECONDS", "600")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).review_defer_seconds == 600.0
+
+
+class TestHumanRetentionProximitySecondsConfig:
+    """Leading-edge fix, storage side (2026-07-31): retention purge for
+    human-adjacent review bursts, symmetric look-around window."""
+
+    def test_default(self):
+        from config import PerformanceConfig
+        assert PerformanceConfig().human_retention_proximity_seconds == 240.0
+
+    def test_env_override(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_HUMAN_RETENTION_PROXIMITY_SECONDS", "300")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).human_retention_proximity_seconds == 300.0
+
+    def test_zero_disables_purge_is_a_valid_value(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_HUMAN_RETENTION_PROXIMITY_SECONDS", "0")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).human_retention_proximity_seconds == 0.0
+
+    def test_rejects_out_of_bounds(self, monkeypatch):
+        # BOUNDS["PERFORMANCE_HUMAN_RETENTION_PROXIMITY_SECONDS"] = (0.0, 3600.0)
+        monkeypatch.setenv("PERFORMANCE_HUMAN_RETENTION_PROXIMITY_SECONDS", "3700")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+    def test_rejects_below_bound(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_HUMAN_RETENTION_PROXIMITY_SECONDS", "-1")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+    def test_accepts_upper_bound(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_HUMAN_RETENTION_PROXIMITY_SECONDS", "3600")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).human_retention_proximity_seconds == 3600.0
+
+
 class TestMaxImagesDefault:
     """Change 2 (2026-07-27): burst image retention raised from 100 to 300 —
     on a busy day the old default deleted frames within hours, so the

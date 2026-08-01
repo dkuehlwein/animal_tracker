@@ -144,32 +144,57 @@ class StorageManager:
     def purge_human_bursts(self) -> int:
         """
         Delete the saved photos of HUMAN-status detections older than
-        `human_retention_hours` (privacy purge, Task 3). The DB row for each
-        detection is deliberately kept as a metadata-only record — only the
-        image files are removed.
+        `human_retention_hours` (privacy purge, Task 3), AND the saved
+        photos of review-class (no_animal/unclassifiable) bursts that sit
+        within `human_retention_proximity_seconds` of a HUMAN-status
+        detection (leading-edge fix, 2026-07-31 — a burst just BEFORE the
+        first HUMAN burst of a visit can leak a recognisable face to REVIEW
+        and would otherwise survive the full ~300-burst rotation). The DB
+        row for each detection is deliberately kept as a metadata-only
+        record in both cases — only the image files are removed.
 
         A no-op if this StorageManager wasn't given a database reference, or
         if no burst files remain (idempotent when files are already gone).
+        The proximity sweep is itself a no-op when
+        human_retention_proximity_seconds <= 0 (rollback lever;
+        DatabaseManager.get_human_adjacent_review_detections returns []
+        without querying).
         """
         if self.database is None:
             return 0
 
         try:
             cutoff = datetime.now() - timedelta(hours=self.config.performance.human_retention_hours)
-            rows = self.database.get_human_detections_older_than(cutoff)
 
-            deleted_count = 0
-            for _detection_id, image_path, _timestamp in rows:
+            human_rows = self.database.get_human_detections_older_than(cutoff)
+            human_deleted = 0
+            for _detection_id, image_path, _timestamp in human_rows:
                 base = self._burst_base(image_path)
-                deleted_count += self._delete_burst_files(base)
+                human_deleted += self._delete_burst_files(base)
 
-            if rows:
+            proximity_rows = self.database.get_human_adjacent_review_detections(
+                cutoff, self.config.performance.human_retention_proximity_seconds
+            )
+            proximity_deleted = 0
+            for _detection_id, image_path, _timestamp in proximity_rows:
+                base = self._burst_base(image_path)
+                proximity_deleted += self._delete_burst_files(base)
+
+            if human_rows:
                 logger.info(
-                    f"Purged {len(rows)} human-status burst(s) "
-                    f"({deleted_count} files) older than "
+                    f"Purged {len(human_rows)} human-status burst(s) "
+                    f"({human_deleted} files) older than "
                     f"{self.config.performance.human_retention_hours}h"
                 )
-            return deleted_count
+            if proximity_rows:
+                logger.info(
+                    f"Purged {len(proximity_rows)} human-adjacent review burst(s) "
+                    f"({proximity_deleted} files) within "
+                    f"{self.config.performance.human_retention_proximity_seconds:.0f}s "
+                    f"of a human detection, older than "
+                    f"{self.config.performance.human_retention_hours}h"
+                )
+            return human_deleted + proximity_deleted
 
         except Exception as e:
             logger.error(f"Error purging human bursts: {e}", exc_info=True)
