@@ -319,6 +319,73 @@ def test_animal_only_high_confidence_still_identified(tmp_path):
 
 
 # ===========================================================================
+# Exp #13: SpeciesNet's explicit "blank" (empty frame) ensemble verdict scores
+# ~0.99, so it used to clear the confidence threshold and be reported as an
+# IDENTIFIED species — a MAIN-channel alert on a frame the model called empty,
+# bypassing the whole review-class mute stack. It must route to NO_ANIMAL.
+# ===========================================================================
+
+def test_blank_ensemble_prediction_routes_to_no_animal(tmp_path):
+    from data_models import DetectionStatus
+
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "animal", "conf": 0.25, "bbox": [0, 0, 1, 1]}],
+        prediction="f1856211-cfb7-4a5b-9158-c0f72fd09ee6;;;;;;blank",
+        prediction_score=0.9985,
+        classifications={
+            "classes": ["f1856211-cfb7-4a5b-9158-c0f72fd09ee6;;;;;;blank"],
+            "scores": [0.9985],
+        },
+    )
+    assert result.status == DetectionStatus.NO_ANIMAL
+    assert result.animals_detected is False
+    assert result.species_name == "Unknown species"
+    assert "blank" in (result.fallback_reason or "").lower()
+    # observability metadata is still carried, so top_species_raw keeps the
+    # blank label in the DB for the tuning loop.
+    assert result.metadata is not None
+    assert result.metadata["top_classifier_prediction"] == {
+        "label": "f1856211-cfb7-4a5b-9158-c0f72fd09ee6;;;;;;blank",
+        "score": 0.9985,
+    }
+
+
+def test_specific_animal_named_blank_suffix_not_treated_as_blank(tmp_path):
+    """Only a fully-generic label ending in 'blank' is the empty-frame verdict;
+    a populated taxonomy is still an identification."""
+    from data_models import DetectionStatus
+
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "animal", "conf": 0.9, "bbox": [0, 0, 1, 1]}],
+        prediction="abc;mammalia;carnivora;canidae;vulpes;vulpes;blank",
+        prediction_score=0.85,
+        classifications={
+            "classes": ["abc;mammalia;carnivora;canidae;vulpes;vulpes;blank"],
+            "scores": [0.85],
+        },
+    )
+    assert result.status == DetectionStatus.IDENTIFIED
+
+
+def test_is_blank_prediction_edge_cases():
+    from species_identifier import SpeciesIdentifier
+
+    f = SpeciesIdentifier._is_blank_prediction
+    assert f("f1856211-cfb7-4a5b-9158-c0f72fd09ee6;;;;;;blank") is True
+    assert f("uuid;;;;;;BLANK") is True
+    assert f("") is False
+    assert f(None) is False
+    assert f("blank") is False  # single segment, no UUID prefix shape
+    assert f("aves;;;;;bird") is False
+    assert f("f2efdae9;no cv result;no cv result;no cv result;"
+             "no cv result;no cv result;no cv result") is False
+
+
+# ===========================================================================
 # Task 3 (ADR-004 observability): the classifier's raw top-1 prediction
 # (before geofence/rollup) must be carried in metadata even when the
 # ensemble rolls the final label up to a generic class-level guess

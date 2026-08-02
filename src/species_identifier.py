@@ -360,6 +360,36 @@ class SpeciesIdentifier:
                 status=DetectionStatus.UNCLASSIFIABLE,
             )
 
+        # Detect SpeciesNet's explicit "blank" (empty frame) verdict. The
+        # ensemble emits it as a fully-generic taxonomy label whose last
+        # segment is "blank" (e.g. "<uuid>;;;;;;blank") at ~0.99 score, so
+        # without this branch it sails past the confidence threshold below and
+        # is reported as an IDENTIFIED species — a MAIN-channel alert on a
+        # frame the model itself called empty. Route it to NO_ANIMAL, the same
+        # review-class status an empty scene gets anywhere else, so the REVIEW
+        # prefix and the human/blur/scene/sampling mute stack all apply (an
+        # IDENTIFIED burst bypasses every one of those gates).
+        if self._is_blank_prediction(final_species):
+            logger.info(
+                f"Ensemble returned blank (empty frame) prediction "
+                f"{final_species!r} at {final_confidence:.2f} — routing to "
+                f"NO_ANIMAL instead of IDENTIFIED"
+            )
+            return IdentificationResult(
+                species_name='Unknown species',
+                confidence=0.0,
+                api_success=True,
+                processing_time=processing_time,
+                fallback_reason=(
+                    f'SpeciesNet ensemble returned blank prediction '
+                    f'({final_confidence:.2f})'
+                ),
+                metadata=metadata,
+                detection_result=detection_result,
+                animals_detected=False,
+                status=DetectionStatus.NO_ANIMAL,
+            )
+
         # Apply confidence threshold
         if final_confidence < self.config.species.unknown_species_threshold:
             return IdentificationResult(
@@ -389,6 +419,21 @@ class SpeciesIdentifier:
             animals_detected=True,
             status=DetectionStatus.IDENTIFIED,
         )
+
+    @staticmethod
+    def _is_blank_prediction(taxonomy_label: str) -> bool:
+        """True when a SpeciesNet label is the ensemble's explicit "blank"
+        (empty frame) verdict — the last semicolon segment is ``blank`` and no
+        taxonomy segment names an animal (e.g.
+        ``f1856211-...;;;;;;blank``). Deliberately narrow: a real taxonomy
+        label never ends in ``blank``, and requiring the taxonomy segments to
+        be empty means a hypothetical ``...;aves;...;blank`` would not match.
+        """
+        parts = [p.strip() for p in (taxonomy_label or '').split(';')]
+        if len(parts) < 2 or parts[-1].lower() != 'blank':
+            return False
+        # parts[0] is the model's UUID for the class, not taxonomy.
+        return not any(parts[1:-1])
 
     @staticmethod
     def _is_specific_animal_taxon(taxonomy_label: str) -> bool:
