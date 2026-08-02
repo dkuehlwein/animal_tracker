@@ -1659,3 +1659,55 @@ the knobs. 529 tests pass.
 
 KEEP, exp #11 stays running, night 4 of 5. `pending_restart_at` stamped 2026-08-02T03:25.
 See runs/0010.
+
+## 2026-08-02 — exp #11 CONCLUDED (KEEP); exp #13 opened + shipped: the alert whose species was "blank"
+
+114 triggers (08:05–19:21), 82 HUMAN-status suppressions, 31 review-class, 1 `identified`.
+No human labels for a second day (last: 07-31 18:23) — **2 of the 3 days that trip the
+feedback-starved freeze**; if 08-03 is also empty the next tick freezes and holds
+`best_known_good`. Auto-labelled fp_rate 0.97 (n=32, all tier-1) is an estimate, not truth.
+
+**Exp #11, night 5 = extension night 1, and the deferral gate did exactly what it was
+built for.** Two cancels: 4184 (12:15:13, first HUMAN of the visit 44 s later) and 4212
+(13:31:19, 215 s later). Both were unreachable by *both* backward conditions — prior human
+18 and 51 min back, density 2 and 0 — i.e. precisely the leading-edge class that produced
+one leaked person-in-REVIEW on each of 07-29, 07-30 and 07-31. Tonight: zero. The backward
+conditions fired 7 more times (5 window, 2 density). **All 9 mutes adjudicated frame by
+frame: 0 concealed animals** (76 across the five nights, 0 concealed animals total). All 9
+*sent* review-class bursts adjudicated too: 0 people, 0 animals. Two of them sat in the
+240–600 s pre-human band (4165 at 479 s, 4210 at 386 s) and both are genuinely empty
+scenes — **no evidence to widen `review_defer_seconds`; it stays 240.** Part B's symmetric
+purge runs after every detection and matches 284 human-adjacent review rows, deleting 0
+files because all 284 predate the 300-burst image rotation — a no-op today by construction,
+biting from 08-04 when tonight's bursts cross 48 h. CONCLUDED, KEEP. Adjudicating every
+`human_proximity_muted=1` burst is now a **standing nightly duty**, not experiment-scoped.
+
+**Exp #13 (runs/0011), found in the one non-review row of the night.** Id 4175:
+`detection_status='identified'`, `species_name='f1856211-…;;;;;;blank'`, confidence 0.9985,
+five frames of empty garden. `blank` is SpeciesNet's own label for "nothing here", and it
+is emitted *confidently* — which is what breaks the routing: `_parse_prediction` has an
+explicit branch for the sibling sentinel `no cv result` but none for `blank`, so 0.99 clears
+`unknown_species_threshold` and lands in the success case as IDENTIFIED. 54 such bursts
+corpus-wide since 06-08; of the 11 that carry a label, **11/11 false_positive, 0 animal
+labels of any kind**, and all 54 show `detection_count=1` at `max_detection_confidence`
+0.21–0.31 — one weak box the classifier then calls empty.
+
+The noise is the smaller half. **Every mute path in this system keys on review-class
+status**, so an `identified` burst is checked by none of them: a person captured while the
+ensemble says `blank` goes straight to MAIN, with no proximity check, no deferral, no blur
+or scene gate. That is the same harm exp #11 spent five nights closing on the REVIEW side,
+left wide open on the channel Daniel actually trusts. Fixed by mirroring the branch that
+already exists one line above: `_is_blank_prediction()` (last segment `blank` **and** all
+taxonomy segments empty) → NO_ANIMAL, `animals_detected=False`, observability metadata kept
+so `top_species_raw` still records the blank label. Narrow on purpose — a populated taxonomy
+ending in `blank` stays IDENTIFIED, with a test to hold that. Commit `55234f1`, 532 tests
+pass, `pending_restart_at` 2026-08-03T03:25. FN-veto cleared by measurement, and note the
+change is not a suppression: these bursts become review-class, so they keep their DB row and
+~50% still reach Telegram behind the 🔍 REVIEW prefix.
+
+Lesson worth carrying: five nights of adjudication all pointed at the review-class path,
+and the leak that was left sat in the *other* branch — the one the mute stack never sees.
+When a privacy fix is scoped to a status class, check what the other status classes bypass.
+
+Ops: `wildlife-camera.service` stopped by hand 14:06:44 and restarted 14:56:05 (~50 min
+coverage gap, SIGTERM/143, no crash).

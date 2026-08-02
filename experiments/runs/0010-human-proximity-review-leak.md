@@ -635,3 +635,68 @@ rather than opened as a separate experiment (same root cause, same gate family,
 same column; precedent: the density condition on night 1). `pending_restart_at`
 stamped 2026-08-02T03:25 so both parts go live with the pre-sunrise restart.
 Label supply 5 human labels this window — not starved.
+
+---
+
+## Night 5 (2026-08-02) — extension night 1: the deferral gate fired, and fired correctly
+
+First night with the exp #11 extension live (commit `424265d`, applied at the
+2026-08-02T03:30 restart). 114 triggers, 82 HUMAN-status suppressions, 31
+review-class bursts, 1 `identified`.
+
+**The Deferred REVIEW Send Gate cancelled two sends, both genuine leading-edge
+cases** — the exact class no backward-looking rule can reach:
+
+| id | burst | first HUMAN of the visit | lead | prior human | density |
+|----|-------|--------------------------|------|-------------|---------|
+| 4184 | 12:15:13 | 4185 @ 12:15:57 | 44 s | 11:57:35 (1058 s) | 2 |
+| 4212 | 13:31:19 | 4213 @ 13:34:54 | 215 s | 12:40:27 (3052 s) | 0 |
+
+Both were unreachable by the window condition (prior human 18 and 51 min back)
+and by the density condition (2 and 0 detections in 1800 s). Under the previous
+build both would have been sent to REVIEW as the opening frame of a visit —
+which is how 3829, 3867 and 3909 leaked on the three preceding nights. Zero
+person-in-REVIEW leaks tonight. `[REVIEW-DEFER]` logged, mute persisted in
+`human_proximity_muted`, no other gate double-logged.
+
+The backward conditions fired 7 more times: 4206, 4217, 4220, 4223, 4254
+(window) and 4207, 4264 (density).
+
+**FN-veto duty — all 9 muted bursts adjudicated frame by frame (45 frames, all
+on disk): 0 concealed animals.** Empty garden in every one. Scene gate muted
+nothing tonight (no `scene_gate_muted=1` rows), so that standing duty is vacuous
+this tick.
+
+**Leak duty — all 9 review-class bursts that were actually sent adjudicated:
+0 people, 0 animals.** Two of them sit in the 240–600 s pre-human band that a
+wider deferral window would have caught (4165 at 479 s, 4210 at 386 s before the
+next HUMAN burst) and **both are genuinely empty scenes** — so tonight produced
+no evidence for widening `review_defer_seconds`, and it stays at 240.
+
+**Part B (symmetric retention purge) is live and correct**: `resource_manager`
+logs `Purged 1039 human-status burst(s) ... Purged 284 human-adjacent review
+burst(s) (0 files) within 240s of a human detection, older than 48h` after each
+detection. `(0 files)` because every one of those 284 rows is older than the
+300-burst image rotation — the purge is a no-op today by construction and will
+start deleting real files once tonight's human-adjacent bursts cross 48 h on
+08-04. The rewritten (bisect, not SQL `EXISTS`) implementation shows no hot-path
+cost: bursts continued at the normal ~30 s cadence all day.
+
+**Ops note, not a code fault**: `wildlife-camera.service` was stopped by hand at
+14:06:44 (SIGTERM → status=143, systemd's normal "Failed" cosmetics for a service
+without an exit-0 SIGTERM handler) and restarted 14:56:05 — a ~50 min gap in
+coverage with ssh sessions bracketing it. No crash, no restart loop.
+
+### Decision — CONCLUDED, KEEP (live)
+
+Exit criteria met: 5 nights (07-28..08-02), ≥3 muted bursts adjudicated clean
+every night (9, 4, 1, 53, 9 — 76 total, **0 concealed animals**), and no
+person-in-REVIEW leak on the first night the completed mechanism was live. Each
+of the three preceding nights produced exactly one leading-edge leak; tonight the
+gate that closes that path cancelled two and leaked none. The gate family stays
+live in full: window 240 s, density 8/1800 s, deferral 240 s, symmetric purge
+240 s. The nightly adjudication of every `human_proximity_muted=1` burst becomes
+a **standing duty**, not an experiment-scoped one — it is the only thing standing
+between a mute path and a silent false negative.
+
+Freeing the active slot for exp #13 (runs/0011).
