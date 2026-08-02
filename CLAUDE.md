@@ -148,6 +148,7 @@ The species identification system integrates Google SpeciesNet v5.0.2:
 - **Lazy Loading**: Model loads on first identification request (not at startup) - takes ~6 seconds
 - **Geographic Filtering**: Configured for Bonn, Germany (DEU/NW region) via geofencing
 - **Confidence Thresholds**: Two-stage filtering (detection @ 0.5, classification @ 0.5)
+- **Blank-prediction routing** (exp #13, 2026-08-02, commit `55234f1`): SpeciesNet's explicit empty-frame verdict is a fully-generic taxonomy label ending in `blank` (e.g. `<uuid>;;;;;;blank`) emitted at ~0.99 confidence, so it used to clear `unknown_species_threshold` and return `DetectionStatus.IDENTIFIED` — a MAIN-channel species alert on a frame the model called empty, and one that bypassed every review-class mute path (human-proximity, deferral, blur, scene, sampling). `SpeciesIdentifier._is_blank_prediction` (last segment `blank` **and** all taxonomy segments empty) now routes it to `DetectionStatus.NO_ANIMAL` with `animals_detected=False`, mirroring the adjacent `no cv result` → UNCLASSIFIABLE branch; observability metadata is preserved so `top_species_raw` still records the blank label. A populated taxonomy ending in `blank` is unaffected. Rollback: `git revert 55234f1` + restart.
 - **Error Resilience**: Always returns valid IdentificationResult, never crashes
 - **MockSpeciesIdentifier**: Test implementation for development without SpeciesNet
 
