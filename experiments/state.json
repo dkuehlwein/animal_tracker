@@ -178,7 +178,7 @@
     "n_sampled_out": 14,
     "total_triggers": 114
   },
-  "last_tick_completed_day": "2026-08-01",
+  "last_tick_completed_day": "2026-08-02",
   "nightly_verdict": "Quiet day for wildlife, busy one for people -- 114 triggers, 82 person photos held back, nothing missed -- and last night's four-minute delay caught two review photos taken seconds before someone walked into frame, exactly the leak we chased for three nights, so that fix is now finished and kept. Separately I found the camera sending you \"identified species\" alerts whose species was literally \"blank\" (the model's own word for an empty picture): 54 of them since June, every labelled one a false alarm, and they skipped all the people-privacy checks -- fixed tonight, live after the pre-dawn restart.",
   "paused": false,
   "pending_restart_at": "2026-08-03T03:25:00+02:00",
