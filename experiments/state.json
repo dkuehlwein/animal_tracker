@@ -106,6 +106,7 @@
     "PERFORMANCE_SCENE_GATE_ENABLED": 1,
     "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD": 0.97
   },
+  "feedback_starved_since": "2026-08-03",
   "history": [
     {
       "config": {},
@@ -178,8 +179,8 @@
     "n_sampled_out": 3,
     "total_triggers": 4
   },
-  "last_tick_completed_day": "2026-08-02",
-  "nightly_verdict": "Quiet day for wildlife, busy one for people -- 114 triggers, 82 person photos held back, nothing missed -- and last night's four-minute delay caught two review photos taken seconds before someone walked into frame, exactly the leak we chased for three nights, so that fix is now finished and kept. Separately I found the camera sending you \"identified species\" alerts whose species was literally \"blank\" (the model's own word for an empty picture): 54 of them since June, every labelled one a false alarm, and they skipped all the people-privacy checks -- fixed tonight, live after the pre-dawn restart.",
+  "last_tick_completed_day": "2026-08-03",
+  "nightly_verdict": "Very quiet day -- only 4 triggers and nothing at all sent to your phone; I checked the camera wasn't broken by auditing the every-20-seconds timelapse stream, and it was genuinely just a still, overcast Monday with no animals missed. Since you haven't labelled anything since 31 July, the loop has now frozen itself and will make no changes until some labels come in.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 4280

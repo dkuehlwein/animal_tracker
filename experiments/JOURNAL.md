@@ -1711,3 +1711,46 @@ When a privacy fix is scoped to a status class, check what the other status clas
 
 Ops: `wildlife-camera.service` stopped by hand 14:06:44 and restarted 14:56:05 (~50 min
 coverage gap, SIGTERM/143, no crash).
+
+## 2026-08-03 — FEEDBACK-STARVED FREEZE tripped; exp #13 night 1 live but unexercised; 4-trigger day audited clean
+
+4 triggers all day (08:33–10:56), 1 HUMAN, 3 review-class — **all 3 sampled out, so zero
+Telegram messages of any kind were sent today**. Last human label remains 2026-07-31 18:23:
+08-01, 08-02, 08-03 are three consecutive empty days, so `is_feedback_starved(3)` is now
+True. **Tuning is FROZEN**: no new experiment opened, no env delta, no code change. Note
+`best_known_good` is `{}` and always has been — "hold `best_known_good`" is executed as
+*hold the current deployed config unchanged*, NOT as restoring an empty dict, which would
+silently wipe every gate the loop has shipped. Recorded as `feedback_starved_since` in
+state.json so the next tick doesn't have to re-derive it.
+
+**Exp #13 (blank→NO_ANIMAL) is live from the 03:30 restart but never fired**: 0 `;blank`
+bursts, 0 `identified` rows. Neither confirmed nor refuted; exit criteria unchanged.
+
+**4 vs a 192/night baseline is a nominal volume collapse, and it was dismissed on positive
+evidence rather than on "the change I shipped can't have caused it."** The detector fired
+normally (motion_area 923–1729 vs threshold 800; sunrise start, 1500-frame warmup, sunset
+stop all logged). The independent timelapse FN-audit stream — which the loop had not used
+before tonight — wrote 179 frames/hour with a textbook luma curve (8.3→96→1.0) and nonzero
+frame diffs throughout, ruling out a frozen sensor or stuck AE. And the scene really was
+still: mean inter-frame diff 1.4–2.2/hour vs 3.0–6.9 on 08-01/08-02, peak 6–19 vs 28–71.
+08-01 (252) and 08-02 (114, 82 of them HUMAN) were gardening days; today was a Monday with
+an overcast morning (08h luma 51 vs 99.5 yesterday). Fewer people, less sun, fewer
+shadow-driven triggers.
+
+**FN audit, top 20 of 1 070 timelapse frames by inter-frame diff — clean.** Each candidate
+split into global luma shift vs residual localized blobs after removing it. All resolve to
+illumination: 08:38:24 (diff 19.5) = +19.4 AE step plus a sun/shade boundary on the left
+wall; 10:45:34 (19.2) = −16.0 shift, 720 residual px, largest blob a 23×18 shadow edge on
+grass; 12:53/11:40/08:53 leave ≤41 residual px and no blob ≥40 px. No animal was missed.
+The timelapse stream is now the loop's answer to "is a quiet night real or a blind camera" —
+it is the only artifact that can distinguish them, and it should be the first thing checked
+on any future volume-collapse trip.
+
+**One finding for the next tick: 4278 is a false HUMAN.** pc 0.330, barely over the 0.3
+gate, on frames containing no person; its neighbours scored 0.277/0.252/0.169 on the same
+empty scene. MegaDetector's person head is noisy on dark low-contrast frames (luma ~51,
+sharpness 3.6). Benign direction — an empty frame was suppressed, not sent — but a false
+HUMAN arms the 240 s proximity mute and the 240 s deferral cancel for someone who was never
+there. Nothing followed within 240 s today, so cost was zero. Deliberately NOT acted on:
+frozen, one data point, and `SPECIES_HUMAN_DETECTION_CONFIDENCE` trades directly against the
+privacy gate five nights of work went into. Watch for recurrence.

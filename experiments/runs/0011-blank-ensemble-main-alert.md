@@ -93,3 +93,62 @@ Once live at the 08-03T03:25 restart: no new row should carry
 preserved in `top_species_raw`, flowing through the normal mute stack. Exit
 criteria: 3 nights with ≥1 blank-labelled burst correctly routed to review-class
 and no animal-labelled blank burst.
+
+---
+
+## Night 1 (2026-08-03) — live but unexercised; the day itself was the story
+
+Code live from the 03:30 restart (`55234f1`, AE=normal, all deployed env
+unchanged). **The gate never fired: zero `;blank` bursts, zero `identified`
+rows, 4 triggers all day.** Nothing confirms or refutes the fix yet — exit
+criteria unchanged, still needs 3 nights with ≥1 blank burst.
+
+**Volume: 4 triggers vs a 192/night baseline — a nominal collapse, dismissed on
+positive evidence, not on the assumption that exp #13 is harmless** (it is
+post-trigger routing and cannot affect trigger count, but that argument alone
+would be exactly the kind of self-serving reasoning the guardrail exists to
+catch). Three independent checks:
+
+1. **The detector is alive.** 4277/4279/4280 fired at motion_area 923–1729
+   against the 800 threshold; the 06:02 sunrise start, the 1500-frame warmup,
+   and the 21:13 sunset stop all logged normally.
+2. **The camera is alive.** The timelapse FN-audit stream (`data/timelapse`,
+   one grayscale frame/20 s) wrote 179 frames/hour all day with a textbook
+   daylight luma curve — 8.3 (06h) → 51 (08h) → 96 (10–12h) → 22 (18h) → 1.0
+   (21h) — and a nonzero frame-to-frame diff throughout. A frozen sensor or a
+   stuck AE would flatten both; neither is flat.
+3. **The scene was genuinely still.** Mean inter-frame diff on 08-03 runs
+   1.4–2.2 per hour vs 3.0–6.9 on 08-01/08-02, and peak diff 6–19 vs 28–71.
+   08-01 (252 triggers) and 08-02 (114, of which 82 HUMAN) were gardening days;
+   08-03 was a Monday with an overcast morning (08h luma 51 vs 99.5 same hour
+   on 08-02). Fewer people and less sun means fewer shadow-driven triggers.
+
+**FN audit over the timelapse stream — clean.** Ranked all 1 070 of today's
+timelapse frames by inter-frame difference and adjudicated the top 20. Each was
+decomposed into a global luma shift vs. residual localized blobs after removing
+that shift. Every candidate resolves to illumination, not an object: 08:38:24
+(the largest, diff 19.5) is a +19.4 luma AE step plus a sun/shade boundary
+brightening the left wall; 10:45:34 (19.2) is a −16.0 shift with 720 residual
+pixels, the largest blob a 23×18 shadow edge crossing the grass; 12:53, 11:40,
+08:53 leave ≤41 residual pixels and no blob ≥40 px at all. **No animal was
+missed today** — the quiet day is real, not a blind detector.
+
+**Adjudication of the day's 4 rows.** All 3 review-class rows were sampled out
+(`review_sampled_out=1`), so **zero REVIEW messages and zero MAIN messages were
+sent all day**. No proximity mutes, no scene-gate mutes, nothing to adjudicate
+under the standing duty. Frames inspected anyway (CLAHE-brightened, the 08:33
+burst being near-dark): all four are the empty garden.
+
+**One finding worth recording: 4278 is a false HUMAN.** `detection_status='human'`
+at `person_confidence=0.330`, just over the 0.3 gate — but its frames contain no
+person. Its neighbour 4277 (27 s earlier) scored 0.277 and 4279/4280 scored
+0.252/0.169, all on empty scenes; MegaDetector's person head is simply noisy on
+dark, low-contrast frames (08:33 luma ~51, sharpness 3.6). The failure direction
+is benign — an empty frame was suppressed instead of sent — but it is not free:
+a false HUMAN seeds `_last_human_detection_at`, arming the 240 s proximity mute
+and the 240 s deferral cancel for a person who was never there. Today nothing
+followed within 240 s (next trigger 09:45), so the cost was zero. **Not acted on
+tonight** (freeze, and one instance is not a pattern); noted for the next tick to
+check whether false-HUMAN-at-low-luma recurs, since raising
+`SPECIES_HUMAN_DETECTION_CONFIDENCE` trades directly against the privacy gate
+this loop spent five nights hardening and must not be touched on one data point.
