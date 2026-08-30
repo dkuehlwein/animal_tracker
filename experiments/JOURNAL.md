@@ -1754,3 +1754,93 @@ HUMAN arms the 240 s proximity mute and the 240 s deferral cancel for someone wh
 there. Nothing followed within 240 s today, so cost was zero. Deliberately NOT acted on:
 frozen, one data point, and `SPECIES_HUMAN_DETECTION_CONFIDENCE` trades directly against the
 privacy gate five nights of work went into. Watch for recurrence.
+
+## 2026-08-30 — 27-night outage backlog; exp #13 CONCLUDED KEEP; exp #14 opened + shipped (the human gate was firing on detector noise)
+
+**The loop was down for 27 nights.** `journalctl -u wildlife-loop` shows every
+gated-in tick from 2026-08-04 to 2026-08-29 dying at "Failed to authenticate:
+OAuth session expired and could not be refreshed" — the deterministic pre-gate
+passed, the Claude session never started, so `endtick` never ran and
+`last_tick_completed_day` sat at 2026-08-03. The camera, the feedback sidecar and
+the deploy timer all kept running throughout; nothing was lost but judgment.
+Tonight's session authenticated, and 483 triggers (ids 4281–4763) were waiting
+behind the watermark. Credentials are the loop's single point of failure and the
+failure is silent to Daniel — the nightgate heartbeat only fires on *gated-out*
+ticks, so a night that gates IN and then dies sends nothing at all. Worth a
+guard, backlogged below.
+
+**Feedback-starved freeze LIFTED.** `feedback_starved_since` was stamped
+2026-08-03 on three labelless days. Labels resumed 08-05 and kept coming: 56
+human labels between 08-05 and 08-28, the most recent 2 days ago. The freeze
+condition (3 consecutive labelless days) is not met; the field is cleared.
+
+**Exp #13 (blank-ensemble-main-alert) CONCLUDED KEEP.** The outage handed it 27
+nights of single-arm evidence. Blank-verdict rows routed to MAIN: **10/97
+pre-fix, 0/23 post-fix**, zero `species_name LIKE '%blank'` rows in the window.
+All 6 IDENTIFIED rows in 483 triggers are real animals (a bird, a 4-burst cat
+sequence, one more bird), and both human `animal` labels in the window sit on
+IDENTIFIED rows — every human-confirmed animal reached MAIN. See runs/0011.
+
+**Exp #14 (phantom-human-gate) opened, shipped, live at the 08-31T03:25 restart.**
+Promoted from runs/0011's own closing note about id 4278 — the 08-03 tick flagged
+one false HUMAN at pc 0.330 and correctly refused to act on a single point. The
+backlog supplies the pattern.
+
+184 of 483 triggers (38%) were suppressed as HUMAN; on 08-30 alone, 64 of 75
+(85%). **182 of the 184 carry `detection_count=0`** — MegaDetector produced no
+box above its own 0.5 operating threshold, yet the privacy gate fires on the raw
+person-category score at 0.3. Adjudicated every HUMAN burst with frames still on
+disk (48 h retention → 08-29/08-30): **30 bursts at pc 0.17–0.43 contain no
+person, 2 more at 0.46–0.48 contain no person, and every burst at ≥0.496 is a
+real person.** The lone counter-example is 4741 (pc 0.435), four minutes into a
+genuine gardening visit whose other bursts score 0.61–0.96. The gate has been
+reading foliage noise on dark low-contrast frames as people.
+
+Suppressing empty frames is harmless by itself; the downstream cost is not.
+(i) Every phantom seeds `_last_human_detection_at`, the 1800 s density counter
+and the 240 s deferral cancel — of 134 proximity/deferral mutes since 07-28,
+**23 (17%) were armed only by phantoms**, i.e. exps #11/#12's privacy machinery
+muting real review-class bursts for people who were never there. (ii) The human
+gate runs *before* the animal branch, so an animal burst carrying a 0.35 noise
+score is suppressed with no species ID and no notification — unobserved (all 32
+adjudicated phantoms are empty) but a large structural exposure at 38% of
+triggers. (iii) The HUMAN branch writes only `person_confidence` into metadata,
+so `top_species_raw` is NULL on all 184 rows: a third of the corpus is invisible
+to metrics.
+
+Fix: `SPECIES_HUMAN_DETECTION_CONFIDENCE` 0.30 → **0.50**, aligning the privacy
+gate with MegaDetector's own detection threshold so it stops consuming boxes the
+detector rejected. The `homo`-taxonomy and raw-homo-leak triggers (pc<0.30) are
+untouched. The knob had no `BOUNDS` entry — `loop.deploy` rejected it outright —
+so commit `6d8bcc1` adds it as (0.3, 0.7), floored at the shipped default and
+capped so the loop cannot gut the gate. 532 tests pass.
+
+FN-veto: strictly improving — the change only *reduces* suppression, moving
+bursts into review-class where the existing stack applies; it creates no new
+mute path. Privacy-veto, measured over 1 467 HUMAN rows since 07-08: T=0.50
+demotes 345 rows (24%), of which **252 stay muted by proximity/deferral/density**
+and 93 (~1.7/day) would reach REVIEW. Of those 93, the 30 with frames on disk
+were adjudicated and **all 30 are empty garden**; 4741, the one real person in
+the demoted band, is *not* among them — the 240 s proximity gate holds it. Zero
+known privacy regressions. Honest residual: the other 63 predate image rotation
+and cannot be adjudicated.
+
+Pre-registered: HUMAN share 38%→~29%; +0.5–1 REVIEW msg/day after scene+sampling
+(>4/day = volume explosion → roll back); phantom-armed mutes 17%→~0. **Nightly
+duty: adjudicate every review-class burst with pc in [0.30,0.50). A recognizable
+person in REVIEW is a rollback event, not a tuning event.**
+
+**Metrics (backlog window, 483 triggers):** fp_rate 0.980 [0.957, 0.991] over 297
+labelled; 54 human labels, 52 FP, 2 animal (both IDENTIFIED, both MAIN-routed);
+0 errors; 146 sampled out; 2 can't-tell. FN unmeasured as ever.
+
+**Standing duty discharged:** 21 muted review-class bursts with frames on disk
+(15 proximity/deferral, 8 scene-gate, 2 overlapping) adjudicated — all empty
+garden, 0 concealed animals, 0 recognizable people. 32 of the 53 mutes in the
+window lost their frames to rotation over the outage and could not be checked.
+
+**Backlogged (id 15, not opened — one experiment at a time):** the loop has no
+dead-man's switch. A tick that passes the night gate and then dies is silent;
+27 nights passed before a human noticed. Cheap fix: have `loop.nightgate` send a
+Telegram alert when `last_tick_completed_day` falls more than ~2 loop-days
+behind, independent of whether the session starts.

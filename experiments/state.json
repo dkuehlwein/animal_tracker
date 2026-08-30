@@ -1,5 +1,5 @@
 {
-  "active_experiment_id": 13,
+  "active_experiment_id": 14,
   "backlog": [
     {
       "hypothesis": "CONCLUDED 2026-06-15 (keep). Same-channel \ud83d\udd0d REVIEW prefix on status\u2208{NO_ANIMAL,UNCLASSIFIABLE} flags 99% of FP at 0 FN; live since 06-12, location-agnostic. Second-channel routing is OUT per Daniel (no 2nd channel \u2014 adds overhead, won't click two). See runs/0001 + LEARNINGS.",
@@ -86,11 +86,25 @@
       "validation": "live"
     },
     {
-      "hypothesis": "ACTIVATED + SHIPPED 2026-08-02 (commit 55234f1, restart-gated 08-03T03:25). SpeciesNet's explicit empty-frame verdict '<uuid>;;;;;;blank' scores ~0.99, clears unknown_species_threshold (0.5) and is returned as DetectionStatus.IDENTIFIED -- a MAIN-channel species alert on a frame the model itself called empty (id 4175 today, 5 frames of empty garden). Second, larger harm: IDENTIFIED status bypasses EVERY review-class mute path (human-proximity window+density, deferred send, blur, scene, sampling), so a person captured while the ensemble says blank goes straight to MAIN with no privacy gate at all. Fix mirrors the existing 'no cv result' sentinel branch: _is_blank_prediction() (last taxonomy segment 'blank' AND all taxonomy segments empty) -> NO_ANIMAL, animals_detected=False, observability metadata preserved so top_species_raw keeps the blank label. Narrow by construction: a populated taxonomy ending in 'blank' stays IDENTIFIED. FN-veto cleared BY MEASUREMENT: 54 blank bursts corpus-wide since 06-08, 11 labelled, 11/11 false_positive, 0 animal labels of any kind; all 54 have detection_count=1 at max_detection_confidence 0.21-0.31 (weak box, classifier says empty). Not a suppression either -- these become review-class, so ~50% still reach Telegram with the REVIEW prefix. Cost 54/4276 = 1.3% of triggers, ~1 MAIN alert/busy day removed. 532 tests pass. Rollback: git revert 55234f1 + restart. See runs/0011.",
+      "hypothesis": "CONCLUDED 2026-08-30 (KEEP, live). ACTIVATED + SHIPPED 2026-08-02 (commit 55234f1, restart-gated 08-03T03:25). SpeciesNet's explicit empty-frame verdict '<uuid>;;;;;;blank' scores ~0.99, clears unknown_species_threshold (0.5) and is returned as DetectionStatus.IDENTIFIED -- a MAIN-channel species alert on a frame the model itself called empty (id 4175 today, 5 frames of empty garden). Second, larger harm: IDENTIFIED status bypasses EVERY review-class mute path (human-proximity window+density, deferred send, blur, scene, sampling), so a person captured while the ensemble says blank goes straight to MAIN with no privacy gate at all. Fix mirrors the existing 'no cv result' sentinel branch: _is_blank_prediction() (last taxonomy segment 'blank' AND all taxonomy segments empty) -> NO_ANIMAL, animals_detected=False, observability metadata preserved so top_species_raw keeps the blank label. Narrow by construction: a populated taxonomy ending in 'blank' stays IDENTIFIED. FN-veto cleared BY MEASUREMENT: 54 blank bursts corpus-wide since 06-08, 11 labelled, 11/11 false_positive, 0 animal labels of any kind; all 54 have detection_count=1 at max_detection_confidence 0.21-0.31 (weak box, classifier says empty). Not a suppression either -- these become review-class, so ~50% still reach Telegram with the REVIEW prefix. Cost 54/4276 = 1.3% of triggers, ~1 MAIN alert/busy day removed. 532 tests pass. Rollback: git revert 55234f1 + restart. See runs/0011. CONCLUDED 2026-08-30 after 27 nights of unattended single-arm evidence (the loop's Claude session was OAuth-dead 08-04..08-29; the camera ran throughout). Blank-verdict rows routed to MAIN: 10/97 pre-fix vs 0/23 post-fix; no species_name LIKE '%blank' row survives in the window. All 6 IDENTIFIED rows across 483 triggers are real animals, and both human 'animal' labels in the window sit on IDENTIFIED rows. Cost as predicted: ~0.9 bursts/day become review-class. Rollback: git revert 55234f1 + restart. See runs/0011 Resolution.",
       "id": 13,
       "slug": "blank-ensemble-main-alert",
+      "status": "concluded",
+      "validation": "live"
+    },
+    {
+      "hypothesis": "ACTIVATED + SHIPPED 2026-08-30 (commit 6d8bcc1 + env delta SPECIES_HUMAN_DETECTION_CONFIDENCE 0.3->0.5, restart-gated 08-31T03:25). The human/privacy gate fires on MegaDetector person boxes at >=0.30, below MegaDetector's own 0.5 operating threshold: 182 of 184 HUMAN rows in the 483-trigger backlog carry detection_count=0, i.e. the detector produced no box it would itself accept. Adjudication of every HUMAN burst with frames on disk (08-29/08-30): 32 bursts at pc 0.17-0.48 contain NO person, every burst at >=0.496 is a real person; lone exception 4741 (pc 0.435) sits 4 min into a real visit scoring 0.61-0.96. Harm is downstream, not in the suppression itself: (i) every phantom arms the 240s proximity mute, 1800s density counter and 240s deferral cancel -- 23 of 134 proximity mutes since 07-28 (17%) were armed ONLY by phantoms; (ii) the human gate precedes the animal branch, so an animal burst carrying a noise-grade person score is suppressed with no species ID, no notification, no observability (unobserved but 38% of triggers pass through it); (iii) the HUMAN branch writes only person_confidence, so top_species_raw is NULL on all 184 rows. Fix aligns the gate with the detector's own threshold. Knob had no BOUNDS entry (deploy rejected it) -- 6d8bcc1 adds (0.3, 0.7), floored at the shipped default, capped so the loop cannot gut the gate; 532 tests pass. FN-veto: strictly improving, the change only reduces suppression and creates no new mute path. Privacy-veto MEASURED over 1467 HUMAN rows since 07-08: T=0.50 demotes 345 (24%), 252 stay muted by proximity/deferral/density, 93 (~1.7/day) would reach REVIEW -- of those 93 the 30 with frames on disk are ALL empty garden, and 4741 is not among them (proximity holds it). Zero known privacy regressions; residual = 63 demoted rows predate image rotation and cannot be adjudicated. Pre-registered: HUMAN share 38%->~29%, +0.5-1 REVIEW msg/day (>4/day = rollback), phantom-armed mutes 17%->~0. NIGHTLY DUTY: adjudicate every review-class burst with pc in [0.30,0.50); a recognizable person in REVIEW is a ROLLBACK event, not a tuning event. Rollback: loop.deploy --rollback, or SPECIES_HUMAN_DETECTION_CONFIDENCE=0.3 + restart. See runs/0012.",
+      "id": 14,
+      "slug": "phantom-human-gate",
       "status": "running",
       "validation": "live"
+    },
+    {
+      "hypothesis": "BACKLOG (not opened -- one experiment at a time). The loop has no dead-man's switch: loop.nightgate only heartbeats on GATED-OUT ticks, so a tick that passes the gate and then dies (OAuth expiry 2026-08-04..29, 27 nights) is completely silent to Daniel. Cheap fix: have nightgate send a Telegram alert whenever last_tick_completed_day falls more than ~2 loop-days behind loop_day(), independent of whether the Claude session starts.",
+      "id": 15,
+      "slug": "loop-dead-mans-switch",
+      "status": "backlog",
+      "validation": "none"
     }
   ],
   "baselines": {
@@ -104,9 +118,10 @@
     "PERFORMANCE_MAX_IMAGES": 300,
     "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.5,
     "PERFORMANCE_SCENE_GATE_ENABLED": 1,
-    "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD": 0.97
+    "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD": 0.97,
+    "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
   },
-  "feedback_starved_since": "2026-08-03",
+  "feedback_starved_since": null,
   "history": [
     {
       "config": {},
@@ -137,6 +152,18 @@
         "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD": 0.97
       },
       "replaced_at": "2026-07-29T03:25:00+02:00"
+    },
+    {
+      "config": {
+        "PERFORMANCE_HUMAN_DENSITY_COUNT": 8,
+        "PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS": 1800,
+        "PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS": 240,
+        "PERFORMANCE_MAX_IMAGES": 300,
+        "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.5,
+        "PERFORMANCE_SCENE_GATE_ENABLED": 1,
+        "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD": 0.97
+      },
+      "replaced_at": "2026-08-31T03:25:00+02:00"
     }
   ],
   "last_heartbeat_loopday": "2026-08-30",
@@ -179,9 +206,9 @@
     "n_sampled_out": 146,
     "total_triggers": 483
   },
-  "last_tick_completed_day": "2026-08-03",
-  "nightly_verdict": "Very quiet day -- only 4 triggers and nothing at all sent to your phone; I checked the camera wasn't broken by auditing the every-20-seconds timelapse stream, and it was genuinely just a still, overcast Monday with no animals missed. Since you haven't labelled anything since 31 July, the loop has now frozen itself and will make no changes until some labels come in.",
+  "last_tick_completed_day": "2026-08-30",
+  "nightly_verdict": "The loop itself was broken for 27 nights -- its login expired on 4 August and every nightly run since died before starting, so nothing was reviewed until tonight (the camera and your labelling kept working fine throughout). Catching up on all 483 captures, I found the camera has been hiding about a third of everything it sees by mistakenly deciding a person was present: 32 of 33 checked 'person' photos are just the empty garden, so I raised the person-detection bar tonight -- real people are still hidden, phantoms no longer are.",
   "paused": false,
-  "pending_restart_at": null,
+  "pending_restart_at": "2026-08-31T03:25:00+02:00",
   "watermark": 4763
 }

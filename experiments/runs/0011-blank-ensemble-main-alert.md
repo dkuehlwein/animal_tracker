@@ -152,3 +152,43 @@ tonight** (freeze, and one instance is not a pattern); noted for the next tick t
 check whether false-HUMAN-at-low-luma recurs, since raising
 `SPECIES_HUMAN_DETECTION_CONFIDENCE` trades directly against the privacy gate
 this loop spent five nights hardening and must not be touched on one data point.
+
+---
+
+## Resolution — CONCLUDED 2026-08-30 (KEEP, live)
+
+**27 nights of unattended evidence, arriving in one batch.** The loop's Claude
+session failed OAuth every night from 2026-08-04 to 2026-08-29 (`journalctl -u
+wildlife-loop`: "Failed to authenticate: OAuth session expired and could not be
+refreshed", ~13 gated-in ticks lost). The camera never stopped: 483 triggers
+accumulated behind the watermark. Exp #13 shipped on 2026-08-02 and went live at
+the 08-03T03:25 restart, so the entire outage window is post-fix evidence — an
+unusually long single-arm run, collected without supervision.
+
+**The fix does exactly what it was built to do, and nothing else.**
+
+| window | blank-verdict rows | routed IDENTIFIED (MAIN alert) |
+|--------|-------------------|-------------------------------|
+| pre-fix (id ≤ 4280, 8 weeks) | 97 | **10** |
+| post-fix (id > 4280, 27 days) | 23 | **0** |
+
+Zero blank-labelled bursts reached MAIN across 483 triggers. No
+`species_name LIKE '%blank'` row exists in the post-fix window at all — the
+ensemble's blank verdict no longer survives into a species name.
+
+**No collateral damage on the animal branch.** The 6 IDENTIFIED rows in the
+window are all real: a bird (4297, human-labelled `animal`), a domestic cat
+sequence (4409–4412, incl. a 0.96-confidence cat), and 4516 (human-labelled
+`animal`). Both human `animal` labels in the whole 27-day window sit on
+IDENTIFIED rows — i.e. every animal a human confirmed was routed to MAIN, none
+to review-class. The narrow-by-construction claim (a *populated* taxonomy ending
+in `blank` stays IDENTIFIED) was never exercised, as expected.
+
+**Cost, as predicted.** 23 bursts became review-class instead of MAIN over 27
+days (~0.9/day), where they face the normal mute stack. No guardrail trip.
+
+Rollback remains `git revert 55234f1` + restart. Nothing about this experiment
+needs further watching; blank-routing is now ordinary behaviour.
+
+**Slot handed to exp #14** (`runs/0012-phantom-human-gate.md`), which was
+promoted from this run file's own closing note about id 4278.
