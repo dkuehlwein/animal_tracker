@@ -22,6 +22,15 @@ BOUNDS: dict[str, tuple[float, float]] = {
     "MOTION_CONSECUTIVE_REQUIRED": (1, 6),
     "MOTION_MIN_COLOR_VARIANCE": (0.0, 2000.0),
     "SPECIES_UNKNOWN_SPECIES_THRESHOLD": (0.3, 0.95),
+    # Human/privacy gate person-confidence trigger (exp #14, 2026-08-30). The
+    # gate consumed MegaDetector person boxes *below* MegaDetector's own 0.5
+    # operating threshold, so sub-threshold noise on empty frames was routed to
+    # DetectionStatus.HUMAN (32/32 adjudicated bursts at pc 0.17-0.47 contained
+    # no person). Tunable so the loop can align the gate with the detector's
+    # operating point. Floored at the shipped 0.3 default — lowering it only
+    # makes the phantom-HUMAN class larger — and capped at 0.7 so the loop can
+    # never gut the privacy gate.
+    "SPECIES_HUMAN_DETECTION_CONFIDENCE": (0.3, 0.7),
     "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD": (0.80, 1.0),
     # Boolean flag, not a range — present only so loop.deploy is allowed to
     # flip it (deploy rejects keys not in BOUNDS). No config field_validator
