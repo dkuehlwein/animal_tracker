@@ -166,16 +166,16 @@
       "replaced_at": "2026-08-31T03:25:00+02:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-08-30",
+  "last_heartbeat_loopday": "2026-08-31",
   "last_metrics": {
-    "date": "2026-08-30",
+    "date": "2026-08-31",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.9566336937562595,
-      0.990709139632486
+      0.8318207759473837,
+      1.0
     ],
     "fp_claude_ci": [
       0.0,
@@ -183,32 +183,32 @@
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 291,
+    "fp_count": 19,
     "fp_human_ci": [
-      0.8746482308272452,
-      0.9897836320515545
+      0.0,
+      1.0
     ],
-    "fp_human_count": 52,
-    "fp_human_rate": 0.9629629629629629,
+    "fp_human_count": 0,
+    "fp_human_rate": 0.0,
     "fp_md_ci": [
-      0.9584475459186488,
-      0.993580533654095
+      0.8318207759473837,
+      1.0
     ],
-    "fp_md_count": 239,
-    "fp_md_rate": 0.9835390946502057,
-    "fp_rate": 0.9797979797979798,
+    "fp_md_count": 19,
+    "fp_md_rate": 1.0,
+    "fp_rate": 1.0,
     "fp_trustworthy": true,
-    "labeled_triggers": 297,
-    "n_cant_tell": 2,
+    "labeled_triggers": 19,
+    "n_cant_tell": 0,
     "n_claude": 0,
-    "n_human": 54,
-    "n_md": 243,
-    "n_sampled_out": 146,
-    "total_triggers": 483
+    "n_human": 0,
+    "n_md": 19,
+    "n_sampled_out": 8,
+    "total_triggers": 45
   },
   "last_tick_completed_day": "2026-08-30",
   "nightly_verdict": "The loop itself was broken for 27 nights -- its login expired on 4 August and every nightly run since died before starting, so nothing was reviewed until tonight (the camera and your labelling kept working fine throughout). Catching up on all 483 captures, I found the camera has been hiding about a third of everything it sees by mistakenly deciding a person was present: 32 of 33 checked 'person' photos are just the empty garden, so I raised the person-detection bar tonight -- real people are still hidden, phantoms no longer are.",
   "paused": false,
-  "pending_restart_at": "2026-08-31T03:25:00+02:00",
-  "watermark": 4763
+  "pending_restart_at": null,
+  "watermark": 4808
 }
