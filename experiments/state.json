@@ -105,6 +105,13 @@
       "slug": "loop-dead-mans-switch",
       "status": "backlog",
       "validation": "none"
+    },
+    {
+      "hypothesis": "BACKLOG, opened 2026-08-31 (exp #14 night-1 finding; NOT shipped -- one experiment at a time). The human/privacy gate has a SECOND phantom path that exp #14's threshold lever cannot reach. human_gate_fired = max_person_conf >= T or is_homo_taxon or raw_homo_leak; the is_homo_taxon arm is a pure membership test over the ensemble label with NO score threshold, so it fires at any confidence. Of 1493 HUMAN rows since 2026-07-08, 284 fired via the taxon arm and their prediction scores are sharply BIMODAL: low mode 0.45-0.66 (91 rows), empty trough 0.70-0.80 (25 rows), high mode >=0.85 (168 rows). Adjudicated 2026-08-31: ALL 17 low-mode rows with frames still on disk are EMPTY GARDEN, zero people (4701 0.61, 4704 0.62, 4713 0.54, 4719 0.58, 4721 0.57, 4725 0.55, 4726 0.62, 4727 0.61, 4728 0.66, 4730 0.56, 4731 0.61, 4764 0.57, 4780 0.50, 4785 0.54, 4786 0.62, 4795 0.65, 4797 0.53); by contrast 4772 (0.93) and 4804 (0.99) are unmistakable, fully recognizable people. All 91 low-mode rows carry person_confidence < 0.50, so exp #14's SPECIES_HUMAN_DETECTION_CONFIDENCE lever cannot reach any of them at any in-BOUNDS value. Harm is the same three costs exp #14 was opened for: each phantom arms the 240s proximity mute / 1800s density counter / 240s deferral cancel (the 2026-08-31 mute of 4798 was armed by phantom 4797), each suppresses the animal branch before species ID with no notification and no observability, and each writes NULL top_species_raw. ~1.7/day, 6% of all HUMAN rows since 07-08. HELD not shipped: no env knob exists (this is a code change) and the one-experiment-at-a-time guardrail binds code changes exactly as env deltas; exp #14 is on night 1 with 45 triggers and none of its pre-registered predictions yet evaluable, so a second demotion path of comparable size (~1.7/day) into the SAME gate would make its volume effect permanently unattributable. This is a guardrail hold with a concrete release trigger, NOT a wait for approval. RELEASE TRIGGER: ship as the first act of the tick that concludes exp #14 (2-3 clean nights), or immediately on an exp #14 rollback (rolling T back to 0.30 leaves the taxon phantoms untouched, so the case only strengthens). PRE-REGISTERED DESIGN: add a score floor to the taxon arm (is_homo_taxon and prediction_score >= homo_taxon_min_score), env SPECIES_HOMO_TAXON_MIN_SCORE, default 0.75 -- sited in the empty trough, above the 0.66 top of the adjudicated-empty mode and below the 0.85 bottom of the confirmed-people mode, a boundary read off the data rather than a fitted edge. Privacy-veto MUST be re-measured over all 284 taxon rows before shipping, exactly as exp #14 did (count demoted rows surviving the proximity/deferral/density stack into REVIEW, adjudicate every one with frames on disk). The raw-homo-leak arm (exp #9) stays unthresholded -- rare-event insurance, measured base rate 3 rows corpus-wide. See runs/0012 night 1.",
+      "id": 16,
+      "slug": "homo-taxon-phantom-gate",
+      "status": "backlog",
+      "validation": "none"
     }
   ],
   "baselines": {
@@ -206,8 +213,8 @@
     "n_sampled_out": 8,
     "total_triggers": 45
   },
-  "last_tick_completed_day": "2026-08-30",
-  "nightly_verdict": "The loop itself was broken for 27 nights -- its login expired on 4 August and every nightly run since died before starting, so nothing was reviewed until tonight (the camera and your labelling kept working fine throughout). Catching up on all 483 captures, I found the camera has been hiding about a third of everything it sees by mistakenly deciding a person was present: 32 of 33 checked 'person' photos are just the empty garden, so I raised the person-detection bar tonight -- real people are still hidden, phantoms no longer are.",
+  "last_tick_completed_day": "2026-08-31",
+  "nightly_verdict": "First night back to normal: the camera saw a lot of real garden visitors today, and last night's raised person-detection bar behaved exactly as intended -- of the five photos it stopped hiding, four were the empty garden and one was a genuinely blurry person that two other safeguards caught before it could reach you. While checking, I found the camera has a second, separate way of mistakenly deciding a person is present: 17 out of 17 photos I checked from that path are just the empty garden. I've written up the fix but am deliberately holding it a few nights so it doesn't muddle the measurement of the change already running.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 4808

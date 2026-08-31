@@ -1844,3 +1844,42 @@ dead-man's switch. A tick that passes the night gate and then dies is silent;
 27 nights passed before a human noticed. Cheap fix: have `loop.nightgate` send a
 Telegram alert when `last_tick_completed_day` falls more than ~2 loop-days
 behind, independent of whether the session starts.
+
+## 2026-08-31 — exp #14 night 1 (T=0.50 live); second phantom path found in the taxon arm
+
+Restart applied 03:30:04. 45 triggers, heavy human traffic (26 HUMAN / 18 no_animal /
+1 unclassifiable / 0 identified). Loop healthy again after the 27-night OAuth outage.
+
+**Exp #14 verdict: KEEP RUNNING.** Gate behaving exactly as configured — all 17
+person-box-fired HUMAN rows today sit at pc 0.507–0.934, none below the new 0.50.
+Demoted band (pc ∈ [0.30,0.50)) fully adjudicated, 5 bursts: 4765/4769/4782/4784
+empty garden (phantoms, as predicted), **4774 a real person**. Not a rollback event:
+never sent (sampling-muted), would additionally have been cancelled by the 240 s
+deferral (HUMAN burst 4775 landed 41 s later), and it is a motion-blur smear with no
+resolvable face — the 3829/3867 class, not the 3909 class. First real test of the
+exp #11/#12 defence-in-depth under T=0.50; it held. Standing duty clean: proximity
+mutes 4773/4792/4798 all empty, no scene-gate mutes. Volume 8 REVIEW sends (verified
+against sendPhoto), 3 attributable to the demotion — above the +0.5–1/day prediction,
+below the >4/day trip, on n=1 unusually busy night. fp_rate 1.00 [0.832, 1.0] over 19
+auto-labelled; 0 human labels on today's rows (2 arrived on 08-29 rows, both FP/can't-tell);
+FN unmeasured; not feedback-starved.
+
+**New: backlog #16 — the homo-taxon arm is a second, independent phantom path.**
+`is_homo_taxon` is a pure membership test with no score threshold, so it fires
+regardless of confidence. Taxon-fired HUMAN rows since 07-08 (284 of 1493) are sharply
+bimodal: low mode 0.45–0.66 (91 rows), empty trough 0.70–0.80 (25), high mode ≥0.85 (168).
+**All 17 low-mode rows with frames still on disk adjudicated tonight — 17/17 empty garden,
+zero people** (4701/4704/4713/4719/4721/4725/4726/4727/4728/4730/4731 from 08-29/30, plus
+4764/4780/4785/4786/4795/4797 today). By contrast 4772 (0.93) and 4804 (0.99) are
+unmistakable, fully recognizable people. All 91 low-mode rows carry pc<0.50, so exp #14's
+lever cannot reach any of them; each still arms the proximity/density/deferral machinery
+(tonight's mute of 4798 was armed by phantom 4797) and suppresses the animal branch with
+no species ID and NULL top_species_raw. ~1.7/day, 6% of all HUMAN rows.
+
+Held, not shipped: no env knob exists (code change), and one-experiment-at-a-time binds
+code changes too. Exp #14 is on night 1 with nothing yet evaluable; a second demotion path
+of the same magnitude into the same gate would make tonight's +3 REVIEW messages
+permanently unattributable. Release trigger: first act of the tick that concludes exp #14,
+or immediately on an exp #14 rollback. Pre-registered design: `SPECIES_HOMO_TAXON_MIN_SCORE`
+default 0.75, sited in the empty trough between the adjudicated-empty mode (≤0.66) and the
+confirmed-people mode (≥0.85); privacy-veto to be re-measured over all 284 taxon rows first.
