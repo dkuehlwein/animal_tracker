@@ -222,3 +222,262 @@ def test_main_exits_0_when_no_state_file(tmp_path, monkeypatch):
         nightgate.main(["--state", str(sp)])
     except SystemExit as e:
         assert e.code == 0
+
+
+# ---------------------------------------------------------------------------
+# days_behind() — pure function
+# ---------------------------------------------------------------------------
+
+def test_days_behind_normal_gap():
+    assert nightgate.days_behind("2026-08-04", "2026-08-31") == 27
+
+
+def test_days_behind_zero_gap():
+    assert nightgate.days_behind("2026-06-08", "2026-06-08") == 0
+
+
+def test_days_behind_none_input():
+    assert nightgate.days_behind(None, "2026-06-08") is None
+
+
+def test_days_behind_unparseable_input():
+    assert nightgate.days_behind("not-a-date", "2026-06-08") is None
+
+
+# ---------------------------------------------------------------------------
+# should_alert_staleness() — pure function
+# ---------------------------------------------------------------------------
+
+def test_staleness_two_days_behind_no_alert():
+    """Exactly at the threshold (2 days behind) → no alert."""
+    ok = nightgate.should_alert_staleness(
+        last_tick_completed_day="2026-06-06",
+        current_loop_day="2026-06-08",
+        last_alert_loopday=None,
+    )
+    assert ok is False
+
+
+def test_staleness_three_days_behind_alerts():
+    """Strictly more than 2 days behind → alert."""
+    ok = nightgate.should_alert_staleness(
+        last_tick_completed_day="2026-06-05",
+        current_loop_day="2026-06-08",
+        last_alert_loopday=None,
+    )
+    assert ok is True
+
+
+def test_staleness_already_alerted_this_loopday_no_second_alert():
+    ok = nightgate.should_alert_staleness(
+        last_tick_completed_day="2026-06-05",
+        current_loop_day="2026-06-08",
+        last_alert_loopday="2026-06-08",
+    )
+    assert ok is False
+
+
+def test_staleness_missing_last_tick_completed_day_no_alert():
+    ok = nightgate.should_alert_staleness(
+        last_tick_completed_day=None,
+        current_loop_day="2026-06-08",
+        last_alert_loopday=None,
+    )
+    assert ok is False
+
+
+# ---------------------------------------------------------------------------
+# should_alert_camera_down() — pure function
+# ---------------------------------------------------------------------------
+
+def test_camera_inactive_alerts():
+    ok = nightgate.should_alert_camera_down(
+        camera_active=False,
+        current_loop_day="2026-06-08",
+        last_alert_loopday=None,
+    )
+    assert ok is True
+
+
+def test_camera_active_no_alert():
+    ok = nightgate.should_alert_camera_down(
+        camera_active=True,
+        current_loop_day="2026-06-08",
+        last_alert_loopday=None,
+    )
+    assert ok is False
+
+
+def test_camera_already_alerted_this_loopday_no_second_alert():
+    ok = nightgate.should_alert_camera_down(
+        camera_active=False,
+        current_loop_day="2026-06-08",
+        last_alert_loopday="2026-06-08",
+    )
+    assert ok is False
+
+
+# ---------------------------------------------------------------------------
+# main()-level: dead-man's switch checks (staleness + camera liveness)
+# ---------------------------------------------------------------------------
+
+def test_main_staleness_alert_fires_on_proceed_path(tmp_path, monkeypatch):
+    """Alerts fire even when the gate PROCEEDS — this is the whole point:
+    the 27-night OAuth outage was on ticks that passed the gate."""
+    sp = tmp_path / "state.json"
+    state_mod.save_state(sp, {
+        "last_tick_completed_day": "2026-06-01",  # 7 days behind
+    })
+
+    monkeypatch.setattr(nightgate, "_get_is_daytime", lambda: False)
+    monkeypatch.setattr(nightgate, "_get_loop_day", lambda: "2026-06-08")
+    monkeypatch.setattr(nightgate, "_send_heartbeat", lambda *a: None)
+    monkeypatch.setattr(nightgate, "_is_camera_active", lambda: True)
+
+    alert_calls = []
+    monkeypatch.setattr(
+        nightgate,
+        "_send_alert",
+        lambda state_path, loop_day_str, text, stamp_key: alert_calls.append(stamp_key),
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        nightgate.main(["--state", str(sp)])
+    assert exc_info.value.code == 0
+    assert "last_staleness_alert_loopday" in alert_calls
+
+
+def test_main_camera_alert_fires_on_proceed_path(tmp_path, monkeypatch):
+    """Camera-down alert fires even when the gate PROCEEDS."""
+    sp = tmp_path / "state.json"
+    state_mod.save_state(sp, {"last_tick_completed_day": "2026-06-07"})
+
+    monkeypatch.setattr(nightgate, "_get_is_daytime", lambda: False)
+    monkeypatch.setattr(nightgate, "_get_loop_day", lambda: "2026-06-08")
+    monkeypatch.setattr(nightgate, "_send_heartbeat", lambda *a: None)
+    monkeypatch.setattr(nightgate, "_is_camera_active", lambda: False)
+
+    alert_calls = []
+    monkeypatch.setattr(
+        nightgate,
+        "_send_alert",
+        lambda state_path, loop_day_str, text, stamp_key: alert_calls.append(stamp_key),
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        nightgate.main(["--state", str(sp)])
+    assert exc_info.value.code == 0
+    assert "last_camera_alert_loopday" in alert_calls
+
+
+def test_main_alerts_fire_on_skip_path_too(tmp_path, monkeypatch):
+    """Alerts also fire on a SKIP tick (daytime), alongside the heartbeat."""
+    sp = tmp_path / "state.json"
+    state_mod.save_state(sp, {"last_tick_completed_day": "2026-06-01"})
+
+    monkeypatch.setattr(nightgate, "_get_is_daytime", lambda: True)
+    monkeypatch.setattr(nightgate, "_get_loop_day", lambda: "2026-06-08")
+    monkeypatch.setattr(nightgate, "_send_heartbeat", lambda *a: None)
+    monkeypatch.setattr(nightgate, "_is_camera_active", lambda: False)
+
+    alert_calls = []
+    monkeypatch.setattr(
+        nightgate,
+        "_send_alert",
+        lambda state_path, loop_day_str, text, stamp_key: alert_calls.append(stamp_key),
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        nightgate.main(["--state", str(sp)])
+    assert exc_info.value.code == 1
+    assert "last_staleness_alert_loopday" in alert_calls
+    assert "last_camera_alert_loopday" in alert_calls
+
+
+def test_main_staleness_alert_failure_does_not_change_exit_code_proceed(tmp_path, monkeypatch):
+    """A failing _send_alert must not change main()'s exit code on the proceed path."""
+    sp = tmp_path / "state.json"
+    state_mod.save_state(sp, {"last_tick_completed_day": "2026-06-01"})
+
+    monkeypatch.setattr(nightgate, "_get_is_daytime", lambda: False)
+    monkeypatch.setattr(nightgate, "_get_loop_day", lambda: "2026-06-08")
+    monkeypatch.setattr(nightgate, "_send_heartbeat", lambda *a: None)
+    monkeypatch.setattr(nightgate, "_is_camera_active", lambda: True)
+
+    def _failing_alert(*a):
+        raise RuntimeError("Telegram is down")
+
+    monkeypatch.setattr(nightgate, "_send_alert", _failing_alert)
+
+    with pytest.raises(SystemExit) as exc_info:
+        nightgate.main(["--state", str(sp)])
+    assert exc_info.value.code == 0
+
+
+def test_main_camera_check_failure_does_not_change_exit_code_skip(tmp_path, monkeypatch):
+    """An exception from _is_camera_active must not change main()'s exit code
+    on the skip path, and must not raise out of main()."""
+    sp = tmp_path / "state.json"
+    state_mod.save_state(sp, {"last_tick_completed_day": "2026-06-08"})
+
+    monkeypatch.setattr(nightgate, "_get_is_daytime", lambda: True)
+    monkeypatch.setattr(nightgate, "_get_loop_day", lambda: "2026-06-08")
+    monkeypatch.setattr(nightgate, "_send_heartbeat", lambda *a: None)
+
+    def _failing_camera_check():
+        raise TimeoutError("systemctl timed out")
+
+    monkeypatch.setattr(nightgate, "_is_camera_active", _failing_camera_check)
+    monkeypatch.setattr(nightgate, "_send_alert", lambda *a: None)
+
+    with pytest.raises(SystemExit) as exc_info:
+        nightgate.main(["--state", str(sp)])
+    assert exc_info.value.code == 1
+
+
+def test_main_does_not_resend_staleness_alert_same_loop_day(tmp_path, monkeypatch):
+    sp = tmp_path / "state.json"
+    state_mod.save_state(sp, {
+        "last_tick_completed_day": "2026-06-01",
+        "last_staleness_alert_loopday": "2026-06-08",
+    })
+
+    monkeypatch.setattr(nightgate, "_get_is_daytime", lambda: False)
+    monkeypatch.setattr(nightgate, "_get_loop_day", lambda: "2026-06-08")
+    monkeypatch.setattr(nightgate, "_send_heartbeat", lambda *a: None)
+    monkeypatch.setattr(nightgate, "_is_camera_active", lambda: True)
+
+    alert_calls = []
+    monkeypatch.setattr(
+        nightgate,
+        "_send_alert",
+        lambda state_path, loop_day_str, text, stamp_key: alert_calls.append(stamp_key),
+    )
+
+    with pytest.raises(SystemExit):
+        nightgate.main(["--state", str(sp)])
+    assert alert_calls == []
+
+
+def test_main_does_not_resend_camera_alert_same_loop_day(tmp_path, monkeypatch):
+    sp = tmp_path / "state.json"
+    state_mod.save_state(sp, {
+        "last_tick_completed_day": "2026-06-07",
+        "last_camera_alert_loopday": "2026-06-08",
+    })
+
+    monkeypatch.setattr(nightgate, "_get_is_daytime", lambda: False)
+    monkeypatch.setattr(nightgate, "_get_loop_day", lambda: "2026-06-08")
+    monkeypatch.setattr(nightgate, "_send_heartbeat", lambda *a: None)
+    monkeypatch.setattr(nightgate, "_is_camera_active", lambda: False)
+
+    alert_calls = []
+    monkeypatch.setattr(
+        nightgate,
+        "_send_alert",
+        lambda state_path, loop_day_str, text, stamp_key: alert_calls.append(stamp_key),
+    )
+
+    with pytest.raises(SystemExit):
+        nightgate.main(["--state", str(sp)])
+    assert alert_calls == []

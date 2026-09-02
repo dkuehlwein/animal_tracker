@@ -12,6 +12,14 @@ On a SKIP, a heartbeat is sent once per loop-day (Fix #3):
   - The heartbeat send is BEST-EFFORT: a failure is logged but never changes the
     gate's exit code.
 
+On EVERY tick (proceed or skip), two independent dead-man's-switch checks run:
+  - Loop staleness: if last_tick_completed_day is more than 2 days behind the
+    current loop-day, alert once per loop-day (last_staleness_alert_loopday).
+  - Camera liveness: if wildlife-camera.service is not `active`, alert once per
+    loop-day (last_camera_alert_loopday).
+  Both are BEST-EFFORT: a failure is logged but never changes the gate's exit
+  code, and never raises out of main().
+
 A one-line reason is printed to stdout in both cases, e.g.:
   proceed: night, run not done
   skip: daytime
@@ -28,7 +36,9 @@ from __future__ import annotations
 
 import argparse
 import logging
+import subprocess
 import sys
+from datetime import date
 from pathlib import Path
 
 # Ensure src/ is importable when run as __main__ or from tests.
@@ -76,6 +86,40 @@ def _send_heartbeat(state_path: str, loop_day_str: str) -> None:
     state_mod.save_state(state_path, st)
 
 
+def _is_camera_active() -> bool:
+    """Return True iff wildlife-camera.service is active (systemd).
+
+    Monkeypatch this in tests to avoid a real subprocess call. A non-zero
+    return code from `systemctl is-active` is normal for an inactive unit —
+    only stdout is inspected, never the return code.
+    """
+    result = subprocess.run(
+        ["systemctl", "is-active", "wildlife-camera.service"],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    return result.stdout.strip() == "active"
+
+
+def _send_alert(state_path: str, loop_day_str: str, text: str, stamp_key: str) -> None:
+    """Send an alert via loop.report and stamp `stamp_key` = loop_day_str.
+
+    Generic best-effort alert sender shared by the staleness and camera-down
+    checks. Monkeypatch this in tests to avoid real Telegram calls.
+    """
+    import asyncio
+    from loop import report as report_mod
+
+    # Fire-and-forget: best-effort send (may fail on network error).
+    asyncio.run(report_mod.send(text))
+
+    # Stamp alert sent into state.json so we don't double-send this loop-day.
+    st = state_mod.load_state(state_path)
+    st[stamp_key] = loop_day_str
+    state_mod.save_state(state_path, st)
+
+
 # ---------------------------------------------------------------------------
 # Pure decision function — fully testable without I/O
 # ---------------------------------------------------------------------------
@@ -104,6 +148,55 @@ def should_run(
     if last_tick_completed_day == current_loop_day:
         return False, f"skip: tonight's run already done ({current_loop_day})"
     return True, "proceed: night, run not done"
+
+
+# ---------------------------------------------------------------------------
+# Dead-man's switch — loop staleness + camera liveness (best-effort, silent
+# failure never changes the gate's exit code). Both checks run on EVERY tick,
+# regardless of whether the gate proceeds or skips — the 27-night OAuth
+# outage was on ticks that PASSED the gate and then died silently.
+# ---------------------------------------------------------------------------
+
+def days_behind(last_tick_completed_day: str | None, current_loop_day: str) -> int | None:
+    """Return how many whole days `last_tick_completed_day` is behind
+    `current_loop_day`, or None if it's missing/unparseable (fresh checkout
+    is not a failure)."""
+    if not last_tick_completed_day:
+        return None
+    try:
+        last = date.fromisoformat(last_tick_completed_day)
+        current = date.fromisoformat(current_loop_day)
+    except ValueError:
+        return None
+    return (current - last).days
+
+
+def should_alert_staleness(
+    last_tick_completed_day: str | None,
+    current_loop_day: str,
+    last_alert_loopday: str | None,
+    threshold_days: int = 2,
+) -> bool:
+    """True iff the loop is stale (> threshold_days behind) and no staleness
+    alert has been sent yet this loop-day."""
+    if last_alert_loopday == current_loop_day:
+        return False
+    behind = days_behind(last_tick_completed_day, current_loop_day)
+    if behind is None:
+        return False
+    return behind > threshold_days
+
+
+def should_alert_camera_down(
+    camera_active: bool,
+    current_loop_day: str,
+    last_alert_loopday: str | None,
+) -> bool:
+    """True iff the camera service is down and no camera alert has been
+    sent yet this loop-day."""
+    if camera_active:
+        return False
+    return last_alert_loopday != current_loop_day
 
 
 # ---------------------------------------------------------------------------
@@ -149,6 +242,39 @@ def main(argv: list[str] | None = None) -> None:
                     "nightgate: heartbeat send failed (best-effort — skipping cleanly)",
                     exc_info=True,
                 )
+
+    # Dead-man's switch checks — run on EVERY tick (proceed or skip), never
+    # change the exit code, never raise out of main().
+    try:
+        last_staleness_alert = st.get("last_staleness_alert_loopday")
+        if should_alert_staleness(last_tick_completed_day, current_loop_day, last_staleness_alert):
+            behind = days_behind(last_tick_completed_day, current_loop_day)
+            text = (
+                f"⚠️ Wildlife loop has not completed a nightly run since "
+                f"{last_tick_completed_day} ({behind} days). It may be stuck — "
+                f"check the loop service."
+            )
+            _send_alert(args.state, current_loop_day, text, "last_staleness_alert_loopday")
+    except Exception:  # noqa: BLE001
+        log.warning(
+            "nightgate: staleness alert failed (best-effort — skipping cleanly)",
+            exc_info=True,
+        )
+
+    try:
+        camera_active = _is_camera_active()
+        last_camera_alert = st.get("last_camera_alert_loopday")
+        if should_alert_camera_down(camera_active, current_loop_day, last_camera_alert):
+            text = (
+                "⚠️ Wildlife camera service is not running — no photos are being "
+                "captured. Check wildlife-camera.service."
+            )
+            _send_alert(args.state, current_loop_day, text, "last_camera_alert_loopday")
+    except Exception:  # noqa: BLE001
+        log.warning(
+            "nightgate: camera liveness check failed (best-effort — skipping cleanly)",
+            exc_info=True,
+        )
 
     raise SystemExit(0 if run else 1)
 
