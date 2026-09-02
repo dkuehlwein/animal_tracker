@@ -1883,3 +1883,73 @@ permanently unattributable. Release trigger: first act of the tick that conclude
 or immediately on an exp #14 rollback. Pre-registered design: `SPECIES_HOMO_TAXON_MIN_SCORE`
 default 0.75, sited in the empty trough between the adjudicated-empty mode (≤0.66) and the
 confirmed-people mode (≥0.85); privacy-veto to be re-measured over all 284 taxon rows first.
+
+## 2026-09-02 (tick resumed 09-03 00:0x after a mid-commit crash)
+
+**Crash recovery first.** The Pi rebooted uncleanly at 22:11:20 *during* last
+night's notebook commit, leaving 7 zero-length files in `.git/objects` — including
+the commit object `refs/heads/main` and `HEAD` both pointed at. Every git command
+died with `fatal: bad object HEAD`. Recovered: `.git` backed up to
+`/tmp/git-backup-20260903-000115`, the 7 empty objects quarantined to
+`/tmp/git-quarantine`, `main` + index reset to `96c8b79` (last intact commit);
+`git fsck` now clean. Because `loop_day()` maps 00:0x back to `2026-09-02`, this
+tick is a **resume**, not a new night. Ingest + metrics verified still current
+(`MAX(id)`=4912 = stored watermark, 0 new rows) and deliberately NOT re-run.
+**Checkpoint discipline is the whole story here**: tier-2 adjudication (`3f60768`)
+and metrics (`96c8b79`) were already committed at 22:06/22:07, so the only
+token-expensive step was not re-paid for. Lost and redone tonight: the notebook
+write, the report, `endtick`. The uncommitted `nightgate.py` work survived in the
+working tree untouched. Second unexplained reboot in two days (09-01 19:13,
+09-02 22:11) — watching, not acting on n=2.
+
+**Exp #14 (phantom-human-gate) CONCLUDED — KEEP, live.** Three nights (08-31,
+09-01, 09-02; the last two truncated by a ~20 h camera outage). 0 privacy
+regressions, 0 concealed animals, 0 volume explosion, 0 attributable REVIEW rise.
+Of the 6 REVIEW messages sent across 09-01/02, none carries pc ≥ 0.30, so the
+"+0.5–1/day, >4 = rollback" prediction held at +0. Standing duty clean: the single
+demoted-band row (4904, pc 0.337) is an empty dusk pond, muted anyway by proximity.
+9 proximity mutes adjudicated, 0 concealed animals; 3 contained real people, all
+correctly muted. **Honest scope note recorded against over-crediting**: the win is
+smaller than the 483-trigger opening projection, which treated person_confidence as
+the only path into the HUMAN branch. It is not — 13 of the 14 rows with
+pc ∈ [0.30,0.50) are *still* HUMAN because the homo-taxon arm fired independently.
+The "phantom-armed mutes 17%→~0" prediction consequently FAILED (3/9 = 33% still
+phantom-armed). Residual phantoms belong to the taxon arm.
+
+**Backlog #16 (homo-taxon score floor) REJECTED AS DESIGNED — not shipped.** Its
+release trigger ("ship as the first act of the tick that concludes exp #14") fired
+this tick and was spent on the required re-validation, which refuted the design.
+All 17 low-mode taxon rows in the window adjudicated: **6 contain real people**
+(4907 0.549, 4840 0.599, 4897 0.617, 4845 0.631, 4850 0.673, 4848 0.674; 4840/4848
+show two adults full-frame, plainly identifiable). Empties span 0.579–0.731, people
+span 0.549–0.674 — **completely interleaved**, no in-BOUNDS floor separates them.
+Night 1's "bimodality" was a sampling artifact of a quiet day. Counterfactual: 4897
+(person at close range, 2186 s after the last surviving HUMAN burst, density 0, no
+HUMAN burst in the 240 s deferral) **would have been sent to REVIEW** — a rollback
+event under exp #14's own rule, on night 1. What survives: the phantom half is
+confirmed (11/17 empty, and they arm real mutes — 4828 armed two). What is refuted:
+that the taxon score can separate the classes. Future attempts need a *different
+discriminator*, not a different threshold; absent one the arm stays unthresholded,
+because a muted empty scene is strictly cheaper than a person's photo in REVIEW.
+
+**Exp #15 (loop-dead-mans-switch) ACTIVATED + SHIPPED — commit `2f469fa`.** Takes
+the freed slot. The loop cannot report its own death: nightgate heartbeats only on
+*gated-out* ticks, so the 27-night OAuth outage (08-04..29, on ticks that PASSED the
+gate) and the ~20 h camera outage (09-01 19:13 → 09-02 15:14, nothing checks the
+camera) were both silent. Two best-effort checks now run on EVERY tick — loop
+staleness (`days_behind > 2`) and camera liveness (`systemctl is-active`) — each
+alerting once per loop-day via `last_staleness_alert_loopday` /
+`last_camera_alert_loopday`. Both wrapped so they can never change the gate's exit
+code or raise out of `main()`: a broken alert path degrades to the old silence,
+never to a broken gate. 550 tests pass (was 532); replayed against both real
+incidents, both fire; live smoke test on real state is silent and exits 0 (exactly
+2 days behind, `>2` correctly false at the boundary). No env delta, no
+`pending_restart_at` — loop-side code, live on the next tick. FN-veto N/A.
+**Residual gap, explicitly not claimed as solved**: the switch lives inside
+nightgate, so it cannot fire if the timer itself stops — and the 09-01 tick never
+ran at all. That needs an off-Pi watchdog.
+
+Metrics (unchanged from the crashed tick, ids 4809–4912): 104 triggers, 82 HUMAN,
+21 no_animal, 1 unclassifiable, **0 animals of any kind**. fp_rate 1.00
+[0.851, 1.0] over 22 auto-labelled; 5 human labels; FN unmeasured; 9 sampled out;
+not feedback-starved (labels 08-28, 08-31, 09-02).

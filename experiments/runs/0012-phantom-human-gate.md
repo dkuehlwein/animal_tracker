@@ -1,9 +1,9 @@
 ---
 id: 14
 slug: phantom-human-gate
-status: running
+status: concluded         # CONCLUDED 2026-09-02 (KEEP, live) after 3 nights
 validation: live          # shipped 2026-08-30 (commit 6d8bcc1 + env delta), live at the 2026-08-31T03:25 restart
-occupies_active_slot: true   # exp #13 (runs/0011) concluded KEEP this tick; this takes the slot
+occupies_active_slot: false  # released 2026-09-02; slot passes to exp #15 (runs/0013)
 hypothesis: "The human/privacy gate fires on MegaDetector person boxes at >=0.30, below MegaDetector's own 0.5 operating threshold. On empty frames that sub-threshold score is noise, so ~a quarter of all HUMAN-status suppressions are phantoms: no person is present. Raising SPECIES_HUMAN_DETECTION_CONFIDENCE to 0.50 aligns the gate with the detector's operating point, at zero measured privacy cost because the layered proximity/deferral/density gates still mute the real people who score in the demoted band."
 created: 2026-08-30
 promoted_from: "runs/0011 closing note (2026-08-03): id 4278, detection_status='human' at person_confidence=0.330 on frames containing no person. Deliberately not acted on then — one data point, and the loop was frozen. This tick found 32 more."
