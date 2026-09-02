@@ -289,3 +289,148 @@ shipping, exactly as exp #14 did: count how many demoted rows would survive the
 proximity/deferral/density stack and reach REVIEW, and adjudicate every one with
 frames on disk. The raw-homo-leak arm (exp #9) stays unthresholded — it is
 rare-event insurance with a measured base rate of 3 rows corpus-wide.
+
+---
+
+## Nights 2–3 — 2026-09-01 and 2026-09-02 (one tick; the 09-01 tick never ran)
+
+**Coverage caveat up front.** The 09-01 loop tick never executed and the camera
+was down for ~20 h. Timeline from journald + `wildlife.log`: the Pi rebooted
+2026-09-01 19:13; `wildlife-camera.service` came up cleanly at 19:13:33, ran 15 s,
+and was stopped at 19:13:59 by an interactive `sudo systemctl stop
+wildlife-camera.service` from Daniel's own pts/0 session. It stayed down until
+`wildlife-deploy.service` restarted it at 2026-09-02 15:14:23. So 09-02 is a
+**partial day (15:14 onward only)** — no morning, and 09-01 is truncated at 19:14.
+Nothing crashed; this was a manual stop that was never undone. Neither the dead
+camera nor the missed tick produced any notification — see the new exp #15 below.
+
+Window: ids 4809–4912, 104 triggers (86 on 09-01, 18 on 09-02).
+82 HUMAN, 21 `no_animal`, 1 `unclassifiable`, **0 animals of any kind**.
+
+### The demoted band — nightly duty, clean
+
+Review-class bursts with `person_confidence` ∈ [0.30, 0.50): exactly **one**,
+id 4904 (pc=0.337, 09-02 19:18:38). Adjudicated: empty dusk pond scene, no person,
+no animal. It was muted anyway by the proximity window. **Zero people reached
+REVIEW from the demoted band; no rollback event.**
+
+Only one row in two days landed in the demoted band because the *homo-taxon arm*
+re-captured almost all of the rest: of the 14 rows with pc ∈ [0.30, 0.50) in this
+window, 13 are still HUMAN because the taxon arm fired on them independently of
+`person_confidence`. This is the single most important measurement of these two
+nights — **exp #14's lever reaches far less of the phantom population than the
+482-trigger backlog projected**, because that projection treated the pc arm as
+the only gate.
+
+### Standing duty — 9 proximity mutes, all adjudicated, 0 concealed animals
+
+| id | time | mute reason | contents |
+|----|------|-------------|----------|
+| 4820 | 09-01 11:15 | deferral cancel (human +240 s) | empty garden |
+| 4829 | 09-01 12:51 | window | empty garden |
+| 4830 | 09-01 12:53 | window | empty garden |
+| 4864 | 09-01 15:04 | density (≥8/1800 s) | empty garden |
+| 4875 | 09-01 18:15 | window | **child crouching, recognizable** |
+| 4889 | 09-01 18:29 | window | **child walking, recognizable** |
+| 4900 | 09-02 19:12 | deferral cancel (human +106 s) | partial body, frame edge |
+| 4904 | 09-02 19:18 | window | empty pond |
+| 4906 | 09-02 19:20 | window | partial body, frame edge |
+
+Zero concealed animals (85 across all five exp #11 nights plus these). Three of
+the nine contain a real person that the ensemble called `no_animal` — the exact
+leak class exp #11 exists for, all three correctly muted. Scene gate muted
+nothing. Blur gate muted 4821 and 4831 (both empty, luma 82/91).
+
+### Volume — no explosion, and none of it attributable to this change
+
+REVIEW messages actually sent (verified against the gate logs): **5 on 09-01,
+1 on 09-02**. None of the 6 carries pc ≥ 0.30, so **0 of them are attributable to
+the T=0.50 demotion** — against a pre-registered +0.5–1/day and a >4/day rollback
+trip. The one demoted burst (4904) was caught by the proximity stack, exactly as
+the privacy-veto measurement predicted it would be.
+
+### Pre-registered predictions — final status
+
+| prediction | result |
+|---|---|
+| HUMAN share 38% → ~29% | **not evaluable.** Observed 79% (82/104), but these were genuinely human-dense days (two long garden visits, many bursts at pc>0.8). The share is dominated by activity mix, not by the gate. |
+| +0.5–1 REVIEW msg/day, >4 = rollback | **held.** +0 attributable. |
+| phantom-armed proximity mutes 17% → ~0 | **FAILED.** 3 of 9 (33%) were armed only by a phantom — 4829/4830 by phantom 4828, 4820's deferral cancel by phantom 4822. Cause is the taxon arm, which this lever cannot reach. |
+| `top_species_raw` non-NULL on demoted rows | held on the one demoted row. |
+
+### Verdict: CONCLUDE — KEEP
+
+Three nights (08-31, 09-01, 09-02; the last two truncated by the outage above).
+Across all three: **0 privacy regressions, 0 concealed animals, 0 volume
+explosion, 0 attributable REVIEW rise**, and the gate is now aligned with
+MegaDetector's own 0.5 operating point instead of firing on sub-threshold noise.
+The change is strictly suppression-reducing, so it creates no FN risk by
+construction. It stays live at `SPECIES_HUMAN_DETECTION_CONFIDENCE=0.50`.
+
+Honest scope note, recorded so a later tick does not over-credit this: the win is
+smaller than the opening measurement implied. The pc arm was never the only path
+into the HUMAN branch, and the taxon arm re-captures most of the demoted rows.
+The residual phantom population is the taxon arm's — and the next section shows
+it cannot be fixed the way backlog #16 pre-registered.
+
+Rollback remains `loop.deploy --rollback` or `SPECIES_HUMAN_DETECTION_CONFIDENCE=0.3`
++ restart.
+
+---
+
+## Backlog #16 — pre-registered design REFUTED by tonight's adjudication. Not shipped.
+
+Backlog #16 was opened on night 1 with a concrete release trigger: *"ship as the
+first act of the tick that concludes exp #14."* That tick is this one. The trigger
+fired, the design was re-measured before shipping as the protocol requires — and
+**the measurement refutes it. It is not being shipped.**
+
+The pre-registered design was a score floor on the taxon arm,
+`SPECIES_HOMO_TAXON_MIN_SCORE = 0.75`, sited in what night 1 read as an empty
+trough between an "adjudicated-empty" low mode (≤0.66) and a "confirmed-people"
+high mode (≥0.85). Night 1's evidence for that separation was 17/17 low-mode
+bursts containing no person.
+
+This window contains 34 taxon-arm HUMAN rows (pc < 0.50), 17 of them in the
+low mode (score < 0.75). **All 17 have frames on disk and all 17 were adjudicated
+tonight. Six contain real people.**
+
+| verdict | ids (ensemble score) |
+|---|---|
+| empty garden — phantom | 4810 (0.660), 4813 (0.597), 4814 (0.651), 4815 (0.624), 4816 (0.665), 4822 (0.606), 4828 (0.594), 4832 (0.672), 4834 (0.647), 4835 (0.731), 4866 (0.579) |
+| **real person** | **4907 (0.549), 4840 (0.599), 4897 (0.617), 4845 (0.631), 4850 (0.673), 4848 (0.674)** |
+
+4840 and 4848 show two adults full-frame and plainly identifiable; 4845 shows a
+person bending over in a red top; 4850 is a close-range walking figure; 4897 and
+4907 are bodies at the frame edge at close range.
+
+**The two classes are completely interleaved.** People occupy 0.549–0.674; empties
+occupy 0.579–0.731. There is no score floor — 0.75 or any other in-BOUNDS value —
+that separates them. Night 1's bimodality was a sampling artifact of a quiet day
+with almost no human traffic, not a property of the signal.
+
+Counterfactual, run over this window with the demoted set removed from the
+HUMAN pool that arms the proximity/density/deferral stack:
+
+- 4840, 4845, 4848, 4850, 4907 would all still be muted — they sit inside dense
+  visits (gaps 33–162 s, density 3–10, HUMAN bursts within 240 s after).
+- **4897 would have been sent to REVIEW as a notification.** It is a person at
+  close range, 2186 s after the previous surviving HUMAN burst, density 0, with
+  no HUMAN burst inside the 240 s deferral window. Every layer of the stack is
+  blind to it.
+
+So the pre-registered design would have produced a person-in-REVIEW event on its
+first night live. Under this experiment's own standing rule that is a rollback
+event, not a tuning event — which means it must not be deployed in the first
+place. Backlog #16 is returned to the backlog with `status: rejected-as-designed`
+and this counter-evidence attached, so no later tick re-derives the 0.75 floor
+from night 1's numbers alone.
+
+What survives: the *phantom* half of #16's finding is confirmed and even
+strengthened — 11 of 17 low-mode taxon rows are empty garden, and they do arm
+real mutes (4828 armed two). What is refuted is the claim that the ensemble's
+homo-taxon score can tell the two apart. Any future attempt at this needs a
+different discriminator, not a different threshold; absent one, the taxon arm
+should stay unthresholded, because the failure mode of leaving it alone (a muted
+empty scene, costing observability) is strictly cheaper than the failure mode of
+demoting it (a person's photo in REVIEW).
