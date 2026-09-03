@@ -175,47 +175,47 @@
   ],
   "last_heartbeat_loopday": "2026-09-03",
   "last_metrics": {
-    "date": "2026-09-02",
+    "date": "2026-09-03",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.8513451253913791,
-      1.0
+      0.30064184258240184,
+      0.9544127391902995
     ],
     "fp_claude_ci": [
+      0.2076596008020477,
+      0.9385080552796037
+    ],
+    "fp_claude_count": 2,
+    "fp_claude_rate": 0.6666666666666666,
+    "fp_count": 3,
+    "fp_human_ci": [
+      0.20654931437723745,
+      1.0
+    ],
+    "fp_human_count": 1,
+    "fp_human_rate": 1.0,
+    "fp_md_ci": [
       0.0,
       1.0
     ],
-    "fp_claude_count": 0,
-    "fp_claude_rate": 0.0,
-    "fp_count": 22,
-    "fp_human_ci": [
-      0.5655175352168251,
-      1.0
-    ],
-    "fp_human_count": 5,
-    "fp_human_rate": 1.0,
-    "fp_md_ci": [
-      0.8156818649911483,
-      1.0
-    ],
-    "fp_md_count": 17,
-    "fp_md_rate": 1.0,
-    "fp_rate": 1.0,
+    "fp_md_count": 0,
+    "fp_md_rate": 0.0,
+    "fp_rate": 0.75,
     "fp_trustworthy": true,
-    "labeled_triggers": 22,
+    "labeled_triggers": 4,
     "n_cant_tell": 0,
-    "n_claude": 0,
-    "n_human": 5,
-    "n_md": 17,
-    "n_sampled_out": 9,
-    "total_triggers": 104
+    "n_claude": 3,
+    "n_human": 1,
+    "n_md": 0,
+    "n_sampled_out": 2,
+    "total_triggers": 8
   },
   "last_tick_completed_day": "2026-09-02",
   "nightly_verdict": "Recovered a crash: the Pi rebooted mid-save last night and broke the notebook's version history, so tonight I repaired it and finished the run that was cut off -- no analysis was lost or redone. The raised person-detection bar is confirmed working and is now closed out, but I found and rejected a follow-up fix I had planned: six of the seventeen photos I checked turned out to contain real people, so that change would have sent someone's picture to you. Instead I shipped an alarm that tells you when the camera stops running or the nightly check stops happening -- the two failures that have each already gone unnoticed for a day or more.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 4912
+  "watermark": 4920
 }
