@@ -1953,3 +1953,58 @@ Metrics (unchanged from the crashed tick, ids 4809–4912): 104 triggers, 82 HUM
 21 no_animal, 1 unclassifiable, **0 animals of any kind**. fp_rate 1.00
 [0.851, 1.0] over 22 auto-labelled; 5 human labels; FN unmeasured; 9 sampled out;
 not feedback-starved (labels 08-28, 08-31, 09-02).
+
+## 2026-09-03 — exp #15 night 1 clean; deferral gate catches a third leading-edge person; 0 animals again
+
+Window `4913–4920`, **8 triggers** (14:57–18:14), the camera's whole active day.
+4 HUMAN, 3 `no_animal`, 1 `unclassifiable`, **0 animals of any kind** — second
+tick running with zero animal captures. fp_rate **0.75** [0.30, 0.95] over 4
+labelled (1 human, 3 tier-2); FN unmeasured; 2 sampled out; 0 `cant_tell`. Not
+feedback-starved (human labels 08-31, 09-02, 09-03 — Daniel labelled 4913 at 21:17,
+independently agreeing with my adjudication).
+
+**Exp #15 (loop-dead-mans-switch) — night 1, KEEP RUNNING.** The timer fired 7×
+today and every tick ran both checks on both branches (2 proceed, 5 skip); exit
+codes correct, no traceback. Staleness correctly silent (`days_behind` = 1, and
+`1 > 2` is false — the "one missed night must not page" case the threshold was
+chosen for). Camera correctly silent (`active` all day, `NRestarts=0`). Neither
+`except` branch string appears in the journal, so the checks ran clean rather than
+failing quietly. Prediction 1 holds; 2 is a confirmed null; 3 needs a real incident.
+Not concluding on one clean night — a monitoring change's value is realised on
+failure. Noted limit: a healthy check emits no log line, so "ran clean" is inferred,
+and a later tick should not go looking for a positive "checks ok" line.
+
+**Deferral gate earned its keep a third time (exp #11, live).** 4915 (16:59:46) is a
+textbook leading edge: dark motion-smeared human leg in frame 1, `unclassifiable`,
+raw top-1 `blank` @ 0.91, pc 0.233 — under every threshold — and the visit's first
+HUMAN burst (4916) landed **60 s later**. Backward window, density, blur, scene and
+sampling are all blind to it by construction; only `review_defer_seconds=240` caught
+it. Confirmed leading-edge cancellations now: 4184 (44 s), 4212 (215 s), 4915 (60 s).
+240 s stays comfortably wide.
+
+**Backlog #16 rejection corroborated out-of-sample.** 4918 is an unmistakable person
+across all 5 frames at `person_confidence` **0.214** — HUMAN *only* via the homo-taxon
+arm, nowhere near the 0.5 confidence arm. Same finding as the 09-02 adjudication, on
+fresh data: the taxon arm carries real people the confidence arm cannot see, so
+thresholding/demoting it leaks person photos to REVIEW. Recorded as corroboration,
+not reopened.
+
+**Standing duties all discharged.** Every review-class burst had frames on disk and
+every one was adjudicated: 4913 empty (sent, FP), 4914 empty (sampled out), 4915
+person (deferral-cancelled), 4917 empty — the bright bottom-right blob is low-sun
+lens glare, fixed across frames, not a subject (sampled out). One
+`human_proximity_muted=1` (4915), **0 concealed animals**. No `scene_gate_muted=1`
+rows. No review-class row with pc in [0.30, 0.50) (exp #14 duty) — tonight's sit at
+0.196–0.233. **0 person frames reached REVIEW.**
+
+**Volume checked, not a guardrail event.** 8 is low but no config changed since
+08-31, the camera ran the full day (sunrise 06:48:52, sunset 20:12:16, "8 detections
+today"), and daily volume under the *identical* config has ranged 8–86 in four days.
+Distribution since 08-14: 2, 4, 5, 7, 8, 11, 13, 14, 14, 18, 32, 40, 43, 45, 75, 86 —
+activity-driven, high days human-dense. `baselines.volume_per_night = 192` is stale
+by an order of magnitude and is not the right comparison point.
+
+**Reboot watch clean** — no third unexplained reboot. `uptime -s` = 09-02 22:11:59,
+23 h 52 min up, camera `NRestarts=0`. Counter did not advance; still not actionable.
+
+No deploy, no code change, no `pending_restart_at`. One experiment active (#15).

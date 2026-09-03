@@ -136,3 +136,105 @@ zero new rows) and deliberately not re-run.
 Second reboot in two days (09-01 19:13, 09-02 22:11), both unexplained by any
 log entry. Worth watching for a hardware/power fault; not actionable on two
 data points, and explicitly not opened as an experiment.
+
+## Night 1 — 2026-09-03 (running)
+
+First night with the switch live. Window `id 4913..4920`, 8 triggers
+(2026-09-03 14:57:39 → 18:14:11), the whole of the camera's active day.
+
+### Did the switch behave? Yes — silently, which is the correct outcome
+
+`wildlife-loop.timer` fired 7 times today (00:00, 02:00, 04:00, 06:00, 18:00,
+20:00, 22:00). Every one of them ran the two new checks, on both branches:
+`proceed: night, run not done` (00:00, 22:00), `skip: tonight's run already done`
+(02/04/06:00), `skip: daytime` (18/20:00). Exit codes correct, no traceback.
+
+- **Staleness check — correctly silent.** `last_tick_completed_day` = `2026-09-02`,
+  loop-day `2026-09-03` → `days_behind` = 1, and `1 > 2` is false. No alert, no
+  `last_staleness_alert_loopday` stamp in `state.json`. This is the "single missed
+  night must not page" case the threshold-2 choice was made for, and it held.
+- **Camera check — correctly silent.** `systemctl is-active wildlife-camera.service`
+  = `active` all day (`ExecMainStartTimestamp` 2026-09-02 22:11:20, `NRestarts=0`).
+  No alert, no `last_camera_alert_loopday` stamp.
+- **Containment held.** The `except Exception` branches log
+  `"nightgate: staleness alert failed"` / `"... camera liveness check failed"`;
+  neither string appears anywhere in `journalctl -u wildlife-loop.service` today.
+  No exception was swallowed — the checks ran clean, they did not merely fail quietly.
+
+Prediction 1 ("zero alerts on healthy nights") **holds** for night 1. Predictions 2
+and 3 are unexercised — 2 is a null result confirmed above, 3 needs a real outage
+and cannot be forced without staging one, which is not worth doing.
+
+**Known observability limit, not a defect:** a healthy check emits no log line at
+all, so "ran clean" is inferred from (a) the correct gate reason printing, (b) the
+absence of the two failure strings, and (c) `main()` reaching its exit normally.
+That is sufficient evidence, but a future tick should not expect a positive
+"checks ok" line to exist.
+
+### Reboot watch — clean
+
+The two unexplained reboots (09-01 19:13, 09-02 22:11) did **not** get a third.
+`uptime -s` = 2026-09-02 22:11:59, 23 h 52 min up, camera `NRestarts=0`. Still not
+actionable, still not an experiment; the counter simply did not advance.
+
+### Standing duties, all discharged
+
+Eight triggers: 4 HUMAN (4916, 4918, 4919, 4920), 3 `no_animal` (4913, 4914, 4917),
+1 `unclassifiable` (4915). **Zero animals of any kind, for the second tick running.**
+
+Every review-class burst had frames on disk and every one was adjudicated
+(tier-2 labels appended for the three without a human label):
+
+| id | time | disposition | adjudication |
+|---|---|---|---|
+| 4913 | 14:57:39 | **sent to REVIEW** | empty pond scene, 5 frames, no subject → FP. Daniel independently labelled it `false_positive` at 21:17, matching. |
+| 4914 | 16:51:54 | review-sampled out | empty pond → `false_positive` (tier2) |
+| 4915 | 16:59:46 | **deferral-cancelled** | frame 1 shows a dark motion-smeared human leg crossing the near field; frames 2–5 empty → `person` (tier2) |
+| 4917 | 17:38:18 | review-sampled out | empty pond; the bright bottom-right blob is low-sun lens glare, fixed across frames, not a subject → `false_positive` (tier2) |
+
+- `human_proximity_muted=1`: exactly one (4915) — adjudicated, **0 concealed animals**.
+- `scene_gate_muted=1`: none tonight (scene gate evaluated but never fired).
+- review-class rows with `person_confidence` in [0.30, 0.50) (exp #14 standing duty):
+  **none** — tonight's review-class rows sit at pc 0.196–0.233.
+- Person frames reaching REVIEW: **0**.
+
+### Two findings worth carrying forward
+
+**1. The deferral gate earned its keep again (exp #11, concluded/live).** 4915 is a
+textbook leading-edge leak: a person's leg at close range, classified
+`unclassifiable` (raw top-1 `blank` @ 0.91), pc 0.233 — below every threshold — and
+the visit's first HUMAN burst (4916) did not land until **60 s later**. Backward
+window, density and blur/scene/sampling are all blind to it by construction; only
+`review_defer_seconds=240` caught it, logging
+`[REVIEW-DEFER] ... (human detected 60s after burst, no animal found)` at 17:03:46.
+Running total of confirmed leading-edge cancellations: 4184 (44 s), 4212 (215 s),
+4915 (60 s). The 240 s window remains comfortably wide for all three.
+
+**2. Independent confirmation that backlog #16 was right to be rejected.** 4918 is a
+real person — light trousers, dark top, close range, unmistakable across all 5
+frames — and its `person_confidence` is **0.214**. It is HUMAN *only* because the
+homo-taxon arm fired; the person-confidence arm (threshold 0.5 since exp #14) is
+nowhere near it. That is a fresh, out-of-sample instance of exactly what the
+09-02 adjudication found: the taxon arm carries real people that the confidence
+arm cannot see, so demoting or thresholding it leaks person photos into REVIEW.
+No new experiment; recorded as corroboration so a later tick does not reopen it.
+
+### Volume — low, but not a guardrail event
+
+8 triggers is the second-lowest day since 08-14 (08-26 had 2). Checked before
+treating it as a signal: no config was deployed tonight or since 08-31, the camera
+ran the full day (sunrise transition 06:48:52, sunset 20:12:16, "8 detections
+today"), and daily volume under the *identical* deployed config has ranged 8–86 in
+the last four days alone. The distribution since 08-14 is 2, 4, 5, 7, 8, 11, 13,
+14, 14, 18, 32, 40, 43, 45, 75, 86 — activity-driven, and the high days are
+human-dense (08-30: 64/75 HUMAN; 09-01: 68/86). Not a volume collapse; no rollback
+trigger. `baselines.volume_per_night = 192` in `state.json` is stale by an order of
+magnitude and should not be read as the comparison point.
+
+### Verdict — KEEP RUNNING
+
+One clean night is not enough to conclude a monitoring change whose entire value
+is realised on failure. Prediction 1 held, the containment design held, and the
+gate is not noisy. Continue; conclude once there is either a real incident that
+the switch catches (the strong evidence) or enough healthy nights that "zero false
+pages" is established (the weak evidence).
