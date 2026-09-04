@@ -175,47 +175,47 @@
   ],
   "last_heartbeat_loopday": "2026-09-04",
   "last_metrics": {
-    "date": "2026-09-03",
+    "date": "2026-09-04",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.30064184258240184,
-      0.9544127391902995
-    ],
-    "fp_claude_ci": [
-      0.2076596008020477,
-      0.9385080552796037
-    ],
-    "fp_claude_count": 2,
-    "fp_claude_rate": 0.6666666666666666,
-    "fp_count": 3,
-    "fp_human_ci": [
-      0.20654931437723745,
+      0.9229264369144198,
       1.0
     ],
-    "fp_human_count": 1,
-    "fp_human_rate": 1.0,
+    "fp_claude_ci": [
+      0.9229264369144198,
+      1.0
+    ],
+    "fp_claude_count": 46,
+    "fp_claude_rate": 1.0,
+    "fp_count": 46,
+    "fp_human_ci": [
+      0.0,
+      1.0
+    ],
+    "fp_human_count": 0,
+    "fp_human_rate": 0.0,
     "fp_md_ci": [
       0.0,
       1.0
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.75,
+    "fp_rate": 1.0,
     "fp_trustworthy": true,
-    "labeled_triggers": 4,
+    "labeled_triggers": 46,
     "n_cant_tell": 0,
-    "n_claude": 3,
-    "n_human": 1,
+    "n_claude": 46,
+    "n_human": 0,
     "n_md": 0,
-    "n_sampled_out": 2,
-    "total_triggers": 8
+    "n_sampled_out": 23,
+    "total_triggers": 48
   },
   "last_tick_completed_day": "2026-09-03",
   "nightly_verdict": "Quiet day -- 8 triggers, no animals at all, and four people, all correctly kept out of your inbox, including one where the camera caught a leg 60 seconds before it recognised the person and the delayed-send rule cancelled it just in time. The new camera-and-loop watchdog finished its first night with no false alarms; nothing was changed tonight.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 4920
+  "watermark": 4968
 }
