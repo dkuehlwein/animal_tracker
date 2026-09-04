@@ -2008,3 +2008,56 @@ by an order of magnitude and is not the right comparison point.
 23 h 52 min up, camera `NRestarts=0`. Counter did not advance; still not actionable.
 
 No deploy, no code change, no `pending_restart_at`. One experiment active (#15).
+
+## 2026-09-04 — exp #15 night 2 clean; scene gate proven inert, and it finally has FN evidence
+
+Window `4921..4968`, **48 triggers** (10:12–18:03), 46 review-class, 2 HUMAN, **0
+animals**. Metrics: fp_rate 1.00 (46/46, all tier-2), n_human 0, n_sampled_out 23.
+Every burst had frames on disk; all 46 review-class bursts adjudicated empty.
+
+**Exp #15 night 2 — clean.** No staleness alert, no camera alert, exit 0, no
+traceback; camera `active`, `NRestarts=0`, no third unexplained reboot. Loop was 1
+day behind, threshold-2 correctly silent. Prediction 1 holds for a second night.
+KEEP RUNNING — a monitoring change concludes on a caught incident or many healthy
+nights, not two.
+
+**Standing duties all clean.** 0 `human_proximity_muted`, 0 `scene_gate_muted`, 1
+`below_sharpness_floor` (4968, empty). Exp #14 duty (review-class rows with pc in
+[0.30,0.50)): 4958 (0.343) and 4968 (0.322), both empty across all 5 frames. The
+two HUMAN rows (4945 pc 0.047 via the taxon arm, 4946 pc 0.851) are real people,
+correctly suppressed. **0 concealed animals, 0 person frames in REVIEW.**
+
+**Cause of the 48-trigger day: the pond water feature was running.** A visible
+stream in every frame from 10:12 on, absent from 09-03's frames of the same scene.
+Environmental transient; nothing deployed since 08-31.
+
+**Both trigger-side levers FN-vetoed BY MEASUREMENT.** `MOTION_THRESHOLD`: the 289
+IDENTIFIED rows have min `motion_area` **800** — animals sit exactly on the current
+floor (800, 802, 803, 804, 805, 808, 810…), so any raise deletes confirmed animals.
+`MOTION_MIN_CONTOUR_AREA`: tonight's water FPs (largest contour 166–19973, mostly
+500–1900) overlap confirmed animals (92, 675, 692, 743, 757, 791, 800, 802…).
+Third independent confirmation, after exps #3 (ROI) and #4 (MOG2), that this
+scene's motion features do not separate FP from animal.
+
+**The scene gate is inert, and lowering T is now positively vetoed (backlog #17).**
+45 same-scene review bursts scored min 0.664 / median 0.887 / **max 0.944** — `T=0.97`
+had 45 chances and could not fire once; corpus-wide 25 mutes since 2026-07-26 and
+**0 in the last 5 days**. Within-burst pairs (same scene, seconds apart) score
+median 0.968 / max 0.990, so the metric encodes *time drift*, not subject presence
+— and a person filling the frame scores 0.474–0.739, overlapping the empty band's
+low end (0.664). Decisive: burst **4516** (2026-08-16, IDENTIFIED animal, the only
+animal burst with frames still on disk) scores **0.931** against the empty reference
+immediately preceding it — inside tonight's empty band. Lowering `T` to 0.93 would
+have muted a real animal. **`T` stays 0.97**; the veto is now evidence, not absence.
+
+**Shipped: `obs(scene-gate)` commit `f14ed0d`** (restart-gated 09-05T03:25).
+`scene_similarity` is measured for every status, not just review-class, so the
+animal bucket can fill from IDENTIFIED rows; the decision (`scene_gate_muted`) and
+the reference set stay review-class-only → no routing change, FN-veto N/A by
+construction. Needed because it cannot be recovered later: only **1 of 40**
+IDENTIFIED bursts still had frames on disk. 550 tests pass. Promotion criterion in
+backlog #17: at ≥5 animal similarities, apply `T = max(animal) + 0.02`; if that
+lands above 0.97, raise the gate — if below, the gate is unusable in this scene and
+disabling it is the honest call. Do not lower `T` before that bucket exists.
+
+No env delta. One experiment active (#15).

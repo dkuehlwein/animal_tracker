@@ -238,3 +238,101 @@ is realised on failure. Prediction 1 held, the containment design held, and the
 gate is not noisy. Continue; conclude once there is either a real incident that
 the switch catches (the strong evidence) or enough healthy nights that "zero false
 pages" is established (the weak evidence).
+
+## Night 2 — 2026-09-04 (running)
+
+Window `id 4921..4968`, **48 triggers**, all on 2026-09-04 (10:12–18:03). Camera
+`active`, `NRestarts=0`, `uptime -s` 2026-09-02 22:11:59 (no third unexplained
+reboot). Nightgate proceeded normally; **no staleness alert and no camera alert**
+(`last_staleness_alert_loopday` / `last_camera_alert_loopday` still absent from
+`state.json`, i.e. never stamped). Loop was exactly 1 day behind at gate time, and
+the threshold-2 rule correctly stayed silent. Prediction 1 ("zero alerts on healthy
+nights") **holds for night 2**; prediction 2 (gate never fails) holds — exit 0, no
+traceback.
+
+### Standing duties — all discharged, all clean
+
+All 48 bursts had frames on disk. 46 review-class bursts adjudicated (contact
+sheets of every best frame, plus full 5-frame strips for the 13 bursts with
+`person_confidence >= 0.13`): **every one is the empty pond scene**. Tier-2
+`false_positive` appended for all 46.
+
+- `human_proximity_muted=1`: **none**. The two HUMAN bursts (4945 12:36:07 pc 0.047,
+  4946 12:36:40 pc 0.851 — both plainly real people, correctly suppressed) are
+  followed by the next review-class burst 940 s later, well outside the 240 s
+  window, and density was 2 (< 8). Correct no-op, not a miss.
+- `scene_gate_muted=1`: **none** (see below — the gate could not fire at all).
+- `below_sharpness_floor=1`: 1 row (4968, 18:03, sharpness 10.4) — empty scene,
+  sampled out anyway.
+- Review-class rows with `pc` in [0.30, 0.50) (exp #14 duty): 2 — 4958 (0.343) and
+  4968 (0.322). Both adjudicated across all 5 frames: **empty**.
+- **0 concealed animals. 0 person frames reached REVIEW.** 0 animals of any kind
+  today: no IDENTIFIED row in the window.
+
+### What actually drove 48 triggers
+
+The pond's water feature was running: a visible stream from the nozzle in every
+frame from ~10:12 onward, absent from 09-03's frames of the same scene. Moving
+water in the central region plus sun/shadow drift, for eight hours. This is an
+environmental transient, not a config regression — nothing has been deployed
+since 08-31.
+
+Checked whether any trigger-side lever could cut it, and **both are FN-vetoed by
+measurement, not by assumption**:
+
+- `MOTION_THRESHOLD` (800, BOUNDS 200–8000): real animals sit *on the floor*.
+  Across 289 IDENTIFIED rows the minimum `motion_area` is **800**, and the human
+  `animal`/`animal_wrong_id`-labelled rows run 800, 802, 803, 804, 805, 808, 810…
+  Raising the threshold at all starts deleting confirmed animals immediately.
+- `MOTION_MIN_CONTOUR_AREA` (50): tonight's water FPs have `largest_contour_area`
+  166–19973 (mostly 500–1900), and confirmed animals have 92, 675, 692, 743, 744,
+  757, 791, 800, 802… — the same range. Entangled, exactly as exps #3 and #4 found
+  for ROI and MOG2 knobs. Third independent confirmation that this scene's motion
+  features do not separate FP from animal.
+
+### The scene gate is inert here — measured, and it now has FN evidence
+
+This is the tick's real finding, opened as **backlog #17**.
+
+| measurement | value |
+|---|---|
+| cross-burst similarity, 45 same-scene review bursts | min 0.664, median 0.887, **max 0.944** |
+| within-burst (frame1 vs frame5, seconds apart, same scene) | median 0.968, max 0.990 |
+| person filling the frame (4945/4946 vs preceding empty refs) | **0.474–0.739** |
+| **real animal** (4516, 2026-08-16 IDENTIFIED) vs its preceding empty ref | **0.931** |
+
+Three consequences, none of which were knowable before tonight:
+
+1. `T = 0.97` is **unreachable** cross-burst in this scene — 45 chances, max 0.944.
+   Corpus-wide the gate has muted 25 bursts since 2026-07-26 and **0 in the last
+   5 days**. It is not cutting REVIEW volume; it is doing nothing.
+2. The metric is dominated by **illumination/time drift**, not subject presence:
+   a person filling the frame (0.474–0.739) *overlaps* the empty-scene band's low
+   end (0.664). The score mostly encodes how recently the reference was taken.
+3. The FN-veto on lowering `T` is no longer absence-of-evidence. Burst 4516 — the
+   only animal burst with frames still on disk — scores **0.931** against the empty
+   reference immediately before it, i.e. *inside* tonight's empty band and above
+   its 60th percentile. Lowering `T` to 0.93 would have muted a real animal.
+   **`T` stays 0.97.**
+
+### Shipped this tick (instrumentation, not an experiment)
+
+`obs(scene-gate)`, commit **f14ed0d**, restart-gated `pending_restart_at`
+2026-09-05T03:25. `scene_similarity` is now measured and DB-logged for **every**
+status, not only review-class. `scene_gate_muted` and the reference-set `add()`
+stay review-class-only, so no burst changes routing and no animal/HUMAN frame can
+become an "empty scene" reference — **FN-veto N/A by construction**. 550 tests pass.
+
+Why a code change rather than reasoning from what exists: the missing datum is
+"what does an animal-containing burst score against a recent empty reference?", and
+the only large supply of animal-containing bursts is IDENTIFIED rows, whose
+similarity was never computed. It cannot be recovered retroactively — tonight only
+**1 of 40** IDENTIFIED bursts still had frames on disk. This does not take exp #15's
+active slot: it has no detection/notification behaviour to validate, and cannot
+confound a loop-side monitoring experiment.
+
+### Verdict — KEEP RUNNING
+
+Night 2 clean: no false pages, containment held, camera up. Same reasoning as
+night 1 — a monitoring change is concluded on a caught incident or on enough
+healthy nights, not on two.
