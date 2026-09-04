@@ -343,29 +343,42 @@ class WildlifeSystem:
                 top_classifier_prediction.get('score') if top_classifier_prediction else None
             )
 
-            # Task 4 (scene-unchanged gate): only evaluated for review-class
-            # statuses (no_animal/unclassifiable) when the gate is enabled —
-            # everything else (IDENTIFIED/HUMAN/ERROR) leaves both fields
-            # None, which is the same "gate never mutes" behaviour as today.
-            # A mute requires an affirmatively computed similarity >=
-            # threshold; None never mutes (fail-open).
+            # Task 4 (scene-unchanged gate). Two separable things happen here:
+            #
+            #   1. `scene_similarity` is MEASURED for every status when the
+            #      gate is enabled (2026-09-04, backlog #17). It is pure
+            #      observability — a number in a DB column, no routing effect.
+            #      Recording it only for review-class rows made the gate's own
+            #      threshold unvalidatable: the FN question is "what does a
+            #      burst containing a real animal score against a recent empty
+            #      reference?", and IDENTIFIED rows are the only large supply
+            #      of animal-containing bursts, so leaving them NULL meant the
+            #      animal bucket could never fill. Frames roll off disk within
+            #      ~300 bursts, so this cannot be reconstructed after the fact.
+            #   2. `scene_gate_muted` — the DECISION — is still evaluated only
+            #      for review-class statuses (no_animal/unclassifiable).
+            #      Everything else (IDENTIFIED/HUMAN/ERROR) leaves it None,
+            #      which is the same "gate never mutes" behaviour as before.
+            #      A mute requires an affirmatively computed similarity >=
+            #      threshold; None never mutes (fail-open).
             scene_similarity = None
             scene_gate_muted = None
             if (self.config.performance.scene_gate_enabled
-                    and self.scene_reference_set is not None
-                    and is_review_detection(species_result.status)):
+                    and self.scene_reference_set is not None):
                 scene_similarity = self.scene_reference_set.best_similarity(image_path, timestamp)
-                scene_gate_muted = (
-                    scene_similarity is not None
-                    and scene_similarity >= self.config.performance.scene_gate_similarity_threshold
-                )
-                # Reference-set update happens after the mute decision above,
-                # and includes muted bursts — a muted burst IS a recently
-                # confirmed empty scene, so it's exactly the kind of frame
-                # future comparisons should be checked against. HUMAN and
-                # IDENTIFIED/ERROR statuses never reach this branch, so they
-                # never become references.
-                self.scene_reference_set.add(image_path, timestamp)
+                if is_review_detection(species_result.status):
+                    scene_gate_muted = (
+                        scene_similarity is not None
+                        and scene_similarity
+                        >= self.config.performance.scene_gate_similarity_threshold
+                    )
+                    # Reference-set update happens after the mute decision
+                    # above, and includes muted bursts — a muted burst IS a
+                    # recently confirmed empty scene, so it's exactly the kind
+                    # of frame future comparisons should be checked against.
+                    # HUMAN and IDENTIFIED/ERROR statuses are measured against
+                    # the reference set but never become references themselves.
+                    self.scene_reference_set.add(image_path, timestamp)
 
             # Human-proximity mute gate: mute review-class bursts that land
             # shortly after a HUMAN-status detection (extreme close-up /

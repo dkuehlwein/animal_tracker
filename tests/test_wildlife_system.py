@@ -804,8 +804,9 @@ async def test_scene_below_threshold_still_notifies(system, tmp_path):
 @pytest.mark.asyncio
 async def test_scene_gate_never_touches_identified_animal(system, tmp_path):
     """Task 4 (c): an IDENTIFIED animal frame near-identical to a reference
-    still notifies — the scene gate only ever evaluates review-class
-    statuses, so best_similarity must not even be consulted.
+    still notifies — the scene gate only ever MUTES review-class statuses.
+    Since 2026-09-04 the similarity is still measured (observability, see
+    backlog #17), but it can never turn into a mute here.
     """
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
@@ -821,7 +822,13 @@ async def test_scene_gate_never_touches_identified_animal(system, tmp_path):
     await system._process_and_notify_detection(img, 5000)
 
     assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
-    system.scene_reference_set.best_similarity.assert_not_called()
+    # Measured for observability, but never a mute on a non-review status.
+    system.scene_reference_set.best_similarity.assert_called_once()
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['scene_similarity'] == pytest.approx(0.99)
+    assert row['scene_gate_muted'] is None
 
 
 @pytest.mark.asyncio
@@ -845,7 +852,12 @@ async def test_scene_gate_would_match_human_suppressed_via_human_gate_single_log
     telegram.send_photo_with_caption.assert_not_called()
     telegram.send_media_group.assert_not_called()
     system.cleanup_old_images.assert_called_once()
-    system.scene_reference_set.best_similarity.assert_not_called()
+    # Measured (observability) but never muting: the HUMAN gate owns this row.
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['scene_similarity'] == pytest.approx(0.99)
+    assert row['scene_gate_muted'] is None
 
     gate_logs = [
         r.message for r in caplog.records
@@ -954,6 +966,15 @@ async def test_scene_gate_reference_set_update_review_yes_human_no(system, tmp_p
 
     system.scene_reference_set.add.reset_mock()
     system.species_identifier.identify_species = MagicMock(return_value=_identification_human())
+    await system._process_and_notify_detection(img, 5000)
+    system.scene_reference_set.add.assert_not_called()
+
+    # ... and neither does an IDENTIFIED animal, even though its similarity is
+    # now measured for observability (2026-09-04, backlog #17).
+    system.scene_reference_set.add.reset_mock()
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification(True, boxes=[{'confidence': 0.7}])
+    )
     await system._process_and_notify_detection(img, 5000)
     system.scene_reference_set.add.assert_not_called()
 
