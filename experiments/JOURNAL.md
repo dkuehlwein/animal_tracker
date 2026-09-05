@@ -2061,3 +2061,65 @@ lands above 0.97, raise the gate — if below, the gate is unusable in this scen
 disabling it is the honest call. Do not lower `T` before that bucket exists.
 
 No env delta. One experiment active (#15).
+
+## 2026-09-05 — the camera moved, and nothing noticed
+
+33 triggers, **33/33 adjudicated empty**, fp_rate 1.00 (CI 0.896–1.0), 0 animals,
+0 HUMAN-status bursts, 0 person frames in REVIEW. Second 100%-FP day in a row
+(48 yesterday), which forced the question of *what changed*.
+
+**Answer: the camera was physically re-aimed on 2026-09-02.** Sampling one saved
+frame per day across the full 22-day retention window shows one sharp
+discontinuity — wide garden view (lawn, border, roses) through 09-01, tight pond
+close-up with the **fountain jetting water** from 09-02 onward. The changeover
+sits exactly inside the known trigger gap: last pre-outage trigger 4894 @ 09-01
+18:35:33, first post-restart 4895 @ 09-02 15:51:29. The re-aim and the ~20 h
+manual-stop outage (runs/0013) are **one event**. The loop ran a full tick on
+09-02 — concluded exp #14, shipped exp #15 — against a scene that no longer
+existed. `systemctl is-active` was `active` throughout: **service liveness is not
+scene liveness.**
+
+**Three trigger-side levers tested against the 307-row animal corpus, all vetoed
+by measurement, none by assumption:**
+
+1. `motion_area` — animals sit *inside* the FP band (median 1047, 201/307 below
+   1200). `MOTION_THRESHOLD` 800→1200 would cost ~2/3 of all animals on record.
+2. Contour fragmentation — the promising one. FP median `contour_count` **47** vs
+   animal median **3**, and both fields are in the DB for both classes, so the FN
+   cost is measurable rather than guessed. Every point of the grid trades animals
+   for quiet; best corner (cc≥40 & lca≤1000) = 26% FP suppressed for 15% of
+   animals corpus-wide. Physical reason: **a bird landing at the pond splashes**,
+   producing the fountain's own fragmented signature.
+3. Spatial mask — tonight's motion centroids cluster hard on the jet (cx median
+   0.68, cy 0.26, 27/32 above the midline), but there are **zero animal bursts in
+   the new scene** to validate against, and #3's entanglement result was measured
+   in the *old* framing. FN unmeasured + plausible FN rise → HOLD.
+
+Third independent discriminator to fail after #3 (space) and #4 (motion knobs).
+Recorded so future ticks stop re-deriving it: **trigger-side suppression does not
+separate FP from animals in this camera.** Notification-layer routing remains the
+only architecture that has ever produced a win here.
+
+**Exp #15 (loop-dead-mans-switch) CONCLUDED — KEEP, live.** Three clean nights,
+~19 timer firings, zero alerts fired — and since the stamps are only written on a
+send, the *absence* of `last_staleness_alert_loopday` / `last_camera_alert_loopday`
+is direct evidence of zero false alerts. Conditions never fired in production
+(correct — nothing broke), so the conclusion rests on replay against both real
+incidents, on `_send_alert` sharing `report.send()` with the heartbeat that
+delivers daily, and on 31 unit tests covering `main()` composition and failure
+isolation. Same precedent as exp #9. Residual gap unchanged: it cannot fire if
+the timer itself stops.
+
+**Exp #18 (new-scene-regime) ACTIVATED**, observational, no change shipped.
+Also: `baselines.volume_per_night` **192 → 27** — at 192 the volume-collapse
+guardrail would have demanded a rollback on any night under 20 triggers, i.e. on
+a normal night in the new scene (09-02: 18, 09-03: 8). Maintenance, not tuning.
+
+Not claimed: that the move caused the animal drought. `identified` bursts decayed
+to zero *before* it (68/wk W27 → 0 for W33–35, last on 08-16, old framing), and
+W34/35 are human-dominated. Season, garden use and framing are confounded.
+
+Standing duties all clean: 5 rows in the `person_confidence` [0.30, 0.50) watch
+band inspected frame-by-frame (all empty), 6 below-floor dusk bursts checked, 0
+scene-gate mutes, 0 proximity mutes, 1 fresh human label (4987) matching my
+adjudication.

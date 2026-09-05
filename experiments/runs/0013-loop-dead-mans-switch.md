@@ -336,3 +336,63 @@ confound a loop-side monitoring experiment.
 Night 2 clean: no false pages, containment held, camera up. Same reasoning as
 night 1 — a monitoring change is concluded on a caught incident or on enough
 healthy nights, not on two.
+
+---
+
+## Night 3 — 2026-09-05 — CONCLUDED (KEEP, live)
+
+Third consecutive clean night (09-03, 09-04, 09-05). The timer fired 7× today;
+every tick ran both checks on both the proceed and the skip branch, exit codes
+correct, and neither `except`-branch warning string
+(`staleness alert failed` / `camera liveness check failed`) appears anywhere in
+the journal since ship — the checks ran, they did not fail quietly.
+
+**Both alarms correctly stayed silent, and both silences are the right answer:**
+
+| check | live input tonight | expected | observed |
+|---|---|---|---|
+| staleness | `last_tick_completed_day` 2026-09-04, loop-day 2026-09-05 → `days_behind`=1 | silent (`1 > 2` false) | silent, no stamp written |
+| camera | `systemctl is-active wildlife-camera.service` = `active` | silent | silent, no stamp written |
+
+`state.json` carries neither `last_staleness_alert_loopday` nor
+`last_camera_alert_loopday` — the stamps are only written on a send, so their
+absence is direct evidence that zero alerts (and therefore zero **false** alerts)
+have fired in three nights.
+
+### Why three nights is enough, and what is NOT being claimed
+
+The trigger conditions have never fired in production. That is the *correct*
+outcome — nothing broke — but it means the conclusion rests on three legs, none
+of which is "we watched it catch a real outage":
+
+1. **Replay against both real incidents** (night 0): the 27-night OAuth outage and
+   the ~20 h camera stop both fire. Recorded at ship time, not re-litigated here.
+2. **The send path is independently proven in production.** `_send_alert` calls
+   `report.send()` — the *same* function `_send_heartbeat` uses. The heartbeat
+   delivered on each of 09-03/04/05 (`last_heartbeat_loopday` = 2026-09-05 today).
+   So the one seam a pure unit test cannot cover — does a Telegram message
+   actually leave this Pi — is exercised daily by a different caller.
+3. **Composition is unit-tested, not just the pure functions.** `main()` is
+   covered on the proceed path, the skip path, the do-not-resend path, and the
+   failure-isolation path for both checks (`tests/test_loop_nightgate.py`,
+   31 cases). The gate's exit code cannot change and `main()` cannot raise.
+
+Precedent for concluding rare-event insurance unexercised: exp #9's raw-homo
+trigger, concluded KEEP after six nights during which it never fired, on exactly
+this reasoning — an unexercised guard whose *cost* is measured at zero and whose
+*correctness* is established by replay is a keep, not an open question.
+
+**Residual gap, restated unchanged (still not solved, still not claimed):** the
+switch lives inside `nightgate`, so it cannot fire if `wildlife-loop.timer`
+itself stops. That needs an off-Pi watchdog.
+
+**One thing this experiment demonstrably did NOT catch**, worth recording against
+its own hypothesis: the camera was **physically re-aimed** during the 2026-09-01
+outage (see runs/0014). `systemctl is-active` was `active` throughout afterwards,
+so the liveness check was correct and silent while the system's entire input
+distribution changed. Service liveness is not scene liveness. That is a real
+blind spot in the *monitoring* story, but not a defect in this experiment — it is
+the opening finding of exp #18.
+
+**Verdict: CONCLUDED — KEEP, live.** Rollback remains `git revert 2f469fa`, no
+restart. Active slot released to exp #18.
