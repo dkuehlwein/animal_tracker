@@ -180,7 +180,7 @@
       "replaced_at": "2026-08-31T03:25:00+02:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-09-04",
+  "last_heartbeat_loopday": "2026-09-05",
   "last_metrics": {
     "date": "2026-09-04",
     "error_count": 0,
@@ -223,6 +223,6 @@
   "last_tick_completed_day": "2026-09-04",
   "nightly_verdict": "Busy false-alarm day: 48 triggers, no animals at all, and every one of the 46 alerts was the empty pond -- the water feature was running and moving water tripped the camera all afternoon. Two people were caught and correctly kept out of your inbox; nothing changed except a small logging tweak so we can finally check whether the 'same scene as before' filter is safe to tighten.",
   "paused": false,
-  "pending_restart_at": "2026-09-05T03:25:00+02:00",
+  "pending_restart_at": null,
   "watermark": 4968
 }
