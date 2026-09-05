@@ -182,28 +182,28 @@
   ],
   "last_heartbeat_loopday": "2026-09-05",
   "last_metrics": {
-    "date": "2026-09-04",
+    "date": "2026-09-05",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.9229264369144198,
+      0.895730002457548,
       1.0
     ],
     "fp_claude_ci": [
-      0.9229264369144198,
+      0.8928208017449293,
       1.0
     ],
-    "fp_claude_count": 46,
+    "fp_claude_count": 32,
     "fp_claude_rate": 1.0,
-    "fp_count": 46,
+    "fp_count": 33,
     "fp_human_ci": [
-      0.0,
+      0.20654931437723745,
       1.0
     ],
-    "fp_human_count": 0,
-    "fp_human_rate": 0.0,
+    "fp_human_count": 1,
+    "fp_human_rate": 1.0,
     "fp_md_ci": [
       0.0,
       1.0
@@ -212,17 +212,17 @@
     "fp_md_rate": 0.0,
     "fp_rate": 1.0,
     "fp_trustworthy": true,
-    "labeled_triggers": 46,
+    "labeled_triggers": 33,
     "n_cant_tell": 0,
-    "n_claude": 46,
-    "n_human": 0,
+    "n_claude": 32,
+    "n_human": 1,
     "n_md": 0,
-    "n_sampled_out": 23,
-    "total_triggers": 48
+    "n_sampled_out": 18,
+    "total_triggers": 33
   },
   "last_tick_completed_day": "2026-09-04",
   "nightly_verdict": "Busy false-alarm day: 48 triggers, no animals at all, and every one of the 46 alerts was the empty pond -- the water feature was running and moving water tripped the camera all afternoon. Two people were caught and correctly kept out of your inbox; nothing changed except a small logging tweak so we can finally check whether the 'same scene as before' filter is safe to tighten.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 4968
+  "watermark": 5001
 }
