@@ -481,3 +481,102 @@ def test_main_does_not_resend_camera_alert_same_loop_day(tmp_path, monkeypatch):
     with pytest.raises(SystemExit):
         nightgate.main(["--state", str(sp)])
     assert alert_calls == []
+
+
+# ---------------------------------------------------------------------------
+# main()-level: scene-liveness check (exp #18)
+# ---------------------------------------------------------------------------
+
+def test_main_scene_alert_fires_on_proceed_path(tmp_path, monkeypatch):
+    """A scene-change measurement past threshold triggers the scene alert,
+    even on the PROCEED path — same shape as staleness/camera."""
+    sp = tmp_path / "state.json"
+    state_mod.save_state(sp, {"last_tick_completed_day": "2026-06-07"})
+
+    monkeypatch.setattr(nightgate, "_get_is_daytime", lambda: False)
+    monkeypatch.setattr(nightgate, "_get_loop_day", lambda: "2026-06-08")
+    monkeypatch.setattr(nightgate, "_send_heartbeat", lambda *a: None)
+    monkeypatch.setattr(nightgate, "_is_camera_active", lambda: True)
+    monkeypatch.setattr(nightgate, "_get_image_dir", lambda: tmp_path)
+    monkeypatch.setattr(
+        nightgate,
+        "_measure_scene_match",
+        lambda image_dir, now: {
+            "match_fraction": 0.0, "n_recent": 12, "n_baseline": 10,
+            "n_matched": 0, "median_best": 0.05,
+        },
+    )
+
+    alert_calls = []
+    monkeypatch.setattr(
+        nightgate,
+        "_send_alert",
+        lambda state_path, loop_day_str, text, stamp_key: alert_calls.append(stamp_key),
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        nightgate.main(["--state", str(sp)])
+    assert exc_info.value.code == 0
+    assert "last_scene_change_alert_loopday" in alert_calls
+
+
+def test_main_no_scene_alert_when_scene_matches(tmp_path, monkeypatch):
+    """A matching-scene measurement never triggers the scene alert."""
+    sp = tmp_path / "state.json"
+    state_mod.save_state(sp, {"last_tick_completed_day": "2026-06-07"})
+
+    monkeypatch.setattr(nightgate, "_get_is_daytime", lambda: False)
+    monkeypatch.setattr(nightgate, "_get_loop_day", lambda: "2026-06-08")
+    monkeypatch.setattr(nightgate, "_send_heartbeat", lambda *a: None)
+    monkeypatch.setattr(nightgate, "_is_camera_active", lambda: True)
+    monkeypatch.setattr(nightgate, "_get_image_dir", lambda: tmp_path)
+    monkeypatch.setattr(
+        nightgate,
+        "_measure_scene_match",
+        lambda image_dir, now: {
+            "match_fraction": 0.9, "n_recent": 12, "n_baseline": 10,
+            "n_matched": 11, "median_best": 0.8,
+        },
+    )
+
+    alert_calls = []
+    monkeypatch.setattr(
+        nightgate,
+        "_send_alert",
+        lambda state_path, loop_day_str, text, stamp_key: alert_calls.append(stamp_key),
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        nightgate.main(["--state", str(sp)])
+    assert exc_info.value.code == 0
+    assert alert_calls == []
+
+
+def test_main_scene_check_failure_does_not_change_exit_code(tmp_path, monkeypatch):
+    """An exception from _measure_scene_match must not change main()'s exit
+    code and must not raise out of main() (failure isolation)."""
+    sp = tmp_path / "state.json"
+    state_mod.save_state(sp, {"last_tick_completed_day": "2026-06-07"})
+
+    monkeypatch.setattr(nightgate, "_get_is_daytime", lambda: False)
+    monkeypatch.setattr(nightgate, "_get_loop_day", lambda: "2026-06-08")
+    monkeypatch.setattr(nightgate, "_send_heartbeat", lambda *a: None)
+    monkeypatch.setattr(nightgate, "_is_camera_active", lambda: True)
+    monkeypatch.setattr(nightgate, "_get_image_dir", lambda: tmp_path)
+
+    def _failing_measure(image_dir, now):
+        raise RuntimeError("cv2 exploded")
+
+    monkeypatch.setattr(nightgate, "_measure_scene_match", _failing_measure)
+
+    alert_calls = []
+    monkeypatch.setattr(
+        nightgate,
+        "_send_alert",
+        lambda state_path, loop_day_str, text, stamp_key: alert_calls.append(stamp_key),
+    )
+
+    with pytest.raises(SystemExit) as exc_info:
+        nightgate.main(["--state", str(sp)])
+    assert exc_info.value.code == 0
+    assert alert_calls == []

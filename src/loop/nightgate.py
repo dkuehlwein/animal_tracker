@@ -12,13 +12,17 @@ On a SKIP, a heartbeat is sent once per loop-day (Fix #3):
   - The heartbeat send is BEST-EFFORT: a failure is logged but never changes the
     gate's exit code.
 
-On EVERY tick (proceed or skip), two independent dead-man's-switch checks run:
+On EVERY tick (proceed or skip), three independent dead-man's-switch checks run:
   - Loop staleness: if last_tick_completed_day is more than 2 days behind the
     current loop-day, alert once per loop-day (last_staleness_alert_loopday).
   - Camera liveness: if wildlife-camera.service is not `active`, alert once per
     loop-day (last_camera_alert_loopday).
-  Both are BEST-EFFORT: a failure is logged but never changes the gate's exit
-  code, and never raises out of main().
+  - Scene liveness: compares recent burst frames against a 3-7-day-old
+    baseline (see loop.scene_watch) to catch a camera re-aim/bump that leaves
+    the service `active` but pointed at a different scene. Best-effort and
+    alerts at most once per ALERT_COOLDOWN_DAYS (last_scene_change_alert_loopday).
+  All three are BEST-EFFORT: a failure is logged but never changes the gate's
+  exit code, and never raises out of main().
 
 A one-line reason is printed to stdout in both cases, e.g.:
   proceed: night, run not done
@@ -38,7 +42,7 @@ import argparse
 import logging
 import subprocess
 import sys
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 # Ensure src/ is importable when run as __main__ or from tests.
@@ -66,6 +70,11 @@ def _get_is_daytime() -> bool:
 def _get_loop_day() -> str:
     """Return the current loop-day as a YYYY-MM-DD string."""
     return state_mod.loop_day()
+
+
+def _get_image_dir() -> Path:
+    """Return the configured burst-image directory (delegates to Config)."""
+    return Config().storage.image_dir
 
 
 def _send_heartbeat(state_path: str, loop_day_str: str) -> None:
@@ -100,6 +109,21 @@ def _is_camera_active() -> bool:
         timeout=10,
     )
     return result.stdout.strip() == "active"
+
+
+def _measure_scene_match(image_dir, now):
+    """Delegate to loop.scene_watch.measure_scene_match, imported lazily.
+
+    nightgate's module-level imports are intentionally light (Config,
+    SunChecker, loop.state only — see the module docstring); cv2/numpy must
+    not become import-time dependencies of nightgate, so scene_watch (which
+    imports both) is only imported inside this function.
+
+    Monkeypatch this in tests to avoid real image I/O.
+    """
+    from loop import scene_watch
+
+    return scene_watch.measure_scene_match(image_dir, now)
 
 
 def _send_alert(state_path: str, loop_day_str: str, text: str, stamp_key: str) -> None:
@@ -273,6 +297,26 @@ def main(argv: list[str] | None = None) -> None:
     except Exception:  # noqa: BLE001
         log.warning(
             "nightgate: camera liveness check failed (best-effort — skipping cleanly)",
+            exc_info=True,
+        )
+
+    try:
+        from loop import scene_watch
+
+        image_dir = _get_image_dir()
+        measurement = _measure_scene_match(image_dir, datetime.now())
+        last_scene_alert = st.get("last_scene_change_alert_loopday")
+        if scene_watch.should_alert_scene_change(measurement, current_loop_day, last_scene_alert):
+            text = (
+                f"⚠️ The camera looks like it is pointing somewhere new — only "
+                f"{measurement['n_matched']} of the last {measurement['n_recent']} photos "
+                f"still match the view it had a few days ago. If you moved or bumped it, "
+                f"nothing is wrong. Otherwise, check the mount."
+            )
+            _send_alert(args.state, current_loop_day, text, "last_scene_change_alert_loopday")
+    except Exception:  # noqa: BLE001
+        log.warning(
+            "nightgate: scene liveness check failed (best-effort — skipping cleanly)",
             exc_info=True,
         )
 
