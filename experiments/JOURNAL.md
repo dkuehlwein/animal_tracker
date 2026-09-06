@@ -2123,3 +2123,86 @@ Standing duties all clean: 5 rows in the `person_confidence` [0.30, 0.50) watch
 band inspected frame-by-frame (all empty), 6 below-floor dusk bursts checked, 0
 scene-gate mutes, 0 proximity mutes, 1 fresh human label (4987) matching my
 adjudication.
+
+## 2026-09-06 — exp #18 night 2: the storm didn't recur, and the loop's blind spot got an instrument
+
+22 triggers, 19 of them HUMAN-status (a 3h work session at the pond), **3**
+review-class — down from 46 and 33. Adjudicated: 5006/5013 empty pond, **5020 a
+person at arm's length**. 0 animals, fifth day running.
+
+**The fountain did not stop.** Water-region inter-frame diff on tonight's empty
+bursts: 0.96 / 1.14, inside the storm days' band (medians 1.83 / 2.56). The jet
+is visible in 5013's frames. Why volume fell is **unmeasured** and recorded as
+such — there were zero triggers before 12:07 today vs steady from 10:00 on
+09-04/05, and frames only exist where a trigger fired, so the light/wind
+conditions of the quiet hours cannot be reconstructed. Review-class volume in
+this scene is 4/4/46/33/3 over 09-02…09-06: **do not size a lever off one day.**
+No second re-aim (8 frames sampled across 09-02→09-06 are one continuous scene).
+
+**Shipped: a scene-change watchdog (commit `6348234`).** Night 1's real finding
+was never about water — it was *"nothing compares today's framing to
+yesterday's; service liveness is not scene liveness."* That cost three nights of
+analysis against a dead scene. Now a third dead-man's-switch check sits in
+`loop/nightgate.py` beside exp #15's staleness/camera pair.
+
+The existing `scene_similarity` column **cannot** do this job: its reference set
+is bounded at 6 h and the re-aim coincided with a 20 h outage, so at restart
+every reference was stale, the set was empty, and the gate failed open. A
+cross-*day* comparison is a different measurement, not a threshold tweak.
+
+Comparator chosen by measurement, not preference. `scene_gate.py`'s
+normalized-intensity mean-abs-diff does **not** separate the classes here —
+same-scene 0.7089–0.9389 vs across-boundary 0.5581–0.6851, bands nearly
+touching, because the new close-up scene is dappled-sunlight-dominated (exactly
+backlog #17's illumination-drift result). **Edge-structure NCC** gives
+same-scene 0.6154–0.9607 vs across-boundary 0.0389–0.2604. A re-aim changes
+structure; sun does not.
+
+The statistic is a match **fraction**, not a max (defeated by a low-volume day
+straddling the move) nor a median (defeated by a person filling the frame): of
+the last 12 frames, how many match *any* baseline frame from 3–7 days ago at
+edge-NCC ≥ 0.45. Replayed over the whole retention window — 11 same-scene days
+score **0.58–1.00**, all three clean post-move days score **0.00**. The 0.25
+threshold sits in a gap wider than either margin. The 08-31 data point is the
+one that governs false alarms: 26 HUMAN bursts, still 0.75, because a body
+blocks the scene's edges without replacing them. It would have fired on the
+09-04 tick — one night before the human-driven discovery.
+
+Gates: **FN-veto N/A by construction** (monitoring-only; cannot change what is
+captured, classified, muted or notified — same standing as `f14ed0d`), ≤1
+message per event on a 7-day cooldown, fails silent on <8 recent or <8 baseline
+frames and on any exception. Not a new experiment — the instrument for *this*
+experiment's own finding. Loop-side code, live on the next tick, no camera
+restart. Rollback `git revert 6348234`.
+
+Verified independently of the coding agent: 574/574 tests pass, and the shipped
+module replayed on the real corpus reproduces every number above. Known latency
+property, measured not assumed: the "recent 12" window backfills across days
+when volume is low, so 09-02/09-03 (6 and 10 frames on disk) straddled the move
+and scored 0.92/0.75 — detection is trigger-volume-bound, first clean sample
+wins. Cooldown pre-seeded to today so the instrument doesn't re-announce the
+re-aim Daniel was already told about in plain English on the 09-05 tick;
+verified it re-arms 09-13, by which point the baseline is all-post-move and
+scores 1.00.
+
+**Exp #14's watch band, second real test.** 5020 sits at `person_confidence`
+0.314 — a torso and legs filling the frame, motion-blurred, no face — and was
+**not sent** (`human_proximity_muted=1`, 113 s after HUMAN burst 5019, inside
+the 240 s window). Pre-registered rollback criterion is a recognizable person
+*reaching* REVIEW, so `SPECIES_HUMAN_DETECTION_CONFIDENCE` stays at 0.50. Worth
+recording though: in this close-up framing a person can fill the frame and still
+score 0.31, so the demoted band is not hypothetical here and the proximity gate
+is carrying the load, not the person-box threshold. **Zero review-class messages
+were sent today** — no exposure.
+
+Nearest miss in the proximity stack (no action): 5013, `motion_area` 57694 with
+`contour_count` 2 on empty frames — a person passing close and gone before
+capture. 976 s past the last HUMAN burst (window 240 s), density 6 in 1800 s
+(threshold 8), no HUMAN burst inside the 240 s deferral. Nothing leaked; the
+frames contain no person. Widening any of the three parameters to cover it would
+mute far more on speculation than it protects.
+
+**Backlog #19 opened** (parked, cosmetic): `loop.report`'s "Not yet labelled"
+line counts HUMAN-status bursts, which are unlabelled-*because-unsent* exactly
+like `review_sampled_out` rows the report already excludes. Tonight it read 17
+on a day with 19 HUMAN triggers. Deliberately not bundled into tonight's tick.
