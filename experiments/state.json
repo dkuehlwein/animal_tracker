@@ -196,22 +196,22 @@
   ],
   "last_heartbeat_loopday": "2026-09-07",
   "last_metrics": {
-    "date": "2026-09-06",
+    "date": "2026-09-07",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.2076596008020477,
-      0.9385080552796037
+      0.5655175352168251,
+      1.0
     ],
     "fp_claude_ci": [
-      0.2076596008020477,
-      0.9385080552796037
+      0.5655175352168251,
+      1.0
     ],
-    "fp_claude_count": 2,
-    "fp_claude_rate": 0.6666666666666666,
-    "fp_count": 2,
+    "fp_claude_count": 5,
+    "fp_claude_rate": 1.0,
+    "fp_count": 5,
     "fp_human_ci": [
       0.0,
       1.0
@@ -224,20 +224,22 @@
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.6666666666666666,
+    "fp_rate": 1.0,
     "fp_trustworthy": true,
-    "labeled_triggers": 3,
+    "labeled_triggers": 5,
     "n_cant_tell": 0,
-    "n_claude": 3,
+    "n_claude": 5,
     "n_human": 0,
+    "n_human_suppressed": 9,
     "n_md": 0,
-    "n_sampled_out": 2,
-    "total_triggers": 22
+    "n_sampled_out": 4,
+    "n_unlabeled": 0,
+    "total_triggers": 14
   },
   "last_scene_change_alert_loopday": "2026-09-06",
   "last_tick_completed_day": "2026-09-06",
   "nightly_verdict": "Much quieter day: 22 alerts, and only 3 were the fountain -- the rest were people working at the pond, all correctly kept out of your inbox, including one close-up that the privacy filter caught. Still no animals for a fifth day, so I added a watchdog that will now message you if the camera ever gets bumped or re-aimed again, instead of the loop taking three nights to notice like last time.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5023
+  "watermark": 5037
 }
