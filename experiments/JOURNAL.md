@@ -2206,3 +2206,53 @@ mute far more on speculation than it protects.
 line counts HUMAN-status bursts, which are unlabelled-*because-unsent* exactly
 like `review_sampled_out` rows the report already excludes. Tonight it read 17
 on a day with 19 HUMAN triggers. Deliberately not bundled into tonight's tick.
+
+## 2026-09-07 — exp #18 night 3: the drought is measured, not inferred
+
+14 triggers (48→33→22→14), 9 HUMAN, 5 review-class, 0 animals. All 5 review-class
+adjudicated tier-2: empty pond, fountain still running (visible jet at 13:05 and
+15:23, so the volume decay is MOG2 adapting, not the fountain being switched off).
+fp 5/5, one review message actually sent (5024).
+
+**Shipped `scripts/fn_audit_timelapse.py` (`ea3c3d7`) and ran it.** The 20 s
+timelapse stream is an independent observation of the same framing, so it can
+break the loop's central ambiguity: an empty animal bucket cannot distinguish
+"no animal came" from "the detector stopped seeing animals," and that ambiguity
+has vetoed every trigger-side lever for three weeks. 10,000 frames, 09-03 17:03 →
+09-07 20:03, three complete daylight windows plus two partials, ranked by
+transient-object size with each pixel normalized by its own local temporal std
+(kills fountain/bamboo, keeps one-off intruders). **Zero animals.** Top-25
+candidates are all trigger-coincident, fountain-quadrant, or whole-scene sun/shade
+transitions — the two largest unmatched hits (09-04 11:51, 5966 px, 276 s from any
+trigger; 09-05 13:09, 4887 px, 453 s) were inspected directly and are dappled
+light on an empty pond. Camera is not blind; the pond is empty.
+
+**The drought predates the re-aim and no system change explains it.** Last
+`identified` = 4516, 2026-08-16 (human-labelled `animal`): 22 days, 16 of them in
+the OLD framing (367 triggers, 0 animals). Rate-normalized: 20/652 non-HUMAN
+triggers were animals in 07-25…08-16 (3.1%) vs 0/239 since (expected ~7.4,
+Poisson p≈6e-4) — a real drop, not just lower exposure. No commit 08-03…08-30
+(the loop's own OAuth outage) and no env deploy 07-29…08-31, so a pipeline
+regression is ruled out at the onset. Correction to night 1's framing: "the new
+scene has no animals" is not a scene property. The FN-veto stands, but on
+"nothing to tune against," not "we cannot see."
+
+Gates: 9/9 HUMAN suppressed, two inspected (5029 pc 0.128 — torso + arm in the
+pond; 5037 pc 0.0125 — limb at dusk), both caught by the `homo`-taxonomy arm, not
+the person-box threshold — in this close framing MegaDetector's person score
+collapses and the taxonomy arm carries the privacy gate. 2 proximity-muted (both
+genuinely empty), 4 sampled out, 0 scene-gate mutes, 2 below-floor review-class.
+Human labels arrived 07:02 — not feedback-starved.
+
+**Backlog #19 closed (`6a024fa`).** `loop.report` counted privacy-gated HUMAN
+bursts as "Not yet labelled" (17 on a 22-trigger day) — nobody looked because
+nobody was shown. Fixing it exposed a second error it masked: the remainder also
+subtracted `n_sampled_out`, which is already inside `n_md`. `compute_metrics` now
+counts `n_human_suppressed` / `n_unlabeled` directly; report adds
+"Not sent (privacy gate): N". Reporting-only, no FN risk, no restart. 582 tests pass.
+
+No detection change; no env delta; `pending_restart_at` stays null. Zero-animal
+streak 6 days in-scene / 22 system-wide. Prediction for night 4: 8–25 triggers,
+0 animals. At 14 in-scene days with a clean timelapse audit, the correct output is
+a note to Daniel that the camera is aimed somewhere animals don't go — aiming is
+his lever, not the loop's.

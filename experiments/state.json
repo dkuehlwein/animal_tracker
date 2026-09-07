@@ -128,11 +128,18 @@
       "validation": "observational"
     },
     {
-      "hypothesis": "OPENED 2026-09-06. Reporting inaccuracy, no detection effect. loop/report.py's 'Not yet labelled: N' line counts HUMAN-status bursts, which are suppressed entirely by design (suppress_human_alerts=true) and are therefore unlabelled-BECAUSE-UNSENT, exactly like review_sampled_out rows -- which the report already excludes for that precise reason (see the review-sampling rules in PROTOCOL.md). Tonight the line read 'Not yet labelled: 17' on a 22-trigger day where 19 triggers were HUMAN-status, i.e. the number is ~all noise and reads as a growing label backlog Daniel is ignoring. Harmless while the scene is animal-dominated; actively misleading in the new human-dominated pond scene (09-02: 14/18 HUMAN, 09-06: 19/22 HUMAN). FIX: give HUMAN-status rows their own report line (or fold them into the existing exclusion) the same way n_sampled_out and n_cant_tell are handled in loop/metrics.py; do NOT touch fp_rate or the per-tier buckets, which are label-conditioned and already exclude these rows. Deliberately NOT shipped on the tick that found it: a scene-change watchdog already shipped the same night and this is cosmetic, so it waits rather than bundling two unrelated code changes into one restart-free deploy.",
+      "hypothesis": "CONCLUDED 2026-09-07 (shipped, commit 6a024fa). loop/report.py counted HUMAN-status bursts in 'Not yet labelled' -- they are suppressed entirely by design (suppress_human_alerts=true) and have no tier-1 mapping, so nobody was ever shown them; the line read 17 on 09-06's 22-trigger day. compute_metrics now emits n_human_suppressed + n_unlabeled directly and report renders 'Not sent (privacy gate): N'. Also fixed a second arithmetic error it masked: the old remainder subtracted n_sampled_out even though sampled-out rows carry a tier-1 label and sit inside n_md. Reporting-only, no FN risk, no restart. 582 tests pass.",
       "id": 19,
       "slug": "human-rows-counted-as-unlabelled",
+      "status": "concluded",
+      "validation": "live"
+    },
+    {
+      "hypothesis": "OPENED 2026-09-07. scripts/fn_audit_timelapse.py (commit ea3c3d7) converts the loop's zero-animal bucket from absence-of-evidence into a measurement: it ranks 20s timelapse frames by transient-object size, normalizing each pixel by its own local temporal std so the fountain/bamboo drop out, and reports the nearest real trigger for each candidate. First run (10k frames, 09-03..09-07, 3 complete daylight days) found ZERO animals -- top-25 candidates were trigger-coincident, fountain-quadrant, or sun/shade transitions. Candidate promotion: run it whenever an FN question blocks a lever, or weekly while the animal bucket is empty (~3 min on the Pi). Do NOT wire it into the nightly chain unattended: its output needs eyes on the top candidates, and illumination transitions are its dominant false alarm by design.",
+      "id": 20,
+      "slug": "timelapse-fn-audit-as-standing-duty",
       "status": "parked",
-      "validation": "parked"
+      "validation": "measured-once"
     }
   ],
   "baselines": {
@@ -237,8 +244,8 @@
     "total_triggers": 14
   },
   "last_scene_change_alert_loopday": "2026-09-06",
-  "last_tick_completed_day": "2026-09-06",
-  "nightly_verdict": "Much quieter day: 22 alerts, and only 3 were the fountain -- the rest were people working at the pond, all correctly kept out of your inbox, including one close-up that the privacy filter caught. Still no animals for a fifth day, so I added a watchdog that will now message you if the camera ever gets bumped or re-aimed again, instead of the loop taking three nights to notice like last time.",
+  "last_tick_completed_day": "2026-09-07",
+  "nightly_verdict": "Quiet day: 14 alerts, 9 of them people at the pond (all kept out of your inbox) and 5 empty-pond fountain triggers. More useful: I checked the camera's own 20-second timelapse across the last three full days -- about 10,000 photos -- and no animal walked into frame at all, so the camera is working fine and the pond is simply not being visited right now.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5037
