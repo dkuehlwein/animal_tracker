@@ -113,10 +113,23 @@ def render_summary(metrics: dict, state: dict, active_experiment: dict) -> str:
     if n_sampled_out > 0:
         lines.append(f"• Not sent (review sampling): {n_sampled_out}")
 
+    # Human/privacy gate: HUMAN-status bursts are suppressed entirely
+    # (suppress_human_alerts=true), so nobody was ever shown them either.
+    # Same treatment as the sampling line above.
+    n_human_suppressed = metrics.get("n_human_suppressed", 0)
+    if n_human_suppressed > 0:
+        lines.append(f"• Not sent (privacy gate): {n_human_suppressed}")
+
     # Remainder: images not yet labelled by any tier (cant_tell rows were
-    # labelled — just unusable — and sampled-out rows were never sent for a
-    # human to label — so both are excluded here too).
-    remainder = total - (n_human + n_claude + n_md + n_cant_tell + n_sampled_out)
+    # labelled — just unusable — and sampled-out / privacy-gated rows were
+    # never sent for a human to label — so all are excluded here too).
+    # metrics.compute_metrics counts this directly when available; the
+    # arithmetic fallback is for last_metrics dicts written before
+    # backlog #19 (2026-09-07), which lack the key.
+    if "n_unlabeled" in metrics:
+        remainder = metrics["n_unlabeled"]
+    else:
+        remainder = total - (n_human + n_claude + n_md + n_cant_tell + n_sampled_out)
     if remainder > 0:
         lines.append(f"• Not yet labelled: {remainder}")
 

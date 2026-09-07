@@ -178,6 +178,30 @@ def compute_metrics(rows: list[dict], fn_audit: Optional[dict]) -> dict:
     # it from the "not yet labelled" remainder (unsent, not unlabelled).
     n_sampled_out = sum(1 for r in rows if r.get("review_sampled_out") is True)
 
+    # Human/privacy gate (backlog #19, 2026-09-07): HUMAN-status bursts are
+    # suppressed entirely by design (suppress_human_alerts=true) and carry no
+    # tier-1 mapping (ingest._STATUS_TO_TIER1 has no "human" key), so they end
+    # up in no bucket at all. Reporting them as "not yet labelled" reads as
+    # "nobody looked at these" when in fact nobody was ever shown them —
+    # exactly the treatment n_sampled_out already gets. Split the unlabelled
+    # remainder here (where detection_status is available) rather than letting
+    # report.py re-derive it by arithmetic: the old subtraction
+    # `total - (... + n_sampled_out)` double-counted sampled-out rows that DO
+    # carry a tier-1/tier-2 label, which happened to partly cancel the HUMAN
+    # over-count. Both are fixed by counting rows directly.
+    def _unlabeled(r: dict) -> bool:
+        return (
+            r.get("human") is None
+            and r.get("tier2") is None
+            and r.get("tier1") is None
+        )
+
+    def _is_human_status(r: dict) -> bool:
+        return str(r.get("detection_status") or "").lower() == "human"
+
+    n_human_suppressed = sum(1 for r in rows if _unlabeled(r) and _is_human_status(r))
+    n_unlabeled = sum(1 for r in rows if _unlabeled(r) and not _is_human_status(r))
+
     return {
         "labeled_triggers": len(labeled),
         "total_triggers": total_triggers,
@@ -212,6 +236,11 @@ def compute_metrics(rows: list[dict], fn_audit: Optional[dict]) -> dict:
         # Same treatment as n_cant_tell above (own report line, excluded
         # from the CSV trend schema) — see the comment where it's computed.
         "n_sampled_out": n_sampled_out,
+        # HUMAN-status bursts nobody was ever shown (privacy gate), and the
+        # genuine "not yet labelled" remainder. Report-surfacing only; not in
+        # _CSV_FIELDS and not part of any FP bucket. See comment above.
+        "n_human_suppressed": n_human_suppressed,
+        "n_unlabeled": n_unlabeled,
     }
 
 

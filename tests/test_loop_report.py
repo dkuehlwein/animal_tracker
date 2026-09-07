@@ -664,3 +664,52 @@ def test_summary_backward_compat_missing_per_tier_keys():
     assert "You labelled 0" in text
     assert "Claude labelled 0" in text
     assert "MegaDetector" in text
+
+
+def test_summary_privacy_gate_line_when_present():
+    """HUMAN-status bursts nobody was shown get their own line (backlog #19)."""
+    m = _tier_metrics()
+    m["n_human_suppressed"] = 9
+    text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
+    assert "Not sent (privacy gate): 9" in text
+
+
+def test_summary_privacy_gate_line_absent_when_zero_or_missing():
+    m = _tier_metrics()
+    m["n_human_suppressed"] = 0
+    assert "privacy gate" not in report.render_summary(
+        metrics=m, state={"paused": False}, active_experiment={}
+    )
+    m2 = _tier_metrics()  # key absent entirely (pre-backlog-#19 state file)
+    assert "privacy gate" not in report.render_summary(
+        metrics=m2, state={"paused": False}, active_experiment={}
+    )
+
+
+def test_summary_remainder_uses_n_unlabeled_when_present():
+    """When metrics supplies n_unlabeled, the remainder is taken from it verbatim
+    rather than re-derived by arithmetic (which double-subtracted sampled-out rows)."""
+    m = _tier_metrics(total=22, n_human=0, fp_human=0, n_claude=3, fp_claude=2, n_md=0, fp_md=0)
+    m["n_sampled_out"] = 2
+    m["n_human_suppressed"] = 19
+    m["n_unlabeled"] = 0
+    text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
+    assert "Not yet labelled" not in text
+    assert "Not sent (privacy gate): 19" in text
+
+    m2 = dict(m, n_unlabeled=4)
+    text2 = report.render_summary(metrics=m2, state={"paused": False}, active_experiment={})
+    assert "Not yet labelled: 4" in text2
+
+
+def test_summary_privacy_gate_line_order():
+    """Privacy-gate line sits after the tier lines and before 'Not yet labelled'."""
+    m = _tier_metrics(total=50, n_human=2, fp_human=0, n_claude=0, fp_claude=0, n_md=38, fp_md=0)
+    m["n_human_suppressed"] = 5
+    m["n_unlabeled"] = 5
+    text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
+    lines = text.splitlines()
+    md_idx = next(i for i, l in enumerate(lines) if "MegaDetector" in l)
+    priv_idx = next(i for i, l in enumerate(lines) if "privacy gate" in l)
+    rem_idx = next(i for i, l in enumerate(lines) if "Not yet labelled" in l)
+    assert md_idx < priv_idx < rem_idx

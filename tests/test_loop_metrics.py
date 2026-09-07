@@ -791,3 +791,54 @@ def test_csv_append_backward_compat(tmp_path):
     ]
     for col in per_tier_cols:
         assert old_row[col] == "", f"old row should have blank {col!r}, got {old_row[col]!r}"
+
+
+def _status_row(**kw):
+    r = {"human": None, "tier2": None, "tier1": None, "reconciled_label": None,
+         "detection_status": None, "review_sampled_out": None}
+    r.update(kw)
+    return r
+
+
+def test_compute_metrics_human_status_rows_split_out_of_unlabeled():
+    """HUMAN-status bursts with no label land in n_human_suppressed, not n_unlabeled."""
+    rows = [
+        _status_row(detection_status="human"),
+        _status_row(detection_status="human"),
+        _status_row(detection_status="no_animal"),
+    ]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_human_suppressed"] == 2
+    assert m["n_unlabeled"] == 1
+
+
+def test_compute_metrics_labelled_human_row_not_double_counted():
+    """A HUMAN-status row that DID get a tier-2 label is labelled, not suppressed-unlabelled."""
+    rows = [_status_row(detection_status="human", tier2="person", reconciled_label="person")]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_human_suppressed"] == 0
+    assert m["n_unlabeled"] == 0
+
+
+def test_compute_metrics_sampled_out_with_tier1_label_not_in_unlabeled():
+    """Sampled-out rows carry a tier-1 label, so they are not part of n_unlabeled
+    (the old report arithmetic subtracted them a second time)."""
+    rows = [_status_row(detection_status="no_animal", tier1="false_positive",
+                 reconciled_label="false_positive", review_sampled_out=True)]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_sampled_out"] == 1
+    assert m["n_unlabeled"] == 0
+    assert m["n_human_suppressed"] == 0
+
+
+def test_compute_metrics_human_split_does_not_affect_fp_buckets():
+    rows = [
+        _status_row(detection_status="human"),
+        _status_row(detection_status="no_animal", human="false_positive",
+             reconciled_label="false_positive"),
+    ]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["labeled_triggers"] == 1
+    assert m["fp_count"] == 1
+    assert m["n_human"] == 1
+    assert m["n_human_suppressed"] == 1
