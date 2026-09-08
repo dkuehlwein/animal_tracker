@@ -441,3 +441,102 @@ That is a physical-aiming question, and aiming is Daniel's lever, not the loop's
 If the streak reaches 14 in-scene days with the timelapse audit still clean, the
 right output is a plain-English note to Daniel that the camera is pointed at a
 spot animals do not visit — not another env delta.
+
+## Night 4 (2026-09-08) — the FN audit gets a positive control
+
+58 triggers (up from 14), **27 HUMAN** and **31 review-class**, **0 animals**.
+The volume jump is entirely human occupancy: two gardening sessions
+(13:14–14:20, 17:15–18:50) account for all 27 HUMAN bursts. Non-human volume is
+31, in line with the previous nights (5, 13, 20, 24). Guardrail: 58 vs baseline
+27 is 2.1x, well under the 5x explosion trip. No collapse.
+
+### The audit is not blind — measured, not assumed
+
+Yesterday's timelapse FN audit found zero animals in ~10 000 frames. That result
+was consistent with two very different worlds: *no animals present*, or *the
+audit cannot see them*. Its sensitivity had never been exercised, because it had
+never found anything.
+
+Tonight's run (same detector, `scripts/fn_audit_timelapse.py` logic, report
+restricted to 2026-09-08's 2 320 daylight frames) surfaced **one real transient
+object that the trigger stream missed**: 13:44:33, blob 2165 px, centre of frame,
+nearest trigger 359 s away — a person in checked shorts walking through. Present
+in exactly one 20 s frame, gone by 13:44:53. It ranked 6th of ~2 300 frames.
+
+That is a **positive control**: the audit demonstrably ranks a genuine one-frame
+intruder above 2 300 frames of fountain, bamboo and dappled light. The
+zero-animal finding is therefore backed by a working instrument, not by an
+untested one.
+
+**Stated limitation, so this is not over-read**: the control object covers 11% of
+the downsized frame. It establishes sensitivity to a large, close object. It does
+**not** establish sensitivity to a bird or a hedgehog at pond distance. The audit
+remains a lower bound on animal presence, now with a known floor instead of none.
+
+Every other top-20 candidate was inspected and is an illumination transition —
+sun/shade moving across the bamboo (13:10, 13:04, 12:41, 14:25, 11:33, 12:01,
+11:12) — exactly the dominant false alarm the script's own calibration note
+predicted.
+
+### The missed crossing is not a threshold problem
+
+The file log samples `motion_area` every 5 s; the two samples bracketing the
+crossing (13:44:32.7 and 13:44:37.8) both read `motion_area=0`, and no INFO-level
+motion line appears in between. The crossing itself falls between samples, so
+this does **not** prove the detector computed zero while the person was in frame —
+but it does rule out the obvious levers: there was no cooldown (last trigger
+10 min earlier), no species-ID blocking, and lowering `MOTION_THRESHOLD` below
+800 cannot help a frame whose computed area is already ~0. Most likely MOG2
+variance inflation during the saturated 13:14–14:20 activity window. Recorded as
+a measurement; **no lever deployed**, because none of the in-bounds knobs
+addresses it and the same detector fired 27 times that same day.
+
+### Gate behaviour tonight
+
+- **Privacy: 27/27 HUMAN suppressed, zero leaks.** Of the 31 review-class bursts,
+  exactly **two** contain a recognizable person (5050 — patterned trousers at the
+  right edge; 5057 — bare legs filling the centre) and **both were
+  human-proximity muted**. Nothing with a person in it reached Telegram.
+- **The person-box arm recovered.** Night 3 found MegaDetector's person score
+  collapsing to 0.01–0.13 in this tight framing, with the `homo`-taxonomy arm
+  carrying the gate alone. Tonight **23 of 27** HUMAN rows scored
+  `person_confidence` ≥ 0.5 (up to 0.998); only 5049/5053/5067/5068 (0.22–0.40)
+  needed the taxonomy arm. The difference is subject distance: tonight's humans
+  were gardening at mid-range, not pressed against the lens. Exp #14's demotion
+  of the threshold to 0.5 is not fragile — it is scene-dependent, and both arms
+  are load-bearing on different days.
+- **Near-miss worth recording**: 5089 landed **254 s** after the last HUMAN burst,
+  4 s longer than the 240 s proximity window, and the density condition did not
+  fire either (4 HUMAN in the trailing 30 min, threshold 8). It was saved only by
+  the blur gate (sharpness 9.5). Adjudicated: the beige mass in its frame 1 is
+  **lens bloom**, a smooth gradient with no edges, not a body — so **no leak
+  occurred and no widening is warranted**. Widening the window on a negative would
+  cost review volume and FN power for nothing. Logged so a future real leak at
+  240–300 s is recognised as the second data point, not the first.
+- Scene gate: **0 mutes again**, max `scene_similarity` across all 58 rows was
+  **0.9487**, below the 0.97 threshold. Backlog #17's "the gate is inert in this
+  scene" finding holds for a fifth day. The promotion criterion (≥5 animal rows
+  carrying `scene_similarity`) is still at 0.
+- 7 below-floor review-class bursts (all dusk/close-motion), 14 sampled out,
+  **6** review-class bursts actually sent (5038, 5039, 5040, 5048, 5051, 5077) —
+  all empty pond.
+
+### Labels and metrics
+
+31 tier-2 labels appended (29 `false_positive`, 2 `person`). One human label
+arrived at 09:02 (5024 `false_positive`, agreeing with the tick's tier-2 call) —
+not feedback-starved. fp_rate 0.935 (29/31), CI [0.79, 0.98]; FN unmeasured by
+the label channel, but bounded by the timelapse audit above.
+
+### Actions taken this tick
+
+**None deployed.** No env delta, no code change, `pending_restart_at` stays null.
+Every trigger-side lever remains FN-vetoed for lack of in-scene animal evidence,
+and tonight produced no positive evidence that would lift any veto.
+
+### Exit criteria — unchanged
+
+Zero-animal streak: **7 days in-scene, 23 system-wide**. Escalation point stays
+~14 in-scene days, and the answer is unchanged in kind: with the audit now
+carrying a positive control, "no animals visit this framing" is the measured
+reading, and re-aiming the camera is Daniel's lever, not the loop's.

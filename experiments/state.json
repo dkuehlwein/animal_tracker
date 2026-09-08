@@ -135,7 +135,7 @@
       "validation": "live"
     },
     {
-      "hypothesis": "OPENED 2026-09-07. scripts/fn_audit_timelapse.py (commit ea3c3d7) converts the loop's zero-animal bucket from absence-of-evidence into a measurement: it ranks 20s timelapse frames by transient-object size, normalizing each pixel by its own local temporal std so the fountain/bamboo drop out, and reports the nearest real trigger for each candidate. First run (10k frames, 09-03..09-07, 3 complete daylight days) found ZERO animals -- top-25 candidates were trigger-coincident, fountain-quadrant, or sun/shade transitions. Candidate promotion: run it whenever an FN question blocks a lever, or weekly while the animal bucket is empty (~3 min on the Pi). Do NOT wire it into the nightly chain unattended: its output needs eyes on the top candidates, and illumination transitions are its dominant false alarm by design.",
+      "hypothesis": "OPENED 2026-09-07. scripts/fn_audit_timelapse.py (commit ea3c3d7) converts the loop's zero-animal bucket from absence-of-evidence into a measurement: it ranks 20s timelapse frames by transient-object size, normalizing each pixel by its own local temporal std so the fountain/bamboo drop out, and reports the nearest real trigger for each candidate. First run (10k frames, 09-03..09-07, 3 complete daylight days) found ZERO animals -- top-25 candidates were trigger-coincident, fountain-quadrant, or sun/shade transitions. Candidate promotion: run it whenever an FN question blocks a lever, or weekly while the animal bucket is empty (~3 min on the Pi). Do NOT wire it into the nightly chain unattended: its output needs eyes on the top candidates, and illumination transitions are its dominant false alarm by design. POSITIVE CONTROL 2026-09-08: the audit surfaced a real transient object the trigger stream missed (13:44:33, blob 2165 px, centre frame, nearest trigger 359 s away -- a person crossing, present in exactly one 20 s frame, ranked 6th of ~2300 frames). Its sensitivity is therefore no longer untested: it demonstrably ranks a genuine one-frame intruder above a corpus of fountain/bamboo/dappled light. Limitation: the control object is 11% of frame, so this bounds sensitivity to large close objects, not to a bird at pond distance.",
       "id": 20,
       "slug": "timelapse-fn-audit-as-standing-duty",
       "status": "parked",
@@ -203,22 +203,22 @@
   ],
   "last_heartbeat_loopday": "2026-09-08",
   "last_metrics": {
-    "date": "2026-09-07",
+    "date": "2026-09-08",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.5655175352168251,
-      1.0
+      0.7928136326370188,
+      0.9821252164780854
     ],
     "fp_claude_ci": [
-      0.5655175352168251,
-      1.0
+      0.7928136326370188,
+      0.9821252164780854
     ],
-    "fp_claude_count": 5,
-    "fp_claude_rate": 1.0,
-    "fp_count": 5,
+    "fp_claude_count": 29,
+    "fp_claude_rate": 0.9354838709677419,
+    "fp_count": 29,
     "fp_human_ci": [
       0.0,
       1.0
@@ -231,22 +231,22 @@
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 1.0,
+    "fp_rate": 0.9354838709677419,
     "fp_trustworthy": true,
-    "labeled_triggers": 5,
+    "labeled_triggers": 31,
     "n_cant_tell": 0,
-    "n_claude": 5,
+    "n_claude": 31,
     "n_human": 0,
-    "n_human_suppressed": 9,
+    "n_human_suppressed": 27,
     "n_md": 0,
-    "n_sampled_out": 4,
+    "n_sampled_out": 14,
     "n_unlabeled": 0,
-    "total_triggers": 14
+    "total_triggers": 58
   },
   "last_scene_change_alert_loopday": "2026-09-06",
   "last_tick_completed_day": "2026-09-07",
-  "nightly_verdict": "Quiet day: 14 alerts, 9 of them people at the pond (all kept out of your inbox) and 5 empty-pond fountain triggers. More useful: I checked the camera's own 20-second timelapse across the last three full days -- about 10,000 photos -- and no animal walked into frame at all, so the camera is working fine and the pond is simply not being visited right now.",
+  "nightly_verdict": "Busy day at the pond: 58 alerts, 27 of them people gardening (all kept out of your inbox, no photo of a person got through) and the rest empty water. Still no animals -- but tonight the timelapse check caught a person walking through that the camera itself missed, which proves that check actually works, so \"no animals\" is a real finding rather than a blind spot.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5037
+  "watermark": 5095
 }
