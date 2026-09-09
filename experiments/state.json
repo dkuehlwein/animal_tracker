@@ -251,8 +251,8 @@
     "total_triggers": 30
   },
   "last_scene_change_alert_loopday": "2026-09-06",
-  "last_tick_completed_day": "2026-09-08",
-  "nightly_verdict": "Busy day at the pond: 58 alerts, 27 of them people gardening (all kept out of your inbox, no photo of a person got through) and the rest empty water. Still no animals -- but tonight the timelapse check caught a person walking through that the camera itself missed, which proves that check actually works, so \"no animals\" is a real finding rather than a blind spot.",
+  "last_tick_completed_day": "2026-09-09",
+  "nightly_verdict": "A blackbird finally showed up at the pond -- four photos at 17:48, the first real animal since the camera was moved, and you confirmed all four. Less good: checking the other bursts I found two where a person walked past and only the one frame the system happened to pick was empty, so one photo of a child reached your review channel. I shipped a fix tonight that checks the other frames of a burst before anything is sent; it takes effect at the 03:25 restart.",
   "paused": false,
   "pending_restart_at": "2026-09-10T03:25:00+02:00",
   "watermark": 5125
