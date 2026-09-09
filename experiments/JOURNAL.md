@@ -2308,3 +2308,78 @@ tick's tier-2 call — not feedback-starved. fp 0.935 (29/31), CI [0.79, 0.98].
 No env delta, no code change, `pending_restart_at` null. Zero-animal streak
 **7 days in-scene / 23 system-wide**. Prediction for night 5: 10–40 triggers,
 0 animals.
+
+## 2026-09-09 — exp #18 CONCLUDED (a blackbird); exp #21 opened + shipped (burst human sweep)
+
+**The zero-animal streak ended.** Four consecutive bursts at 17:48:00–17:49:41
+(5122–5125) hold a **blackbird** on the gravel margin of the pond —
+`aves;;;;;bird`, ensemble 0.53–0.91, raw top-1 `bird` 0.33–0.58 on all four,
+and Daniel hand-labelled every one `animal` at 19:55. First animals in the
+re-aimed scene, first in-scene human `animal` labels, 7 days in-scene / 23
+system-wide broken at 8. Exp #18's premise ("this scene contains zero animal
+bursts, so no trigger-side threshold is validatable in it") held for four
+nights and 172 triggers, was corroborated by night 4's timelapse positive
+control, and has now expired on evidence rather than on patience. **#18
+CONCLUDED, slot released.** Incidental: those four bursts scored
+`scene_similarity` 0.8612–0.8780 — the first animal-side similarity numbers
+in this scene, all safely under the 0.97 gate, though IDENTIFIED bursts can
+never be muted anyway (backlog #17).
+
+**And a privacy leak, found in the same adjudication.** Burst **5119**
+(14:20:50, `unclassifiable`, pc 0.0) reached REVIEW with a child's face
+clearly recognisable in its saved frames. Re-running SpeciesNet per frame:
+frames 1–4 all return `human` (pc 0.894 / 0.881 / 0.032 / 0.0) and only
+frame5 does not — and frame5 won best-frame selection at Laplacian variance
+**13.57 vs 13.41**, a 1.2% margin. The gate saw the one frame of five without
+a person in it.
+
+Nothing downstream could catch it: the person boxes were never scored, so no
+HUMAN-status row existed, and **the whole day had zero HUMAN rows**, leaving
+the proximity window, the density condition, the send deferral and the
+human-adjacent purge all anchorless. Blur, scene and sampling gates each
+passed it legitimately. Nine gates deep and every one was working as designed.
+Burst **5096** (09:22:11) is a second instance the same morning — a leg in
+frame1, empty selected frame. Daniel labelled 5096 `false_positive`, correctly
+for the frame he was shown: the human labeller sees the same single frame the
+gate does, which is why this class survived two months undetected.
+
+Root cause: **the gate's unit of analysis (one frame) is smaller than the
+risk's unit of analysis (one burst, five frames, all retained).**
+
+**Shipped exp #21 (commit `f73a8ae`, restart-gated 09-10T03:25).** On a
+review-class result, measure each sibling frame's divergence from the selected
+one (fraction of pixels differing >40 levels on a 240x135 gray downsample,
+~1 ms) and re-identify the most divergent ones, adopting the first `human`
+result. Adopting the result rather than adding a flag means suppression, the
+`human` DB status and the 48h photo purge all extend to the burst with no new
+column and no new precedence rule. `PERFORMANCE_HUMAN_SWEEP_DIVERGENCE_THRESHOLD`
+= 0.03, `PERFORMANCE_HUMAN_SWEEP_MAX_FRAMES` = 2; either at 0 is the rollback.
+
+Threshold measured over 142 on-disk review-class bursts (09-04..09): the two
+person-carrying bursts rank **1 and 2** at 0.2146 and 0.1694, above every
+empty burst (max 0.0819). T=0.03 keeps >5x margin and sweeps ~10% of
+review-class bursts (~3–5/night, ~10 s each). Rounding *down* is the safe
+direction here — it costs latency, not privacy — the inverse of the scene
+gate's rule. Divergence is not a person detector: it measures whether the
+selected frame represents the burst, which is precisely this leak's
+precondition. The 29 correctly-caught HUMAN bursts of 09-07/08 span
+0.0001–0.35 divergence and are not counter-examples — in all of them the
+person was on the selected frame and was caught there.
+
+FN gates cleared: the sweep only converts review-class (no animal found) to
+HUMAN, and HUMAN already outranks a confident animal, so no animal alert that
+fires today stops firing; blind time rises ~30–50 s per ~10 h night. Volume
+drops ~2 review sends/night out of 6–14.
+
+592/592 tests pass, 9 new. The unreadable-frame test caught a real bug:
+importing SpeciesNet pulls in yolov5, which replaces `cv2.imread` with a
+variant that **raises** on a missing path instead of returning None —
+`_frame_divergence` now catches it so one bad sibling drops itself rather than
+aborting the sweep. Verified end to end on the real frames with the real
+model: 5119 → `human` (pc 0.894), 5096 → `human`, each on its first swept
+frame; both would have been suppressed and purged at 48 h.
+
+Night totals: 30 triggers, 4 identified (all animal), 26 review-class (24
+empty pond, 2 person), 0 HUMAN-status, 0 below-floor, 0 scene-gate mutes (max
+similarity 0.9310, sixth straight inert day). 18 human labels + 14 tier-2.
+fp measured below. No env delta; `pending_restart_at` 2026-09-10T03:25.

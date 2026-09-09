@@ -540,3 +540,38 @@ Zero-animal streak: **7 days in-scene, 23 system-wide**. Escalation point stays
 ~14 in-scene days, and the answer is unchanged in kind: with the audit now
 carrying a positive control, "no animals visit this framing" is the measured
 reading, and re-aiming the camera is Daniel's lever, not the loop's.
+
+---
+
+## Night 5 (2026-09-09) — CONCLUDED. The streak ends: a blackbird.
+
+**30 triggers. 4 IDENTIFIED, 26 review-class, 0 HUMAN-status.**
+
+At 17:48:00–17:49:41 four consecutive bursts (5122–5125) caught a **blackbird
+at the pond edge**, walking the gravel margin between the water and the bamboo.
+`aves;;;;;bird` at ensemble confidence 0.53–0.91, raw classifier top-1 `bird`
+0.33–0.58 on all four. Daniel labelled all four `animal` by hand at 19:55.
+These are the **first animals in the new scene** and the first human
+`animal` labels on in-scene rows.
+
+That closes this experiment's central question. The premise — "the new scene
+contains zero animal bursts so far, so no trigger-side threshold can be
+validated in it" — held for four nights and 172 triggers, was independently
+corroborated by the timelapse FN audit's positive control on night 4, and has
+now expired on the evidence. The scene is not sterile; it is simply quiet.
+**Zero-animal streak: 7 days in-scene, ended at 8.**
+
+Incidental but useful for backlog #17: those four animal-containing bursts
+scored `scene_similarity` 0.8612–0.8780, comfortably under the 0.97 gate
+threshold. IDENTIFIED bursts can never be muted by the scene gate, so this
+changes no routing — but it is the first animal-side similarity measurement
+that exists in this scene, and it sits on the safe side.
+
+The remaining 26 review-class bursts were adjudicated: 24 empty pond
+(fountain, bamboo, sun/shade), and **2 that contain a person** — see below.
+Scene gate 0 mutes for a sixth day, max `scene_similarity` 0.9310 across all
+30 rows. 0 below-floor. 14 tier-2 labels appended (12 fp, 2 person) on top of
+Daniel's 18 human labels.
+
+**Slot released.** The privacy defect found tonight (exp #21, runs/0015)
+takes the active slot.

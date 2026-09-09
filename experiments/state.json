@@ -1,5 +1,5 @@
 {
-  "active_experiment_id": 18,
+  "active_experiment_id": 21,
   "backlog": [
     {
       "hypothesis": "CONCLUDED 2026-06-15 (keep). Same-channel \ud83d\udd0d REVIEW prefix on status\u2208{NO_ANIMAL,UNCLASSIFIABLE} flags 99% of FP at 0 FN; live since 06-12, location-agnostic. Second-channel routing is OUT per Daniel (no 2nd channel \u2014 adds overhead, won't click two). See runs/0001 + LEARNINGS.",
@@ -121,10 +121,10 @@
       "validation": "instrumented"
     },
     {
-      "hypothesis": "ACTIVATED 2026-09-05 (takes the slot exp #15 released). NO code change, NO env delta -- every trigger-side lever is FN-vetoed by measurement. FINDING: the camera was physically RE-AIMED during the 2026-09-01 outage, from a wide garden view (lawn, border, roses, pond small in the lower left) to a tight close-up of the pond with the FOUNTAIN JETTING WATER in the upper right. One frame per day sampled across the whole 22-day retention window shows a single sharp discontinuity, and it sits exactly inside the known trigger gap: last pre-outage trigger 4894 @ 09-01 18:35:33, first post-restart trigger 4895 @ 09-02 15:51:29 (service stopped 09-01 19:13, restarted 09-02 15:14). The re-aim and the ~20h outage are ONE event. The loop ran a full tick on 09-02 (concluded exp #14, shipped exp #15) against a scene that no longer existed and did not notice. CONSEQUENCE: 81 triggers over 09-04+09-05, 0 animals, fp_rate 1.00 both days, every burst the same static pond -- the camera is now pointed at a permanent motion source (water jet + bamboo). THREE TRIGGER-SIDE LEVERS TESTED AND VETOED BY MEASUREMENT, not assumption: (1) motion_area -- animals sit INSIDE the FP band (animal corpus n=307: min 800, median 1047, 201/307 below 1200), so raising MOTION_THRESHOLD 800->1200 costs ~2/3 of all animal detections on record; (2) contour fragmentation -- FP median contour_count 47 vs animal median 3 looked promising and both fields are in the DB for both classes, but the full grid trades animals for quiet at every point (best corner cc>=40 & lca<=1000: 26% FP suppressed for 15% of animals corpus-wide / 5% since 07-01), because a bird landing at the pond SPLASHES and produces the same fragmented signature as the fountain; (3) spatial masking -- tonight's motion centroids cluster hard on the jet (cx median 0.68, cy median 0.26, 27/32 above the midline) but there are ZERO animal bursts in the new scene to validate a mask against, and backlog #3's entanglement result was measured in the OLD framing so it transfers in neither direction -> FN unmeasured + plausible FN rise -> HOLD per the guardrail contract. This is the THIRD independent trigger-side discriminator to fail (area, space, fragmentation), consistent with #3 and #4: in this camera, trigger-side suppression does not separate FP from animals -- future ticks should stop re-deriving it, the architecture answer is notification-layer routing. NOT CLAIMED: that the re-aim caused the animal drought -- identified bursts had already decayed to zero BEFORE the move (68/wk in W27 -> 8 -> 5 -> 1 -> 0 for W33/34/35, last one 2026-08-16 in the old framing), and W34/35 are human-dominated (100/136, 114/238 HUMAN-status); season, garden use and framing are confounded and this notebook cannot separate them. ALSO DONE: baselines.volume_per_night 192 -> 27 (mean of the four post-move nights 18/8/48/33). The 192 baseline predates the move by weeks and is the volume-collapse comparison point -- at 192, check_volume would demand a rollback on any night under 20 triggers, i.e. on a normal night in the new scene. Maintenance, not tuning. EXIT CRITERIA: promote to a real tuning experiment once >=5 animal-containing bursts exist in the NEW scene, then re-derive the spatial mask and backlog #17's scene-gate threshold T = max(animal similarity)+0.02 from the same rows (scene_similarity is recorded for every status since f14ed0d); conclude as a scene-change record if the framing changes again or the fountain stops; ESCALATE if the zero-animal streak reaches ~2 weeks in the new scene. See runs/0014. NIGHT 2 (2026-09-06): FP storm did NOT recur -- 22 triggers, only 3 review-class (vs 46 and 33), the rest a 3h human work session at the pond (19 HUMAN-status). Fountain still running (water-region inter-frame diff on tonight's empty bursts 0.96/1.14, inside the storm days' band, median 1.83/2.56), so the drop is NOT 'the FP source went away'; cause unmeasured (zero triggers before 12:07 today vs steady from 10:00 on 09-04/05, and frames only exist where a trigger fired, so light/wind cannot be reconstructed). Review-class volume in this scene is 4/4/46/33/3 over 09-02..09-06 -- highly variable, do not size a lever off one day. No second re-aim (8 frames sampled 09-02..09-06 show one continuous scene). SHIPPED THIS TICK (commit 6348234, loop-side, live on the next nightgate tick, no camera restart): a scene-change watchdog in loop/nightgate.py as a THIRD dead-man's-switch check alongside exp #15's staleness/camera-liveness pair, closing night 1's central finding that nothing compares today's framing to yesterday's. The existing scene_similarity column CANNOT do this job: its reference set is bounded at 6h and the 09-02 re-aim coincided with a 20h outage, so at restart every reference was stale, the set was empty, and the gate failed open. COMPARATOR CHOSEN BY MEASUREMENT: scene_gate.py's normalized-intensity mean-abs-diff does NOT separate the classes here (same-scene 0.7089-0.9389 vs across-boundary 0.5581-0.6851, bands nearly touching, because the new close-up scene is dappled-sunlight-dominated -- exactly backlog #17's illumination-drift finding); edge-structure NCC (Sobel magnitude of a blurred 128x128 grayscale, zero-mean/unit-std, compared by normalized cross-correlation) gives same-scene 0.6154-0.9607 vs across-boundary 0.0389-0.2604. STATISTIC is a match FRACTION, not a max (defeated by low-volume days straddling the move) nor a median (defeated by a person filling the frame): of the last 12 saved frames, how many match ANY baseline frame from 3-7 days ago at edge-NCC >= 0.45. Replay over the full retention window: 11 same-scene days score 0.58-1.00 (including 08-31, the heaviest human-traffic day in the corpus, at 0.75 -- a body blocks the scene's edges but does not replace them), all three clean post-move days score 0.00. Alert threshold 0.25 sits in a gap more than twice as wide as either margin. Would have fired on the 09-04 tick, one night before the human-driven discovery on 09-05. GATES: FN-veto N/A by construction (monitoring-only, cannot change what is captured/classified/muted/notified -- same standing as f14ed0d); volume guardrail fine (<=1 message per event, 7-day cooldown, 0 fires across 11 same-scene replay days); fails silent on <8 recent or <8 baseline frames and on any exception, never changing the gate's exit code. KNOWN LATENCY PROPERTY: the 'recent 12' window backfills across days when trigger volume is low, so on 09-02/09-03 (6 and 10 frames on disk) the window straddled the move and scored 0.92/0.75 -- detection is trigger-volume-bound, first clean sample wins. Alert cooldown pre-seeded to 2026-09-06 so the instrument does not re-announce the 09-02 re-aim Daniel was already told about in plain English on the 09-05 tick; verified it re-arms 2026-09-13 and that by then the baseline is all-post-move and scores 1.00 (no alert). Rollback: git revert 6348234. Verified independently of the coding agent: 574/574 tests pass and the shipped module replayed on the real corpus reproduces every calibration number above. STANDING DUTIES: 3 review-class bursts adjudicated (5006/5013 empty pond, 5020 a person at arm's length, pc 0.314 -- NOT sent, human_proximity_muted=1 via the 240s window, 113s after HUMAN burst 5019); exp #14's [0.30,0.50) watch band clean by its pre-registered rule (rollback is a recognizable person REACHING review; this is the 4774 near-miss class), so SPECIES_HUMAN_DETECTION_CONFIDENCE stays 0.50 -- but note that in this close-up framing a person can fill the frame and still score 0.31, so the proximity gate is doing the real work; ZERO review-class messages sent today; 0 scene-gate mutes; 2 below-floor bursts both HUMAN-status. Zero-animal streak 5 days in-scene (21 days since the last identified burst 2026-08-16); escalation point ~2 weeks in-scene, not reached.",
+      "hypothesis": "CONCLUDED 2026-09-09 (characterised; slot released). The camera was re-aimed during the 2026-09-01 outage to a tight pond/fountain view, invalidating every scene-derived measurement in this notebook (#3 ROI entanglement, #17 scene-gate distribution, the volume baseline). Four nights of adjudication (09-05..08) found 0 animals in 172 triggers, and the timelapse FN audit (#20) confirmed with a positive control that this was the garden, not the camera. Night 5 ENDED the streak: 4 IDENTIFIED bursts at 17:48-17:49 on 09-09, a blackbird at the pond edge, all four human-labelled 'animal'. The new scene does produce animals; the animal-evidence bucket is no longer empty (scene_similarity 0.861-0.878 on those bursts, well under the 0.97 gate threshold). No code or env change was ever deployed under this id. See runs/0014.",
       "id": 18,
       "slug": "new-scene-regime",
-      "status": "running",
+      "status": "concluded",
       "validation": "observational"
     },
     {
@@ -140,6 +140,13 @@
       "slug": "timelapse-fn-audit-as-standing-duty",
       "status": "parked",
       "validation": "measured-once"
+    },
+    {
+      "hypothesis": "ACTIVATED + SHIPPED 2026-09-09 (commit f73a8ae, restart-gated 09-10T03:25). The human/privacy gate evaluates exactly ONE frame per burst \u2014 the sharpest \u2014 and sharpness is uncorrelated with whether a person is visible, so a burst can leak a person the gate never scored. Burst 5119 leaked a recognisable child's face: frames 1-4 classify human (pc 0.89 on two), only frame5 does not, and frame5 won selection by 13.57 vs 13.41. Burst 5096 the same morning is a second instance. Fix: on a review-class result, re-identify the most divergent sibling frames (fraction of pixels differing on a 240x135 grayscale downsample >= 0.03, capped at 2 frames) and adopt the first HUMAN result. Threshold measured over 142 on-disk review-class bursts: the 2 person-carrying ones ranked 1-2 at 0.169/0.215, busiest empty burst 0.082. Prediction: <=1 person-in-non-selected-frame burst reaches REVIEW per night; sweep fires on ~10% of review-class bursts. Rollback: PERFORMANCE_HUMAN_SWEEP_DIVERGENCE_THRESHOLD=0.",
+      "id": 21,
+      "slug": "burst-human-sweep",
+      "status": "running",
+      "validation": "live"
     }
   ],
   "baselines": {
@@ -203,50 +210,50 @@
   ],
   "last_heartbeat_loopday": "2026-09-09",
   "last_metrics": {
-    "date": "2026-09-08",
+    "date": "2026-09-09",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.7928136326370188,
-      0.9821252164780854
+      0.703186733179637,
+      0.9469034451594526
     ],
     "fp_claude_ci": [
-      0.7928136326370188,
-      0.9821252164780854
-    ],
-    "fp_claude_count": 29,
-    "fp_claude_rate": 0.9354838709677419,
-    "fp_count": 29,
-    "fp_human_ci": [
-      0.0,
+      0.7575059933447592,
       1.0
     ],
-    "fp_human_count": 0,
-    "fp_human_rate": 0.0,
+    "fp_claude_count": 12,
+    "fp_claude_rate": 1.0,
+    "fp_count": 26,
+    "fp_human_ci": [
+      0.5478541568378739,
+      0.9099907189139831
+    ],
+    "fp_human_count": 14,
+    "fp_human_rate": 0.7777777777777778,
     "fp_md_ci": [
       0.0,
       1.0
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.9354838709677419,
+    "fp_rate": 0.8666666666666667,
     "fp_trustworthy": true,
-    "labeled_triggers": 31,
+    "labeled_triggers": 30,
     "n_cant_tell": 0,
-    "n_claude": 31,
-    "n_human": 0,
-    "n_human_suppressed": 27,
+    "n_claude": 12,
+    "n_human": 18,
+    "n_human_suppressed": 0,
     "n_md": 0,
-    "n_sampled_out": 14,
+    "n_sampled_out": 12,
     "n_unlabeled": 0,
-    "total_triggers": 58
+    "total_triggers": 30
   },
   "last_scene_change_alert_loopday": "2026-09-06",
   "last_tick_completed_day": "2026-09-08",
   "nightly_verdict": "Busy day at the pond: 58 alerts, 27 of them people gardening (all kept out of your inbox, no photo of a person got through) and the rest empty water. Still no animals -- but tonight the timelapse check caught a person walking through that the camera itself missed, which proves that check actually works, so \"no animals\" is a real finding rather than a blind spot.",
   "paused": false,
-  "pending_restart_at": null,
-  "watermark": 5095
+  "pending_restart_at": "2026-09-10T03:25:00+02:00",
+  "watermark": 5125
 }
