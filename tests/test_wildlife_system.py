@@ -59,6 +59,12 @@ def system(monkeypatch, tmp_path):
     monkeypatch.setenv('PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS', '120')
     monkeypatch.setenv('PERFORMANCE_HUMAN_DENSITY_COUNT', '8')
     monkeypatch.setenv('PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS', '1800')
+    # Burst human sweep (exp #21): enabled by default in production, but it
+    # re-runs identify_species on sibling frames, which would turn the
+    # single-call `identify_species` mocks below into multi-call ones. Force
+    # it off as this fixture's default, same pattern as the gates above; the
+    # sweep tests override system.config.performance.* directly per-test.
+    monkeypatch.setenv('PERFORMANCE_HUMAN_SWEEP_DIVERGENCE_THRESHOLD', '0')
     for mod in ('wildlife_system', 'config'):
         sys.modules.pop(mod, None)
 
@@ -2154,3 +2160,160 @@ async def test_cooldown_keeps_feeding_motion_detector(monkeypatch):
         f"Cooldown is starving MOG2: detect() called only {len(detect_calls)} "
         f"times in 0.3s. Expected >=5."
     )
+
+
+# ---------------------------------------------------------------------------
+# Burst human sweep (exp #21, 2026-09-09)
+#
+# The human/privacy gate reads exactly one frame per burst — the sharpest —
+# and sharpness is uncorrelated with whether a person is visible. Burst 5119
+# leaked a recognisable face because the only frame of five that did NOT
+# classify as human won selection by 13.57 vs 13.41 Laplacian variance.
+# ---------------------------------------------------------------------------
+
+def _write_frames(tmp_path, specs):
+    """Write burst frames as solid-grey JPEGs of the given levels.
+
+    `specs` maps filename -> grey level; a different level means every pixel
+    differs, which is exactly what _frame_divergence measures.
+    """
+    import cv2
+    paths = []
+    for name, level in specs.items():
+        p = tmp_path / name
+        cv2.imwrite(str(p), np.full((135, 240, 3), level, dtype=np.uint8))
+        paths.append(str(p))
+    return paths
+
+
+def test_frame_divergence_identical_and_different(system, tmp_path):
+    same_a, same_b, other = _write_frames(
+        tmp_path, {'a.jpg': 100, 'b.jpg': 100, 'c.jpg': 200}
+    )
+    assert system._frame_divergence(same_a, same_b) == pytest.approx(0.0)
+    assert system._frame_divergence(same_a, other) == pytest.approx(1.0)
+
+
+def test_frame_divergence_unreadable_frame_returns_none(system, tmp_path):
+    (a,) = _write_frames(tmp_path, {'a.jpg': 100})
+    assert system._frame_divergence(a, tmp_path / 'missing.jpg') is None
+
+
+def test_sweep_escalates_review_burst_to_human(system, tmp_path, caplog):
+    """A person in a divergent sibling frame escalates the whole burst."""
+    selected, sibling = _write_frames(tmp_path, {'f5.jpg': 100, 'f1.jpg': 200})
+    system.config.performance.human_sweep_divergence_threshold = 0.03
+    system.config.performance.human_sweep_max_frames = 2
+    system.species_identifier = MagicMock()
+    system.species_identifier.identify_species.return_value = _identification_human()
+
+    with caplog.at_level('INFO'):
+        result = system._burst_human_sweep(
+            selected, {'all_frame_paths': [sibling, selected]}
+        )
+
+    from data_models import DetectionStatus
+    assert result is not None and result.status == DetectionStatus.HUMAN
+    system.species_identifier.identify_species.assert_called_once_with(sibling)
+    assert '[HUMAN-SWEEP]' in caplog.text
+
+
+def test_sweep_skips_near_identical_burst(system, tmp_path):
+    """The common case — five near-identical frames — costs zero extra passes."""
+    selected, sibling = _write_frames(tmp_path, {'f5.jpg': 100, 'f1.jpg': 100})
+    system.config.performance.human_sweep_divergence_threshold = 0.03
+    system.config.performance.human_sweep_max_frames = 2
+    system.species_identifier = MagicMock()
+
+    assert system._burst_human_sweep(
+        selected, {'all_frame_paths': [sibling, selected]}
+    ) is None
+    system.species_identifier.identify_species.assert_not_called()
+
+
+def test_sweep_returns_none_when_no_person_found(system, tmp_path):
+    selected, sibling = _write_frames(tmp_path, {'f5.jpg': 100, 'f1.jpg': 200})
+    system.config.performance.human_sweep_divergence_threshold = 0.03
+    system.config.performance.human_sweep_max_frames = 2
+    system.species_identifier = MagicMock()
+    system.species_identifier.identify_species.return_value = _identification_no_animal()
+
+    assert system._burst_human_sweep(
+        selected, {'all_frame_paths': [sibling, selected]}
+    ) is None
+
+
+def test_sweep_respects_max_frames_cap(system, tmp_path):
+    """Blind time is an FN source, so the sweep never exceeds the cap."""
+    paths = _write_frames(
+        tmp_path,
+        {'f5.jpg': 100, 'f1.jpg': 200, 'f2.jpg': 210, 'f3.jpg': 220, 'f4.jpg': 230},
+    )
+    selected, siblings = paths[0], paths[1:]
+    system.config.performance.human_sweep_divergence_threshold = 0.03
+    system.config.performance.human_sweep_max_frames = 2
+    system.species_identifier = MagicMock()
+    system.species_identifier.identify_species.return_value = _identification_no_animal()
+
+    system._burst_human_sweep(selected, {'all_frame_paths': siblings + [selected]})
+    assert system.species_identifier.identify_species.call_count == 2
+
+
+@pytest.mark.parametrize('threshold,max_frames', [(0.0, 2), (0.03, 0)])
+def test_sweep_disabled_by_either_rollback_lever(system, tmp_path, threshold, max_frames):
+    selected, sibling = _write_frames(tmp_path, {'f5.jpg': 100, 'f1.jpg': 200})
+    system.config.performance.human_sweep_divergence_threshold = threshold
+    system.config.performance.human_sweep_max_frames = max_frames
+    system.species_identifier = MagicMock()
+
+    assert system._burst_human_sweep(
+        selected, {'all_frame_paths': [sibling, selected]}
+    ) is None
+    system.species_identifier.identify_species.assert_not_called()
+
+
+def test_sweep_handles_missing_sharpness_info(system, tmp_path):
+    (selected,) = _write_frames(tmp_path, {'f5.jpg': 100})
+    system.config.performance.human_sweep_divergence_threshold = 0.03
+    system.config.performance.human_sweep_max_frames = 2
+    system.species_identifier = MagicMock()
+
+    assert system._burst_human_sweep(selected, None) is None
+    assert system._burst_human_sweep(selected, {}) is None
+    system.species_identifier.identify_species.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_process_detection_suppresses_swept_human_burst(system, tmp_path):
+    """End to end: a review-class burst hiding a person is logged HUMAN and
+    never notified — the leak burst 5119 exhibited."""
+    selected, sibling = _write_frames(tmp_path, {'f5.jpg': 100, 'f1.jpg': 200})
+    system.config.performance.human_sweep_divergence_threshold = 0.03
+    system.config.performance.human_sweep_max_frames = 2
+    system.config.performance.suppress_human_alerts = True
+    system.species_identifier = MagicMock()
+    system.species_identifier.identify_species.side_effect = [
+        _identification_no_animal(),   # the selected frame: no person visible
+        _identification_human(),       # the divergent sibling: a person
+    ]
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(
+        selected, 5280,
+        sharpness_info={'all_frame_paths': [sibling, selected],
+                        'sharpness_score': 13.6,
+                        'below_sharpness_floor': False},
+    )
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    telegram.send_detection_notification.assert_not_called()
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        row = conn.execute(
+            "SELECT detection_status FROM detections ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+    assert row[0] == 'human'

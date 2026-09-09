@@ -73,6 +73,19 @@ BOUNDS: dict[str, tuple[float, float]] = {
     # HUMAN-status detection (before OR after), not just HUMAN-status
     # bursts themselves. 0 = disabled (rollback lever).
     "PERFORMANCE_HUMAN_RETENTION_PROXIMITY_SECONDS": (0.0, 3600.0),
+    # Burst human sweep (2026-09-09, exp #21): the human/privacy gate only
+    # ever sees ONE frame per burst — the sharpest — and sharpness is
+    # uncorrelated with whether a person is visible. Burst 5119 leaked a
+    # child's face because frame5 (13.57) beat frame1 (13.41) by 1% and was
+    # the only one of five frames that did NOT classify as human. When a
+    # burst's sibling frames diverge from the selected frame by at least this
+    # fraction of pixels, the selected frame no longer represents the burst,
+    # so the most-divergent siblings are re-identified for a person.
+    # 0.0 = disabled (rollback lever).
+    "PERFORMANCE_HUMAN_SWEEP_DIVERGENCE_THRESHOLD": (0.0, 1.0),
+    # Cap on how many sibling frames the sweep may re-identify per burst
+    # (~10s each on the Pi). 0 = disabled (second rollback lever).
+    "PERFORMANCE_HUMAN_SWEEP_MAX_FRAMES": (0, 4),
 }
 
 FEEDBACK_STARVED_DAYS = 3

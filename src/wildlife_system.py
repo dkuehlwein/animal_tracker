@@ -268,6 +268,82 @@ class WildlifeSystem:
         ]
         return len(self._recent_human_detection_times)
 
+    @staticmethod
+    def _frame_divergence(selected_path, sibling_path) -> Optional[float]:
+        """Fraction of pixels differing between two burst frames.
+
+        Both frames are read grayscale and downsampled to a fixed 240x135 grid
+        so the measure is cheap (~1ms) and insensitive to sensor noise; a pixel
+        counts as differing when its absolute difference exceeds 40 levels.
+
+        Returns None if either frame cannot be read, so one unreadable sibling
+        only drops itself from the sweep rather than aborting it. Importing
+        SpeciesNet pulls in yolov5, which replaces cv2.imread with a variant
+        that RAISES on a missing path instead of returning None — hence the
+        except, not just the None check.
+        """
+        try:
+            a = cv2.imread(str(selected_path), cv2.IMREAD_GRAYSCALE)
+            b = cv2.imread(str(sibling_path), cv2.IMREAD_GRAYSCALE)
+        except Exception as e:
+            logger.debug(f"[HUMAN-SWEEP] unreadable frame ({e}) — skipping")
+            return None
+        if a is None or b is None:
+            return None
+        a = cv2.resize(a, (240, 135))
+        b = cv2.resize(b, (240, 135))
+        return float((cv2.absdiff(a, b) > 40).mean())
+
+    def _burst_human_sweep(self, selected_path, sharpness_info: Optional[dict]):
+        """Re-identify divergent sibling frames of a review-class burst.
+
+        The human/privacy gate sees only the sharpest frame, and sharpness is
+        uncorrelated with whether a person is visible — burst 5119 leaked a
+        recognisable face because the one frame of five that did NOT classify
+        as human won selection by 1% Laplacian variance (exp #21). When the
+        siblings diverge from the selected frame, the selected frame's verdict
+        does not cover the burst, so re-run identification on the most
+        divergent ones and return the first result that comes back HUMAN.
+
+        Returns that IdentificationResult, or None if the sweep is disabled,
+        finds no person, or cannot run. Never raises: on any error the caller
+        keeps the original single-frame result (status quo behaviour).
+        """
+        threshold = self.config.performance.human_sweep_divergence_threshold
+        max_frames = self.config.performance.human_sweep_max_frames
+        if threshold <= 0.0 or max_frames <= 0:
+            return None
+
+        paths = (sharpness_info or {}).get('all_frame_paths') or []
+        candidates = []
+        for p in paths:
+            if str(p) == str(selected_path):
+                continue
+            divergence = self._frame_divergence(selected_path, p)
+            if divergence is not None and divergence >= threshold:
+                candidates.append((divergence, p))
+
+        if not candidates:
+            return None
+
+        # Most divergent first: the frame least represented by the selected
+        # one is the likeliest to hold something the gate never saw.
+        candidates.sort(key=lambda c: c[0], reverse=True)
+        for divergence, path in candidates[:max_frames]:
+            result = self.species_identifier.identify_species(path)
+            if result.status == DetectionStatus.HUMAN:
+                logger.info(
+                    f"[HUMAN-SWEEP] Person found in sibling frame {Path(path).name} "
+                    f"(divergence={divergence:.3f}) of a burst whose selected frame "
+                    f"classified {selected_path} as review-class — escalating burst to HUMAN"
+                )
+                return result
+            logger.debug(
+                f"[HUMAN-SWEEP] {Path(path).name} (divergence={divergence:.3f}) "
+                f"-> {result.status}, no person"
+            )
+        return None
+
     def process_detection(self, image_path: Path, motion_area: int,
                           motion_result=None, sharpness_info: Optional[dict] = None) -> tuple:
         """Process a detection with two-stage species identification and database logging.
@@ -285,6 +361,23 @@ class WildlifeSystem:
             # Two-stage species identification with performance timing
             with PerformanceTimer("Two-stage species identification"):
                 species_result = self.species_identifier.identify_species(image_path)
+
+            # Burst human sweep (exp #21): the gate above judged one frame of
+            # five. If it found no animal, the burst may still hold a person in
+            # a frame it never looked at — check the divergent siblings and, if
+            # one of them is a person, adopt that result so every downstream
+            # human path (suppression, DB status, photo retention) applies to
+            # the whole burst. Wrapped defensively: a sweep failure must never
+            # crash a detection, and its only effect is to route MORE bursts to
+            # HUMAN, never fewer.
+            if is_review_detection(species_result.status):
+                try:
+                    swept = self._burst_human_sweep(image_path, sharpness_info)
+                    if swept is not None:
+                        species_result = swept
+                except Exception as e:
+                    logger.warning(f"[HUMAN-SWEEP] sweep failed, keeping "
+                                   f"single-frame result: {e}")
 
             # Log detection information
             if species_result.detection_result:

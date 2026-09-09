@@ -257,6 +257,60 @@ class PerformanceConfig(BaseSettings):
     # disables (rollback lever).
     human_retention_proximity_seconds: float = 240.0
 
+    # Burst human sweep (2026-09-09, exp #21). Every human/privacy gate in
+    # this system evaluates exactly ONE frame per burst — the sharpest — but
+    # sharpness is uncorrelated with whether a person is visible. Burst 5119
+    # (2026-09-09 14:20:50) leaked a recognisable child's face to REVIEW:
+    # frames 1-4 all classify as human (person_conf 0.89 on two of them) and
+    # only frame5 does not, yet frame5 won selection by 13.57 vs 13.41
+    # Laplacian variance. Nothing downstream could recover — the person boxes
+    # were never scored, so proximity/density/deferral had no HUMAN anchor
+    # (the whole day had zero HUMAN-status rows).
+    #
+    # Fix: when a burst comes back review-class (no animal found), measure how
+    # far each sibling frame diverges from the selected one (fraction of
+    # pixels differing on a 240x135 grayscale downsample). A near-identical
+    # burst means the selected frame does represent it; divergence at or above
+    # this threshold means it does not, so the most-divergent siblings are
+    # re-identified and the burst is escalated to HUMAN if any of them fires
+    # the privacy gate.
+    #
+    # Threshold measured, not guessed: over 142 review-class bursts with
+    # frames still on disk (2026-09-04..09), the two person-carrying bursts
+    # scored 0.169 and 0.215 — ranks 1 and 2 — while the busiest empty-pond
+    # burst reached 0.082. 0.03 keeps a >5x margin under both leaks and still
+    # sweeps only ~10% of review-class bursts (~3-5 per night, ~10s each).
+    # 0.0 disables the sweep (rollback lever).
+    human_sweep_divergence_threshold: float = 0.03
+
+    # Cap on sibling frames re-identified per burst. Each costs a full
+    # SpeciesNet pass (~10s on the Pi), and blind time is an FN source, so the
+    # sweep stops at the first frame that fires the human gate and never
+    # exceeds this many frames. 0 disables the sweep (second rollback lever).
+    human_sweep_max_frames: int = 2
+
+    @field_validator('human_sweep_divergence_threshold')
+    @classmethod
+    def validate_human_sweep_divergence_threshold_bounds(cls, v):
+        low, high = _BOUNDS["PERFORMANCE_HUMAN_SWEEP_DIVERGENCE_THRESHOLD"]
+        if not (low <= v <= high):
+            raise ValueError(
+                f"PERFORMANCE_HUMAN_SWEEP_DIVERGENCE_THRESHOLD={v} out of "
+                f"allowed bounds [{low}, {high}]"
+            )
+        return v
+
+    @field_validator('human_sweep_max_frames')
+    @classmethod
+    def validate_human_sweep_max_frames_bounds(cls, v):
+        low, high = _BOUNDS["PERFORMANCE_HUMAN_SWEEP_MAX_FRAMES"]
+        if not (low <= v <= high):
+            raise ValueError(
+                f"PERFORMANCE_HUMAN_SWEEP_MAX_FRAMES={v} out of allowed "
+                f"bounds [{low}, {high}]"
+            )
+        return v
+
     @field_validator('review_defer_seconds')
     @classmethod
     def validate_review_defer_seconds_bounds(cls, v):
