@@ -208,7 +208,7 @@
       "replaced_at": "2026-08-31T03:25:00+02:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-09-09",
+  "last_heartbeat_loopday": "2026-09-10",
   "last_metrics": {
     "date": "2026-09-09",
     "error_count": 0,
@@ -254,6 +254,6 @@
   "last_tick_completed_day": "2026-09-09",
   "nightly_verdict": "A blackbird finally showed up at the pond -- four photos at 17:48, the first real animal since the camera was moved, and you confirmed all four. Less good: checking the other bursts I found two where a person walked past and only the one frame the system happened to pick was empty, so one photo of a child reached your review channel. I shipped a fix tonight that checks the other frames of a burst before anything is sent; it takes effect at the 03:25 restart.",
   "paused": false,
-  "pending_restart_at": "2026-09-10T03:25:00+02:00",
+  "pending_restart_at": null,
   "watermark": 5125
 }
