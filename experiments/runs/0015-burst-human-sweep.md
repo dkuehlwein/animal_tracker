@@ -142,3 +142,86 @@ burst is ever observed — tonight's four bird bursts had divergence
 review-class bursts; no change to animal alerts. A `[HUMAN-SWEEP]` log line
 plus a `human`-status row with a sub-threshold `person_confidence` is the
 signature to look for.
+
+---
+
+## Night 1 live (2026-09-10) — clean, but no positive test available
+
+Deploy confirmed applied: `wildlife-deploy.service` restarted the camera at
+**03:30:07** (`{"restarted": true, "reason": "applied deploy stamped
+2026-09-10T03:25:00+02:00"}`), so f73a8ae has been live for the whole active
+window.
+
+**Night totals:** 8 triggers, all review-class (`no_animal`), 0 identified,
+0 HUMAN-status, 0 below-floor, 0 scene-gate mutes, 5 sampled out, 3 sent.
+Tier-2: 8/8 empty pond → `false_positive`. Zero human labels arrived today
+(last human labels 2026-09-09, n=18) — not feedback-starved (needs 3 days).
+
+**The sweep fired zero times, and that is the correct behaviour.** Recomputing
+`_frame_divergence` offline over all 4 siblings of each of the 8 bursts gives a
+per-burst maximum of **0.0000–0.0005** — 60x below `T=0.03`. No burst had a
+candidate, so `_burst_human_sweep` returned before its first log statement.
+Cost tonight: 0 extra identifications, 0 added blind time, 0 escalations, 0
+false escalations.
+
+**Liveness was verified without adding instrumentation.** A silent sweep and an
+*inert* sweep look identical in the log, which matters for a privacy fix on its
+first night. Resolved from artifacts already on disk rather than by adding a
+counter: `sharpness_score` is non-NULL on all 8 rows, so `sharpness_info` was
+non-None inside `process_detection`; `all_frame_paths` is set unconditionally in
+the same dict literal that carries it (`wildlife_system.py:712-720`), and that
+same object is threaded 1444 → 1458 → 985 → 375; and the offline recomputation
+reproduces the silence exactly. The sweep ran on all 8 bursts and correctly
+found nothing.
+
+**No positive test was possible.** Nobody entered the garden today — zero
+HUMAN-status rows — so the leak class the sweep exists for did not occur. The
+experiment stays `running`; it needs a day with people in the garden before the
+prediction above can be scored. Absence of a `[HUMAN-SWEEP]` line tonight is
+absence of the *hazard*, not absence of the *fix*.
+
+**FN audit (backlog #20 standing duty), 10k timelapse frames 09-06..09-10:**
+exactly one 2026-09-10 candidate in the top 25 — 12:48:58, blob 2002 px at
+(0.58, 0.13), coincident with trigger 5130 (+4 s). Inspected: the upper half of
+the scene brightens between the 12:48:22 and 12:49:18 neighbours — a sun-out
+illumination transition, the dominant false alarm this detector's own
+calibration note warns about. **No missed animal today.** The zero-animal
+reading for 2026-09-10 rests on a tested instrument, not on absence of evidence.
+
+### Measured negative: intra-burst stillness is NOT an FP lever
+
+Tonight's bursts were triggered by real motion (areas 885–2344, `diff_from_bg`
+~30) yet were *static across the burst itself*, and capture latency rules out
+"the subject already left" — frame 1 lands **205 ms** after the confirmed
+detection. The tempting inference is that a burst whose frames don't move
+contains no subject, and that intra-burst divergence — already computed for
+free by exp #21 — is a cheap FP discriminator.
+
+Measured before proposing, over all 279 on-disk bursts (max divergence of the
+selected frame against its siblings, the same statistic the sweep thresholds):
+
+| bucket | n | min | med | p75 | p90 | max |
+|---|---|---|---|---|---|---|
+| IDENTIFIED (animal) | 4 | 0.0118 | 0.0119 | 0.0131 | 0.0131 | 0.0131 |
+| HUMAN status | 10 | 0.0001 | 0.0071 | 0.0341 | 0.0744 | 0.0744 |
+| review-class, labelled `false_positive` | 180 | 0.0000 | 0.0014 | 0.0107 | 0.0233 | 0.2146 |
+| review-class, unlabelled | 82 | 0.0000 | 0.0000 | 0.0001 | 0.0028 | 0.0139 |
+
+The four confirmed blackbird bursts sit at **0.0118–0.0131**, i.e. between the
+FP distribution's p75 (0.0107) and p90 (0.0233). There is no cut that mutes a
+useful share of FPs without muting the only animal bursts this scene has ever
+produced — the lever is FN-vetoed on measured data, not on assumption. Recorded
+so a later tick does not re-derive it. (Note this table uses max-over-siblings;
+the night-5 entry above quoted 0.0010–0.0034 for the same four bursts under a
+different reduction. Both are far under `T=0.03`, so the sweep's threshold
+margin is unaffected either way.)
+
+Two second-order confirmations from the same table: the sweep's operating point
+is ~10/180 ≈ **5.6%** of review-class bursts, matching the pre-deploy estimate;
+and the two known person leaks (0.2146, 0.1694) still rank 1 and 2 corpus-wide,
+above every empty burst — while both are *labelled* `false_positive` by the
+human, because he judged the one frame he was shown. That is the leak class
+being invisible to human feedback, exactly as documented above, and it is why
+tier-2 and not the label column is the instrument for scoring this experiment.
+
+**Decision: keep, unchanged.** No env delta, no code change, no restart stamped.

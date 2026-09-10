@@ -2383,3 +2383,59 @@ Night totals: 30 triggers, 4 identified (all animal), 26 review-class (24
 empty pond, 2 person), 0 HUMAN-status, 0 below-floor, 0 scene-gate mutes (max
 similarity 0.9310, sixth straight inert day). 18 human labels + 14 tier-2.
 fp measured below. No env delta; `pending_restart_at` 2026-09-10T03:25.
+
+## 2026-09-10 — exp #21 night 1: the sweep is live, quiet, and provably not inert
+
+The privacy fix shipped last night went live on schedule — `wildlife-deploy`
+restarted the camera at **03:30:07** and reported `applied deploy stamped
+2026-09-10T03:25:00`. Then the garden did nothing. 8 triggers all day, every one
+review-class `no_animal`, 0 identified, 0 HUMAN-status, 0 below-floor, 0
+scene-gate mutes (seventh straight inert day), 5 sampled out, 3 sent. Tier-2:
+8/8 empty pond. Zero human labels arrived (last: 18 on 09-09); one day, not a
+freeze.
+
+**The sweep fired zero times.** For a privacy fix on night 1 that reading is
+ambiguous in a way that matters — a correctly-quiet sweep and a sweep that never
+executes produce byte-identical logs, because `_burst_human_sweep` returns
+before its first log statement when no sibling clears the threshold. The lazy
+response is to add a counter and wait another night. Instead, resolved from
+artifacts already on disk: `sharpness_score` is non-NULL on all 8 rows, so
+`sharpness_info` reached `process_detection`; `all_frame_paths` is set
+unconditionally in the same dict literal (`wildlife_system.py:712-720`) and that
+object is threaded 1444 → 1458 → 985 → 375; and recomputing `_frame_divergence`
+offline over all 4 siblings of each burst reproduces the silence exactly —
+per-burst max divergence **0.0000–0.0005**, sixty times under `T=0.03`. The
+sweep ran on all 8 bursts and correctly found nothing. No instrumentation added.
+
+What tonight cannot do is score the experiment. Nobody entered the garden, so
+the leak class the sweep exists for did not occur. Absence of a `[HUMAN-SWEEP]`
+line is absence of the hazard, not evidence about the fix. #21 stays running.
+
+**FN audit** (standing duty, 10k timelapse frames 09-06..09-10): one 09-10
+candidate in the top 25 — 12:48:58, 2002 px, +4 s from trigger 5130, i.e.
+already caught by the trigger stream. Looked at it: the upper scene brightens
+between the 12:48:22 and 12:49:18 neighbours. Sun coming out, not an animal. No
+missed animal today; the zero-animal reading is measured, not assumed.
+
+**Measured negative — intra-burst stillness is not an FP lever.** Tonight's
+bursts were triggered by real motion (`diff_from_bg` ~30) yet were static across
+the burst, and latency rules out "the subject already left": frame 1 lands
+**205 ms** after the confirmed detection. So the FPs are *persistent* scene
+changes — sun/shade shifts, vegetation settling — and the obvious next thought
+is to mute bursts whose frames don't move, using the divergence #21 already
+computes for free. Measured it first, over all 279 on-disk bursts: IDENTIFIED
+(the four blackbird bursts) 0.0118–0.0131; review-class labelled
+`false_positive` med 0.0014, p75 0.0107, p90 0.0233. The only animal bursts this
+scene has ever produced sit *inside* the FP distribution, between its p75 and
+p90. No cut separates them. FN-vetoed on data. Recorded so a later tick does not
+re-derive it — parked as backlog #22.
+
+Two by-products of that table. The sweep's operating point is 10/180 ≈ 5.6% of
+review-class bursts, matching the pre-deploy estimate of ~10%. And the two known
+person leaks (0.2146, 0.1694) still rank 1 and 2 corpus-wide above every empty
+burst — while both carry a *human* `false_positive` label, because Daniel judged
+the single frame he was shown. That is precisely why this experiment is scored
+by tier-2 adjudication of the frames and not by the label column.
+
+Volume 8 vs baseline 27 is within the guardrail (collapse floor 2.7) and inside
+this fortnight's 8–86 range. No env delta, no code change, no restart stamped.

@@ -147,6 +147,13 @@
       "slug": "burst-human-sweep",
       "status": "running",
       "validation": "live"
+    },
+    {
+      "hypothesis": "REJECTED ON MEASUREMENT 2026-09-10 \u2014 do not re-derive. Idea: mute review-class bursts whose 5 frames are near-identical, on the reasoning that a real subject must move within a 1s burst while a sun/shade shift or settled vegetation does not. The signal is free (exp #21's _frame_divergence already computes it) and the premise checked out: capture latency is only 205ms after the confirmed detection, so 'the subject already left' is ruled out, and tonight's 8 FPs had diff_from_bg ~30 with intra-burst divergence 0.0000-0.0005. But measured over all 279 on-disk bursts, the four confirmed blackbird bursts (the only animals this scene has produced) score 0.0118-0.0131 \u2014 INSIDE the false_positive distribution, between its p75 (0.0107) and p90 (0.0233); FP median is 0.0014. No cut mutes a useful share of FPs without muting the animals. FN-vetoed on data, not assumption. Same structural lesson as exp #3 (roi-masking) and exp #4: in this scene, FP and animal motion statistics are entangled, and the separable levers live at the notification layer, not the trigger or burst layer. Revisit only if the animal bucket grows by an order of magnitude.",
+      "id": 22,
+      "slug": "intra-burst-stillness-fp-lever",
+      "status": "rejected-on-measurement",
+      "validation": "measured-and-vetoed"
     }
   ],
   "baselines": {
@@ -251,8 +258,8 @@
     "total_triggers": 8
   },
   "last_scene_change_alert_loopday": "2026-09-06",
-  "last_tick_completed_day": "2026-09-09",
-  "nightly_verdict": "A blackbird finally showed up at the pond -- four photos at 17:48, the first real animal since the camera was moved, and you confirmed all four. Less good: checking the other bursts I found two where a person walked past and only the one frame the system happened to pick was empty, so one photo of a child reached your review channel. I shipped a fix tonight that checks the other frames of a burst before anything is sent; it takes effect at the 03:25 restart.",
+  "last_tick_completed_day": "2026-09-10",
+  "nightly_verdict": "Very quiet day: 8 triggers, all of them the empty pond in shifting sunlight, no animals and nobody in the garden. Last night's privacy fix is running and I confirmed it actually examined every burst rather than sitting idle, but with no people around it had nothing to catch, so it stays on trial; no changes made.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5133
