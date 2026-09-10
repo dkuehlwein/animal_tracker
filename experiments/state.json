@@ -210,50 +210,50 @@
   ],
   "last_heartbeat_loopday": "2026-09-10",
   "last_metrics": {
-    "date": "2026-09-09",
+    "date": "2026-09-10",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.703186733179637,
-      0.9469034451594526
-    ],
-    "fp_claude_ci": [
-      0.7575059933447592,
+      0.6755924351161198,
       1.0
     ],
-    "fp_claude_count": 12,
-    "fp_claude_rate": 1.0,
-    "fp_count": 26,
-    "fp_human_ci": [
-      0.5478541568378739,
-      0.9099907189139831
+    "fp_claude_ci": [
+      0.6755924351161198,
+      1.0
     ],
-    "fp_human_count": 14,
-    "fp_human_rate": 0.7777777777777778,
+    "fp_claude_count": 8,
+    "fp_claude_rate": 1.0,
+    "fp_count": 8,
+    "fp_human_ci": [
+      0.0,
+      1.0
+    ],
+    "fp_human_count": 0,
+    "fp_human_rate": 0.0,
     "fp_md_ci": [
       0.0,
       1.0
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.8666666666666667,
+    "fp_rate": 1.0,
     "fp_trustworthy": true,
-    "labeled_triggers": 30,
+    "labeled_triggers": 8,
     "n_cant_tell": 0,
-    "n_claude": 12,
-    "n_human": 18,
+    "n_claude": 8,
+    "n_human": 0,
     "n_human_suppressed": 0,
     "n_md": 0,
-    "n_sampled_out": 12,
+    "n_sampled_out": 5,
     "n_unlabeled": 0,
-    "total_triggers": 30
+    "total_triggers": 8
   },
   "last_scene_change_alert_loopday": "2026-09-06",
   "last_tick_completed_day": "2026-09-09",
   "nightly_verdict": "A blackbird finally showed up at the pond -- four photos at 17:48, the first real animal since the camera was moved, and you confirmed all four. Less good: checking the other bursts I found two where a person walked past and only the one frame the system happened to pick was empty, so one photo of a child reached your review channel. I shipped a fix tonight that checks the other frames of a burst before anything is sent; it takes effect at the 03:25 restart.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5125
+  "watermark": 5133
 }
