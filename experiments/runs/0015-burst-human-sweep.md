@@ -225,3 +225,39 @@ being invisible to human feedback, exactly as documented above, and it is why
 tier-2 and not the label column is the instrument for scoring this experiment.
 
 **Decision: keep, unchanged.** No env delta, no code change, no restart stamped.
+
+---
+
+## Night 2 live (2026-09-11) — still inert, still no positive test; the tick's find was elsewhere
+
+**Night totals:** 6 triggers, all review-class (4 `no_animal`, 2
+`unclassifiable`), 0 identified, 0 HUMAN-status, 0 below-floor, 0 scene-gate
+mutes, 2 sampled out, 4 sent. Tier-2: 6/6 empty pond → `false_positive`. Three
+human labels arrived at 07:11 on 09-10 rows (5126, 5127, 5133 — all
+`false_positive`), so the feedback channel is alive and the 3-day starvation
+clock is reset.
+
+**Sweep fired zero times, correctly.** Offline recompute of
+`_frame_divergence` over all 4 siblings of each burst: per-burst maxima
+0.0002–0.0128, every one under `T=0.03`. The closest (5134 at 0.0128) is a
+sun/shade shift across the burst. Second night with no candidate; second night
+with nobody in the garden. The experiment still has no positive test and stays
+`running`.
+
+**But one of tonight's bursts was a person-shaped burst after all — just not
+this experiment's leak class.** Burst 5137 carried a homo-sapiens *raw
+classifier* top-1 at 0.512 with a 0.291 person box and still routed to
+`unclassifiable`. Its frames contain no person (adjudicated), so it is a
+phantom, not a leak — but chasing why no human gate fired turned up that exp
+#9's raw-homo trigger has been disabled since the day it shipped by a sentinel
+misparse in its own guard. Opened and shipped as exp #23 (`runs/0016`, commit
+479e0ac). Note what the sweep would have done had 5137 held a real person in a
+sibling frame: divergence 0.0058, no candidate, no sweep. The two mechanisms
+cover different failure modes and neither subsumes the other.
+
+**FN audit (backlog #20 standing duty), 10k timelapse frames 09-07..09-11:**
+exactly one 2026-09-11 candidate in the top 25 — 12:23:26, blob 897 px at
+(0.37, 0.16), coincident with trigger 5135 (+4 s), already captured. No missed
+animal today.
+
+**Decision: keep, unchanged.** No env delta, no code change against #21.

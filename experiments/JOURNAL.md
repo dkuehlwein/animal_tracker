@@ -2439,3 +2439,58 @@ by tier-2 adjudication of the frames and not by the label column.
 
 Volume 8 vs baseline 27 is within the guardrail (collapse floor 2.7) and inside
 this fortnight's 8–86 range. No env delta, no code change, no restart stamped.
+
+## 2026-09-11 — exp #21 night 2 (inert again); exp #23 opened + shipped: the July raw-homo fix has never worked
+
+6 triggers, all review-class, tier-2 6/6 empty pond → `false_positive`. 0
+animals, 0 HUMAN-status, 0 below-floor, 0 scene mutes, 2 sampled out, 4 sent.
+fp 1.0 on n=6, tier-2 only; 3 human labels arrived at 07:11 on 09-10 rows, so
+the starvation clock is reset. FN audit (10k timelapse frames, 09-07..11): one
+09-11 candidate in the top 25, blob 897 px at 12:23:26, coincident with trigger
+5135 (+4 s) — already captured, no missed animal. Volume 6 vs baseline 27 is
+inside the guardrail (collapse floor 2.7) and inside the fortnight's range.
+
+Exp #21 (burst human sweep) second night live, second night with no candidate:
+per-burst max divergence 0.0002–0.0128 against `T=0.03`. Nobody entered the
+garden again, so still no positive test. Stays `running`, unchanged.
+
+The find came from the other end. Burst 5137 (15:15, `unclassifiable`) carried
+a homo-sapiens **raw classifier** top-1 at 0.512 with a 0.291 person box and no
+human gate fired. Frames adjudicated: empty pond — a phantom, not a leak. But
+the reason nothing fired is not phantom-specific. Exp #9's raw-homo trigger is
+guarded by `not _is_specific_animal_taxon(ensemble)`, and that predicate tests
+genus/species for literal non-emptiness while SpeciesNet writes the string
+`no cv result` into *every* taxonomy segment when the crop is unreadable. So
+`uuid;no cv result;…;no cv result` parses as genus `"no cv result"` + species
+`"no cv result"` → "confident specific animal" → trigger suppressed, on exactly
+the label shape it exists for. Its own docstring says it must return False for
+"an unclassifiable sentinel"; the code never did.
+
+Four of the five raw-homo rows corpus-wide carry that shape, **including 2548 —
+one of the three bursts named in exp #9's hypothesis and the only one Daniel
+labelled `person`**. So c366087 (2026-07-21) would not have caught its own
+motivating example, and exp #9's 07-27 conclusion — "the trigger never fired,
+0 rows carry it" — read a guard misfire as specificity. Two more sentinel-shaped
+bursts have passed since (4613 on 08-23, 5137 tonight). Worth naming the failure
+mode: the exp #9 test suite *did* cover "unclassifiable ensemble", using the
+string `"unclassifiable"`, which passes the guard for an unrelated reason
+(`len(parts) < 3`). A test written from the idea of the label rather than from a
+row of the DB.
+
+Fixed as exp #23 (`runs/0016`, commit 479e0ac, restart-gated 09-12T03:25):
+sentinel segments (`no cv result`, `blank`) count as empty; plus the raw top-1
+is now carried in HUMAN metadata so a HUMAN row records which trigger fired.
+595/595 tests pass (3 new, the e2e one built from the real 7-segment label).
+Verified end to end on 5137's actual frames with the real model: `unclassifiable`
+→ `human` 0.512, i.e. suppressed and purged at 48 h.
+
+Cost stated honestly rather than assumed away: 5137 is empty, so this trigger
+will convert roughly one empty burst a month to HUMAN and arm a phantom
+proximity anchor — the exact cost exp #14 fixed, at 1/182 of its scale, against
+a recognisable face kept on disk for the full rotation. Gates: FN-veto clear
+(raw-homo = 5 rows DB-wide, zero real animals; the never-override guard on
+specific animal IDs is intact and tested), volume ≤1 send/month, not starved,
+not paused. Slot: exp #21 keeps it — this is a defect repair of a concluded,
+live mechanism, and the two are separable in the record (`[HUMAN-SWEEP]` +
+sibling-frame escalation vs the raw-classifier-homo-leak log line + a homo
+`top_species_raw` on the HUMAN row).

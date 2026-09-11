@@ -154,6 +154,13 @@
       "slug": "intra-burst-stillness-fp-lever",
       "status": "rejected-on-measurement",
       "validation": "measured-and-vetoed"
+    },
+    {
+      "hypothesis": "ACTIVATED + SHIPPED 2026-09-11 (commit 479e0ac, restart-gated 09-12T03:25). Exp #9's raw-classifier homo-leak trigger has been INERT since it shipped: its guard _is_specific_animal_taxon tested genus/species segments for literal non-emptiness, but SpeciesNet writes 'no cv result' into EVERY taxonomy segment on an unreadable crop, so the unclassifiable sentinel read as a genus+species and the guard reported 'confident specific animal'. 4 of the 5 raw-homo rows corpus-wide carry that shape \u2014 including 2548, exp #9's own motivating leak, human-labelled 'person' \u2014 so exp #9's 'trigger never fired' conclusion was an artifact of the bug. Fix: sentinel segments ('no cv result','blank') count as empty. Verified e2e on burst 5137's real frames with the real model (unclassifiable -> human, 0.512). Cost measured, not assumed: 5137 itself is an empty-pond phantom, so the trigger will suppress ~1 empty burst/month and arm a phantom proximity anchor (exp #14's ledger) \u2014 2 orders of magnitude below exp #14's 182 phantoms, against a missed recognisable face. Does NOT occupy the active slot (defect repair of a concluded/live mechanism); exp #21 keeps it. See runs/0016.",
+      "id": 23,
+      "slug": "raw-homo-sentinel-guard",
+      "status": "running",
+      "validation": "live"
     }
   ],
   "baselines": {
@@ -259,8 +266,8 @@
   },
   "last_scene_change_alert_loopday": "2026-09-06",
   "last_tick_completed_day": "2026-09-10",
-  "nightly_verdict": "Very quiet day: 8 triggers, all of them the empty pond in shifting sunlight, no animals and nobody in the garden. Last night's privacy fix is running and I confirmed it actually examined every burst rather than sitting idle, but with no people around it had nothing to catch, so it stays on trial; no changes made.",
+  "nightly_verdict": "Quiet day: 6 triggers, all the empty pond, no animals and nobody in the garden. One burst was flagged as a person by the classifier but turned out to be empty \u2014 chasing why no privacy gate reacted showed that a person-detection fix from July has been switched off by a bug since the day it shipped, including on the very burst it was built for; I fixed it and it goes live at tomorrow's restart.",
   "paused": false,
-  "pending_restart_at": null,
+  "pending_restart_at": "2026-09-12T03:25:00+02:00",
   "watermark": 5139
 }
