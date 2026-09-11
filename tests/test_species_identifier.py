@@ -528,6 +528,74 @@ def test_raw_classifier_homo_leak_unclassifiable_ensemble_sets_human(tmp_path):
     assert result.confidence == 0.573
 
 
+def test_raw_classifier_homo_leak_no_cv_result_sentinel_ensemble_sets_human(tmp_path):
+    """Exp #23 regression: the REAL production shape of an unclassifiable
+    ensemble is a full 7-segment label whose every taxonomy segment is the
+    literal 'no cv result' sentinel (DB ids 2548, 4613, 5137). A literal
+    non-emptiness test reads those sentinel segments as a genus+species and
+    so treats the label as a confident specific animal, silently disabling
+    the raw-homo trigger this whole block exists for."""
+    from data_models import DetectionStatus
+
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "animal", "conf": 0.9, "bbox": [0, 0, 1, 1]}],
+        prediction=("f2efdae9;no cv result;no cv result;no cv result;"
+                    "no cv result;no cv result;no cv result"),
+        prediction_score=0.0,
+        classifications={
+            "classes": ["990ae9dd;mammalia;primates;hominidae;homo;sapiens;human"],
+            "scores": [0.512],
+        },
+    )
+    assert result.status == DetectionStatus.HUMAN
+    assert result.species_name == "human"
+    assert result.confidence == 0.512
+
+
+def test_human_result_metadata_carries_raw_top1(tmp_path):
+    """Exp #23 observability: a HUMAN result records the raw classifier top-1
+    so the DB shows which trigger fired (raw-homo leak vs person box)."""
+    from data_models import DetectionStatus
+
+    identifier, cfg = _make_identifier()
+    result = _predict(
+        identifier, tmp_path,
+        detections=[{"category": "person", "conf": 0.9, "bbox": [0, 0, 1, 1]}],
+        prediction=";;;;;;animal",
+        prediction_score=0.5,
+        classifications={
+            "classes": ["990ae9dd;mammalia;primates;hominidae;homo;sapiens;human"],
+            "scores": [0.512],
+        },
+    )
+    assert result.status == DetectionStatus.HUMAN
+    assert result.metadata is not None
+    assert result.metadata["person_confidence"] == 0.9
+    assert result.metadata["top_classifier_prediction"] == {
+        "label": "990ae9dd;mammalia;primates;hominidae;homo;sapiens;human",
+        "score": 0.512,
+    }
+
+
+def test_is_specific_animal_taxon_sentinel_segments_are_not_specific():
+    """Sentinel segments count as empty; a real genus+species still does not."""
+    from species_identifier import SpeciesIdentifier
+
+    f = SpeciesIdentifier._is_specific_animal_taxon
+    assert f("f2efdae9;no cv result;no cv result;no cv result;"
+             "no cv result;no cv result;no cv result") is False
+    assert f("uuid;NO CV RESULT;no cv result;no cv result;"
+             "no cv result;no cv result;no cv result") is False
+    assert f("uuid;aves;passeriformes;turdidae;blank;blank;blank") is False
+    assert f("abc;mammalia;carnivora;canidae;vulpes;vulpes;Red Fox") is True
+    assert f(";;;;;;animal") is False
+    assert f("aves;;;;;bird") is False
+    assert f("") is False
+    assert f(None) is False
+
+
 def test_raw_classifier_homo_leak_does_not_override_confident_specific_animal(tmp_path):
     """Raw top-1 homo BUT the ensemble confidently names a specific animal
     (genus+species both non-empty) -> must remain the animal ID, never

@@ -14,6 +14,19 @@ from exceptions import SpeciesIdentificationError, IdentificationTimeout
 
 logger = logging.getLogger(__name__)
 
+#: Taxonomy segment values SpeciesNet emits in place of a real taxon name.
+#: ``no cv result`` fills every segment when the classifier could not read the
+#: crop; ``blank`` is its explicit empty-frame verdict. Neither names an
+#: animal, so both must be read as an absent segment (see
+#: ``SpeciesIdentifier._is_specific_animal_taxon``).
+TAXONOMY_SENTINEL_SEGMENTS = frozenset({'no cv result', 'blank'})
+
+
+def _strip_sentinel(segment: str) -> str:
+    """Return ``segment`` stripped, or '' if it is a SpeciesNet sentinel."""
+    value = (segment or '').strip()
+    return '' if value.lower() in TAXONOMY_SENTINEL_SEGMENTS else value
+
 
 class SpeciesIdentifier:
     """
@@ -291,7 +304,16 @@ class SpeciesIdentifier:
                 detection_result=detection_result,
                 animals_detected=animals_detected,
                 status=DetectionStatus.HUMAN,
-                metadata={'person_confidence': max_person_conf},
+                # The raw top-1 is carried here too (exp #23) so a HUMAN row
+                # records WHICH trigger fired: a raw-homo-leak suppression is
+                # otherwise indistinguishable in the DB from a person-box one,
+                # and that is exactly the row a later tick must audit for
+                # phantoms. Observability only — no routing effect.
+                metadata={
+                    'person_confidence': max_person_conf,
+                    'top_classifier_prediction': top_classifier_prediction,
+                    'top_predictions': top_predictions,
+                },
             )
 
         # Check if any animals were detected
@@ -441,14 +463,18 @@ class SpeciesIdentifier:
         specific animal — i.e. both its genus and species segments are
         non-empty — rather than a generic rollup (e.g. ``;;;;;;animal``,
         ``aves;;;;;bird``), a blank prediction, or an unclassifiable
-        sentinel. Mirrors the genericness check in
+        sentinel. Sentinel segments (``no cv result``, ``blank``) count as
+        empty: SpeciesNet fills EVERY taxonomy segment with ``no cv result``
+        when the crop is unreadable, so a literal non-emptiness test reads
+        that label as a genus+species and wrongly reports a specific animal
+        (exp #23). Mirrors the genericness check in
         ``WildlifeSystem._best_guess_line``, used here to guard the
         raw-classifier homo-leak trigger so it never overrides a confident,
         specific animal identification.
         """
         parts = (taxonomy_label or '').split(';')
-        genus = parts[-3].strip() if len(parts) >= 3 else ''
-        species = parts[-2].strip() if len(parts) >= 2 else ''
+        genus = _strip_sentinel(parts[-3]) if len(parts) >= 3 else ''
+        species = _strip_sentinel(parts[-2]) if len(parts) >= 2 else ''
         return bool(genus and species)
 
     def _create_error_response(self, start_time, reason, detection_result=None):
