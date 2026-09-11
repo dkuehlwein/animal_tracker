@@ -265,7 +265,7 @@
     "total_triggers": 6
   },
   "last_scene_change_alert_loopday": "2026-09-06",
-  "last_tick_completed_day": "2026-09-10",
+  "last_tick_completed_day": "2026-09-11",
   "nightly_verdict": "Quiet day: 6 triggers, all the empty pond, no animals and nobody in the garden. One burst was flagged as a person by the classifier but turned out to be empty \u2014 chasing why no privacy gate reacted showed that a person-detection fix from July has been switched off by a bug since the day it shipped, including on the very burst it was built for; I fixed it and it goes live at tomorrow's restart.",
   "paused": false,
   "pending_restart_at": "2026-09-12T03:25:00+02:00",
