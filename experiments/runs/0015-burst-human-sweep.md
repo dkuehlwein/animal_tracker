@@ -261,3 +261,51 @@ exactly one 2026-09-11 candidate in the top 25 — 12:23:26, blob 897 px at
 animal today.
 
 **Decision: keep, unchanged.** No env delta, no code change against #21.
+
+## Night 3 live (2026-09-12) — first positive test, and a miss
+
+**Night totals:** 34 triggers — 18 HUMAN-status (a gardening session 10:30–10:43
+and an evening crossing 19:09–19:44, every one a real person, all suppressed),
+4 IDENTIFIED (one blackbird at the pond, 16:32–16:34 — the first animals since
+the camera was re-aimed), 12 review-class, 0 below-floor mutes among them, 0
+scene-gate mutes, 9 sampled out, 2 proximity-muted. Only 2 review-class bursts
+were actually sent, both empty pond. Tier-2: 11 `false_positive`, 1 `person`,
+4 `animal`. No human labels arrived today; the channel is alive (labels on
+09-11), so the starvation clock is not running.
+
+**The sweep's first real test was tonight, and it did not fire.** Burst 5169
+(19:17, `unclassifiable`, sent to REVIEW) holds a person walking through the
+garden with a large cloth; frames 3 and 5 return `human` at 0.934 and 0.970
+when re-identified. `_frame_divergence` scored **0.0005** against every
+sibling — 60x under `T=0.03` — so no candidate was ever built.
+
+The frames are not similar; the *measure* is blind at that exposure. Counting
+pixels that differ by >40 raw grey levels makes the trigger a function of the
+scene's dynamic range: burst 5169 has a mean of 11 and a std of 4.8 out of 255,
+so no pixel pair can clear 40 levels whatever is in the picture. The threshold
+was validated on two **daylight** leaks (5119 at 0.2146, 5096 at 0.1694) and
+every night since shipping has been daylight-quiet, which is why nine nights of
+"correctly inert" told us nothing about the dusk half of the day.
+
+What actually kept 5169 out of REVIEW was the Human-Proximity window — a
+HUMAN-status burst 96 s earlier. Had 5169 been the leading burst of that visit,
+as exp #12's three cases were, the sweep was the only layer left and it was
+inert. The defence in depth held tonight by 96 seconds.
+
+Fixed as exp #24 (`runs/0017`, commit c5fe171, plus
+`PERFORMANCE_HUMAN_SWEEP_MAX_FRAMES` 2→4, restart-gated 09-13T03:25):
+contrast-normalise both frames before differencing. Re-measured over all 274
+on-disk review-class bursts, the three known person bursts now rank 1/2/3
+(0.584 / 0.206 / 0.192) with the next at 0.089 — the two original leaks keep
+their scores, so this experiment's own validation survives the change intact.
+
+**Exp #21's mechanism is not in question; its trigger's dynamic range was.**
+The hypothesis — that the privacy gate's unit of analysis is one frame while
+the risk's unit is one burst — is now supported by a third independent burst.
+Status stays `running`: it has fired zero times in three nights and still has
+no positive confirmation, only a corrected negative.
+
+**FN audit (backlog #20 standing duty), timelapse 09-12:** two uncaptured
+candidates, 13:10:55 (445 px) and 11:53:30 (261 px), both in the bamboo canopy
+at the top of the frame — inspected, wind in the leaves, no animal. The 16:34
+candidate is the blackbird and was captured (5166, +6 s). No missed animal.

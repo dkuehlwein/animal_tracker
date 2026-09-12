@@ -161,6 +161,13 @@
       "slug": "raw-homo-sentinel-guard",
       "status": "running",
       "validation": "live"
+    },
+    {
+      "hypothesis": "ACTIVATED + SHIPPED 2026-09-12 (commit c5fe171 + env delta PERFORMANCE_HUMAN_SWEEP_MAX_FRAMES 2->4, restart-gated 09-13T03:25). Exp #21's burst human sweep is structurally blind in low light: its trigger counts pixels differing by >40 RAW grey levels, so it measures the scene's dynamic range as much as its content. Burst 5169 (09-12 19:17) holds a person walking through the garden -- frames 3 and 5 return human at 0.934/0.970 -- and scored 0.0005 (60x under T=0.03) because the frame mean is 11/255; the sweep never ran, and only the Human-Proximity window kept it out of REVIEW. Fix: contrast-normalise both frames before differencing (0.8 sigma of frame contrast instead of 40 absolute levels). Re-measured over all 274 on-disk review-class bursts the three known person bursts rank 1/2/3 (0.584/0.206/0.192) vs next at 0.089; the two original daylight leaks keep their scores so exp #21's validation carries over; sweep rate 3.6% -> 9.1%, ~2/night. max_frames 2->4 because all four siblings of 5169 score 0.49-0.58 -- the ranking carries no signal about which frame holds the person, and the two human frames rank 3rd and 4th. Phantom cost measured: 8 frames over 4 newly-swept bursts, zero HUMAN. Does not occupy the active slot (defect repair of exp #21's shipped mechanism, same precedent as exp #23 vs exp #9). See runs/0017.",
+      "id": 24,
+      "slug": "dusk-blind-divergence",
+      "status": "running",
+      "validation": "live"
     }
   ],
   "baselines": {
@@ -171,6 +178,7 @@
     "PERFORMANCE_HUMAN_DENSITY_COUNT": 8,
     "PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS": 1800,
     "PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS": 240,
+    "PERFORMANCE_HUMAN_SWEEP_MAX_FRAMES": 4,
     "PERFORMANCE_MAX_IMAGES": 300,
     "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.5,
     "PERFORMANCE_SCENE_GATE_ENABLED": 1,
@@ -220,6 +228,19 @@
         "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD": 0.97
       },
       "replaced_at": "2026-08-31T03:25:00+02:00"
+    },
+    {
+      "config": {
+        "PERFORMANCE_HUMAN_DENSITY_COUNT": 8,
+        "PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS": 1800,
+        "PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS": 240,
+        "PERFORMANCE_MAX_IMAGES": 300,
+        "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.5,
+        "PERFORMANCE_SCENE_GATE_ENABLED": 1,
+        "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD": 0.97,
+        "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
+      },
+      "replaced_at": "2026-09-13T03:25:00+02:00"
     }
   ],
   "last_heartbeat_loopday": "2026-09-12",
@@ -266,8 +287,8 @@
   },
   "last_scene_change_alert_loopday": "2026-09-06",
   "last_tick_completed_day": "2026-09-11",
-  "nightly_verdict": "Quiet day: 6 triggers, all the empty pond, no animals and nobody in the garden. One burst was flagged as a person by the classifier but turned out to be empty \u2014 chasing why no privacy gate reacted showed that a person-detection fix from July has been switched off by a bug since the day it shipped, including on the very burst it was built for; I fixed it and it goes live at tomorrow's restart.",
+  "nightly_verdict": "Busy day: people in the garden twice, one blackbird visiting the pond (the first animals in weeks, correctly alerted), and the rest empty-scene false alarms. One burst of someone walking past was only kept private by a 96-second safety margin \u2014 the check that should have caught it turns out to go blind in dim light, which I fixed and it goes live at tomorrow's restart.",
   "paused": false,
-  "pending_restart_at": null,
+  "pending_restart_at": "2026-09-13T03:25:00+02:00",
   "watermark": 5173
 }

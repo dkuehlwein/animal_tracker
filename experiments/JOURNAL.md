@@ -2494,3 +2494,77 @@ not paused. Slot: exp #21 keeps it — this is a defect repair of a concluded,
 live mechanism, and the two are separable in the record (`[HUMAN-SWEEP]` +
 sibling-frame escalation vs the raw-classifier-homo-leak log line + a homo
 `top_species_raw` on the HUMAN row).
+
+## 2026-09-12 — exp #24 opened + shipped (c5fe171); exp #21's sweep is blind at dusk, and tonight it missed a real person
+
+34 triggers, the busiest day since the re-aim. 18 HUMAN-status — a gardening
+session 10:30–10:43 (14 bursts) and an evening crossing 19:09–19:44 — every one
+a real person on inspection, all suppressed, no phantoms. **4 IDENTIFIED: a
+blackbird at the pond 16:32–16:34**, the first animals since the camera was
+re-aimed on 09-01, correctly alerted to MAIN. 12 review-class: 11 empty-scene
+`false_positive`, 1 `person`. fp 0.69 on n=16, tier-2 only; no human labels
+today (channel alive on 09-11, starvation clock not running).
+
+The empty-pond FPs have a named cause now: a dried seed head on a stalk at the
+waterline sways in the wind and clears the 800 px motion threshold. It is in
+every one of the nine daytime review bursts, in the same place, in all five
+frames of each.
+
+**Exp #21's first positive test in three nights, and it was a miss.** Burst
+5169 (19:17, `unclassifiable`, review-class) holds a person in a red shirt
+walking across the garden with a large cloth — five visually unrelated frames,
+of which frames 3 and 5 return `human` at 0.934 and 0.970 when re-identified.
+The sweep never ran: `_frame_divergence` scored **0.0005** against every
+sibling, 60x under `T=0.03`.
+
+The frames are not similar. The measure is blind at that exposure. Counting
+pixels differing by >40 **raw** grey levels makes the trigger a function of the
+scene's dynamic range, and 5169 has a mean of 11.1 / std 4.8 out of 255 — no
+pixel pair can clear 40 levels whatever is in front of the lens. The same
+content change in daylight scored 0.2146. Exp #21's threshold was validated on
+two daylight leaks and every night since has been daylight-quiet, so nine
+nights of "correctly inert" said nothing about the dusk half of the day. Dusk
+is where the sweep matters most: all four evening bursts were below the
+sharpness floor, and one burst returned unclassifiable / unclassifiable /
+human 0.93 / no_animal / human 0.97 across its own five frames.
+
+What kept 5169 out of REVIEW was the Human-Proximity window — an anchor 96 s
+earlier. As the leading burst of a visit (exp #12's exact case) the sweep was
+the last layer and it was inert.
+
+Shipped as exp #24 (`runs/0017`, commit c5fe171): contrast-normalise both
+frames before differencing, so the test reads "more than 0.8 σ of frame
+contrast" instead of "40 absolute levels". Re-measured over all 274 on-disk
+review-class bursts, the three known person bursts rank 1/2/3 (5169 0.584,
+5119 0.206, 5096 0.192) against a next-best of 0.089 — and the two original
+leaks keep their old scores, so exp #21's own validation survives the change.
+Sweep rate 3.6% → 9.1%, ~2/night, inside the envelope exp #21 costed. Pure
+exposure shifts now score ~0, which removes the old measure's main source of
+pointless sweeps.
+
+Paired env delta `PERFORMANCE_HUMAN_SWEEP_MAX_FRAMES` 2→4, because the trigger
+fix alone still misses 5169: all four siblings score 0.49–0.58, so the ranking
+among them carries no signal about which frame holds the person, and the two
+human frames rank 3rd and 4th. Cost ≤46 s per swept burst with nobody present,
+~90 s of extra blind time per night.
+
+Phantom cost measured rather than assumed: the real model over the top-2
+siblings of four newly-swept bursts (including the dark one and the purely
+normalisation-induced daylight ones) — 8 frames, zero HUMAN, no new anchors.
+597/597 tests pass, 2 new: same content change must clear the threshold at both
+noon and dusk amplitude, and a pure exposure shift must not.
+
+Third time in four nights that a shipped guard turned out inert on the case it
+was built for (#9's sentinel misparse → #23, now #21's raw-level threshold →
+#24). The pattern is the same each time: a plausible number, validated on the
+regime that was easy to sample, never re-tested in the regime that mattered.
+Worth treating "correctly inert for N nights" as the weak evidence it is.
+
+Exp #23 night 1: live since the 03:30 restart, no sentinel-shaped burst to test
+it (corpus rate ~1/month). Its observability half is confirmed — HUMAN rows now
+carry the raw top-1, showing 5140 was caught with a person box of 0.013 and a
+raw homo score of 0.714, i.e. MegaDetector missed the child's head entirely and
+only the classifier's taxonomy saved it.
+
+FN audit (backlog #20): two uncaptured timelapse candidates today, both bamboo
+canopy in wind; the blackbird was captured. No missed animal.

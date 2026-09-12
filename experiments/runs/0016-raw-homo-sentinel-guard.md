@@ -128,3 +128,33 @@ plus the raw-classifier-homo-leak log line. No change to animal alerts, no
 change to REVIEW volume beyond at most one burst. If it fires, adjudicate the
 frames: a person confirms the repair, an empty pond is a phantom to be counted
 against the exp #14 ledger, not silently accepted.
+
+## Night 1 live (2026-09-12) — live since the 03:30 restart, no sentinel burst to test it
+
+The pre-sunrise deploy applied at 03:30:07 (`{"restarted": true, "reason":
+"applied deploy stamped 2026-09-12T03:25:00+02:00"}`), so the fix has been live
+for a full active day.
+
+**No row exercised the repaired trigger.** All 18 HUMAN-status bursts today
+fired on the ordinary ensemble path (`homo_taxon=True` in every
+`species_identifier` log line, person boxes 0.01–0.94), and no burst carried a
+sentinel-shaped ensemble label with a homo raw top-1. Zero sentinel-shaped
+bursts at all: the corpus rate is ~1/month, so this is expected.
+
+**The observability half is confirmed working:** every HUMAN row tonight
+carries `top_species_raw`/`top_species_score`, which is what the second half of
+this commit added. Reading them shows something the old rows could not:
+5140 was caught with a person box of **0.013** and a raw homo score of 0.714 —
+MegaDetector missed the child's head entirely at close range and only the
+classifier's taxonomy saved it. That is the same asymmetry this experiment's
+trigger exists to cover.
+
+**The one sentinel burst tonight was not a homo case.** 5169 (19:17) carries
+the `no cv result` sentinel ensemble label, but its raw top-1 is `vehicle`
+0.514 — the yellow cloth — so no human trigger applies and none should. Its
+person is visible in *sibling* frames, which is exp #21's leak class, not this
+one; see `runs/0017`. Worth recording that the two mechanisms again turned out
+not to subsume each other, on the same burst.
+
+**Decision: keep, unchanged.** Cost side is also clean so far — no phantom
+HUMAN escalation attributable to this trigger.
