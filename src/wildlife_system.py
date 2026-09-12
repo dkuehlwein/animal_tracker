@@ -13,6 +13,7 @@ import os
 import time
 
 import cv2
+import numpy as np
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
@@ -268,13 +269,46 @@ class WildlifeSystem:
         ]
         return len(self._recent_human_detection_times)
 
-    @staticmethod
-    def _frame_divergence(selected_path, sibling_path) -> Optional[float]:
+    # Divergence is measured after normalising each frame to this contrast, so
+    # the >40-level test means "differs by more than 0.8 standard deviations of
+    # frame contrast" rather than "differs by 40 raw levels" (exp #24).
+    DIVERGENCE_CANONICAL_STD = 50.0
+    DIVERGENCE_LEVELS = 40
+    # Floor on the divisor, so a near-constant frame cannot amplify sensor
+    # noise without bound. Real dusk frames sit at std 3–6, well above it.
+    DIVERGENCE_MIN_STD = 1.0
+
+    @classmethod
+    def _normalize_contrast(cls, frame):
+        """Rescale a frame to zero mean and a canonical contrast.
+
+        Removes the two things that are not content — overall brightness and
+        overall contrast — so what remains is where the picture differs.
+        """
+        std = max(float(frame.std()), cls.DIVERGENCE_MIN_STD)
+        return (frame - float(frame.mean())) / std * cls.DIVERGENCE_CANONICAL_STD
+
+    @classmethod
+    def _frame_divergence(cls, selected_path, sibling_path) -> Optional[float]:
         """Fraction of pixels differing between two burst frames.
 
         Both frames are read grayscale and downsampled to a fixed 240x135 grid
-        so the measure is cheap (~1ms) and insensitive to sensor noise; a pixel
-        counts as differing when its absolute difference exceeds 40 levels.
+        so the measure is cheap (~1ms) and insensitive to sensor noise, then
+        normalised to a canonical mean/contrast before differencing; a pixel
+        counts as differing when the normalised frames disagree by more than
+        `DIVERGENCE_LEVELS`.
+
+        The normalisation is not cosmetic (exp #24). Comparing raw levels makes
+        the measure a function of the scene's dynamic range as much as of its
+        content: burst 5169 (2026-09-12 19:17) holds a person walking across
+        the frame carrying a large cloth — five visually unrelated frames, two
+        of which the model reads as `human` at >=0.93 — and scored 0.0005,
+        because at a mean of 11/255 almost no pixel pair can differ by 40 raw
+        levels. The same magnitude of change in daylight scored 0.21. Dusk is
+        exactly when motion blur makes the selected frame likeliest to miss a
+        person, so a measure that goes blind there is blind where it matters.
+        Normalising also drops pure exposure shifts, which are not content and
+        were previously the main source of pointless sweeps.
 
         Returns None if either frame cannot be read, so one unreadable sibling
         only drops itself from the sweep rather than aborting it. Importing
@@ -290,9 +324,9 @@ class WildlifeSystem:
             return None
         if a is None or b is None:
             return None
-        a = cv2.resize(a, (240, 135))
-        b = cv2.resize(b, (240, 135))
-        return float((cv2.absdiff(a, b) > 40).mean())
+        a = cls._normalize_contrast(cv2.resize(a, (240, 135)).astype(np.float32))
+        b = cls._normalize_contrast(cv2.resize(b, (240, 135)).astype(np.float32))
+        return float((np.abs(a - b) > cls.DIVERGENCE_LEVELS).mean())
 
     def _burst_human_sweep(self, selected_path, sharpness_info: Optional[dict]):
         """Re-identify divergent sibling frames of a review-class burst.

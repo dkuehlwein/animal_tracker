@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import MagicMock, AsyncMock, ANY
 
+import cv2
 import numpy as np
 import pytest
 
@@ -2171,17 +2172,32 @@ async def test_cooldown_keeps_feeding_motion_detector(monkeypatch):
 # classify as human won selection by 13.57 vs 13.41 Laplacian variance.
 # ---------------------------------------------------------------------------
 
-def _write_frames(tmp_path, specs):
-    """Write burst frames as solid-grey JPEGs of the given levels.
+def _texture(seed, mean=110.0, std=40.0, size=(135, 240)):
+    """A deterministic texture: different seed -> different picture.
 
-    `specs` maps filename -> grey level; a different level means every pixel
-    differs, which is exactly what _frame_divergence measures.
+    `mean`/`std` set the exposure the picture is rendered at, independently of
+    its content, so a test can render the same scene at noon and at dusk.
     """
-    import cv2
+    rng = np.random.default_rng(seed)
+    base = rng.normal(0.0, 1.0, size)
+    base = cv2.GaussianBlur(base, (0, 0), 2.0)
+    base = (base - base.mean()) / max(base.std(), 1e-6)
+    return np.clip(base * std + mean, 0, 255).astype(np.uint8)
+
+
+def _write_frames(tmp_path, specs, mean=110.0, std=40.0):
+    """Write burst frames as textured JPEGs, one texture per level.
+
+    `specs` maps filename -> level. Divergence is measured on contrast-
+    normalised frames (exp #24), so frames that differ only in overall
+    brightness are deliberately NOT divergent; the level therefore seeds the
+    *content*, and two frames sharing a level are the same picture.
+    """
     paths = []
     for name, level in specs.items():
         p = tmp_path / name
-        cv2.imwrite(str(p), np.full((135, 240, 3), level, dtype=np.uint8))
+        img = _texture(level, mean=mean, std=std)
+        cv2.imwrite(str(p), cv2.cvtColor(img, cv2.COLOR_GRAY2BGR))
         paths.append(str(p))
     return paths
 
@@ -2191,7 +2207,47 @@ def test_frame_divergence_identical_and_different(system, tmp_path):
         tmp_path, {'a.jpg': 100, 'b.jpg': 100, 'c.jpg': 200}
     )
     assert system._frame_divergence(same_a, same_b) == pytest.approx(0.0)
-    assert system._frame_divergence(same_a, other) == pytest.approx(1.0)
+    assert system._frame_divergence(same_a, other) > 0.3
+
+
+def test_frame_divergence_ignores_pure_exposure_shift(system, tmp_path):
+    """A brightness/contrast change is not content, so it must not sweep.
+
+    Auto-exposure moves between frames of a burst; before exp #24 a big enough
+    shift alone could clear the threshold and pay for two SpeciesNet passes on
+    a picture nothing had happened in.
+    """
+    (bright,) = _write_frames(tmp_path, {'bright.jpg': 7}, mean=150.0, std=45.0)
+    (dim,) = _write_frames(tmp_path, {'dim.jpg': 7}, mean=40.0, std=15.0)
+    assert system._frame_divergence(bright, dim) < 0.01
+
+
+def test_frame_divergence_is_brightness_invariant(system, tmp_path):
+    """exp #24: the same content change must score the same at dusk as at noon.
+
+    Burst 5169 (2026-09-12 19:17) is the live counter-example the raw-level
+    measure missed: five visually unrelated frames of a person walking through
+    the garden, two of which the model reads as `human` at >=0.93, scored
+    0.0005 because at a mean of 11/255 no pixel pair differs by 40 raw levels.
+    The sweep never ran, and only the human-proximity window kept the burst out
+    of REVIEW.
+    """
+    noon_a, noon_b = _write_frames(
+        tmp_path, {'noon_a.jpg': 11, 'noon_b.jpg': 12}, mean=110.0, std=40.0
+    )
+    dusk_a, dusk_b = _write_frames(
+        tmp_path, {'dusk_a.jpg': 11, 'dusk_b.jpg': 12}, mean=11.0, std=5.0
+    )
+    noon = system._frame_divergence(noon_a, noon_b)
+    dusk = system._frame_divergence(dusk_a, dusk_b)
+
+    threshold = 0.03
+    assert noon > threshold
+    assert dusk > threshold, (
+        f"dusk divergence {dusk:.4f} under threshold — the sweep is blind in "
+        f"low light again (noon scored {noon:.4f} on the same content change)"
+    )
+    assert dusk > noon / 2
 
 
 def test_frame_divergence_unreadable_frame_returns_none(system, tmp_path):
