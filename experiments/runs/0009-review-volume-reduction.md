@@ -198,3 +198,53 @@ sampling — 14 human labels vs 0 the previous night — and every human-labelle
 was one that was actually sent (`review_sampled_out=0` or MAIN), confirming the
 sampling gate and the feedback path agree. As predicted, `fp_rate` moved only
 with the scene, not because of either gate.
+
+---
+
+## Re-measurement 2026-09-13 — both gates audited, both left alone
+
+Not a re-opening of the experiment. Tonight had only two review-class bursts and
+one of them (5176) held a **real blackbird**, so the standing question — what the
+review-class mute stack costs in false negatives — was finally answerable from
+data on disk. Measured rather than assumed, in both directions.
+
+**Scene gate: inert in the current scene regime.** It has muted **25 bursts ever
+and 0 since 2026-08-30** — fourteen nights. Control over the 74 on-disk
+review-class frames since 09-08, scored against their own rolling 3-frame
+reference set exactly as the live gate does: min 0.5052 / p25 0.7895 / median
+0.8327 / p75 0.8844 / **max 0.9487**. Not one comparison reaches T=0.97. The
+July corpus that set the placeholder ran median 0.9534 / max 0.9793; the
+distribution has shifted down ~0.12, consistent with the new pond scene (moving
+water, more foliage) documented in runs/0014.
+
+**First FN-side data point for T=0.97, after seven weeks of having none.** The
+scene-gate threshold has been unvalidatable since the 2026-07-26 override
+because no animal-labelled review-class row had frames on disk. 5176 is one.
+Scored against all 75 on-disk review-class references it tops out at **0.7384**
+— 0.23 below the mute threshold, and below the *median* empty-scene score. One
+animal is not a validation, but the first evidence that exists lands far on the
+safe side, and it lands there for a mechanical reason worth recording: the
+blackbird burst is *less* self-similar than the empty ones, not more.
+
+**Not lowering T.** It would restore the intended ~17% mute rate, but against
+what? Review-class volume is now 2–12/night, not the 44/night that motivated
+this experiment, so the notification saving is ~1 message/night — bought with
+real FN risk in a scene that has just been shown to put animals into the
+review-class bucket. FN-veto direction is clear. Leaving an inert gate inert is
+the cheap side of the trade.
+
+**Review sampling: the protocol's trigger for raising the rate has NOT fired.**
+PROTOCOL reserves raising `review_sample_rate` toward 1.0 for "a real animal
+found in a sampled-out burst". Screened all **29 sampled-out bursts since 09-09
+with frames still on disk** — per burst, the 5-frame median background, the
+selected frame's largest blurred difference from it, and a 30%-width crop around
+that peak (the same method that found the blackbird in 5176). Result: **zero
+animals, zero recognisable people.** Vegetation, rippling water, the gnome, and
+one large yellow patterned cloth (5172, the cloth from exp #24's burst 5169).
+Hold at 0.5. Tonight's animal burst 5176 was sampled *in* and delivered.
+
+The tempting move tonight was to raise the rate anyway — 5176 shows review-class
+bursts do contain animals, and a 50% coin flip on each of them reads badly. The
+screen is what stopped it: 29 bursts of actual evidence say the coin has not yet
+come up wrong. Recorded so a later tick re-derives the argument from the data,
+not from the intuition.

@@ -2568,3 +2568,51 @@ only the classifier's taxonomy saved it.
 
 FN audit (backlog #20): two uncaptured timelapse candidates today, both bamboo
 canopy in wind; the blackbird was captured. No missed animal.
+
+## 2026-09-13 — zero-FP night; exp #24 confirmed at dusk; both review gates audited and held
+
+38 triggers, **zero empty-scene false positives** — every trigger had a real
+subject. 35 human-status bursts (all real people, all suppressed): one morning
+pass, one at 13:04, one at 17:37-17:45, a 25-minute gardening session 18:18-18:43,
+and two at 18:53/19:01. 1 IDENTIFIED = a blackbird at the pond 11:53 (correct MAIN
+alert, second day running). 2 review-class. fp_rate 0.00 on n=3 tier-2
+[0.00, 0.56]; n_human_suppressed 35. No human labels tonight; last arrived 09-12,
+so no freeze.
+
+**Exp #24 night 1 — the repair fires on a new burst, in the regime it was built
+for.** Burst 5210 (19:00:59, dusk, frame mean 14.4) holds a person's blurred limb
+in its *selected* frame. Old raw-40-level divergence: 0.0027-0.0029, inert, 10x
+under T. New contrast-normalised divergence: 0.1353-0.1782, 4.5-6x over T, all
+four siblings swept (the raised cap reached all of them). No escalation, correctly
+— the person is in the selected frame, not a sibling. The gate scored it
+person_confidence 0.303, under the deployed 0.5; privacy held via the
+Human-Proximity **density** condition (>=8 human bursts in 1800s), and the ±240s
+retention window purges its frames at 48h with HUMAN burst 5211 nineteen seconds
+later. Adjudicated: dark blurred limb, no face, not recognisable. Cost: 4 model
+runs, zero phantoms.
+
+Exp #21 is 4 nights live and has still never escalated a burst — burst supply is
+2-12 review-class/night, so this is thin evidence, not failure. Exp #23 still has
+had no sentinel-shaped burst to fire on (~1/month corpus rate).
+
+**5176 — a real blackbird read as `unclassifiable` and sent to REVIEW.** Same bird
+as the 11:53 MAIN alert, 53 s later, this time against dark background next to the
+gnome: MegaDetector produced no box, raw top-1 was `blank` @ 0.64. Delivered, but
+tagged as a likely false positive. It is also the **first animal-labelled
+review-class row with frames on disk** — the bucket that has blocked scene-gate
+validation since 2026-07-26. New backlog #25.
+
+**Both review-class volume gates audited; neither touched.** Scene gate: 25 mutes
+ever, **0 in 14 days**; control over 74 on-disk review frames since 09-08 maxes at
+0.9487 against T=0.97 (July corpus: median 0.9534 / max 0.9793 — the new pond
+scene sits ~0.12 lower). 5176 scores max 0.7384 vs 75 references, i.e. the gate
+would not have muted the one real animal — first FN-side data point for T=0.97,
+and it lands 0.23 on the safe side. Not lowering T: it would buy ~1 message/night
+now that review volume is 2-12/night instead of 44, against real FN risk.
+Sampling gate: screened all 29 sampled-out bursts since 09-09 with frames on disk
+(median-background + peak-difference crop, the method that found 5176's bird) —
+**zero animals, zero recognisable people**. PROTOCOL's stated trigger for raising
+the rate has not fired; hold at 0.5. The screen is what stopped an otherwise
+tempting unforced change.
+
+No deploy, no code change, no restart stamped. Active slot stays with exp #21.

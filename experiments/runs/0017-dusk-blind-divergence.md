@@ -156,3 +156,40 @@ burst escalates to HUMAN on frames containing no person (phantom anchor), or if
 sweep volume exceeds ~4/night sustained. Rollback: `git revert c5fe171`, or
 `PERFORMANCE_HUMAN_SWEEP_MAX_FRAMES=0` / `_DIVERGENCE_THRESHOLD=0` to disable
 the sweep entirely.
+
+## Night 1 (2026-09-13) — the repair fires in the regime it was built for
+
+Live since the 03:30 restart (commit `c5fe171` + `PERFORMANCE_HUMAN_SWEEP_MAX_FRAMES=4`).
+
+Only two review-class bursts existed all day, but one of them is precisely the
+test case: **burst 5210, 19:00:59, `no_animal`, frame mean 14.4 / std 10.9** —
+dusk, and its selected frame1 holds a dark out-of-focus limb of someone walking
+past the lens while frames 2–5 are the empty pond.
+
+| measure | frame2 | frame3 | frame4 | frame5 | verdict at T=0.03 |
+|---|---|---|---|---|---|
+| old, raw 40-level | 0.0027 | 0.0029 | 0.0029 | 0.0029 | **inert** (10x under) |
+| new, contrast-normalised | 0.1782 | 0.1353 | 0.1379 | 0.1387 | **4 candidates** (4.5–6x over) |
+
+This is the predicted failure and the predicted repair measured on a *new*
+burst, not on the one the fix was written from. The old measure would have swept
+nothing; the new one swept all four siblings (the raised cap is what let it
+reach all of them).
+
+No escalation followed, and that is correct: the person is in the **selected**
+frame, not a sibling. The gate scored it `person_confidence=0.303`, just under
+the deployed 0.5 (exp #14's measured operating point — not to be reverted on this
+single instance, which sits in the band where 32/33 adjudicated bursts were
+empty). Privacy held anyway: the Human-Proximity **density** condition muted it
+(`>= 8 human detections in the last 1800s`), and the ±240 s retention-proximity
+window will purge its frames at 48 h alongside HUMAN burst 5211, 19 s later.
+Adjudicated: a dark blurred limb, no face, not recognisable.
+
+Sweep cost this night: 4 model runs (~46 s) on one burst, zero phantoms — inside
+the costed envelope.
+
+Exp #21 (the sweep itself) is now 4 nights live and has **never** escalated a
+burst. Not evidence of failure yet — the burst supply is tiny (2 review-class
+bursts today, 6–12 on recent days) — but it is the second consecutive night
+where the mechanism's own trigger, not its judgment, is all that could be
+verified.
