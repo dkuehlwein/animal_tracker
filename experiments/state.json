@@ -245,22 +245,22 @@
   ],
   "last_heartbeat_loopday": "2026-09-13",
   "last_metrics": {
-    "date": "2026-09-12",
+    "date": "2026-09-13",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.44404355834740666,
-      0.8583535614521796
+      0.0,
+      0.5614970317550454
     ],
     "fp_claude_ci": [
-      0.44404355834740666,
-      0.8583535614521796
+      0.0,
+      0.5614970317550454
     ],
-    "fp_claude_count": 11,
-    "fp_claude_rate": 0.6875,
-    "fp_count": 11,
+    "fp_claude_count": 0,
+    "fp_claude_rate": 0.0,
+    "fp_count": 0,
     "fp_human_ci": [
       0.0,
       1.0
@@ -273,22 +273,22 @@
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.6875,
+    "fp_rate": 0.0,
     "fp_trustworthy": true,
-    "labeled_triggers": 16,
+    "labeled_triggers": 3,
     "n_cant_tell": 0,
-    "n_claude": 16,
+    "n_claude": 3,
     "n_human": 0,
-    "n_human_suppressed": 18,
+    "n_human_suppressed": 35,
     "n_md": 0,
-    "n_sampled_out": 9,
+    "n_sampled_out": 1,
     "n_unlabeled": 0,
-    "total_triggers": 34
+    "total_triggers": 38
   },
   "last_scene_change_alert_loopday": "2026-09-13",
   "last_tick_completed_day": "2026-09-12",
   "nightly_verdict": "Busy day: people in the garden twice, one blackbird visiting the pond (the first animals in weeks, correctly alerted), and the rest empty-scene false alarms. One burst of someone walking past was only kept private by a 96-second safety margin \u2014 the check that should have caught it turns out to go blind in dim light, which I fixed and it goes live at tomorrow's restart.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5173
+  "watermark": 5211
 }
