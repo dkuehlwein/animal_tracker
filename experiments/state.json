@@ -243,7 +243,7 @@
       "replaced_at": "2026-09-13T03:25:00+02:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-09-12",
+  "last_heartbeat_loopday": "2026-09-13",
   "last_metrics": {
     "date": "2026-09-12",
     "error_count": 0,
@@ -285,10 +285,10 @@
     "n_unlabeled": 0,
     "total_triggers": 34
   },
-  "last_scene_change_alert_loopday": "2026-09-06",
+  "last_scene_change_alert_loopday": "2026-09-13",
   "last_tick_completed_day": "2026-09-12",
   "nightly_verdict": "Busy day: people in the garden twice, one blackbird visiting the pond (the first animals in weeks, correctly alerted), and the rest empty-scene false alarms. One burst of someone walking past was only kept private by a 96-second safety margin \u2014 the check that should have caught it turns out to go blind in dim light, which I fixed and it goes live at tomorrow's restart.",
   "paused": false,
-  "pending_restart_at": "2026-09-13T03:25:00+02:00",
+  "pending_restart_at": null,
   "watermark": 5173
 }
