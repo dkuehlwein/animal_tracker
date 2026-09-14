@@ -2616,3 +2616,43 @@ the rate has not fired; hold at 0.5. The screen is what stopped an otherwise
 tempting unforced change.
 
 No deploy, no code change, no restart stamped. Active slot stays with exp #21.
+
+## 2026-09-14 — exp #26 opened + shipped (80d0c00): the "animal" that means "I don't know"
+
+68 triggers, the busiest human day on record: **55 HUMAN-status bursts** between
+16:03 and 17:01, every one a real person, every one suppressed — including six at
+`person_confidence` <= 0.05 that only the raw-classifier homo path could catch.
+Zero phantoms. Exp #14's 0.5 operating point held through the heaviest load it has
+ever seen. fp 0.45 on n=11 tier-2 (5 empty-scene FP, 2 animals, 4 people).
+
+**The leak: `<uuid>;;;;;;animal`.** Two bursts, 5222 (16:13) and 5270 (16:51), are
+extreme close-ups of a person — clothing filling the whole frame, then a trousered
+leg — and both were delivered to MAIN as a species alert. Their ensemble label is
+SpeciesNet's fully-generic rollup, whose "confidence" is literally MegaDetector's
+box confidence (0.6946 / 0.5785, exact match) with no classifier verdict attached:
+it is the *absence* of an identification being reported as one. Because the status
+is `identified`, every mute path — human-proximity window, density, deferred send,
+±240s retention purge — skipped it: they all test `is_review_detection`. 5222 came
+30s after a HUMAN burst; 5270 came 82s after one with 34 HUMAN bursts in the prior
+30 minutes. The gates were not evaded, they were never consulted.
+
+**Re-routing the label is FN-vetoed, so gate it instead.** 78 rows carry this shape
+corpus-wide; 18 are human-labelled `animal`/`animal_wrong_id`. Label alone is not
+the signal — label + human proximity is. Replaying the existing window-OR-density
+test over all 78: mutes **4** (1988 raw top-1 `human`@0.591; 3483 human-labelled
+`false_positive`; tonight's two), **zero** human-labelled animals. ~1.3 mutes/month,
+all non-animals. Shipped: `utils.is_unnamed_animal_label` (narrow, sentinel-aware
+per exp #23's lesson), the human-proximity gate widened to review-class OR
+unnamed-animal IDENTIFIED, and the 48h human-adjacent purge extended to
+`identified` rows with `human_proximity_muted=1`. 612/612 tests; e2e on the real
+rows: 5222/5270 mute, the cat and bird rows 5123/5164 do not. Restart 09-15T03:25.
+Slot unchanged (exp #21) — scope repair, same precedent as #23 vs #9, #24 vs #21.
+
+**The animal bucket is now n=2.** 5213 (13:45) is a **domestic cat** @0.95 — a
+correct MAIN alert, first non-bird in weeks. 5214, 31s later, is the *same cat*
+behind the fence, read `unclassifiable` and sent to REVIEW: the second
+animal-labelled review-class row with frames on disk (after 5176 yesterday). Its
+`scene_similarity` is 0.8204 vs T=0.97 — second FN-side data point, 0.15 on the
+safe side. Scene gate: 0 mutes tonight, 0 in 15 days, tonight's review-class range
+0.727-0.891. Sampling gate: 4 sampled out, screened, three empty scenes and one
+person's legs already proximity-muted — zero animals, hold at 0.5.

@@ -175,6 +175,13 @@
       "slug": "review-class-animal-bucket",
       "status": "open",
       "validation": "none"
+    },
+    {
+      "hypothesis": "ACTIVATED + SHIPPED 2026-09-14 (commit 80d0c00, restart-gated 09-15T03:25). SpeciesNet's fully-generic '<uuid>;;;;;;animal' rollup means 'something is there, I cannot name it' (its ensemble confidence IS MegaDetector's box confidence) but routes to IDENTIFIED, so it fires a MAIN alert that bypasses every review-class mute path (blur/scene/sampling/deferral/human-proximity all test is_review_detection). A person at extreme close range is exactly the input that produces it: on 09-14, 5222 (clothing filling the frame, 30s after a HUMAN burst) and 5270 (trousered leg, 82s after one, 34 HUMAN bursts in the prior 30min) were delivered to MAIN as 'animal detected'. Re-routing the label is FN-vetoed: 18 of the 78 rows with this shape corpus-wide are human-labelled animal/animal_wrong_id. So the label is not the signal, label+human-proximity is: replaying the existing window-OR-density conditions over all 78 rows mutes exactly 4 (1988 raw top-1 human@0.591, 3483 human-labelled false_positive, 5222, 5270) and ZERO human-labelled animals. Fix: utils.is_unnamed_animal_label (narrow, sentinel-aware per exp #23) + human-proximity gate evaluated for review-class OR unnamed-animal IDENTIFIED bursts + the 48h human-adjacent purge extended to identified rows with human_proximity_muted=1. Named identifications untouched (09-14's domestic cat, and bird rows 5123/5164, all still alert). Does NOT occupy the active slot (scope repair of exp #10/#11's shipped mechanism, same precedent as #23 vs #9 and #24 vs #21); exp #21 keeps it. Rollback: git revert 80d0c00 + restart. See runs/0018.",
+      "id": 26,
+      "slug": "unnamed-animal-main-leak",
+      "status": "running",
+      "validation": "live"
     }
   ],
   "baselines": {
@@ -293,9 +300,9 @@
     "total_triggers": 68
   },
   "last_scene_change_alert_loopday": "2026-09-13",
-  "last_tick_completed_day": "2026-09-13",
-  "nightly_verdict": "Quiet, clean day: 38 alerts, and for once not a single false alarm \u2014 35 were people in the garden (all kept private, nothing sent to you) and the rest was the blackbird back at the pond. Nothing changed tonight: I checked whether the two filters that quietly drop 'probably nothing' photos have ever hidden a real animal, found no evidence they have, and left them as they are.",
+  "last_tick_completed_day": "2026-09-14",
+  "nightly_verdict": "Busy afternoon in the garden: 68 alerts, 55 of them people \u2014 all correctly kept private \u2014 plus a cat at the pond, which the camera named correctly. Two photos of someone standing right in front of the lens were sent to you as 'animal detected', because when the camera can't name what it sees it still calls it an animal and skips every privacy check. I fixed that tonight: unnamed 'animal' alerts now go quiet while someone is in the garden, and I checked every such alert of the last three months to be sure no real animal would have been hidden.",
   "paused": false,
-  "pending_restart_at": null,
+  "pending_restart_at": "2026-09-15T03:25:00+02:00",
   "watermark": 5279
 }
