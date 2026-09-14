@@ -252,22 +252,22 @@
   ],
   "last_heartbeat_loopday": "2026-09-14",
   "last_metrics": {
-    "date": "2026-09-13",
+    "date": "2026-09-14",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.0,
-      0.5614970317550454
+      0.21271271622459764,
+      0.719908462590678
     ],
     "fp_claude_ci": [
-      0.0,
-      0.5614970317550454
+      0.21271271622459764,
+      0.719908462590678
     ],
-    "fp_claude_count": 0,
-    "fp_claude_rate": 0.0,
-    "fp_count": 0,
+    "fp_claude_count": 5,
+    "fp_claude_rate": 0.45454545454545453,
+    "fp_count": 5,
     "fp_human_ci": [
       0.0,
       1.0
@@ -280,22 +280,22 @@
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.0,
+    "fp_rate": 0.45454545454545453,
     "fp_trustworthy": true,
-    "labeled_triggers": 3,
+    "labeled_triggers": 11,
     "n_cant_tell": 0,
-    "n_claude": 3,
+    "n_claude": 11,
     "n_human": 0,
-    "n_human_suppressed": 35,
+    "n_human_suppressed": 57,
     "n_md": 0,
-    "n_sampled_out": 1,
+    "n_sampled_out": 4,
     "n_unlabeled": 0,
-    "total_triggers": 38
+    "total_triggers": 68
   },
   "last_scene_change_alert_loopday": "2026-09-13",
   "last_tick_completed_day": "2026-09-13",
   "nightly_verdict": "Quiet, clean day: 38 alerts, and for once not a single false alarm \u2014 35 were people in the garden (all kept private, nothing sent to you) and the rest was the blackbird back at the pond. Nothing changed tonight: I checked whether the two filters that quietly drop 'probably nothing' photos have ever hidden a real animal, found no evidence they have, and left them as they are.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5211
+  "watermark": 5279
 }
