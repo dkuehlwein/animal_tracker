@@ -483,6 +483,18 @@ class DatabaseManager:
         HUMAN burst). Modeled on get_human_detections_older_than; `timestamp`
         is stored as a local wall-clock string in "%Y-%m-%d %H:%M:%S" format.
 
+        Also matches IDENTIFIED rows with `human_proximity_muted = 1` (exp
+        #26, unnamed-animal-main-leak, 2026-09-14): the human-proximity gate
+        now also mutes IDENTIFIED bursts carrying SpeciesNet's fully-generic
+        "<uuid>;;;;;;animal" rollup label (see
+        WildlifeSystem.process_detection) — a burst the loop has already
+        judged is likely a person, not a real animal, must not keep
+        recognisable frames on disk for the full rotation just because its
+        DB status happens to be `identified` rather than a review-class
+        status. An IDENTIFIED row with `human_proximity_muted` False or NULL
+        (the vast majority — named-species identifications) is unaffected
+        and still purge-ineligible via this path.
+
         Perf note (2026-08-01): this was originally a single SQL query using
         a correlated EXISTS subquery with strftime('%s', ...) on both sides
         — SQLite can't use any index for that (it re-parses every timestamp
@@ -514,7 +526,8 @@ class DatabaseManager:
                 cursor.execute('''
                     SELECT id, image_path, timestamp
                     FROM detections
-                    WHERE detection_status IN ('no_animal', 'unclassifiable')
+                    WHERE (detection_status IN ('no_animal', 'unclassifiable')
+                           OR (detection_status = 'identified' AND human_proximity_muted = 1))
                       AND timestamp < ?
                 ''', (cutoff_str,))
                 review_rows = cursor.fetchall()

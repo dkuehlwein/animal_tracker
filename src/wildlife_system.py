@@ -26,7 +26,7 @@ from database_manager import DatabaseManager
 from species_identifier import SpeciesIdentifier
 from notification_service import NotificationService
 from resource_manager import SystemMonitor, StorageManager
-from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnalyzer, get_species_emoji, extract_common_name
+from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnalyzer, get_species_emoji, extract_common_name, is_unnamed_animal_label
 from feedback_protocol import build_feedback_keyboard
 from timelapse_writer import TimelapseWriter
 from data_models import DetectionStatus, is_review_detection, is_human_detection
@@ -517,9 +517,26 @@ class WildlifeSystem:
             # look-back window (gaps of 432s/732s) during a long gardening
             # session, so a burst is also muted when
             # human_density_count-or-more HUMAN-status detections occurred
-            # in the trailing human_density_window_seconds. Only evaluated
-            # for review-class statuses, same None-for-everything-else
-            # convention as scene_gate_muted. Wrapped defensively — any error
+            # in the trailing human_density_window_seconds.
+            #
+            # Widened (exp #26, unnamed-animal-main-leak, 2026-09-14): also
+            # evaluated for IDENTIFIED bursts carrying SpeciesNet's
+            # fully-generic "<uuid>;;;;;;animal" rollup label — an
+            # IDENTIFIED status bypasses every review-class mute path
+            # (blur/scene/sampling/deferral all check is_review_detection),
+            # so two extreme close-ups of a person's clothing/leg reached
+            # MAIN as "animal detected" tonight. Gating this corpus-wide on
+            # this same window-OR-density test mutes exactly the known
+            # human-labelled/confirmed-person rows and zero known animal
+            # false negatives. DB-convention note: `human_proximity_muted`
+            # is therefore now True/False (not always NULL) for some
+            # IDENTIFIED rows too — non-review-class rows where it stays
+            # NULL are simply the ones this widened check didn't apply to
+            # (named-species / no-detection IDENTIFIED bursts).
+            #
+            # Only evaluated for review-class statuses or this unnamed-animal
+            # case, same None-for-everything-else convention as
+            # scene_gate_muted otherwise. Wrapped defensively — any error
             # here must never block a notification, so it fails open to "not
             # muted". `human_proximity_mute_reason` ('window'/'density') is
             # not persisted to the DB (same human_proximity_muted column as
@@ -527,7 +544,12 @@ class WildlifeSystem:
             # below reports.
             human_proximity_muted = None
             human_proximity_mute_reason = None
-            if is_review_detection(species_result.status):
+            is_unnamed_animal = (
+                not is_review_detection(species_result.status)
+                and not is_human_detection(species_result.status)
+                and is_unnamed_animal_label(species_result.species_name)
+            )
+            if is_review_detection(species_result.status) or is_unnamed_animal:
                 try:
                     window = self.config.performance.human_proximity_window_seconds
                     last_human = self._last_human_detection_at
@@ -624,6 +646,7 @@ class WildlifeSystem:
                 'review_sampled_out': review_sampled_out,
                 'human_proximity_muted': human_proximity_muted,
                 'human_proximity_mute_reason': human_proximity_mute_reason,
+                'unnamed_animal': is_unnamed_animal,
             }
 
             return result_dict, timestamp
@@ -1040,13 +1063,21 @@ class WildlifeSystem:
                     and is_human_detection(species_result.get('detection_status')))
         # Human-proximity mute gate: process_detection already computed and
         # DB-persisted human_proximity_muted for every review-class burst
-        # that reaches here. Precedence: right after the Human/Privacy Gate,
+        # that reaches here, AND (exp #26, unnamed-animal-main-leak,
+        # 2026-09-14) for IDENTIFIED bursts carrying SpeciesNet's
+        # fully-generic "<uuid>;;;;;;animal" rollup label — that status
+        # otherwise bypasses every review-class mute path below (Blur/
+        # Scene/Sampling all additionally require is_review_detection, so
+        # they can never fire for one of these bursts regardless of this
+        # widening — a muted unnamed-animal burst still gets exactly one
+        # suppression log). Precedence: right after the Human/Privacy Gate,
         # before Blur/Scene/Sampling — a burst that gate would already
         # suppress (e.g. HUMAN itself) must not also produce this log.
         is_human_proximity_review = (
             not is_human
             and bool(species_result.get('human_proximity_muted'))
-            and is_review_detection(species_result.get('detection_status'))
+            and (is_review_detection(species_result.get('detection_status'))
+                 or bool(species_result.get('unnamed_animal')))
         )
         # Luma gate (exp #8, sharpness-floor-is-a-brightness-gate): the
         # sharpness floor is a raw Laplacian-variance statistic that's

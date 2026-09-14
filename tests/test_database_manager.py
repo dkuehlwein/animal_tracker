@@ -612,6 +612,57 @@ def test_get_human_adjacent_review_detections_excludes_identified_row(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# exp #26 (unnamed-animal-main-leak, 2026-09-14): an IDENTIFIED burst that
+# the human-proximity gate muted (SpeciesNet's generic "<uuid>;;;;;;animal"
+# rollup, judged likely a person) must be purged on the same 48h
+# human-retention policy as a no_animal/unclassifiable review-class row —
+# the loop has already decided this burst is likely a person, so its frames
+# must not survive the full ~300-burst image-retention rotation.
+# ---------------------------------------------------------------------------
+
+def test_get_human_adjacent_review_detections_includes_muted_identified_row(tmp_path):
+    """An IDENTIFIED row with human_proximity_muted=1, adjacent to a HUMAN
+    row and old enough, IS returned — same purge treatment as a muted
+    review-class row."""
+    db, db_path = _make_db(tmp_path)
+    human_id = db.log_detection(
+        image_path="capture_human7.jpg", motion_area=10, detection_status="human"
+    )
+    animal_id = db.log_detection(
+        image_path="capture_animal7.jpg", motion_area=10, detection_status="identified",
+        human_proximity_muted=True,
+    )
+    _age_row(db_path, human_id, hours_ago=49)
+    animal_ts = _age_row(db_path, animal_id, hours_ago=49 + 10 / 3600)
+
+    cutoff = datetime.now() - timedelta(hours=48)
+    rows = db.get_human_adjacent_review_detections(cutoff, window_seconds=240)
+
+    assert rows == [(animal_id, "capture_animal7.jpg", animal_ts)]
+
+
+def test_get_human_adjacent_review_detections_excludes_unmuted_identified_row(tmp_path):
+    """An IDENTIFIED row with human_proximity_muted=0 (evaluated, not
+    muted), adjacent to a HUMAN row and old enough, is NOT returned — only
+    an affirmatively muted IDENTIFIED row is purge-eligible via this path."""
+    db, db_path = _make_db(tmp_path)
+    human_id = db.log_detection(
+        image_path="capture_human8.jpg", motion_area=10, detection_status="human"
+    )
+    animal_id = db.log_detection(
+        image_path="capture_animal8.jpg", motion_area=10, detection_status="identified",
+        human_proximity_muted=False,
+    )
+    _age_row(db_path, human_id, hours_ago=49)
+    _age_row(db_path, animal_id, hours_ago=49 + 10 / 3600)
+
+    cutoff = datetime.now() - timedelta(hours=48)
+    rows = db.get_human_adjacent_review_detections(cutoff, window_seconds=240)
+
+    assert rows == []
+
+
+# ---------------------------------------------------------------------------
 # get_recent_review_detections (Task 2: scene-unchanged gate seed query)
 # ---------------------------------------------------------------------------
 

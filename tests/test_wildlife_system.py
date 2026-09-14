@@ -145,6 +145,53 @@ def _identification_human(confidence=0.9):
     )
 
 
+def _identification_unnamed_animal(confidence=0.72):
+    """An IDENTIFIED result carrying SpeciesNet's fully-generic "an animal
+    is there, but I cannot name it" rollup label (exp #26,
+    unnamed-animal-main-leak) — status stays at its IDENTIFIED default, so
+    is_review_detection() is False for this result, distinct from
+    _identification_no_animal() above.
+    """
+    from data_models import IdentificationResult, DetectionResult
+    det = DetectionResult(
+        animals_detected=True,
+        detection_count=1,
+        bounding_boxes=[{'confidence': 0.4, 'category': '1'}],
+        detections=[],
+        processing_time=0.1,
+    )
+    return IdentificationResult(
+        species_name="1f689929-d0e3-4ac6-8016-16aacd8d0dbe;;;;;;animal",
+        confidence=confidence,
+        api_success=True,
+        processing_time=0.5,
+        detection_result=det,
+        animals_detected=True,
+    )
+
+
+def _identification_named_species(confidence=0.85):
+    """An IDENTIFIED result naming a specific, non-generic species — must
+    never be affected by the unnamed-animal widening of the human-proximity
+    gate."""
+    from data_models import IdentificationResult, DetectionResult
+    det = DetectionResult(
+        animals_detected=True,
+        detection_count=1,
+        bounding_boxes=[{'confidence': 0.8, 'category': '1'}],
+        detections=[],
+        processing_time=0.1,
+    )
+    return IdentificationResult(
+        species_name="uuid;mammalia;carnivora;felidae;felis;catus;domestic cat",
+        confidence=confidence,
+        api_success=True,
+        processing_time=0.5,
+        detection_result=det,
+        animals_detected=True,
+    )
+
+
 def test_process_detection_persists_richer_fields_and_id(system):
     from data_models import MotionResult
     system.species_identifier.identify_species = MagicMock(
@@ -2373,3 +2420,116 @@ async def test_process_detection_suppresses_swept_human_burst(system, tmp_path):
             "SELECT detection_status FROM detections ORDER BY id DESC LIMIT 1"
         ).fetchone()
     assert row[0] == 'human'
+
+
+# ---------------------------------------------------------------------------
+# Human-Proximity Gate widened to unnamed-animal IDENTIFIED bursts (exp #26,
+# unnamed-animal-main-leak, 2026-09-14): SpeciesNet's ensemble sometimes
+# returns a fully-generic "<uuid>;;;;;;animal" rollup label ("something is
+# there, I cannot name it"), which routes to DetectionStatus.IDENTIFIED and
+# so bypasses every review-class mute path (human-proximity, blur, scene,
+# sampling, deferral) — a MAIN-channel "animal detected" alert. Measured
+# over the whole corpus, gating these on the existing Human-Proximity Gate
+# (window OR density) costs zero known human-labelled animal/animal_wrong_id
+# false negatives. Named-species identifications must be completely
+# unaffected.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_unnamed_animal_muted_within_human_proximity_window(system, tmp_path, caplog):
+    """An IDENTIFIED burst carrying the generic '<uuid>;;;;;;animal' label,
+    landing shortly after a HUMAN-status detection, is muted via the
+    human-proximity gate: no Telegram send, a [HUMAN-PROXIMITY] log line,
+    and the DB row records human_proximity_muted=1 even though its status
+    is 'identified', not review-class."""
+    system._last_human_detection_at = datetime.now() - timedelta(seconds=60)
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_unnamed_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    telegram.send_detection_notification.assert_not_called()
+    telegram.send_document.assert_not_called()
+    system.cleanup_old_images.assert_called_once()
+
+    gate_logs = [
+        r.message for r in caplog.records
+        if "HUMAN-GATE" in r.message or "[HUMAN-PROXIMITY]" in r.message
+        or "[BLUR]" in r.message or "[SCENE-GATE]" in r.message
+        or "[REVIEW-SAMPLE]" in r.message
+    ]
+    assert len(gate_logs) == 1
+    assert "[HUMAN-PROXIMITY]" in gate_logs[0]
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row is not None
+    assert row['detection_status'] == 'identified'
+    assert row['human_proximity_muted'] == 1
+
+
+@pytest.mark.asyncio
+async def test_unnamed_animal_not_muted_without_recent_human(system, tmp_path):
+    """The same generic '<uuid>;;;;;;animal' burst, with no recent
+    HUMAN-status detection, still notifies as before and DB-records
+    human_proximity_muted=0 (evaluated-but-not-muted), not NULL."""
+    assert system._last_human_detection_at is None
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_unnamed_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['detection_status'] == 'identified'
+    assert row['human_proximity_muted'] == 0
+
+
+@pytest.mark.asyncio
+async def test_named_species_unaffected_by_unnamed_animal_widening(system, tmp_path):
+    """A named-species IDENTIFIED burst (e.g. domestic cat) inside the
+    human-proximity window is NOT muted — the widening only applies to the
+    generic unnamed-animal rollup label, never to a real identification.
+    human_proximity_muted stays NULL (not evaluated at all), same as any
+    other non-review-class, non-unnamed-animal status."""
+    system._last_human_detection_at = datetime.now() - timedelta(seconds=60)
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_named_species()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['detection_status'] == 'identified'
+    assert row['human_proximity_muted'] is None

@@ -69,6 +69,54 @@ def extract_common_name(taxonomy_label: str) -> str:
     return ''
 
 
+#: Taxonomy segment values SpeciesNet emits in place of a real taxon name —
+#: mirrors ``species_identifier.TAXONOMY_SENTINEL_SEGMENTS``. Duplicated
+#: here (rather than imported) so this module doesn't take on a dependency
+#: on species_identifier; keep the two sets in sync if SpeciesNet's sentinel
+#: vocabulary ever changes.
+_ANIMAL_LABEL_SENTINEL_SEGMENTS = frozenset({'no cv result', 'blank'})
+
+
+def _strip_animal_label_sentinel(segment: str) -> str:
+    """Return `segment` stripped, or '' if it is a SpeciesNet sentinel."""
+    value = (segment or '').strip()
+    return '' if value.lower() in _ANIMAL_LABEL_SENTINEL_SEGMENTS else value
+
+
+def is_unnamed_animal_label(taxonomy_label: str) -> bool:
+    """True when a SpeciesNet label is the ensemble's fully-generic "an
+    animal is there, but I cannot name it" rollup — the last semicolon
+    segment is ``animal`` (case-insensitive) and every taxonomy segment in
+    between is empty (e.g. ``1f689929-...;;;;;;animal``). Deliberately
+    narrow, modeled closely on ``SpeciesIdentifier._is_blank_prediction``: a
+    real, named species label never ends in the bare word ``animal`` (a
+    class-level rollup like ``aves;;;;;bird`` names *bird*, not *animal*,
+    and is correctly not matched), and requiring the in-between segments to
+    be empty means a hypothetical ``...;aves;...;animal`` would not match
+    either. SpeciesNet's sentinel segments (``no cv result``, ``blank``)
+    count as empty here too — same convention as
+    ``species_identifier._strip_sentinel`` — so a label where the classifier
+    couldn't read the crop at all isn't misread as this generic-animal
+    rollup.
+
+    ``taxonomy_label``'s first segment is the model's UUID for the
+    prediction class, not taxonomy, and is ignored.
+
+    Returns False for None, '', non-string, or otherwise malformed input;
+    never raises (exp #26, unnamed-animal-main-leak — this feeds a privacy
+    gate, so it must fail closed to "not an unnamed-animal label" rather
+    than blow up a detection).
+    """
+    try:
+        parts = [p.strip() for p in (taxonomy_label or '').split(';')]
+    except AttributeError:
+        return False
+    if len(parts) < 2 or parts[-1].lower() != 'animal':
+        return False
+    # parts[0] is the model's UUID for the class, not taxonomy.
+    return not any(_strip_animal_label_sentinel(p) for p in parts[1:-1])
+
+
 class PerformanceTimer:
     """Performance timing utility."""
 
