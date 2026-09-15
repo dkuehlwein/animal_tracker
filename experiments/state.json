@@ -259,22 +259,22 @@
   ],
   "last_heartbeat_loopday": "2026-09-15",
   "last_metrics": {
-    "date": "2026-09-14",
+    "date": "2026-09-15",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.21271271622459764,
-      0.719908462590678
+      0.1876163064826506,
+      0.8123836935173494
     ],
     "fp_claude_ci": [
-      0.21271271622459764,
-      0.719908462590678
+      0.1876163064826506,
+      0.8123836935173494
     ],
-    "fp_claude_count": 5,
-    "fp_claude_rate": 0.45454545454545453,
-    "fp_count": 5,
+    "fp_claude_count": 3,
+    "fp_claude_rate": 0.5,
+    "fp_count": 3,
     "fp_human_ci": [
       0.0,
       1.0
@@ -287,22 +287,22 @@
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.45454545454545453,
+    "fp_rate": 0.5,
     "fp_trustworthy": true,
-    "labeled_triggers": 11,
+    "labeled_triggers": 6,
     "n_cant_tell": 0,
-    "n_claude": 11,
+    "n_claude": 6,
     "n_human": 0,
-    "n_human_suppressed": 57,
+    "n_human_suppressed": 21,
     "n_md": 0,
     "n_sampled_out": 4,
     "n_unlabeled": 0,
-    "total_triggers": 68
+    "total_triggers": 27
   },
   "last_scene_change_alert_loopday": "2026-09-13",
   "last_tick_completed_day": "2026-09-14",
   "nightly_verdict": "Busy afternoon in the garden: 68 alerts, 55 of them people \u2014 all correctly kept private \u2014 plus a cat at the pond, which the camera named correctly. Two photos of someone standing right in front of the lens were sent to you as 'animal detected', because when the camera can't name what it sees it still calls it an animal and skips every privacy check. I fixed that tonight: unnamed 'animal' alerts now go quiet while someone is in the garden, and I checked every such alert of the last three months to be sure no real animal would have been hidden.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5279
+  "watermark": 5306
 }
