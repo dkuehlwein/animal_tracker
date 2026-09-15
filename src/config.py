@@ -232,6 +232,30 @@ class PerformanceConfig(BaseSettings):
     human_density_window_seconds: float = 1800.0
     human_density_count: int = 8
 
+    # Demoted-band window (exp #27, 2026-09-15): a band-conditional widening
+    # of the window condition above, not a third independent condition.
+    # Burst 5305 (person_confidence 0.436, a close-up of clothing) landed
+    # 480s after the last HUMAN detection with only 5 HUMAN bursts in the
+    # trailing 1800s — both the window (240s) and density (>=8) conditions
+    # missed it. Replaying the full review-class + unnamed-animal corpus
+    # found `person_confidence` cleanly separates the two populations: the
+    # max over all 20 human-labelled animal/animal_wrong_id rows is 0.0789,
+    # while 5305 scores 0.436 — a >4x gap, no overlap. So when the burst's
+    # OWN person_confidence is >= `human_demoted_person_floor` (0.3, exp
+    # #14's old HUMAN threshold — the bottom of the "demoted" band that
+    # scores too low to trip the Human/Privacy Gate but is not nothing),
+    # the window condition's look-back becomes
+    # max(human_proximity_window_seconds, human_demoted_window_seconds)
+    # instead of human_proximity_window_seconds alone — reusing the density
+    # condition's 1800s "garden is occupied" horizon rather than inventing a
+    # third time constant. Measured cost: 4 newly-muted rows corpus-wide,
+    # zero human-labelled animals among them. person_confidence missing/None
+    # (fails open to the unwidened window) or `human_demoted_window_seconds
+    # == 0.0` (rollback lever) both restore exactly today's behaviour; the
+    # density condition and everything else is untouched.
+    human_demoted_person_floor: float = 0.3
+    human_demoted_window_seconds: float = 1800.0
+
     # Leading-edge fix (2026-07-31): the human-proximity gate above is
     # backward-looking only (it mutes AFTER a HUMAN-status detection), so it
     # can never catch the LEADING EDGE of a human visit — burst 3909
@@ -388,6 +412,26 @@ class PerformanceConfig(BaseSettings):
         if not (low <= v <= high):
             raise ValueError(
                 f"PERFORMANCE_HUMAN_DENSITY_COUNT={v} out of allowed bounds [{low}, {high}]"
+            )
+        return v
+
+    @field_validator('human_demoted_person_floor')
+    @classmethod
+    def validate_human_demoted_person_floor_bounds(cls, v):
+        low, high = _BOUNDS["PERFORMANCE_HUMAN_DEMOTED_PERSON_FLOOR"]
+        if not (low <= v <= high):
+            raise ValueError(
+                f"PERFORMANCE_HUMAN_DEMOTED_PERSON_FLOOR={v} out of allowed bounds [{low}, {high}]"
+            )
+        return v
+
+    @field_validator('human_demoted_window_seconds')
+    @classmethod
+    def validate_human_demoted_window_seconds_bounds(cls, v):
+        low, high = _BOUNDS["PERFORMANCE_HUMAN_DEMOTED_WINDOW_SECONDS"]
+        if not (low <= v <= high):
+            raise ValueError(
+                f"PERFORMANCE_HUMAN_DEMOTED_WINDOW_SECONDS={v} out of allowed bounds [{low}, {high}]"
             )
         return v
 

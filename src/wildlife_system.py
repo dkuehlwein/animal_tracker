@@ -538,10 +538,25 @@ class WildlifeSystem:
             # case, same None-for-everything-else convention as
             # scene_gate_muted otherwise. Wrapped defensively — any error
             # here must never block a notification, so it fails open to "not
-            # muted". `human_proximity_mute_reason` ('window'/'density') is
-            # not persisted to the DB (same human_proximity_muted column as
-            # before) — it only drives which reason the suppression log
-            # below reports.
+            # muted". `human_proximity_mute_reason`
+            # ('window'/'demoted-band window'/'density') is not persisted to
+            # the DB (same human_proximity_muted column as before) — it only
+            # drives which reason the suppression log below reports.
+            #
+            # Demoted-band widening (exp #27, 2026-09-15): the window
+            # condition's look-back is widened to
+            # max(human_proximity_window_seconds, human_demoted_window_seconds)
+            # when THIS burst's own person_confidence clears
+            # human_demoted_person_floor — MegaDetector saw something
+            # person-shaped, just not confidently enough to trip the
+            # Human/Privacy Gate (0.3-0.5). Burst 5305 (person_confidence
+            # 0.436) landed 480s after the last HUMAN detection, past both
+            # the 240s window and the density streak — a plain widening of
+            # either global lever costs a known human-labelled animal FN, but
+            # gating the widening on this burst's own person score does not
+            # (see runs/0019). Fails open to the unwidened window on any
+            # error, a missing/None person_confidence, or
+            # human_demoted_window_seconds == 0.0 (rollback lever).
             human_proximity_muted = None
             human_proximity_mute_reason = None
             is_unnamed_animal = (
@@ -553,10 +568,40 @@ class WildlifeSystem:
                 try:
                     window = self.config.performance.human_proximity_window_seconds
                     last_human = self._last_human_detection_at
+
+                    demoted_active = False
+                    try:
+                        demoted_floor = self.config.performance.human_demoted_person_floor
+                        demoted_window = self.config.performance.human_demoted_window_seconds
+                        demoted_active = bool(
+                            demoted_window > 0
+                            and person_confidence is not None
+                            and person_confidence >= demoted_floor
+                        )
+                    except Exception:
+                        demoted_active = False  # fail open to the base window
+
+                    effective_window = (
+                        max(window, demoted_window) if demoted_active else window
+                    )
+
+                    elapsed = (
+                        (timestamp - last_human).total_seconds()
+                        if last_human is not None else None
+                    )
                     window_muted = bool(
-                        window > 0
-                        and last_human is not None
-                        and 0 <= (timestamp - last_human).total_seconds() <= window
+                        effective_window > 0
+                        and elapsed is not None
+                        and 0 <= elapsed <= effective_window
+                    )
+                    # Distinguish the reason for diagnosability: only call it
+                    # "demoted-band window" when the widened window is what
+                    # actually caused the mute (i.e. the flat window alone
+                    # would not have).
+                    demoted_band_muted = bool(
+                        window_muted
+                        and demoted_active
+                        and not (0 <= elapsed <= window)
                     )
 
                     density_count_threshold = self.config.performance.human_density_count
@@ -568,7 +613,12 @@ class WildlifeSystem:
 
                     human_proximity_muted = window_muted or density_muted
                     if human_proximity_muted:
-                        human_proximity_mute_reason = "window" if window_muted else "density"
+                        if window_muted:
+                            human_proximity_mute_reason = (
+                                "demoted-band window" if demoted_band_muted else "window"
+                            )
+                        else:
+                            human_proximity_mute_reason = "density"
                 except Exception as e:
                     logger.error(f"Error computing human-proximity gate: {e}")
                     human_proximity_muted = False
@@ -1143,6 +1193,13 @@ class WildlifeSystem:
                     f"reason=density: >= {self.config.performance.human_density_count} "
                     f"human detections in the last "
                     f"{self.config.performance.human_density_window_seconds:.0f}s"
+                )
+            elif mute_reason == "demoted-band window":
+                reason_detail = (
+                    f"reason=demoted-band window: within "
+                    f"{max(self.config.performance.human_proximity_window_seconds, self.config.performance.human_demoted_window_seconds):.0f}s "
+                    f"of last human detection (person_confidence >= "
+                    f"{self.config.performance.human_demoted_person_floor})"
                 )
             else:
                 reason_detail = (

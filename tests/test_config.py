@@ -513,6 +513,61 @@ class TestHumanDensityConfig:
             PerformanceConfig(_env_file=None)
 
 
+class TestHumanDemotedBandConfig:
+    """Demoted-band window (exp #27, 2026-09-15): widens the human-proximity
+    window condition when a burst's own person_confidence clears
+    human_demoted_person_floor. See runs/0019-demoted-band-proximity-leak.md."""
+
+    def test_person_floor_default(self):
+        from config import PerformanceConfig
+        assert PerformanceConfig().human_demoted_person_floor == 0.3
+
+    def test_window_default(self):
+        from config import PerformanceConfig
+        assert PerformanceConfig().human_demoted_window_seconds == 1800.0
+
+    def test_person_floor_env_override(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_HUMAN_DEMOTED_PERSON_FLOOR", "0.4")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).human_demoted_person_floor == 0.4
+
+    def test_window_env_override(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_HUMAN_DEMOTED_WINDOW_SECONDS", "2400")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).human_demoted_window_seconds == 2400.0
+
+    def test_window_zero_disables_widening_is_a_valid_value(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_HUMAN_DEMOTED_WINDOW_SECONDS", "0")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).human_demoted_window_seconds == 0.0
+
+    def test_person_floor_rejects_out_of_bounds(self, monkeypatch):
+        # BOUNDS["PERFORMANCE_HUMAN_DEMOTED_PERSON_FLOOR"] = (0.0, 1.0)
+        monkeypatch.setenv("PERFORMANCE_HUMAN_DEMOTED_PERSON_FLOOR", "1.1")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+    def test_person_floor_rejects_below_bound(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_HUMAN_DEMOTED_PERSON_FLOOR", "-0.1")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+    def test_window_rejects_out_of_bounds(self, monkeypatch):
+        # BOUNDS["PERFORMANCE_HUMAN_DEMOTED_WINDOW_SECONDS"] = (0.0, 7200.0)
+        monkeypatch.setenv("PERFORMANCE_HUMAN_DEMOTED_WINDOW_SECONDS", "7300")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+    def test_window_rejects_below_bound(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_HUMAN_DEMOTED_WINDOW_SECONDS", "-1")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+
 class TestReviewDeferSecondsConfig:
     """Leading-edge fix (2026-07-31): deferred REVIEW send with
     cancel-on-human, so a review-class burst just BEFORE the first

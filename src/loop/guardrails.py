@@ -56,6 +56,19 @@ BOUNDS: dict[str, tuple[float, float]] = {
     # lever).
     "PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS": (0.0, 7200.0),
     "PERFORMANCE_HUMAN_DENSITY_COUNT": (0, 100),
+    # Demoted-band window (exp #27, 2026-09-15): widens the window condition
+    # above — not a third independent condition — to
+    # max(PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS,
+    # PERFORMANCE_HUMAN_DEMOTED_WINDOW_SECONDS) when the burst's own
+    # person_confidence >= PERFORMANCE_HUMAN_DEMOTED_PERSON_FLOOR. Burst 5305
+    # (person_confidence 0.436) leaked past both existing conditions at 480s
+    # since the last HUMAN burst with only 5 in the trailing 1800s; replaying
+    # the corpus found the max person_confidence over all human-labelled
+    # animal rows is 0.0789, a clean >4x separation from the floor. 0.0
+    # PERFORMANCE_HUMAN_DEMOTED_WINDOW_SECONDS disables the widening
+    # (rollback lever) and restores the flat window behaviour.
+    "PERFORMANCE_HUMAN_DEMOTED_PERSON_FLOOR": (0.0, 1.0),
+    "PERFORMANCE_HUMAN_DEMOTED_WINDOW_SECONDS": (0.0, 7200.0),
     # Burst image retention (Change 2, 2026-07-27): raised from the 100
     # default so the nightly tuning loop can still visually adjudicate its
     # own muted/sampled-out bursts on busy days.

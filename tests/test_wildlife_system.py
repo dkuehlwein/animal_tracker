@@ -125,6 +125,16 @@ def _identification_no_animal():
     )
 
 
+def _identification_no_animal_with_person(person_confidence):
+    """Same as `_identification_no_animal()` but carrying a
+    `person_confidence` in `metadata` — the value `process_detection` reads
+    to drive the demoted-band window widening (exp #27) and also what it
+    persists to the `person_confidence` DB column."""
+    result = _identification_no_animal()
+    result.metadata = {'person_confidence': person_confidence}
+    return result
+
+
 def _identification_human(confidence=0.9):
     from data_models import IdentificationResult, DetectionResult, DetectionStatus
     det = DetectionResult(
@@ -1475,6 +1485,153 @@ async def test_human_proximity_no_mute_without_prior_human(system, tmp_path):
     await system._process_and_notify_detection(img, 5000)
 
     assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+
+
+# ---------------------------------------------------------------------------
+# Demoted-band window (exp #27, 2026-09-15): the window condition above is
+# widened to max(human_proximity_window_seconds, human_demoted_window_seconds)
+# when the burst's OWN person_confidence clears human_demoted_person_floor
+# (0.3) — MegaDetector saw something person-shaped, just not confidently
+# enough to trip the Human/Privacy Gate. Burst 5305 (person_confidence
+# 0.436, 480s since the last HUMAN detection) is the motivating case: both
+# the flat 240s window and the density condition (5 < 8) missed it.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_human_demoted_band_mutes_at_480s(system, tmp_path, caplog):
+    """The 5305 case: person_confidence (0.436) clears the demoted floor
+    (0.3), so the look-back widens to human_demoted_window_seconds (1800s)
+    and a burst 480s after the last HUMAN detection is muted, logged as
+    'demoted-band window'."""
+    system._last_human_detection_at = datetime.now() - timedelta(seconds=480)
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal_with_person(0.436)
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    gate_logs = [r.message for r in caplog.records if "[HUMAN-PROXIMITY]" in r.message]
+    assert len(gate_logs) == 1
+    assert "demoted-band window" in gate_logs[0]
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['human_proximity_muted'] == 1
+
+
+@pytest.mark.asyncio
+async def test_human_demoted_band_no_mute_beyond_demoted_window(system, tmp_path):
+    """Same elevated person_confidence, but 2000s since the last HUMAN
+    detection — beyond even the widened 1800s demoted window — is NOT
+    muted."""
+    system._last_human_detection_at = datetime.now() - timedelta(seconds=2000)
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal_with_person(0.436)
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['human_proximity_muted'] == 0
+
+
+@pytest.mark.asyncio
+async def test_human_demoted_band_no_mute_below_floor(system, tmp_path):
+    """person_confidence below human_demoted_person_floor (0.3) does not
+    widen the window — 480s since the last HUMAN detection is unchanged
+    (not muted), same as today."""
+    system._last_human_detection_at = datetime.now() - timedelta(seconds=480)
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal_with_person(0.1)
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['human_proximity_muted'] == 0
+
+
+@pytest.mark.asyncio
+async def test_human_demoted_window_zero_restores_flat_window(system, tmp_path):
+    """PERFORMANCE_HUMAN_DEMOTED_WINDOW_SECONDS=0 (the rollback lever)
+    disables the widening even with an elevated person_confidence — flat
+    240s window behaviour is restored, so 480s is NOT muted."""
+    system.config.performance.human_demoted_window_seconds = 0.0
+    system._last_human_detection_at = datetime.now() - timedelta(seconds=480)
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal_with_person(0.436)
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['human_proximity_muted'] == 0
+
+
+@pytest.mark.asyncio
+async def test_human_demoted_band_person_confidence_none_fails_open(system, tmp_path):
+    """A missing person_confidence (metadata absent, e.g. an error-path
+    result) must not raise and must not mute at 480s — same as before this
+    change existed."""
+    system._last_human_detection_at = datetime.now() - timedelta(seconds=480)
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    result = _identification_no_animal()
+    assert result.metadata is None
+    system.species_identifier.identify_species = MagicMock(return_value=result)
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['human_proximity_muted'] == 0
 
 
 def test_human_proximity_muted_none_for_non_review_status(system):
