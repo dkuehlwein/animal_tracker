@@ -257,7 +257,7 @@
       "replaced_at": "2026-09-13T03:25:00+02:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-09-14",
+  "last_heartbeat_loopday": "2026-09-15",
   "last_metrics": {
     "date": "2026-09-14",
     "error_count": 0,
@@ -303,6 +303,6 @@
   "last_tick_completed_day": "2026-09-14",
   "nightly_verdict": "Busy afternoon in the garden: 68 alerts, 55 of them people \u2014 all correctly kept private \u2014 plus a cat at the pond, which the camera named correctly. Two photos of someone standing right in front of the lens were sent to you as 'animal detected', because when the camera can't name what it sees it still calls it an animal and skips every privacy check. I fixed that tonight: unnamed 'animal' alerts now go quiet while someone is in the garden, and I checked every such alert of the last three months to be sure no real animal would have been hidden.",
   "paused": false,
-  "pending_restart_at": "2026-09-15T03:25:00+02:00",
+  "pending_restart_at": null,
   "watermark": 5279
 }
