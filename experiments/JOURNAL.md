@@ -2656,3 +2656,59 @@ animal-labelled review-class row with frames on disk (after 5176 yesterday). Its
 safe side. Scene gate: 0 mutes tonight, 0 in 15 days, tonight's review-class range
 0.727-0.891. Sampling gate: 4 sampled out, screened, three empty scenes and one
 person's legs already proximity-muted — zero animals, hold at 0.5.
+
+## 2026-09-15 — exp #27 (demoted-band-proximity-leak): the sub-threshold person the layered gates were supposed to catch
+
+27 triggers, **zero animals, zero Telegram messages**. 21 HUMAN-status bursts
+(all adjudicated, all genuine people — six with `person_confidence` ≤ 0.10 that
+only the burst sweep / raw-homo path caught, so no phantom-human FN), 6
+review-class (2 proximity-muted, 4 sampled out), 0 IDENTIFIED. fp 0.50 on n=6
+tier-2 (3 empty-scene FP, 3 people). FN unmeasured.
+
+**5305 is exp #14's accepted risk, materialised.** A featureless grey-beige mass
+filling half the frame — clothing at touching distance — `person_confidence`
+**0.436**, just under the 0.5 HUMAN gate. Visually the same class as 5301
+(pc 0.000) which the raw-homo path suppressed twenty minutes earlier; 5305's raw
+top-1 was `blank`, so nothing caught it. Both layered conditions missed, neither
+by much: 480 s since the last HUMAN burst (window 240 s) and 5 HUMAN bursts in
+the trailing 1800 s (density needs 8). What actually stopped it reaching Telegram
+was `review_sampled_out=1` — a hash landing on the mute side of a 50% gate. A
+coin flip is not a privacy control. Exp #14 raised the HUMAN threshold 0.3→0.5 on
+the explicit promise that "the layered proximity/deferral/density gates still
+mute the real people who score in the demoted band". Tonight is the first
+measured failure of that promise (its own adjudication found one real person in
+the band, 4741 at pc 0.435; 5305 is the second, at 0.436).
+
+**No env knob reaches it — measured over all 20 human-labelled animal rows.**
+The global window would need ≥480 s and mutes id 1838 (329 s) at anything above
+~400 s; the density count would need ≤5 and mutes id 2011 (density 5). Both
+FN-vetoed. Hence a code change, per the protocol's no-knob clause.
+
+**The change is a conjunction, and the separation is clean.** Max
+`person_confidence` over all 20 human-labelled animal rows is **0.0789**; 5305 is
+0.436 — 5.5x apart, no overlap. So the burst's own person score can safely gate a
+longer look-back: at `person_confidence >= 0.3` (exp #14's old threshold, the
+bottom of the demoted band) the window becomes 1800 s — reusing the density
+condition's existing "garden is occupied" horizon rather than inventing a third
+time constant — instead of 240 s. Density condition, precedence, scope, column
+and log line all unchanged; fails open on a missing score, a 0 window, or any
+exception. Replayed over all 3103 review-class + unnamed-animal rows: only 19
+carry pc ≥ 0.3 at all, and the change newly mutes **4** — 5305 (the person),
+5090 (an empty-garden demoted-band phantom, adjudicated), and 4765/4782 whose
+frames have rolled off disk. **Zero human-labelled animals.** ~1.3 mutes/month,
+same order as exp #26.
+
+Slot unchanged (exp #21) — scope repair of the Human-Proximity Gate, same
+precedent as #23 vs #9, #24 vs #21, #26 vs #21.
+
+Other duties: scene gate 0 mutes tonight and 0 in 16 days (review-class
+similarity 0.583–0.860 vs T=0.97), still inert per backlog #17, threshold not
+re-derived per the 2026-07-26 override. Sampling gate held at 0.5 — all 4
+sampled-out bursts adjudicated, zero animals. Exp #26 went live at today's 03:30
+restart but saw **zero** IDENTIFIED rows, so it is unobserved; carried forward.
+
+Process note: tier-2 labels were appended *after* the first `loop.metrics` run,
+which measured tonight off tier-1 auto-labels (fp 1.0 on n=6 md). Recomputed
+against a temp state pinned to the old watermark and merged `last_metrics` back;
+the real watermark was never hand-written. Protocol step order is label → measure
+for a reason.

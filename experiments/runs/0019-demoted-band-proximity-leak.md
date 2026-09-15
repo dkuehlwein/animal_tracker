@@ -8,7 +8,7 @@ hypothesis: "Exp #14 raised SPECIES_HUMAN_DETECTION_CONFIDENCE 0.3 -> 0.5 on the
 created: 2026-09-15
 promoted_from: "tier-2 adjudication of 2026-09-15: burst 5305, a close-up of clothing during a 21-burst gardening session, survived every privacy gate."
 confidence: high   # all 3103 review-class/unnamed rows replayed; the 4 the change mutes contain zero human-labelled animals
-commit: TBD
+commit: 3752a7b
 env_delta: {}
 restart_at: 2026-09-16T03:25:00+02:00
 ---
@@ -127,7 +127,7 @@ time constant.
 
 `PERFORMANCE_HUMAN_DEMOTED_WINDOW_SECONDS=0` + service restart disables the
 band-conditional window and restores the flat 240 s behaviour, leaving the
-density condition and every other gate untouched. Full revert: `git revert <SHA>`.
+density condition and every other gate untouched. Full revert: `git revert 3752a7b`.
 
 ## Scene gate / sampling gate duties
 

@@ -182,6 +182,13 @@
       "slug": "unnamed-animal-main-leak",
       "status": "running",
       "validation": "live"
+    },
+    {
+      "hypothesis": "ACTIVATED + SHIPPED 2026-09-15 (commit 3752a7b, restart-gated 09-16T03:25). Exp #14 raised SPECIES_HUMAN_DETECTION_CONFIDENCE 0.3->0.5 on the explicit promise that the layered proximity/deferral/density gates still mute the real people who score in the demoted band. Burst 5305 (person_confidence 0.436, a close-up of clothing during a 21-burst gardening session) is the first measured failure of that promise: 480s after the last HUMAN burst (window 240s) with only 5 HUMAN bursts in the trailing 1800s (density needs 8), so both conditions missed it, and it was held back from Telegram only by the 50% review-sampling coin flip. Neither env lever reaches it without a known FN (global window >=480s mutes id 1838 at 329s; density count <=5 mutes id 2011 at density 5), so the fix is a code change: person_confidence separates the populations cleanly (max 0.0789 over all 20 human-labelled animal rows vs 0.436), so when the burst's OWN person_confidence >= human_demoted_person_floor (0.3) the window condition's look-back widens to max(human_proximity_window_seconds, human_demoted_window_seconds)=1800s, reusing the density condition's existing horizon. Replayed over all 3103 review-class + unnamed-animal rows: 19 carry pc>=0.3, this mutes 4 (5305 the person, 5090 an adjudicated empty-garden phantom, 4765/4782 frames rolled off disk), zero human-labelled animals. Rollback: PERFORMANCE_HUMAN_DEMOTED_WINDOW_SECONDS=0 + restart, or git revert 3752a7b.",
+      "id": 27,
+      "slug": "demoted-band-proximity-leak",
+      "status": "running",
+      "validation": "live"
     }
   ],
   "baselines": {
@@ -300,9 +307,9 @@
     "total_triggers": 27
   },
   "last_scene_change_alert_loopday": "2026-09-13",
-  "last_tick_completed_day": "2026-09-14",
-  "nightly_verdict": "Busy afternoon in the garden: 68 alerts, 55 of them people \u2014 all correctly kept private \u2014 plus a cat at the pond, which the camera named correctly. Two photos of someone standing right in front of the lens were sent to you as 'animal detected', because when the camera can't name what it sees it still calls it an animal and skips every privacy check. I fixed that tonight: unnamed 'animal' alerts now go quiet while someone is in the garden, and I checked every such alert of the last three months to be sure no real animal would have been hidden.",
+  "last_tick_completed_day": "2026-09-15",
+  "nightly_verdict": "Quiet night: 27 alerts, 21 of them people during garden work, all correctly kept private, and no animals at all. One photo of someone standing right against the lens slipped past every privacy check and was only stopped by luck, so I tightened the rule: when the camera half-recognises a person, it now stays quiet for half an hour after anyone was in the garden instead of four minutes.",
   "paused": false,
-  "pending_restart_at": null,
+  "pending_restart_at": "2026-09-16T03:25:00+02:00",
   "watermark": 5306
 }
