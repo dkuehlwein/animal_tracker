@@ -458,6 +458,77 @@ def test_build_caption_shows_best_guess_for_generic_rollup(system):
     assert "Best guess: eurasian blackbird (34%)" in caption
 
 
+def test_build_caption_prefers_geofenced_species_over_raw_top1(system):
+    """exp #28: the raw top-1 is an out-of-region species (blue whistling-thrush,
+    Himalayas) while the geofence-filtered candidate is the common blackbird that
+    actually lives here — the caption must show the in-region species."""
+    species_result = _identified_species_result(
+        "abc;aves;;;;;bird",
+        confidence=0.87,
+        metadata={
+            'top_classifier_prediction': {
+                'label': 'x;aves;passeriformes;muscicapidae;myophonus;caeruleus;blue whistling-thrush',
+                'score': 0.42,
+            },
+            'best_geofenced_species': {
+                'label': 'y;aves;passeriformes;turdidae;turdus;merula;common blackbird',
+                'score': 0.062,
+            },
+        },
+    )
+    caption = system._build_caption(species_result, 1000, datetime.now())
+    assert "Best guess: common blackbird (6%)" in caption
+    assert "whistling" not in caption
+
+
+def test_build_caption_falls_back_to_raw_top1_without_geofenced_candidate(system):
+    """No in-region candidate in the top-k (best_geofenced_species is None) —
+    behaviour is unchanged from before exp #28: show the raw top-1."""
+    species_result = _identified_species_result(
+        "abc;aves;;;;;bird",
+        metadata={
+            'top_classifier_prediction': {
+                'label': 'x;aves;passeriformes;turdidae;turdus;migratorius;american robin',
+                'score': 0.33,
+            },
+            'best_geofenced_species': None,
+        },
+    )
+    caption = system._build_caption(species_result, 1000, datetime.now())
+    assert "Best guess: american robin (33%)" in caption
+
+
+def test_build_caption_no_best_guess_when_guess_repeats_ensemble_name(system):
+    """exp #28: the classifier's top-1 IS the same generic rollup the ensemble
+    already reported ('bird') — 'Best guess: bird' under a bird verdict adds
+    nothing and must be suppressed."""
+    species_result = _identified_species_result(
+        "abc;aves;;;;;bird",
+        metadata={
+            'top_classifier_prediction': {'label': 'abc;aves;;;;;bird', 'score': 0.55},
+        },
+    )
+    caption = system._build_caption(species_result, 1000, datetime.now())
+    assert "Best guess" not in caption
+
+
+def test_build_caption_never_crashes_on_malformed_geofenced_species(system):
+    """Never-crash constraint extends to the new candidate source: a malformed
+    best_geofenced_species must fall through to the raw top-1, not raise."""
+    species_result = _identified_species_result(
+        "abc;aves;;;;;bird",
+        metadata={
+            'best_geofenced_species': "not-a-dict",
+            'top_classifier_prediction': {
+                'label': 'y;aves;passeriformes;turdidae;turdus;merula;common blackbird',
+                'score': 0.2,
+            },
+        },
+    )
+    caption = system._build_caption(species_result, 1000, datetime.now())
+    assert "Best guess: common blackbird (20%)" in caption
+
+
 def test_build_caption_no_best_guess_when_ensemble_already_species_level(system):
     """Ensemble already resolved to a full species (genus+species present)
     — the best-guess line would add nothing, so it must not appear."""

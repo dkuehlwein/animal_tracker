@@ -863,14 +863,25 @@ class WildlifeSystem:
         return species_name_raw
 
     def _best_guess_line(self, ensemble_species_name_raw: str, metadata: Optional[dict]) -> Optional[str]:
-        """Build a 'Best guess: <common name> (NN%)' caption line from the
-        classifier's raw top-1 prediction (Task 3, ADR-004 observability).
+        """Build a 'Best guess: <common name> (NN%)' caption line for a burst
+        whose ensemble label is a generic rollup (Task 3, ADR-004 observability;
+        geofence preference added by exp #28).
 
-        Only returns a line when it adds real information: the ensemble
-        label itself must be a generic rollup (genus and/or species taxonomy
-        segments empty, e.g. "aves;;;;;bird" or ";;;;;;animal"), a top
-        classifier prediction must exist, and its own common name must not
-        itself be a generic sentinel ("blank" / "no cv result" / "animal").
+        Candidate order:
+          1. ``metadata['best_geofenced_species']`` — the highest-scoring
+             species-level candidate from the classifier's top-k that
+             SpeciesNet's geofence actually allows in the configured
+             country/region. Already computed by
+             ``SpeciesIdentifier._find_best_geofenced_species``.
+          2. ``metadata['top_classifier_prediction']`` — the raw, ungeofenced
+             top-1, used only when no in-region candidate exists.
+
+        Only returns a line when it adds real information: the ensemble label
+        must be a generic rollup (genus and/or species taxonomy segments empty,
+        e.g. "aves;;;;;bird" or ";;;;;;animal"), the candidate's common name
+        must not be a generic sentinel ("blank" / "no cv result" / "animal"),
+        and it must not merely repeat the ensemble's own common name (a
+        "Best guess: Bird" line under a "bird" verdict says nothing).
         Scores are shown even when low — that's the point.
 
         Never raises: any error here must not block the notification.
@@ -878,8 +889,11 @@ class WildlifeSystem:
         try:
             if not metadata:
                 return None
-            top = metadata.get('top_classifier_prediction')
-            if not top:
+
+            candidate = metadata.get('best_geofenced_species')
+            if not isinstance(candidate, dict) or not candidate.get('label'):
+                candidate = metadata.get('top_classifier_prediction')
+            if not candidate:
                 return None
 
             parts = (ensemble_species_name_raw or '').split(';')
@@ -889,10 +903,17 @@ class WildlifeSystem:
                 # Ensemble already resolved to species level — nothing to add.
                 return None
 
-            top_label = top.get('label', '')
-            top_score = top.get('score', 0.0)
+            top_label = candidate.get('label', '')
+            top_score = candidate.get('score', 0.0)
             common_name = extract_common_name(top_label)
             if not common_name or common_name.strip().lower() in ('blank', 'no cv result', 'animal'):
+                return None
+
+            # A guess that just restates the ensemble's own rollup name
+            # ("Best guess: Bird" under a 🐦 bird verdict) carries no
+            # information — suppress it.
+            ensemble_common = extract_common_name(ensemble_species_name_raw or '')
+            if ensemble_common and ensemble_common.strip().lower() == common_name.strip().lower():
                 return None
 
             return f"Best guess: {common_name} ({top_score:.0%})"
