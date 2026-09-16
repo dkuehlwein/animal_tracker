@@ -2712,3 +2712,50 @@ which measured tonight off tier-1 auto-labels (fp 1.0 on n=6 md). Recomputed
 against a temp state pinned to the old watermark and merged `last_metrics` back;
 the real watermark was never hand-written. Protocol step order is label → measure
 for a reason.
+
+## 2026-09-16 — exp #28 (geofenced-best-guess): three real blackbirds, and a caption that named a Himalayan thrush
+
+11 triggers — quiet, but the **animal bucket is finally non-empty**. At 11:04,
+11:04 and 11:06 a male Eurasian blackbird worked the pond gravel (5307/5308/5309,
+all `identified`, all delivered to MAIN, all human-labelled `animal` by Daniel
+before this tick; my independent tier-2 read agrees). First animals since the
+re-aim (exp #18). fp 0.571 on n=7 (CI 0.25–0.84); human-only fp 1/4 = 0.25.
+Zero FN: the 4 review-class bursts (5312–5315) are bamboo and pond surface,
+largest moving blob 936 px. Zero leaks: all 4 HUMAN rows genuine people, two of
+them (5310 pc 0.436, 5317 pc 0.199) caught only by the raw-homo path in the
+demoted band — exactly exp #27's territory, though no *review-class* burst
+carried pc ≥ 0.3, so **exp #27 is live-but-unobserved** after today's 03:30
+restart. Exp #26 likewise saw no unnamed-animal row. Both carry forward.
+
+The night's finding came from the animals themselves. Those three MAIN alerts
+read `Best guess: Blue whistling-thrush (42%)`, `Best guess: Bird (55%)`,
+`Best guess: Bird (40%)`. *Myophonus caeruleus* is Himalayan; the other two
+restate the verdict. Re-running SpeciesNet in-tick over the three saved frames:
+`metadata['best_geofenced_species']` held **common blackbird** on all three
+(0.062 / 0.029 / 0.032) — the correct species, computed on every identification
+by `_find_best_geofenced_species` from SpeciesNet's own DEU/NW geofence, stored
+in metadata, and never read by the caption. `_best_guess_line` was using the raw,
+ungeofenced top-1. Note the inversion: the right answer sat at 3–6% while an
+impossible congener sat at 42% — the classifier is not region-aware, the
+geofence is, so raw score is the wrong selection rule for this line.
+
+Shipped `838e5f6` (restart-gated 09-17T03:25): prefer `best_geofenced_species`,
+fall back to raw top-1 only when no in-region candidate exists, and suppress a
+guess that merely repeats the ensemble's rollup name. Caption text only — no
+routing, no mute, no column, no message created or destroyed — so the FN-veto is
+trivially satisfied and bounds don't apply. 4 tests added, 630 pass.
+
+Honest limit on the evidence: of the last 127 `identified` rows with a recorded
+raw top-1, 83 render the tautological "Best guess: Bird" and ~5 name a
+geographically impossible species (chinese monal, black agouti ×2, american
+robin, blue whistling-thrush) — but `best_geofenced_species` was never
+persisted, and those frames are gone, so the fix's *correctness* rests on
+tonight's 3/3, not on the 83. Direction is safe regardless: when the top-1 is
+itself in-region and species-level, both sources return the same prediction.
+Deliberately did NOT add a column for it this tick.
+
+Standing duties: scene gate 0 mutes tonight and 0 in 17 days (similarities
+0.618–0.854 vs T=0.97), still inert per backlog #17, threshold untouched per the
+2026-07-26 override. Blur gate muted 5314/5315, both adjudicated empty. Sampling
+gate held at 0.5, both sampled-out bursts adjudicated empty — no FN evidence, no
+reason to raise. Slot unchanged (exp #21).

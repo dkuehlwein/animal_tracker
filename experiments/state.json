@@ -189,6 +189,13 @@
       "slug": "demoted-band-proximity-leak",
       "status": "running",
       "validation": "live"
+    },
+    {
+      "hypothesis": "ACTIVATED + SHIPPED 2026-09-16 (commit 838e5f6, restart-gated 09-17T03:25). The 'Best guess' caption line used the classifier's RAW top-1 (metadata['top_classifier_prediction']) \u2014 ungeofenced and pre-rollup. Tonight's three bursts (5307/5308/5309), the first real animals in weeks and all a Eurasian blackbird at the pond (human-labelled `animal`), therefore carried 'Best guess: Blue whistling-thrush (42%)' (a Himalayan species) and twice 'Best guess: Bird (NN%)' (tautology under a bird verdict). metadata['best_geofenced_species'] \u2014 already computed on every identification by SpeciesIdentifier._find_best_geofenced_species, walking the classifier top-k for the first species-level candidate SpeciesNet's geofence allows in DEU/NW \u2014 held 'common blackbird' on all three (re-run offline against the saved frames: 0.062/0.029/0.032). Fix: _best_guess_line prefers best_geofenced_species, falls back to the raw top-1 only when no in-region candidate exists, and suppresses a guess that merely repeats the ensemble's own rollup name. Caption text only \u2014 no routing, no suppression, zero FP/FN risk (FN-veto trivially satisfied). Corpus context: of the last 127 identified rows with a recorded raw top-1, 83 render the tautological 'Best guess: Bird' and ~5 name a species impossible in Germany. Rollback: git revert 838e5f6 + restart.",
+      "id": 28,
+      "slug": "geofenced-best-guess",
+      "status": "running",
+      "validation": "live"
     }
   ],
   "baselines": {
@@ -307,9 +314,9 @@
     "total_triggers": 11
   },
   "last_scene_change_alert_loopday": "2026-09-13",
-  "last_tick_completed_day": "2026-09-15",
-  "nightly_verdict": "Quiet night: 27 alerts, 21 of them people during garden work, all correctly kept private, and no animals at all. One photo of someone standing right against the lens slipped past every privacy check and was only stopped by luck, so I tightened the rule: when the camera half-recognises a person, it now stays quiet for half an hour after anyone was in the garden instead of four minutes.",
+  "last_tick_completed_day": "2026-09-16",
+  "nightly_verdict": "A quiet day with good news: a blackbird visited the pond three times and the camera correctly alerted on all three \u2014 the first real animals in weeks, and nothing was missed or wrongly kept private. The alerts did guess the wrong bird (a Himalayan species that cannot live here), so I fixed the caption to use the camera's own region filter, which already had 'common blackbird' correct all three times.",
   "paused": false,
-  "pending_restart_at": null,
+  "pending_restart_at": "2026-09-17T03:25:00+02:00",
   "watermark": 5317
 }
