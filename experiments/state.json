@@ -264,7 +264,7 @@
       "replaced_at": "2026-09-13T03:25:00+02:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-09-15",
+  "last_heartbeat_loopday": "2026-09-16",
   "last_metrics": {
     "date": "2026-09-15",
     "error_count": 0,
@@ -310,6 +310,6 @@
   "last_tick_completed_day": "2026-09-15",
   "nightly_verdict": "Quiet night: 27 alerts, 21 of them people during garden work, all correctly kept private, and no animals at all. One photo of someone standing right against the lens slipped past every privacy check and was only stopped by luck, so I tightened the rule: when the camera half-recognises a person, it now stays quiet for half an hour after anyone was in the garden instead of four minutes.",
   "paused": false,
-  "pending_restart_at": "2026-09-16T03:25:00+02:00",
+  "pending_restart_at": null,
   "watermark": 5306
 }
