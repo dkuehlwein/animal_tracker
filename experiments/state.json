@@ -266,50 +266,50 @@
   ],
   "last_heartbeat_loopday": "2026-09-16",
   "last_metrics": {
-    "date": "2026-09-15",
+    "date": "2026-09-16",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.1876163064826506,
-      0.8123836935173494
+      0.2504583645276572,
+      0.8417801447485302
     ],
     "fp_claude_ci": [
-      0.1876163064826506,
-      0.8123836935173494
-    ],
-    "fp_claude_count": 3,
-    "fp_claude_rate": 0.5,
-    "fp_count": 3,
-    "fp_human_ci": [
-      0.0,
+      0.4385029682449546,
       1.0
     ],
-    "fp_human_count": 0,
-    "fp_human_rate": 0.0,
+    "fp_claude_count": 3,
+    "fp_claude_rate": 1.0,
+    "fp_count": 4,
+    "fp_human_ci": [
+      0.04558726080970055,
+      0.6993581574175981
+    ],
+    "fp_human_count": 1,
+    "fp_human_rate": 0.25,
     "fp_md_ci": [
       0.0,
       1.0
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.5,
+    "fp_rate": 0.5714285714285714,
     "fp_trustworthy": true,
-    "labeled_triggers": 6,
+    "labeled_triggers": 7,
     "n_cant_tell": 0,
-    "n_claude": 6,
-    "n_human": 0,
-    "n_human_suppressed": 21,
+    "n_claude": 3,
+    "n_human": 4,
+    "n_human_suppressed": 4,
     "n_md": 0,
-    "n_sampled_out": 4,
+    "n_sampled_out": 2,
     "n_unlabeled": 0,
-    "total_triggers": 27
+    "total_triggers": 11
   },
   "last_scene_change_alert_loopday": "2026-09-13",
   "last_tick_completed_day": "2026-09-15",
   "nightly_verdict": "Quiet night: 27 alerts, 21 of them people during garden work, all correctly kept private, and no animals at all. One photo of someone standing right against the lens slipped past every privacy check and was only stopped by luck, so I tightened the rule: when the camera half-recognises a person, it now stays quiet for half an hour after anyone was in the garden instead of four minutes.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5306
+  "watermark": 5317
 }
