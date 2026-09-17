@@ -271,7 +271,7 @@
       "replaced_at": "2026-09-13T03:25:00+02:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-09-16",
+  "last_heartbeat_loopday": "2026-09-17",
   "last_metrics": {
     "date": "2026-09-16",
     "error_count": 0,
@@ -317,6 +317,6 @@
   "last_tick_completed_day": "2026-09-16",
   "nightly_verdict": "A quiet day with good news: a blackbird visited the pond three times and the camera correctly alerted on all three \u2014 the first real animals in weeks, and nothing was missed or wrongly kept private. The alerts did guess the wrong bird (a Himalayan species that cannot live here), so I fixed the caption to use the camera's own region filter, which already had 'common blackbird' correct all three times.",
   "paused": false,
-  "pending_restart_at": "2026-09-17T03:25:00+02:00",
+  "pending_restart_at": null,
   "watermark": 5317
 }
