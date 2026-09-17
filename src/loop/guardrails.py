@@ -99,6 +99,18 @@ BOUNDS: dict[str, tuple[float, float]] = {
     # Cap on how many sibling frames the sweep may re-identify per burst
     # (~10s each on the Pi). 0 = disabled (second rollback lever).
     "PERFORMANCE_HUMAN_SWEEP_MAX_FRAMES": (0, 4),
+    # Confident-Blank Mute Gate (exp #29, 2026-09-17): mutes a review-class
+    # burst when the classifier's raw top-1 prediction is SpeciesNet's
+    # fully-generic "blank" (empty frame) label at high confidence. Measured
+    # over all 182 review-class rows with a blank raw top-1 and a recorded
+    # top_species_score: the 5 rows ever human-labelled animal/
+    # animal_wrong_id score 0.6431-0.8475 (ceiling 0.8475); 42 human-confirmed
+    # false positives score median 0.9219, max 0.9825. Lower bound here is
+    # deliberately max(animal-labelled blank score)=0.8475 + 0.02 = 0.87 (NOT
+    # 0.0) so the autonomous loop can never deploy a threshold at or below the
+    # measured animal ceiling — the config-level field_validator still allows
+    # 0.0 so a human can disable the gate by hand (the rollback lever).
+    "PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD": (0.87, 1.0),
 }
 
 FEEDBACK_STARVED_DAYS = 3

@@ -654,5 +654,74 @@ class TestMaxImagesDefault:
         assert PerformanceConfig().max_images == 300
 
 
+class TestBlankConfidenceMuteThresholdConfig:
+    """Confident-Blank Mute Gate config knob (exp #29, 2026-09-17): mute a
+    review-class burst when the classifier's raw top-1 is SpeciesNet's
+    generic "blank" label at or above this confidence. Bounds are
+    deliberately [0.0, 1.0] here (not loop.guardrails.BOUNDS, which is
+    0.87-1.0 for the autonomous loop only) — 0.0 must remain valid as the
+    human-only rollback lever that disables the gate."""
+
+    def test_default(self):
+        from config import PerformanceConfig
+        assert PerformanceConfig().blank_confidence_mute_threshold == 0.92
+
+    def test_env_override(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD", "0.95")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).blank_confidence_mute_threshold == 0.95
+
+    def test_accepts_zero_the_disable_lever(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD", "0.0")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).blank_confidence_mute_threshold == 0.0
+
+    def test_accepts_lower_bound_via_default_field_range(self):
+        from config import PerformanceConfig
+        assert PerformanceConfig(
+            blank_confidence_mute_threshold=0.0
+        ).blank_confidence_mute_threshold == 0.0
+
+    def test_accepts_upper_bound(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD", "1.0")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).blank_confidence_mute_threshold == 1.0
+
+    def test_rejects_above_bound(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD", "1.5")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+    def test_rejects_below_bound(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD", "-0.1")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+
+class TestBlankConfidenceMuteThresholdGuardrailsBounds:
+    """loop.guardrails.BOUNDS for this key is tighter than the config-level
+    validator (0.87-1.0 vs 0.0-1.0): the autonomous loop may never deploy a
+    value at or below the measured animal ceiling (0.8475), but a human
+    editing the env file directly can still set 0.0 to disable the gate."""
+
+    def test_guardrails_lower_bound_is_above_animal_ceiling(self):
+        from loop.guardrails import BOUNDS
+        low, high = BOUNDS["PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD"]
+        assert low == 0.87
+        assert high == 1.0
+
+    def test_guardrails_rejects_zero(self):
+        from loop.guardrails import validate_param
+        with pytest.raises(ValueError):
+            validate_param("PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD", 0.0)
+
+    def test_guardrails_accepts_default(self):
+        from loop.guardrails import validate_param
+        # Should not raise.
+        validate_param("PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD", 0.92)
+
+
 if __name__ == '__main__':
     pytest.main([__file__])

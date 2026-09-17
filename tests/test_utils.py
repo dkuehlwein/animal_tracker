@@ -77,3 +77,63 @@ def test_is_unnamed_animal_label_malformed_non_string_input_no_crash():
     from utils import is_unnamed_animal_label
     assert is_unnamed_animal_label(12345) is False
     assert is_unnamed_animal_label(["not", "a", "string"]) is False
+
+
+# ---------------------------------------------------------------------------
+# is_blank_label (exp #29 Confident-Blank Mute Gate, 2026-09-17): mirrors
+# is_unnamed_animal_label above and SpeciesIdentifier._is_blank_prediction —
+# True iff the last semicolon segment is "blank" (case-insensitive) and every
+# taxonomy segment in between is empty (sentinel segments "no cv result" and
+# "blank" count as empty per the exp #23 sentinel lesson).
+# ---------------------------------------------------------------------------
+
+def test_is_blank_label_bare_uuid_rollup():
+    from utils import is_blank_label
+    assert is_blank_label("f1856211-d0e3-4ac6-8016-16aacd8d0dbe;;;;;;blank") is True
+
+
+def test_is_blank_label_all_sentinel_segments():
+    from utils import is_blank_label
+    assert is_blank_label(
+        "uuid;no cv result;no cv result;no cv result;"
+        "no cv result;no cv result;blank"
+    ) is True
+
+
+def test_is_blank_label_case_insensitive():
+    from utils import is_blank_label
+    assert is_blank_label("uuid;;;;;;BLANK") is True
+
+
+def test_is_blank_label_populated_taxonomy_not_blank():
+    """A populated taxonomy ending in 'blank' must NOT match."""
+    from utils import is_blank_label
+    assert is_blank_label("uuid;aves;;;;;blank") is False
+
+
+def test_is_blank_label_unnamed_animal_rollup_not_blank():
+    from utils import is_blank_label
+    assert is_blank_label("uuid;;;;;;animal") is False
+
+
+def test_is_blank_label_real_species_not_blank():
+    from utils import is_blank_label
+    assert is_blank_label(
+        "uuid;mammalia;carnivora;felidae;felis;catus;domestic cat"
+    ) is False
+
+
+def test_is_blank_label_empty_string():
+    from utils import is_blank_label
+    assert is_blank_label("") is False
+
+
+def test_is_blank_label_none():
+    from utils import is_blank_label
+    assert is_blank_label(None) is False
+
+
+def test_is_blank_label_malformed_non_string_input_no_crash():
+    from utils import is_blank_label
+    assert is_blank_label(12345) is False
+    assert is_blank_label(["not", "a", "string"]) is False

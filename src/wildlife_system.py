@@ -26,7 +26,7 @@ from database_manager import DatabaseManager
 from species_identifier import SpeciesIdentifier
 from notification_service import NotificationService
 from resource_manager import SystemMonitor, StorageManager
-from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnalyzer, get_species_emoji, extract_common_name, is_unnamed_animal_label
+from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnalyzer, get_species_emoji, extract_common_name, is_unnamed_animal_label, is_blank_label
 from feedback_protocol import build_feedback_keyboard
 from timelapse_writer import TimelapseWriter
 from data_models import DetectionStatus, is_review_detection, is_human_detection
@@ -470,6 +470,39 @@ class WildlifeSystem:
                 top_classifier_prediction.get('score') if top_classifier_prediction else None
             )
 
+            # Confident-Blank Mute Gate (exp #29, 2026-09-17): mute a
+            # review-class burst when the classifier's RAW top-1 prediction
+            # is SpeciesNet's fully-generic "blank" (empty frame) label at or
+            # above blank_confidence_mute_threshold. Measured over all 182
+            # review-class rows with a blank raw top-1: the 5 rows ever
+            # human-labelled animal/animal_wrong_id score 0.6431-0.8475
+            # (ceiling 0.8475), while 42 human-confirmed false positives
+            # score median 0.9219, max 0.9825 — the default 0.92 threshold
+            # mutes 52/182 (29%) of blank review-class bursts corpus-wide
+            # with zero animal-labelled and zero person-labelled rows caught.
+            #
+            # None ("gate didn't apply") when the status isn't review-class
+            # or the threshold is 0.0 (disabled — the rollback lever; a
+            # literal `score >= 0.0` comparison would be the dangerous
+            # direction, so this is special-cased rather than relying on the
+            # comparison alone) — same convention as scene_gate_muted.
+            # Otherwise True/False. Wrapped defensively: any error here must
+            # never block a notification, so it fails open to False (not
+            # muted), never to True.
+            blank_confidence_muted = None
+            try:
+                blank_threshold = self.config.performance.blank_confidence_mute_threshold
+                if blank_threshold > 0.0 and is_review_detection(species_result.status):
+                    blank_confidence_muted = bool(
+                        top_species_raw
+                        and is_blank_label(top_species_raw)
+                        and top_species_score is not None
+                        and top_species_score >= blank_threshold
+                    )
+            except Exception as e:
+                logger.error(f"Error computing blank-confidence mute gate: {e}")
+                blank_confidence_muted = False
+
             # Task 4 (scene-unchanged gate). Two separable things happen here:
             #
             #   1. `scene_similarity` is MEASURED for every status when the
@@ -657,6 +690,7 @@ class WildlifeSystem:
                 scene_similarity=scene_similarity,
                 scene_gate_muted=scene_gate_muted,
                 human_proximity_muted=human_proximity_muted,
+                blank_confidence_muted=blank_confidence_muted,
             )
 
             logger.info(f"Detection {detection_id} logged: {species_result.species_name} "
@@ -697,6 +731,9 @@ class WildlifeSystem:
                 'human_proximity_muted': human_proximity_muted,
                 'human_proximity_mute_reason': human_proximity_mute_reason,
                 'unnamed_animal': is_unnamed_animal,
+                'blank_confidence_muted': blank_confidence_muted,
+                'top_species_raw': top_species_raw,
+                'top_species_score': top_species_score,
             }
 
             return result_dict, timestamp
@@ -1170,18 +1207,39 @@ class WildlifeSystem:
             and is_review_detection(species_result.get('detection_status'))
             and luma_supports_blur_mute
         )
+        # Confident-Blank Mute Gate (exp #29, 2026-09-17): process_detection
+        # already computed and DB-persisted blank_confidence_muted for every
+        # review-class burst that reaches here — True when the classifier's
+        # RAW top-1 prediction was SpeciesNet's generic "blank" label at or
+        # above blank_confidence_mute_threshold. The is_review_detection
+        # check here is kept as defense-in-depth (same pattern as the
+        # neighbouring gates), even though process_detection only ever sets
+        # it for review-class statuses. Precedence: human gate first,
+        # human-proximity gate second, blur gate third, THIS gate fourth,
+        # scene gate fifth — a below-floor OR HUMAN OR human-proximity-muted
+        # burst gets exactly one suppression log regardless of what this gate
+        # would have said.
+        is_blank_confidence_review = (
+            not is_human
+            and not is_human_proximity_review
+            and not is_blurry_review
+            and bool(species_result.get('blank_confidence_muted'))
+            and is_review_detection(species_result.get('detection_status'))
+        )
         # Scene-unchanged gate (Task 4): process_detection only ever sets
         # scene_gate_muted for review-class statuses, but the
         # is_review_detection check here is kept as defense-in-depth (same
         # pattern as is_blurry_review above) rather than trusting that
         # invariant blindly. Precedence: human gate first, human-proximity
-        # gate second, blur gate third, scene gate fourth — a below-floor OR
-        # HUMAN OR human-proximity-muted burst gets exactly one suppression
-        # log regardless of what the scene gate would have said.
+        # gate second, blur gate third, blank-confidence gate fourth, scene
+        # gate fifth — a below-floor OR HUMAN OR human-proximity-muted OR
+        # blank-confidence-muted burst gets exactly one suppression log
+        # regardless of what the scene gate would have said.
         is_scene_unchanged_review = (
             not is_human
             and not is_human_proximity_review
             and not is_blurry_review
+            and not is_blank_confidence_review
             and bool(species_result.get('scene_gate_muted'))
             and is_review_detection(species_result.get('detection_status'))
         )
@@ -1190,14 +1248,15 @@ class WildlifeSystem:
         # review-class burst that reaches here (see the follow-up UPDATE in
         # process_detection). This is a pure notification-volume lever, not
         # a quality gate — the burst is still species-ID'd and DB-logged
-        # regardless. It must come last, after Human/Proximity/Blur/Scene, so
-        # a burst that any of those gates would already suppress still
-        # produces exactly ONE suppression log instead of a second, redundant
-        # one.
+        # regardless. It must come last, after
+        # Human/Proximity/Blur/Blank-Confidence/Scene, so a burst that any of
+        # those gates would already suppress still produces exactly ONE
+        # suppression log instead of a second, redundant one.
         is_sampled_out_review = (
             not is_human
             and not is_human_proximity_review
             and not is_blurry_review
+            and not is_blank_confidence_review
             and not is_scene_unchanged_review
             and bool(species_result.get('review_sampled_out'))
             and is_review_detection(species_result.get('detection_status'))
@@ -1239,6 +1298,15 @@ class WildlifeSystem:
                 f"{species_result.get('detection_id')} "
                 f"(sharpness={sharpness_info.get('sharpness_score'):.1f}, "
                 f"luma={best_frame_luma:.1f}, no animal found)"
+            )
+        elif is_blank_confidence_review:
+            logger.info(
+                f"[BLANK-CONF] Suppressing notification for detection "
+                f"{species_result.get('detection_id')} "
+                f"(raw_top1={species_result.get('top_species_raw')}, "
+                f"score={species_result.get('top_species_score'):.3f} >= "
+                f"threshold={self.config.performance.blank_confidence_mute_threshold:.3f}, "
+                f"no animal found)"
             )
         elif is_scene_unchanged_review:
             logger.info(

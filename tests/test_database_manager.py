@@ -868,3 +868,64 @@ def test_get_recent_human_detection_times_excludes_non_human_rows(tmp_path):
 def test_get_recent_human_detection_times_no_rows_returns_empty_list(tmp_path):
     db, _ = _make_db(tmp_path)
     assert db.get_recent_human_detection_times(datetime.now() - timedelta(hours=1)) == []
+
+
+# ---------------------------------------------------------------------------
+# blank_confidence_muted column (Confident-Blank Mute Gate, exp #29,
+# 2026-09-17) — same True/False/None round-trip convention as
+# human_proximity_muted above, set directly on the initial INSERT (no
+# detection_id dependency, no follow-up UPDATE needed).
+# ---------------------------------------------------------------------------
+
+def test_log_detection_persists_blank_confidence_muted_true(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(
+        image_path="capture_bc1.jpg",
+        motion_area=1200,
+        blank_confidence_muted=True,
+    )
+    assert det_id is not None
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?", (det_id,)).fetchone()
+
+    assert row["blank_confidence_muted"] == 1
+
+
+def test_log_detection_persists_blank_confidence_muted_false(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(
+        image_path="capture_bc2.jpg",
+        motion_area=1200,
+        blank_confidence_muted=False,
+    )
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?", (det_id,)).fetchone()
+
+    assert row["blank_confidence_muted"] == 0
+
+
+def test_log_detection_blank_confidence_muted_default_null(tmp_path):
+    """Old call signature (no blank_confidence_muted kwarg) still works; new
+    column is NULL."""
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(image_path="capture_bc3.jpg", motion_area=10)
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?", (det_id,)).fetchone()
+    assert row["blank_confidence_muted"] is None
+
+
+def test_migration_adds_blank_confidence_muted_column_to_old_schema(tmp_path):
+    """A pre-existing (old-schema) DB gets the new column added on open,
+    same as every other Phase-1 migration column."""
+    db_path = tmp_path / "old.db"
+    _create_old_schema(str(db_path))
+    config = SimpleNamespace(storage=SimpleNamespace(database_path=str(db_path)))
+    db = DatabaseManager(config)  # triggers migration in init_database
+    with sqlite3.connect(str(db_path)) as conn:
+        cursor = conn.execute("PRAGMA table_info(detections)")
+        columns = {row[1] for row in cursor.fetchall()}
+    assert "blank_confidence_muted" in columns

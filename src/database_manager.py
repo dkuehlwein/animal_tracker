@@ -63,6 +63,15 @@ class DatabaseManager:
         # scene_gate_muted; unlike review_sampled_out this is written on the
         # initial INSERT (no detection_id dependency).
         "human_proximity_muted": "BOOLEAN",
+        # Confident-Blank Mute Gate (exp #29): True when a review-class
+        # burst's raw classifier top-1 was SpeciesNet's generic "blank"
+        # label at or above blank_confidence_mute_threshold, False when
+        # review-class and evaluated but not muted, NULL when the status
+        # isn't review-class or the gate is disabled (threshold 0.0). Same
+        # NULL-for-non-review-class convention as scene_gate_muted; written
+        # on the initial INSERT (no detection_id dependency), same as
+        # human_proximity_muted.
+        "blank_confidence_muted": "BOOLEAN",
     }
 
     def init_database(self):
@@ -167,7 +176,8 @@ class DatabaseManager:
                      below_sharpness_floor=None, person_confidence=None,
                      top_species_raw=None, top_species_score=None,
                      scene_similarity=None, scene_gate_muted=None,
-                     review_sampled_out=None, human_proximity_muted=None) -> Optional[int]:
+                     review_sampled_out=None, human_proximity_muted=None,
+                     blank_confidence_muted=None) -> Optional[int]:
         """Log a detection event to the database.
 
         The trailing keyword arguments are the Phase-1 richer-logging fields
@@ -187,7 +197,9 @@ class DatabaseManager:
         `human_proximity_muted` is the human-proximity mute gate's decision
         (True/False for review-class bursts, None otherwise) — unlike
         `review_sampled_out` it doesn't depend on this row's own id, so it's
-        set directly on the initial INSERT.
+        set directly on the initial INSERT. `blank_confidence_muted` is the
+        Confident-Blank Mute Gate's decision (exp #29), same True/False/None
+        convention and also set directly on the initial INSERT.
         """
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -227,6 +239,7 @@ class DatabaseManager:
                     "scene_gate_muted": scene_gate_muted,
                     "review_sampled_out": review_sampled_out,
                     "human_proximity_muted": human_proximity_muted,
+                    "blank_confidence_muted": blank_confidence_muted,
                 }
                 columns = ", ".join(values)
                 placeholders = ", ".join("?" * len(values))

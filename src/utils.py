@@ -117,6 +117,38 @@ def is_unnamed_animal_label(taxonomy_label: str) -> bool:
     return not any(_strip_animal_label_sentinel(p) for p in parts[1:-1])
 
 
+def is_blank_label(taxonomy_label: str) -> bool:
+    """True when a SpeciesNet label is the ensemble's explicit "blank"
+    (empty frame) verdict — the last semicolon segment is ``blank``
+    (case-insensitive) and every taxonomy segment in between is empty (e.g.
+    ``f1856211-...;;;;;;blank``). Mirrors ``is_unnamed_animal_label`` above
+    and ``SpeciesIdentifier._is_blank_prediction``: a real, named species
+    label never ends in the bare word ``blank``, and requiring the
+    in-between segments to be empty means a hypothetical
+    ``...;aves;...;blank`` would not match either. SpeciesNet's sentinel
+    segments (``no cv result``, ``blank``) count as empty here too — same
+    convention as ``species_identifier._strip_sentinel`` — so a label where
+    the classifier couldn't read the crop at all isn't misread as this
+    blank verdict (exp #23 sentinel lesson).
+
+    ``taxonomy_label``'s first segment is the model's UUID for the
+    prediction class, not taxonomy, and is ignored.
+
+    Returns False for None, '', non-string, or otherwise malformed input;
+    never raises — this feeds a notification-mute gate (exp #29), so it
+    must fail closed to "not a blank label" rather than blow up a
+    detection.
+    """
+    try:
+        parts = [p.strip() for p in (taxonomy_label or '').split(';')]
+    except AttributeError:
+        return False
+    if len(parts) < 2 or parts[-1].lower() != 'blank':
+        return False
+    # parts[0] is the model's UUID for the class, not taxonomy.
+    return not any(_strip_animal_label_sentinel(p) for p in parts[1:-1])
+
+
 class PerformanceTimer:
     """Performance timing utility."""
 

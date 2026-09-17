@@ -135,6 +135,17 @@ def _identification_no_animal_with_person(person_confidence):
     return result
 
 
+def _identification_no_animal_with_top1(label, score):
+    """Same as `_identification_no_animal()` but carrying a
+    `top_classifier_prediction` in `metadata` — the raw, pre-rollup
+    classifier top-1 that `process_detection` reads to drive the
+    Confident-Blank Mute Gate (exp #29) and persists to the
+    `top_species_raw`/`top_species_score` DB columns."""
+    result = _identification_no_animal()
+    result.metadata = {'top_classifier_prediction': {'label': label, 'score': score}}
+    return result
+
+
 def _identification_human(confidence=0.9):
     from data_models import IdentificationResult, DetectionResult, DetectionStatus
     det = DetectionResult(
@@ -2761,3 +2772,338 @@ async def test_named_species_unaffected_by_unnamed_animal_widening(system, tmp_p
         row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
     assert row['detection_status'] == 'identified'
     assert row['human_proximity_muted'] is None
+
+
+# ---------------------------------------------------------------------------
+# Confident-Blank Mute Gate (exp #29, 2026-09-17): mute a review-class burst
+# when the classifier's RAW top-1 prediction is SpeciesNet's fully-generic
+# "blank" label at or above blank_confidence_mute_threshold (default 0.92).
+# Precedence: Human/Privacy > Human-Proximity > Blur > Confident-Blank >
+# Scene > Review Sampling > Deferred Send.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_blank_confidence_at_threshold_suppresses_notification(system, tmp_path, caplog):
+    """A review-class burst whose raw top-1 is blank at exactly the
+    threshold is muted: no Telegram send, a [BLANK-CONF] log line, and the
+    DB row records blank_confidence_muted + top_species_raw/score."""
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal_with_top1(
+            "f1856211-d0e3-4ac6-8016-16aacd8d0dbe;;;;;;blank", 0.92
+        )
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    telegram.send_detection_notification.assert_not_called()
+    telegram.send_document.assert_not_called()
+    system.cleanup_old_images.assert_called_once()
+    assert any("[BLANK-CONF]" in r.message for r in caplog.records)
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row is not None
+    assert row['blank_confidence_muted'] == 1
+    assert row['top_species_raw'] == "f1856211-d0e3-4ac6-8016-16aacd8d0dbe;;;;;;blank"
+    assert row['top_species_score'] == pytest.approx(0.92)
+
+
+@pytest.mark.asyncio
+async def test_blank_confidence_above_threshold_suppresses_notification(system, tmp_path):
+    """Comfortably above threshold also mutes."""
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal_with_top1("uuid;;;;;;blank", 0.98)
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['blank_confidence_muted'] == 1
+
+
+@pytest.mark.asyncio
+async def test_blank_confidence_below_threshold_still_notifies(system, tmp_path):
+    """Just below threshold does not mute — the burst still sends as a
+    normal (REVIEW-prefixed) notification, and blank_confidence_muted is
+    False (evaluated-but-not-muted), not NULL."""
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal_with_top1("uuid;;;;;;blank", 0.91)
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['blank_confidence_muted'] == 0
+
+
+@pytest.mark.asyncio
+async def test_blank_confidence_not_muted_for_non_blank_label(system, tmp_path):
+    """A high-confidence but NON-blank raw top-1 (e.g. a real species guess)
+    must never trip this gate."""
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal_with_top1(
+            "uuid;mammalia;carnivora;felidae;felis;catus;domestic cat", 0.99
+        )
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['blank_confidence_muted'] == 0
+
+
+@pytest.mark.asyncio
+async def test_blank_confidence_missing_score_does_not_mute(system, tmp_path):
+    """No top_classifier_prediction in metadata (score is None) must not
+    mute — fails open."""
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['blank_confidence_muted'] == 0
+
+
+@pytest.mark.asyncio
+async def test_blank_confidence_threshold_zero_disables_gate(system, tmp_path):
+    """threshold=0.0 disables the gate entirely (the rollback lever):
+    blank_confidence_muted stays NULL ("gate didn't apply") even for a
+    would-have-muted blank/high-score burst, and the burst still notifies."""
+    system.config.performance.blank_confidence_mute_threshold = 0.0
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal_with_top1("uuid;;;;;;blank", 0.99)
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['blank_confidence_muted'] is None
+
+
+@pytest.mark.asyncio
+async def test_blank_confidence_muted_none_for_non_review_status(system, tmp_path):
+    """A non-review-class (IDENTIFIED animal) status leaves
+    blank_confidence_muted NULL regardless of what the raw top-1 says —
+    the gate only ever evaluates review-class bursts."""
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    identified = _identification(True, boxes=[{'confidence': 0.7}])
+    identified.metadata = {
+        'top_classifier_prediction': {'label': 'uuid;;;;;;blank', 'score': 0.99}
+    }
+    system.species_identifier.identify_species = MagicMock(return_value=identified)
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['blank_confidence_muted'] is None
+
+
+@pytest.mark.asyncio
+async def test_blur_wins_over_blank_confidence_single_log(system, tmp_path, caplog):
+    """A below-floor blurry review-class burst that is ALSO blank-confident
+    is suppressed via the blur gate only — exactly one suppression log,
+    [BLUR], not [BLANK-CONF]."""
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal_with_top1("uuid;;;;;;blank", 0.99)
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(
+            img, 5000, sharpness_info=_below_floor_sharpness_info()
+        )
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+
+    gate_logs = [
+        r.message for r in caplog.records
+        if "HUMAN-GATE" in r.message or "[HUMAN-PROXIMITY]" in r.message
+        or "[BLUR]" in r.message or "[BLANK-CONF]" in r.message
+        or "[SCENE-GATE]" in r.message or "[REVIEW-SAMPLE]" in r.message
+    ]
+    assert len(gate_logs) == 1
+    assert "[BLUR]" in gate_logs[0]
+
+
+@pytest.mark.asyncio
+async def test_blank_confidence_wins_over_scene_gate_single_log(system, tmp_path, caplog):
+    """A blank-confident review-class burst that would ALSO match the scene
+    reference is suppressed via the blank-confidence gate only — exactly one
+    suppression log, [BLANK-CONF], not [SCENE-GATE]."""
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal_with_top1("uuid;;;;;;blank", 0.99)
+    )
+    system.scene_reference_set.best_similarity = MagicMock(return_value=0.99)
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+
+    gate_logs = [
+        r.message for r in caplog.records
+        if "HUMAN-GATE" in r.message or "[HUMAN-PROXIMITY]" in r.message
+        or "[BLUR]" in r.message or "[BLANK-CONF]" in r.message
+        or "[SCENE-GATE]" in r.message or "[REVIEW-SAMPLE]" in r.message
+    ]
+    assert len(gate_logs) == 1
+    assert "[BLANK-CONF]" in gate_logs[0]
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    # process_detection computes scene_gate_muted independently of the
+    # blank-confidence gate (same as it does for the blur gate) — it may
+    # legitimately also be True here. What matters is precedence in the
+    # notification layer, asserted above via the single [BLANK-CONF] log.
+    assert row['blank_confidence_muted'] == 1
+
+
+@pytest.mark.asyncio
+async def test_blank_confidence_wins_over_sampling_single_log(system, tmp_path, caplog):
+    """A blank-confident review-class burst is suppressed via the
+    blank-confidence gate, not double-suppressed or mis-attributed to
+    sampling, even at rate=0.0."""
+    system.config.performance.review_sample_rate = 0.0
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal_with_top1("uuid;;;;;;blank", 0.99)
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+
+    gate_logs = [
+        r.message for r in caplog.records
+        if "HUMAN-GATE" in r.message or "[HUMAN-PROXIMITY]" in r.message
+        or "[BLUR]" in r.message or "[BLANK-CONF]" in r.message
+        or "[SCENE-GATE]" in r.message or "[REVIEW-SAMPLE]" in r.message
+    ]
+    assert len(gate_logs) == 1
+    assert "[BLANK-CONF]" in gate_logs[0]
+
+
+@pytest.mark.asyncio
+async def test_human_wins_over_blank_confidence_single_log(system, tmp_path, caplog):
+    """A HUMAN burst is suppressed by the human gate, not blank-confidence —
+    single suppression log, even with a blank/high-score top-1 in
+    metadata."""
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    human = _identification_human()
+    human.metadata = {
+        'top_classifier_prediction': {'label': 'uuid;;;;;;blank', 'score': 0.99}
+    }
+    system.species_identifier.identify_species = MagicMock(return_value=human)
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+
+    gate_logs = [
+        r.message for r in caplog.records
+        if "HUMAN-GATE" in r.message or "[HUMAN-PROXIMITY]" in r.message
+        or "[BLUR]" in r.message or "[BLANK-CONF]" in r.message
+        or "[SCENE-GATE]" in r.message or "[REVIEW-SAMPLE]" in r.message
+    ]
+    assert len(gate_logs) == 1
+    assert "HUMAN-GATE" in gate_logs[0]

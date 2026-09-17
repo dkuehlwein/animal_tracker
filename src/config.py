@@ -256,6 +256,30 @@ class PerformanceConfig(BaseSettings):
     human_demoted_person_floor: float = 0.3
     human_demoted_window_seconds: float = 1800.0
 
+    # Confident-Blank Mute Gate (exp #29, 2026-09-17): mute a review-class
+    # (NO_ANIMAL/UNCLASSIFIABLE) burst when the species classifier's RAW
+    # top-1 prediction is SpeciesNet's fully-generic "blank" (empty frame)
+    # label (see utils.is_blank_label) at or above this confidence. Measured
+    # over all 182 review-class rows with a blank raw top-1 and a recorded
+    # top_species_score: the 5 rows ever human-labelled animal/
+    # animal_wrong_id score 0.6431-0.8475 (ceiling 0.8475), while 42
+    # human-confirmed false positives score median 0.9219, max 0.9825. The
+    # default 0.92 mutes 52/182 (29%) of blank review-class bursts
+    # corpus-wide with zero animal-labelled and zero person-labelled rows
+    # caught (margin over the animal ceiling: 0.0725, 3.6x the protocol's
+    # pre-registered max(animal)+0.02 rule).
+    #
+    # Bounds here are deliberately [0.0, 1.0], NOT the tighter loop-tunable
+    # range in loop.guardrails.BOUNDS (0.87-1.0) — 0.0 means the gate is
+    # DISABLED (the rollback lever), not "mute everything"; a literal
+    # `score >= 0.0` comparison would be the dangerous direction, so the
+    # wiring in wildlife_system.process_detection special-cases 0.0 to skip
+    # evaluation entirely rather than relying on the score comparison alone.
+    # The autonomous loop itself is still confined to the guardrails range
+    # and can never deploy a value at or below the measured animal ceiling;
+    # only a human editing the env file directly can set 0.0.
+    blank_confidence_mute_threshold: float = 0.92
+
     # Leading-edge fix (2026-07-31): the human-proximity gate above is
     # backward-looking only (it mutes AFTER a HUMAN-status detection), so it
     # can never catch the LEADING EDGE of a human visit — burst 3909
@@ -432,6 +456,20 @@ class PerformanceConfig(BaseSettings):
         if not (low <= v <= high):
             raise ValueError(
                 f"PERFORMANCE_HUMAN_DEMOTED_WINDOW_SECONDS={v} out of allowed bounds [{low}, {high}]"
+            )
+        return v
+
+    @field_validator('blank_confidence_mute_threshold')
+    @classmethod
+    def validate_blank_confidence_mute_threshold_bounds(cls, v):
+        # Hardcoded [0.0, 1.0], not loop.guardrails.BOUNDS (0.87-1.0) — see
+        # the field comment above. 0.0 is the human-only rollback lever and
+        # must stay valid here even though the loop itself may never deploy
+        # a value that low.
+        low, high = 0.0, 1.0
+        if not (low <= v <= high):
+            raise ValueError(
+                f"PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD={v} out of allowed bounds [{low}, {high}]"
             )
         return v
 
