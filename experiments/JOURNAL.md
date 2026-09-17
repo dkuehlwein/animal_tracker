@@ -2759,3 +2759,44 @@ Standing duties: scene gate 0 mutes tonight and 0 in 17 days (similarities
 2026-07-26 override. Blur gate muted 5314/5315, both adjudicated empty. Sampling
 gate held at 0.5, both sampled-out bursts adjudicated empty — no FN evidence, no
 reason to raise. Slot unchanged (exp #21).
+
+## 2026-09-17 — exp #29 opened + shipped (confident-blank-mute); scene-gate discriminator refuted
+
+23 triggers, zero animals. 5322 a real person (pc 0.663), correctly suppressed by
+the primary gate. 5329 a taxon-arm phantom (homo @0.534, pc 0.0, five empty
+frames) — backlog #16's ruled-on mode, cost nothing, armed nothing (next
+review-class burst 611 s later). The other 21 all bamboo in wind: frame-differenced
+every frame against a median background, largest non-annotation blob 507 px, crops
+inspected at full res, leaves. Blur 0 mutes, proximity 0, scene 0 (0.830–0.911 vs
+T=0.97).
+
+**Backlog #17's open question is answered, and the answer is negative.** The
+`scene_similarity`-for-every-status widening shipped 2026-09-04 has now filled the
+animal bucket: n=10 human-labelled animal rows, 0.7886–0.9202, sitting *entirely
+inside* the 139-row human-FP range 0.5335–0.9675, animal median 0.8759 BELOW the
+FP median 0.8952. `max(animal)+0.02` = 0.9402, which is 0.02 from a measured
+blackbird. No in-bounds threshold separates the classes. Same shape as backlog #16:
+real signal, interleaved classes, wrong discriminator. T=0.97 stays put — the
+2026-07-26 override's safe-but-inert state is now the *evidenced* position rather
+than the accepted-risk one.
+
+**Different discriminator found and shipped.** The raw classifier's blank verdict
+does separate. 182 review-class rows corpus-wide with a blank raw top-1: the 5 ever
+labelled animal ceiling at 0.8475 (recent two 0.6431/0.7454), human-FP median
+0.9219 / max 0.9825, person-labelled max 0.9116. T=0.92 mutes 52/182 (29%); all 29
+labelled mutes are false_positive, zero animals, zero people — margin 0.0725, 3.6×
+the pre-registered max+0.02 rule. Re-replayed against the shipped
+`utils.is_blank_label` after implementation: identical. FN-veto clears by
+measurement.
+
+Shipped `3c2856c` (restart-gated 09-18T03:25): new gate between Blur and Scene,
+`blank_confidence_muted` column on the initial INSERT, `[BLANK-CONF]` log,
+fails open on missing score / non-blank label / exception / threshold 0.0.
+`guardrails.BOUNDS` floored at 0.87 = animal ceiling + margin so the loop cannot
+tune itself into a known FN. 34 tests, 664 pass. Does not take the slot (scene-gate
+family mechanism repair, precedent #23/#26/#27) — exp #21 keeps it.
+
+Stated plainly: this mutes **0 of tonight's 19** eligible bursts (tonight topped out
+at 0.917). It is a corpus-wide 29% cut, not a fix for tonight, and it is not
+credited with one. New nightly duty: adjudicate every `blank_confidence_muted=1`
+burst; an animal in one is an FN-veto event → raise T above that row's score.

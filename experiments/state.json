@@ -114,10 +114,10 @@
       "validation": "refuted"
     },
     {
-      "hypothesis": "OPENED 2026-09-04. The Scene-Unchanged Gate is effectively INERT in the current scene and its threshold is still unvalidatable, both now MEASURED rather than assumed. (a) Inert: on 2026-09-04 the camera fired 48 times at one static pond scene; 45 review-class bursts recorded scene_similarity min 0.664 / median 0.887 / MAX 0.944, so T=0.97 could not fire once. Corpus-wide the gate has muted 25 bursts since it was enabled 2026-07-26 and 0 in the last 5 days. (b) The metric is illumination/time-drift dominated, not subject-presence dominated: within-burst frame1-vs-frame5 pairs of the SAME scene seconds apart score median 0.968 (max 0.990), while cross-burst pairs of the same scene minutes-to-hours apart top out at 0.944 -- and a person filling the frame (bursts 4945/4946) scores 0.474-0.739, which OVERLAPS the empty-scene band's low end (0.664). So the score mostly measures how long ago the reference was taken. (c) FN evidence, first datapoint ever: burst 4516 (2026-08-16, IDENTIFIED animal, the only animal burst with frames still on disk) scores 0.931 against the empty reference immediately preceding it -- INSIDE tonight's empty band. Lowering T to 0.93 would have muted a real animal, so the FN-veto now has positive evidence, not just absence of evidence. T stays 0.97. SHIPPED THIS TICK (commit f14ed0d, restart-gated 09-05T03:25): scene_similarity is now measured and DB-logged for EVERY status, not only review-class, so the animal bucket can finally fill from IDENTIFIED rows; scene_gate_muted and the reference-set update stay review-class-only, so no routing changes (FN-veto N/A by construction). PROMOTION CRITERION: once >=5 IDENTIFIED (or human animal-labelled) rows carry a scene_similarity, apply the protocol's rule T = max(animal sims) + 0.02 clamped to BOUNDS [0.80,1.0]. If that lands above 0.97 the gate should be RAISED (it is currently too permissive on paper and inert in practice); if below, the gate is not usable in this scene and disabling it is the honest call. Do not lower T before that bucket exists.",
+      "hypothesis": "CONCLUDED 2026-09-17 (answered by measurement, negative). The scene gate is inert AND its discriminator is now REFUTED, not merely unvalidatable. The 2026-09-04 scene_similarity-for-every-status widening filled the animal bucket: n=10 human-labelled animal/animal_wrong_id rows span 0.7886-0.9202, ENTIRELY INSIDE the 139-row human-FP range 0.5335-0.9675, with the animal median 0.8759 BELOW the FP median 0.8952. The pre-registered max(animal)+0.02 rule yields T=0.9402, 0.02 from a measured blackbird (5164 at 0.9202) and above four more at 0.9104-0.9170; any T low enough to mute a bamboo-wind night (<=0.911) sits inside the animal distribution. Same shape as backlog #16: real signal, completely interleaved classes, no threshold fixes it. T=0.97 therefore STAYS at the 2026-07-26 override value - now the evidenced position, not the accepted-risk one. Do not re-derive it and do not disable the gate: it is harmless where it sits. The needed different discriminator was found the same tick and shipped as exp #29 (confident-blank mute, commit 3c2856c) - the classifier raw top-1 blank confidence, which DOES separate (animal ceiling 0.8475 vs FP median 0.9219). See runs/0021.",
       "id": 17,
       "slug": "scene-gate-inert-and-unvalidatable",
-      "status": "parked",
+      "status": "concluded",
       "validation": "instrumented"
     },
     {
@@ -194,6 +194,13 @@
       "hypothesis": "ACTIVATED + SHIPPED 2026-09-16 (commit 838e5f6, restart-gated 09-17T03:25). The 'Best guess' caption line used the classifier's RAW top-1 (metadata['top_classifier_prediction']) \u2014 ungeofenced and pre-rollup. Tonight's three bursts (5307/5308/5309), the first real animals in weeks and all a Eurasian blackbird at the pond (human-labelled `animal`), therefore carried 'Best guess: Blue whistling-thrush (42%)' (a Himalayan species) and twice 'Best guess: Bird (NN%)' (tautology under a bird verdict). metadata['best_geofenced_species'] \u2014 already computed on every identification by SpeciesIdentifier._find_best_geofenced_species, walking the classifier top-k for the first species-level candidate SpeciesNet's geofence allows in DEU/NW \u2014 held 'common blackbird' on all three (re-run offline against the saved frames: 0.062/0.029/0.032). Fix: _best_guess_line prefers best_geofenced_species, falls back to the raw top-1 only when no in-region candidate exists, and suppresses a guess that merely repeats the ensemble's own rollup name. Caption text only \u2014 no routing, no suppression, zero FP/FN risk (FN-veto trivially satisfied). Corpus context: of the last 127 identified rows with a recorded raw top-1, 83 render the tautological 'Best guess: Bird' and ~5 name a species impossible in Germany. Rollback: git revert 838e5f6 + restart.",
       "id": 28,
       "slug": "geofenced-best-guess",
+      "status": "running",
+      "validation": "live"
+    },
+    {
+      "hypothesis": "ACTIVATED + SHIPPED 2026-09-17 (commit 3c2856c, restart-gated 09-18T03:25). The Scene-Unchanged Gate asks whether pixels match a recent empty-scene reference, and that question was measured this tick NOT to separate animals from empty gardens (see backlog #17, concluded same tick). The classifier already answers a better one. On a burst MegaDetector boxes nothing in, the species classifier scores the whole frame and returns SpeciesNet generic <uuid>;;;;;;blank with a confidence in that emptiness. Measured over all 182 review-class rows corpus-wide carrying that raw top-1 with a recorded score: the 5 ever labelled animal/animal_wrong_id ceiling at 0.8475 (0.6431, 0.7454, 0.8023, 0.8297, 0.8475; the two recent ones 5176/5214 at 0.6431/0.7454), 42 human-confirmed FP run median 0.9219 / max 0.9825, and the 7 ever labelled person top out at 0.9116. T=0.92 mutes 52/182 (29%) corpus-wide; all 29 muted rows carrying any label are false_positive - zero animals, zero people. Margin 0.0725 over the animal ceiling, 3.6x the pre-registered max+0.02 rule, re-replayed against the shipped utils.is_blank_label predicate after implementation with identical results, so the FN-veto clears by measurement. Notification-only: still species-ID d, DB-logged, frames saved; new blank_confidence_muted BOOLEAN on the initial INSERT; [BLANK-CONF] log; precedence Human > Human-Proximity > Blur > Confident-Blank > Scene > Sampling > Deferral so exactly one suppression log. Fails open on missing/None score, non-blank label, any exception, and threshold 0.0 (the rollback lever). guardrails.BOUNDS floored at 0.87 = 0.8475+0.02 so the loop can never tune itself into a known FN. HONEST LIMIT: mutes 0 of tonight 19 eligible bursts (tonight topped out at 0.917) - a corpus-wide cut, NOT a fix for tonight, and not credited with one; n=5 on the FN side. Does NOT occupy the active slot (scene-gate-family mechanism repair, precedent #23/#26/#27); exp #21 keeps it. NEW NIGHTLY DUTY: adjudicate every blank_confidence_muted=1 burst; a real animal in one is an FN-veto event, respond by raising T strictly above that row top_species_score (in bounds). Rollback: PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD=0 + restart, or git revert 3c2856c. See runs/0021.",
+      "id": 29,
+      "slug": "confident-blank-mute",
       "status": "running",
       "validation": "live"
     }
@@ -273,50 +280,50 @@
   ],
   "last_heartbeat_loopday": "2026-09-17",
   "last_metrics": {
-    "date": "2026-09-16",
+    "date": "2026-09-17",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.2504583645276572,
-      0.8417801447485302
+      0.7900884492974114,
+      0.9922833338565469
     ],
     "fp_claude_ci": [
-      0.4385029682449546,
+      0.7900884492974114,
+      0.9922833338565469
+    ],
+    "fp_claude_count": 22,
+    "fp_claude_rate": 0.9565217391304348,
+    "fp_count": 22,
+    "fp_human_ci": [
+      0.0,
       1.0
     ],
-    "fp_claude_count": 3,
-    "fp_claude_rate": 1.0,
-    "fp_count": 4,
-    "fp_human_ci": [
-      0.04558726080970055,
-      0.6993581574175981
-    ],
-    "fp_human_count": 1,
-    "fp_human_rate": 0.25,
+    "fp_human_count": 0,
+    "fp_human_rate": 0.0,
     "fp_md_ci": [
       0.0,
       1.0
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.5714285714285714,
+    "fp_rate": 0.9565217391304348,
     "fp_trustworthy": true,
-    "labeled_triggers": 7,
+    "labeled_triggers": 23,
     "n_cant_tell": 0,
-    "n_claude": 3,
-    "n_human": 4,
-    "n_human_suppressed": 4,
+    "n_claude": 23,
+    "n_human": 0,
+    "n_human_suppressed": 0,
     "n_md": 0,
-    "n_sampled_out": 2,
+    "n_sampled_out": 7,
     "n_unlabeled": 0,
-    "total_triggers": 11
+    "total_triggers": 23
   },
   "last_scene_change_alert_loopday": "2026-09-13",
   "last_tick_completed_day": "2026-09-16",
   "nightly_verdict": "A quiet day with good news: a blackbird visited the pond three times and the camera correctly alerted on all three \u2014 the first real animals in weeks, and nothing was missed or wrongly kept private. The alerts did guess the wrong bird (a Himalayan species that cannot live here), so I fixed the caption to use the camera's own region filter, which already had 'common blackbird' correct all three times.",
   "paused": false,
-  "pending_restart_at": null,
-  "watermark": 5317
+  "pending_restart_at": "2026-09-18T03:25:00+02:00",
+  "watermark": 5340
 }
