@@ -349,7 +349,7 @@
     "total_triggers": 16
   },
   "last_scene_change_alert_loopday": "2026-09-13",
-  "last_tick_completed_day": "2026-09-17",
+  "last_tick_completed_day": "2026-09-18",
   "nightly_verdict": "Good news twice over: a blackbird visited the pond this morning and the camera caught it across five bursts \u2014 but it only recognised the bird in two of them, so three real-animal alerts were downgraded or silently dropped. Those three frames also finally let me check the old 'looks the same as before' filter against a real animal, and the bird sat only a hair below the level where that filter would have silenced it, so I raised its bar out of harm's way; the new empty-frame filter meanwhile hid three genuinely empty alerts today and correctly left the bird alone.",
   "paused": false,
   "pending_restart_at": "2026-09-19T03:25:00+02:00",
