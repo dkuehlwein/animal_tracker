@@ -278,7 +278,7 @@
       "replaced_at": "2026-09-13T03:25:00+02:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-09-17",
+  "last_heartbeat_loopday": "2026-09-18",
   "last_metrics": {
     "date": "2026-09-17",
     "error_count": 0,
@@ -324,6 +324,6 @@
   "last_tick_completed_day": "2026-09-17",
   "nightly_verdict": "A busy but empty day: 23 alerts, not one animal \u2014 21 were wind in the bamboo, plus one real person the camera correctly kept private. I finally settled an old question by measuring it: the \"looks the same as before\" filter cannot tell an empty garden from a bird, so I left it alone and instead switched to the camera's own \"this frame is empty\" score, which can \u2014 it would quietly drop about 3 in 10 of these empty-garden alerts without having dropped a single animal in two months of history.",
   "paused": false,
-  "pending_restart_at": "2026-09-18T03:25:00+02:00",
+  "pending_restart_at": null,
   "watermark": 5340
 }
