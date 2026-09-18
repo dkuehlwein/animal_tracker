@@ -2800,3 +2800,52 @@ Stated plainly: this mutes **0 of tonight's 19** eligible bursts (tonight topped
 at 0.917). It is a corpus-wide 29% cut, not a fix for tonight, and it is not
 credited with one. New nightly duty: adjudicate every `blank_confidence_muted=1`
 burst; an animal in one is an FN-veto event → raise T above that row's score.
+
+## 2026-09-18 — exp #30 (scene-gate-animal-bucket); backlog #25 concluded, #31 opened
+
+16 triggers, fp 0.625 (n=16, tier-2). **Five of them are one blackbird.**
+
+09:27-09:29, five consecutive bursts 5341-5345, bird unambiguous in all five at
+full resolution. Named in two (5341 `aves;;;;;bird` 0.869 → MAIN; 5343
+`;;;;;;animal` 0.520 → MAIN). The other three are review-class **false negatives
+of the species pipeline**: 5342/5344 rolled to `no cv result`, 5345 produced no box.
+Two of the three were sampled out and never reached Telegram. First time this FN
+class has been measured rather than inferred — 3/5 within one visit. Logged as
+backlog #31; no env lever reaches it, needs a corpus measurement pass first.
+
+Rest of night: 5353 a real person (`person_confidence` 0.504) suppressed correctly.
+Ten FP, all the pond top-up hose — jet running ~12:59 past 16:43.
+
+**Exp #29's first live day.** Blank-conf gate muted 3 (5346 @0.959, 5347 @0.940,
+5354 @0.963); all three inspected, empty garden, correct, no FN-veto event. It also
+left 5342 alone — same generic `blank` raw top-1 but at 0.638, under T=0.92. The
+0.8475 animal ceiling held on fresh data it had never seen.
+
+**Backlog #25 delivers; the scene gate's animal bucket is populated.** Empty since
+the 2026-07-26 override, which is why the pre-registered rule `T = max(animal)+0.02`
+has never had an input. On the **live** scale (the column the gate thresholds):
+animal-bearing review-class 0.9572 / 0.9592, the same bird 34 s later in 5343 at
+**0.9621**, against the gate's entire realised mute band over 54 days — all 25
+mutes — of **[0.9701, 0.9812]**. Margin: **0.008**. A bird at ~1% of a downsized
+normalised grayscale frame cannot move a pixel-similarity score further than that.
+Backlog #17 reached this mechanism yesterday from the FP/animal *overlap*; tonight
+confirms it from the animal side, directly.
+
+Rule applied: 0.9621 + 0.02 = 0.9821 → **deployed T = 0.982**, restart-gated
+09-19T03:25. Including 5343 is deliberate — which bursts of one two-minute visit
+landed review-class rather than `identified` was classifier noise, so the
+review-class-only max (→ 0.9792) is luckier, not safer; protocol says round up.
+
+Said plainly, because the run file should not be read as a tuning step: **at 0.982
+the gate would have muted 0 of its 25 lifetime mutes. As an FP lever the scene gate
+is finished.** It was already inert in practice — last mute 2026-08-30, nineteen
+nights ago, lifetime yield 25/896 = 2.8% of review-class bursts. It stays enabled
+and armed, not disabled. The FP job has passed to the confident-blank gate: 29%
+corpus-wide on paper, 3/13 tonight in the field.
+
+On the override: Daniel's 2026-07-26 instruction was not to re-derive the threshold
+or disable the gate *while the animal bucket was empty*, a condition it called
+"permanent for now." It isn't any more. This is neither a disable nor an
+absence-of-evidence argument — it is the protocol's own monitoring duty and its own
+arithmetic, run for the first time on real input. `/rollback` is the lever if he
+reads it differently.

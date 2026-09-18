@@ -170,11 +170,11 @@
       "validation": "live"
     },
     {
-      "hypothesis": "Review-class bursts can contain real animals the detector never boxes, and 5176 (2026-09-13 11:54, `unclassifiable`, raw top-1 `blank` @0.64) is the FIRST such row with frames still on disk \u2014 the bucket whose emptiness has blocked scene-gate threshold validation since the 2026-07-26 override. Same blackbird as the IDENTIFIED MAIN alert 53s earlier; it was missed only because it sat against dark background beside the gnome. Two things follow. (1) The animal-labelled review-class bucket is no longer permanently empty: it now has n=1 with frames, and the pond scene is producing daily blackbird visits, so a real FN-side distribution for the scene/sampling gates may be accumulable for the first time \u2014 keep adjudicating and accreting these rather than re-deriving that the bucket is empty. (2) The miss itself has no env lever: status `unclassifiable` comes from MegaDetector returning no box, and its 0.2 operating threshold is not in BOUNDS. Do NOT lower a detector threshold on n=1; that is the FP-raising direction. Measured 2026-09-13: 5176 scores max 0.7384 scene-similarity against 75 on-disk review references vs T=0.97, so the scene gate would not have muted it.",
+      "hypothesis": "CONCLUDED 2026-09-18 (delivered). The review-class animal bucket that has blocked scene-gate threshold validation since the 2026-07-26 override is no longer empty: a five-burst blackbird visit at 09:27-09:29 (5341-5345) put THREE animal-bearing review-class bursts on disk with live scene_similarity recorded \u2014 5344 @0.9572, 5345 @0.9592 (5342 has no similarity), plus the same bird 34s later in 5343 @0.9621 (identified via the unnamed ';;;;;;animal' rollup). The gate's entire realised mute band over 54 days is [0.9701, 0.9812], so the separation between 'blackbird present' and 'gate mutes' is 0.008. Pre-registered rule T = max(animal)+0.02 = 0.9821 applied -> deployed T=0.982 (exp #30, runs/0022). See also backlog #17 (concluded 2026-09-17), which reached the same mechanism conclusion from the FP/animal overlap. Do not re-open: the bucket question is answered.",
       "id": 25,
       "slug": "review-class-animal-bucket",
-      "status": "open",
-      "validation": "none"
+      "status": "concluded",
+      "validation": "live"
     },
     {
       "hypothesis": "ACTIVATED + SHIPPED 2026-09-14 (commit 80d0c00, restart-gated 09-15T03:25). SpeciesNet's fully-generic '<uuid>;;;;;;animal' rollup means 'something is there, I cannot name it' (its ensemble confidence IS MegaDetector's box confidence) but routes to IDENTIFIED, so it fires a MAIN alert that bypasses every review-class mute path (blur/scene/sampling/deferral/human-proximity all test is_review_detection). A person at extreme close range is exactly the input that produces it: on 09-14, 5222 (clothing filling the frame, 30s after a HUMAN burst) and 5270 (trousered leg, 82s after one, 34 HUMAN bursts in the prior 30min) were delivered to MAIN as 'animal detected'. Re-routing the label is FN-vetoed: 18 of the 78 rows with this shape corpus-wide are human-labelled animal/animal_wrong_id. So the label is not the signal, label+human-proximity is: replaying the existing window-OR-density conditions over all 78 rows mutes exactly 4 (1988 raw top-1 human@0.591, 3483 human-labelled false_positive, 5222, 5270) and ZERO human-labelled animals. Fix: utils.is_unnamed_animal_label (narrow, sentinel-aware per exp #23) + human-proximity gate evaluated for review-class OR unnamed-animal IDENTIFIED bursts + the 48h human-adjacent purge extended to identified rows with human_proximity_muted=1. Named identifications untouched (09-14's domestic cat, and bird rows 5123/5164, all still alert). Does NOT occupy the active slot (scope repair of exp #10/#11's shipped mechanism, same precedent as #23 vs #9 and #24 vs #21); exp #21 keeps it. Rollback: git revert 80d0c00 + restart. See runs/0018.",
@@ -203,6 +203,20 @@
       "slug": "confident-blank-mute",
       "status": "running",
       "validation": "live"
+    },
+    {
+      "hypothesis": "ACTIVATED + SHIPPED 2026-09-18 (env delta PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD 0.97 -> 0.982, restart-gated 09-19T03:25). Post-enable monitoring duty on the scene gate, run for the first time with a non-empty animal bucket. Live-scale animal-bearing scene_similarity reached 0.9621 (0.9572/0.9592 on review-class rows) against a realised mute band of [0.9701, 0.9812] \u2014 a 0.008 margin. Applied the protocol's pre-registered rule T = max(animal)+0.02 = 0.9821 -> 0.982. NOT a disable and NOT an absence-of-evidence argument: the gate stays enabled and armed, but at T=0.982 it would have muted 0 of its 25 lifetime mutes, so its FP yield is ~0 and the scene gate is finished as an FP lever (last actual mute 2026-08-30, lifetime yield 25/896 = 2.8%). That job has passed to exp #29's confident-blank gate. Daniel's 2026-07-26 override forbade re-deriving the threshold while the animal bucket was empty; that condition no longer holds. Rollback: PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD=0.97 + restart, or /rollback. Monitor: any review-class row adjudicated 'animal' carrying scene_gate_muted=1 is an FN-veto event -> raise T again.",
+      "id": 30,
+      "slug": "scene-gate-animal-bucket",
+      "status": "running",
+      "validation": "live"
+    },
+    {
+      "hypothesis": "OPENED 2026-09-18. The dominant FN source is no longer a mute gate \u2014 it is the species pipeline. A Eurasian blackbird plainly visible at full resolution in all five frames of a five-burst visit (5341-5345) was named in only two: 5342/5344 rolled up to 'no cv result' (unclassifiable) and 5345 produced no box at all (no_animal). Raw top-1 on 5344 was 'black woodpecker' @0.142; on 5342 the generic 'blank' @0.638. So MegaDetector boxes it weakly or not at all at this distance/contrast (dark bird on dark gravel, ~1% of frame) and the ensemble discards the classifier's weak bird evidence. No env lever reaches this: unknown_species_threshold is not what produces 'no cv result'. Candidate directions, none validated: (a) treat a low-score but SPECIFIC animal raw top-1 on a review-class burst as an animal signal (cf. backlog #10, rejected 2026-07-26 on sampling-exemption grounds, but this is a routing question not a sampling one); (b) run the detector on more than the sharpest frame, as exp #21 already does for the human sweep \u2014 the bird's pose/contrast varies across the 5 frames. Needs a measurement pass over the corpus before anything ships; do not guess a threshold.",
+      "id": 31,
+      "slug": "speciesnet-misses-visible-bird",
+      "status": "open",
+      "validation": "unvalidated"
     }
   ],
   "baselines": {
@@ -217,7 +231,7 @@
     "PERFORMANCE_MAX_IMAGES": 300,
     "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.5,
     "PERFORMANCE_SCENE_GATE_ENABLED": 1,
-    "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD": 0.97,
+    "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD": 0.982,
     "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
   },
   "feedback_starved_since": null,
@@ -276,6 +290,20 @@
         "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
       },
       "replaced_at": "2026-09-13T03:25:00+02:00"
+    },
+    {
+      "config": {
+        "PERFORMANCE_HUMAN_DENSITY_COUNT": 8,
+        "PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS": 1800,
+        "PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS": 240,
+        "PERFORMANCE_HUMAN_SWEEP_MAX_FRAMES": 4,
+        "PERFORMANCE_MAX_IMAGES": 300,
+        "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.5,
+        "PERFORMANCE_SCENE_GATE_ENABLED": 1,
+        "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD": 0.97,
+        "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
+      },
+      "replaced_at": "2026-09-19T03:25:00+02:00"
     }
   ],
   "last_heartbeat_loopday": "2026-09-18",
@@ -322,8 +350,8 @@
   },
   "last_scene_change_alert_loopday": "2026-09-13",
   "last_tick_completed_day": "2026-09-17",
-  "nightly_verdict": "A busy but empty day: 23 alerts, not one animal \u2014 21 were wind in the bamboo, plus one real person the camera correctly kept private. I finally settled an old question by measuring it: the \"looks the same as before\" filter cannot tell an empty garden from a bird, so I left it alone and instead switched to the camera's own \"this frame is empty\" score, which can \u2014 it would quietly drop about 3 in 10 of these empty-garden alerts without having dropped a single animal in two months of history.",
+  "nightly_verdict": "Good news twice over: a blackbird visited the pond this morning and the camera caught it across five bursts \u2014 but it only recognised the bird in two of them, so three real-animal alerts were downgraded or silently dropped. Those three frames also finally let me check the old 'looks the same as before' filter against a real animal, and the bird sat only a hair below the level where that filter would have silenced it, so I raised its bar out of harm's way; the new empty-frame filter meanwhile hid three genuinely empty alerts today and correctly left the bird alone.",
   "paused": false,
-  "pending_restart_at": null,
+  "pending_restart_at": "2026-09-19T03:25:00+02:00",
   "watermark": 5356
 }
