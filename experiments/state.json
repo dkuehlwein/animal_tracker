@@ -280,22 +280,22 @@
   ],
   "last_heartbeat_loopday": "2026-09-18",
   "last_metrics": {
-    "date": "2026-09-17",
+    "date": "2026-09-18",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.7900884492974114,
-      0.9922833338565469
+      0.38641040545502714,
+      0.8151876744113636
     ],
     "fp_claude_ci": [
-      0.7900884492974114,
-      0.9922833338565469
+      0.38641040545502714,
+      0.8151876744113636
     ],
-    "fp_claude_count": 22,
-    "fp_claude_rate": 0.9565217391304348,
-    "fp_count": 22,
+    "fp_claude_count": 10,
+    "fp_claude_rate": 0.625,
+    "fp_count": 10,
     "fp_human_ci": [
       0.0,
       1.0
@@ -308,22 +308,22 @@
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.9565217391304348,
+    "fp_rate": 0.625,
     "fp_trustworthy": true,
-    "labeled_triggers": 23,
+    "labeled_triggers": 16,
     "n_cant_tell": 0,
-    "n_claude": 23,
+    "n_claude": 16,
     "n_human": 0,
     "n_human_suppressed": 0,
     "n_md": 0,
     "n_sampled_out": 7,
     "n_unlabeled": 0,
-    "total_triggers": 23
+    "total_triggers": 16
   },
   "last_scene_change_alert_loopday": "2026-09-13",
   "last_tick_completed_day": "2026-09-17",
   "nightly_verdict": "A busy but empty day: 23 alerts, not one animal \u2014 21 were wind in the bamboo, plus one real person the camera correctly kept private. I finally settled an old question by measuring it: the \"looks the same as before\" filter cannot tell an empty garden from a bird, so I left it alone and instead switched to the camera's own \"this frame is empty\" score, which can \u2014 it would quietly drop about 3 in 10 of these empty-garden alerts without having dropped a single animal in two months of history.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5340
+  "watermark": 5356
 }
