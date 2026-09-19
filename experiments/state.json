@@ -356,7 +356,7 @@
     "total_triggers": 31
   },
   "last_scene_change_alert_loopday": "2026-09-13",
-  "last_tick_completed_day": "2026-09-18",
+  "last_tick_completed_day": "2026-09-19",
   "nightly_verdict": "Busy night: 31 alerts, and a blackbird visited the pond mid-morning \u2014 this time the camera recognised it in all four of its bursts, unlike yesterday. Every one of the other 26 alerts was wind in the bamboo. Two of those were announced as \"animal detected\" in the main channel on a plainly empty garden, so I shipped a fix that mutes exactly that kind of false alarm; checked against every such alert ever recorded, it would have silenced four real false alarms and no real animals.",
   "paused": false,
   "pending_restart_at": "2026-09-20T03:25:00+02:00",
