@@ -217,6 +217,13 @@
       "slug": "speciesnet-misses-visible-bird",
       "status": "open",
       "validation": "unvalidated"
+    },
+    {
+      "hypothesis": "ACTIVATED + SHIPPED 2026-09-19 (commit f4d7730, restart-gated 09-20T03:25). SpeciesNet's fully-generic '<uuid>;;;;;;animal' rollup routes to IDENTIFIED, so it fires a MAIN-channel species alert that bypasses every review-class mute path (Blur/Confident-Blank/Scene/Sampling/Deferral all test is_review_detection). Exp #26 covered the PRIVACY leak of this shape; the plain FP leak was unhandled. Bursts 5365 (11:19) and 5374 (13:34) on 2026-09-19 were both MAIN 'animal detected' alerts on a demonstrably empty garden -- the only two FPs all night to reach the main channel. Discriminator over all 82 unnamed-animal rows corpus-wide (52 labelled): when the classifier's RAW top-1 over the crop NAMES an animal the burst is real (34/34 labelled rows are animals); when it is the generic 'blank' the two models disagree and 6 of 8 labelled rows are FPs. Box confidence does NOT separate them (animal 0.5024-0.9020 vs FP 0.5017-0.7454). The 2 blank-raw rows that ARE animals (ids 2212/2213, six minutes apart = ONE visit, so n=1 independent counter-example) score 0.9722/0.9795, so the gate mutes only BELOW T -- a safety carve-out around a known counter-example, NOT an independently validated discriminator, and the run file says so. T=0.90 mutes 4/6 measured FPs with a 0.072 margin; the protocol's mirrored rule min(animal)-0.02=0.9522 mutes exactly the same four rows, so the wider margin costs nothing measured and lowering is the FN-safe direction for a mute-below gate. loop.guardrails BOUNDS (0.0, 0.9522) so the loop can never reach the counter-example. Corpus replay at T=0.90: mutes 5 rows in the system's entire history (1940 unlabelled, 3483/5222/5365/5374 all false_positive), ZERO animal-labelled and ZERO person-labelled (the one person with this shape, 5270, has a NAMED raw top-1) -- ~1.5 mutes/month, all MAIN-channel. New column unnamed_animal_blank_muted; 17 new tests, 681 pass. MONITORING DUTY: adjudicate every unnamed_animal_blank_muted=1 burst nightly; one animal-labelled row in the muted band retires the threshold, two retire the gate. Rollback: PERFORMANCE_UNNAMED_ANIMAL_BLANK_MUTE_THRESHOLD=0 + restart, or git revert f4d7730. See runs/0023.",
+      "id": 32,
+      "slug": "unnamed-animal-blank-mute",
+      "status": "running",
+      "validation": "live"
     }
   ],
   "baselines": {
@@ -308,50 +315,50 @@
   ],
   "last_heartbeat_loopday": "2026-09-19",
   "last_metrics": {
-    "date": "2026-09-18",
+    "date": "2026-09-19",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.38641040545502714,
-      0.8151876744113636
+      0.6736564604120674,
+      0.9290737555663471
     ],
     "fp_claude_ci": [
-      0.38641040545502714,
-      0.8151876744113636
+      0.8045593626380625,
+      0.9929037664980127
     ],
-    "fp_claude_count": 10,
-    "fp_claude_rate": 0.625,
-    "fp_count": 10,
+    "fp_claude_count": 24,
+    "fp_claude_rate": 0.96,
+    "fp_count": 26,
     "fp_human_ci": [
-      0.0,
-      1.0
+      0.09677141110578041,
+      0.700006684861608
     ],
-    "fp_human_count": 0,
-    "fp_human_rate": 0.0,
+    "fp_human_count": 2,
+    "fp_human_rate": 0.3333333333333333,
     "fp_md_ci": [
       0.0,
       1.0
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.625,
+    "fp_rate": 0.8387096774193549,
     "fp_trustworthy": true,
-    "labeled_triggers": 16,
+    "labeled_triggers": 31,
     "n_cant_tell": 0,
-    "n_claude": 16,
-    "n_human": 0,
+    "n_claude": 25,
+    "n_human": 6,
     "n_human_suppressed": 0,
     "n_md": 0,
-    "n_sampled_out": 7,
+    "n_sampled_out": 12,
     "n_unlabeled": 0,
-    "total_triggers": 16
+    "total_triggers": 31
   },
   "last_scene_change_alert_loopday": "2026-09-13",
   "last_tick_completed_day": "2026-09-18",
-  "nightly_verdict": "Good news twice over: a blackbird visited the pond this morning and the camera caught it across five bursts \u2014 but it only recognised the bird in two of them, so three real-animal alerts were downgraded or silently dropped. Those three frames also finally let me check the old 'looks the same as before' filter against a real animal, and the bird sat only a hair below the level where that filter would have silenced it, so I raised its bar out of harm's way; the new empty-frame filter meanwhile hid three genuinely empty alerts today and correctly left the bird alone.",
+  "nightly_verdict": "Busy night: 31 alerts, and a blackbird visited the pond mid-morning \u2014 this time the camera recognised it in all four of its bursts, unlike yesterday. Every one of the other 26 alerts was wind in the bamboo. Two of those were announced as \"animal detected\" in the main channel on a plainly empty garden, so I shipped a fix that mutes exactly that kind of false alarm; checked against every such alert ever recorded, it would have silenced four real false alarms and no real animals.",
   "paused": false,
-  "pending_restart_at": null,
-  "watermark": 5356
+  "pending_restart_at": "2026-09-20T03:25:00+02:00",
+  "watermark": 5387
 }

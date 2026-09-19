@@ -2849,3 +2849,67 @@ or disable the gate *while the animal bucket was empty*, a condition it called
 absence-of-evidence argument — it is the protocol's own monitoring duty and its own
 arithmetic, run for the first time on real input. `/rollback` is the lever if he
 reads it differently.
+
+## 2026-09-19 — exp #32 (unnamed-animal-blank-mute) opened + shipped f4d7730
+
+31 triggers, the busiest night in weeks. 26 FP (fp_rate 0.839, CI [0.674, 0.929],
+n=31 — 6 human labels, 25 tier-2), 1 person correctly suppressed, and **4 animal
+bursts that are one blackbird**.
+
+**Exp #31 did not recur.** 5360-5363 (10:29-10:39) are a blackbird at the gravel
+strip and far bank; the pipeline named and alerted **all four**, against two of
+five last night on a comparable visit. The bracketing bursts 5359/5364 were read
+frame by frame at full resolution — no bird in any of the ten frames, so this is
+a clean sweep, not a lucky subset. Nothing was changed between the two nights.
+The species-pipeline FN class is therefore **intermittent**, not a hard
+distance/contrast floor. One night; keep #31 open.
+
+**Gate audit.** Confident-blank (exp #29, night 2): 6 mutes — 5371, 5382-5385,
+5387 — all six adjudicated empty, all six correct; two-night total 9/9. Scene
+gate (exp #30, night 1 at T=0.982): 0 mutes, tonight's max `scene_similarity`
+0.9322, nowhere near it — exactly as predicted when the gate was declared
+finished as an FP lever. Human-proximity: 0. Review sampling: 12 out.
+
+**The finding.** The two bursts that reached MAIN as species alerts — 5365
+(11:19) and 5374 (13:34) — are both an empty garden, and both carry SpeciesNet's
+fully-generic `<uuid>;;;;;;animal` rollup, whose ensemble confidence *is* the
+MegaDetector box confidence with no classifier verdict behind it. That label
+routes to IDENTIFIED, and every review-class mute path tests
+`is_review_detection`, so the shape bypasses all of them by construction. Exp
+#26 closed the *privacy* leak of this shape on 09-14; the *false-positive* leak
+was never closed, and it is the commoner one. These two were the whole of
+tonight's MAIN-channel damage — the other 24 FPs were muted or REVIEW-prefixed.
+
+**The discriminator is the classifier's own raw top-1 over the crop.** All 82
+unnamed-animal rows corpus-wide, 52 labelled: raw top-1 NAMES an animal → 34
+animal / 0 FP; raw top-1 is generic `blank` → 2 animal / 6 FP. Box confidence
+separates nothing (animal 0.5024-0.9020 vs FP 0.5017-0.7454, fully overlapping).
+
+**The threshold is a carve-out, and is recorded as one.** The 2 blank-raw animals
+are ids 2212/2213 — six minutes apart, i.e. **one visit, n=1 independent
+counter-example** — at 0.9722/0.9795 against FPs at 0.0561/0.0594/0.5901/0.8411/
+0.9690/0.9862. So the gate mutes only *below* T. I have no mechanism for why a
+confident blank marks a real animal and an unsure one a false positive; with n=1
+it may be coincidence, and the run file says so rather than dressing it up as a
+validated separator. T=0.90 leaves a 0.072 margin; the protocol's mirrored rule
+`min(animal)-0.02 = 0.9522` mutes **exactly the same four rows** (nothing lies
+between 0.8411 and 0.9690), so the wider margin costs nothing measured — and for
+a mute-below gate, lowering is the FN-safe direction, so 0.90 *is* the
+conservative choice by the protocol's own logic. `loop.guardrails` caps the loop
+at `(0.0, 0.9522)`; it can never reach the counter-example.
+
+**Replayed over the entire corpus before shipping:** 5 mutes in the system's
+whole history — 1940 (unlabelled, frames gone), 3483, 5222, 5365, 5374 (all
+`false_positive`). Zero animal-labelled, zero person-labelled: the one person
+carrying this shape (5270) has a *named* raw top-1 and is untouched, so the gate
+adds no privacy exposure. ~1.5 mutes/month, all MAIN-channel.
+
+Shipped `f4d7730`, restart-gated 09-20T03:25: new
+`PERFORMANCE_UNNAMED_ANIMAL_BLANK_MUTE_THRESHOLD` (0.90; `0.0` = special-cased
+disable), new `unnamed_animal_blank_muted` column, precedence Human/Privacy >
+Human-Proximity > **Unnamed-Animal-Blank** > Blur > Confident-Blank > Scene >
+Sampling > Deferral, fails open, 17 new tests, 681 pass.
+
+Nightly duty from 09-20: adjudicate every `unnamed_animal_blank_muted=1` burst.
+Pre-registered kill condition — **one** animal-labelled row in the muted band
+retires the threshold, **two** retire the gate.
