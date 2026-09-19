@@ -929,3 +929,62 @@ def test_migration_adds_blank_confidence_muted_column_to_old_schema(tmp_path):
         cursor = conn.execute("PRAGMA table_info(detections)")
         columns = {row[1] for row in cursor.fetchall()}
     assert "blank_confidence_muted" in columns
+
+
+# ---------------------------------------------------------------------------
+# unnamed_animal_blank_muted column (Unnamed-Animal Blank-Raw Mute Gate,
+# exp #32, 2026-09-19) — same True/False/None round-trip convention as
+# blank_confidence_muted above, set directly on the initial INSERT.
+# ---------------------------------------------------------------------------
+
+def test_log_detection_persists_unnamed_animal_blank_muted_true(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(
+        image_path="capture_uab1.jpg",
+        motion_area=1200,
+        unnamed_animal_blank_muted=True,
+    )
+    assert det_id is not None
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?", (det_id,)).fetchone()
+
+    assert row["unnamed_animal_blank_muted"] == 1
+
+
+def test_log_detection_persists_unnamed_animal_blank_muted_false(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(
+        image_path="capture_uab2.jpg",
+        motion_area=1200,
+        unnamed_animal_blank_muted=False,
+    )
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?", (det_id,)).fetchone()
+
+    assert row["unnamed_animal_blank_muted"] == 0
+
+
+def test_log_detection_unnamed_animal_blank_muted_default_null(tmp_path):
+    """Old call signature (no unnamed_animal_blank_muted kwarg) still works;
+    new column is NULL."""
+    db, db_path = _make_db(tmp_path)
+    det_id = db.log_detection(image_path="capture_uab3.jpg", motion_area=10)
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections WHERE id = ?", (det_id,)).fetchone()
+    assert row["unnamed_animal_blank_muted"] is None
+
+
+def test_migration_adds_unnamed_animal_blank_muted_column_to_old_schema(tmp_path):
+    """A pre-existing (old-schema) DB gets the new column added on open."""
+    db_path = tmp_path / "old_uab.db"
+    _create_old_schema(str(db_path))
+    config = SimpleNamespace(storage=SimpleNamespace(database_path=str(db_path)))
+    db = DatabaseManager(config)  # triggers migration in init_database
+    with sqlite3.connect(str(db_path)) as conn:
+        cursor = conn.execute("PRAGMA table_info(detections)")
+        columns = {row[1] for row in cursor.fetchall()}
+    assert "unnamed_animal_blank_muted" in columns

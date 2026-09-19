@@ -3107,3 +3107,198 @@ async def test_human_wins_over_blank_confidence_single_log(system, tmp_path, cap
     ]
     assert len(gate_logs) == 1
     assert "HUMAN-GATE" in gate_logs[0]
+
+
+# ---------------------------------------------------------------------------
+# Unnamed-Animal Blank-Raw Mute Gate (exp #32, 2026-09-19): an IDENTIFIED
+# burst carrying SpeciesNet's fully-generic "<uuid>;;;;;;animal" rollup fires
+# a MAIN-channel species alert that bypasses every review-class mute path.
+# When the classifier's RAW top-1 over the crop is "blank" BELOW
+# unnamed_animal_blank_mute_threshold (default 0.90) the two models disagree
+# and the classifier isn't even confident the crop is empty — mute it.
+# Precedence: Human/Privacy > Human-Proximity > Unnamed-Animal-Blank > Blur >
+# Confident-Blank > Scene > Review Sampling > Deferred Send.
+# ---------------------------------------------------------------------------
+
+def _unnamed_animal_with_top1(label, score, confidence=0.58):
+    """The generic ';;;;;;animal' rollup plus a raw classifier top-1."""
+    result = _identification_unnamed_animal(confidence=confidence)
+    result.metadata = {'top_classifier_prediction': {'label': label, 'score': score}}
+    return result
+
+
+@pytest.mark.asyncio
+async def test_unnamed_animal_blank_below_threshold_suppresses_notification(
+    system, tmp_path, caplog
+):
+    """Burst 5374's shape: generic ';;;;;;animal' rollup with a low-confidence
+    blank raw top-1. No Telegram send, one [UNNAMED-BLANK] log, DB records
+    unnamed_animal_blank_muted."""
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_unnamed_animal_with_top1("f1856211;;;;;;blank", 0.0561)
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    telegram.send_detection_notification.assert_not_called()
+    telegram.send_document.assert_not_called()
+    assert sum("[UNNAMED-BLANK]" in r.message for r in caplog.records) == 1
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['unnamed_animal_blank_muted'] == 1
+    assert row['top_species_raw'] == "f1856211;;;;;;blank"
+
+
+@pytest.mark.asyncio
+async def test_unnamed_animal_blank_at_threshold_still_notifies(system, tmp_path):
+    """The gate mutes strictly BELOW the threshold — a score exactly at it
+    must still alert (the known animal counter-example sits above)."""
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_unnamed_animal_with_top1("uuid;;;;;;blank", 0.90)
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['unnamed_animal_blank_muted'] == 0
+
+
+@pytest.mark.asyncio
+async def test_unnamed_animal_high_confidence_blank_still_notifies(system, tmp_path):
+    """The n=1 animal counter-example (ids 2212/2213, blank @ 0.9722): a
+    high-confidence blank raw top-1 on this shape is NOT muted."""
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_unnamed_animal_with_top1("uuid;;;;;;blank", 0.9722)
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['unnamed_animal_blank_muted'] == 0
+
+
+@pytest.mark.asyncio
+async def test_unnamed_animal_named_raw_top1_never_muted(system, tmp_path):
+    """34/34 labelled rows whose raw top-1 NAMES an animal are real animals —
+    a named raw top-1 must never be muted, however low its score."""
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_unnamed_animal_with_top1(
+            "87fdd451;aves;passeriformes;corvidae;corvus;brachyrhynchos;american crow",
+            0.2306,
+        )
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['unnamed_animal_blank_muted'] == 0
+
+
+@pytest.mark.asyncio
+async def test_unnamed_animal_blank_threshold_zero_disables_gate(system, tmp_path):
+    """0.0 DISABLES the gate (rollback lever) — it does not mean 'mute
+    nothing by comparison': the column stays NULL ('gate didn't apply')."""
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.config.performance.unnamed_animal_blank_mute_threshold = 0.0
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_unnamed_animal_with_top1("uuid;;;;;;blank", 0.05)
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['unnamed_animal_blank_muted'] is None
+
+
+@pytest.mark.asyncio
+async def test_unnamed_animal_blank_muted_none_for_review_class(system, tmp_path):
+    """A review-class burst is not this shape — the gate leaves the column
+    NULL and the Confident-Blank gate owns that population instead."""
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal_with_top1("uuid;;;;;;blank", 0.05)
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    assert row['unnamed_animal_blank_muted'] is None
+
+
+@pytest.mark.asyncio
+async def test_human_proximity_wins_over_unnamed_animal_blank_single_log(
+    system, tmp_path, caplog
+):
+    """A burst this gate WOULD mute that the human-proximity gate already
+    mutes produces exactly one suppression log ([HUMAN-PROXIMITY])."""
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system._last_human_detection_at = datetime.now()
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_unnamed_animal_with_top1("uuid;;;;;;blank", 0.05)
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    assert any("[HUMAN-PROXIMITY]" in r.message for r in caplog.records)
+    assert not any("[UNNAMED-BLANK]" in r.message for r in caplog.records)

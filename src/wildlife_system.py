@@ -665,6 +665,54 @@ class WildlifeSystem:
                 self._recent_human_detection_times.append(timestamp)
                 self._count_recent_human_detections(timestamp)  # prune now, not just at use
 
+            # Unnamed-Animal Blank-Raw Mute Gate (exp #32, 2026-09-19).
+            # SpeciesNet's fully-generic "<uuid>;;;;;;animal" rollup routes
+            # to IDENTIFIED, so it fires a MAIN-channel species alert that
+            # bypasses every review-class mute path (Blur/Confident-Blank/
+            # Scene/Sampling/Deferral all test is_review_detection). Exp #26
+            # widened the human-proximity gate to cover the PRIVACY leak of
+            # this shape; the plain false-positive leak was still unhandled,
+            # and bursts 5365 and 5374 on 2026-09-19 were both MAIN "animal
+            # detected" alerts on a demonstrably empty garden.
+            #
+            # The discriminator is the classifier's own raw top-1 over the
+            # crop MegaDetector boxed. When it NAMES an animal the burst is
+            # real (34/34 labelled rows corpus-wide are animals). When it is
+            # SpeciesNet's generic "blank" the two models disagree, and 6 of
+            # 8 labelled rows are false positives. The 2 that are animals
+            # (ids 2212/2213, six minutes apart — one visit, so n=1
+            # independent counter-example) score 0.9722/0.9795, so the mute
+            # fires only BELOW the threshold. This is a carve-out around a
+            # known counter-example, not an independently validated
+            # discriminator: an animal that ever lands in the muted band is
+            # an FN-veto event (lower the threshold, or disable at 0.0).
+            #
+            # Measured at the 0.90 default over the whole observability-era
+            # corpus: mutes 4 false positives (0.0561, 0.0594, 0.5901,
+            # 0.8411), ZERO animal-labelled and ZERO person-labelled rows.
+            #
+            # None ("gate didn't apply") when the burst isn't an
+            # unnamed-animal rollup or the threshold is 0.0 (disabled — the
+            # rollback lever, special-cased rather than relying on a
+            # `score < 0.0` comparison), otherwise True/False. Fails open to
+            # False (never mutes) on any error — same convention as the
+            # Confident-Blank Mute Gate above.
+            unnamed_animal_blank_muted = None
+            try:
+                unnamed_blank_threshold = (
+                    self.config.performance.unnamed_animal_blank_mute_threshold
+                )
+                if unnamed_blank_threshold > 0.0 and is_unnamed_animal:
+                    unnamed_animal_blank_muted = bool(
+                        top_species_raw
+                        and is_blank_label(top_species_raw)
+                        and top_species_score is not None
+                        and top_species_score < unnamed_blank_threshold
+                    )
+            except Exception as e:
+                logger.error(f"Error computing unnamed-animal blank mute gate: {e}")
+                unnamed_animal_blank_muted = False
+
             # Log to database (richer Phase-1 fields included)
             detection_id = self.database.log_detection(
                 image_path=image_path,
@@ -691,6 +739,7 @@ class WildlifeSystem:
                 scene_gate_muted=scene_gate_muted,
                 human_proximity_muted=human_proximity_muted,
                 blank_confidence_muted=blank_confidence_muted,
+                unnamed_animal_blank_muted=unnamed_animal_blank_muted,
             )
 
             logger.info(f"Detection {detection_id} logged: {species_result.species_name} "
@@ -732,6 +781,7 @@ class WildlifeSystem:
                 'human_proximity_mute_reason': human_proximity_mute_reason,
                 'unnamed_animal': is_unnamed_animal,
                 'blank_confidence_muted': blank_confidence_muted,
+                'unnamed_animal_blank_muted': unnamed_animal_blank_muted,
                 'top_species_raw': top_species_raw,
                 'top_species_score': top_species_score,
             }
@@ -1187,6 +1237,23 @@ class WildlifeSystem:
             and (is_review_detection(species_result.get('detection_status'))
                  or bool(species_result.get('unnamed_animal')))
         )
+        # Unnamed-Animal Blank-Raw Mute Gate (exp #32, 2026-09-19):
+        # process_detection already computed and DB-persisted
+        # unnamed_animal_blank_muted — True only for an IDENTIFIED burst
+        # carrying SpeciesNet's fully-generic "<uuid>;;;;;;animal" rollup
+        # whose raw classifier top-1 was "blank" BELOW
+        # unnamed_animal_blank_mute_threshold. This shape is never
+        # review-class, so it can never collide with the Blur/
+        # Confident-Blank/Scene/Sampling gates below (all of which
+        # additionally require is_review_detection); it is placed here,
+        # right after the Human-Proximity gate, so that a burst that gate
+        # already mutes for privacy reasons produces exactly one
+        # suppression log.
+        is_unnamed_animal_blank = (
+            not is_human
+            and not is_human_proximity_review
+            and bool(species_result.get('unnamed_animal_blank_muted'))
+        )
         # Luma gate (exp #8, sharpness-floor-is-a-brightness-gate): the
         # sharpness floor is a raw Laplacian-variance statistic that's
         # confounded by scene brightness — at dusk almost every frame scores
@@ -1202,6 +1269,7 @@ class WildlifeSystem:
         is_blurry_review = (
             not is_human
             and not is_human_proximity_review
+            and not is_unnamed_animal_blank
             and bool(sharpness_info)
             and sharpness_info.get('below_sharpness_floor')
             and is_review_detection(species_result.get('detection_status'))
@@ -1222,6 +1290,7 @@ class WildlifeSystem:
         is_blank_confidence_review = (
             not is_human
             and not is_human_proximity_review
+            and not is_unnamed_animal_blank
             and not is_blurry_review
             and bool(species_result.get('blank_confidence_muted'))
             and is_review_detection(species_result.get('detection_status'))
@@ -1238,6 +1307,7 @@ class WildlifeSystem:
         is_scene_unchanged_review = (
             not is_human
             and not is_human_proximity_review
+            and not is_unnamed_animal_blank
             and not is_blurry_review
             and not is_blank_confidence_review
             and bool(species_result.get('scene_gate_muted'))
@@ -1255,6 +1325,7 @@ class WildlifeSystem:
         is_sampled_out_review = (
             not is_human
             and not is_human_proximity_review
+            and not is_unnamed_animal_blank
             and not is_blurry_review
             and not is_blank_confidence_review
             and not is_scene_unchanged_review
@@ -1291,6 +1362,16 @@ class WildlifeSystem:
                 f"[HUMAN-PROXIMITY] Suppressing notification for detection "
                 f"{species_result.get('detection_id')} "
                 f"({reason_detail}, no animal found)"
+            )
+        elif is_unnamed_animal_blank:
+            logger.info(
+                f"[UNNAMED-BLANK] Suppressing notification for detection "
+                f"{species_result.get('detection_id')} "
+                f"(generic ';;;;;;animal' rollup, raw_top1="
+                f"{species_result.get('top_species_raw')}, "
+                f"score={species_result.get('top_species_score'):.3f} < "
+                f"threshold="
+                f"{self.config.performance.unnamed_animal_blank_mute_threshold:.3f})"
             )
         elif is_blurry_review:
             logger.info(

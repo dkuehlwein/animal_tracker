@@ -725,3 +725,42 @@ class TestBlankConfidenceMuteThresholdGuardrailsBounds:
 
 if __name__ == '__main__':
     pytest.main([__file__])
+
+
+class TestUnnamedAnimalBlankMuteThreshold:
+    """Unnamed-Animal Blank-Raw Mute Gate (exp #32, 2026-09-19). Mutes BELOW
+    the threshold, so unlike every other gate here the FN-safe direction is
+    DOWN; 0.0 disables the gate entirely (the human-only rollback lever)."""
+
+    def test_default(self):
+        assert PerformanceConfig().unnamed_animal_blank_mute_threshold == 0.90
+
+    def test_env_override(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_UNNAMED_ANIMAL_BLANK_MUTE_THRESHOLD", "0.85")
+        assert PerformanceConfig(
+            _env_file=None
+        ).unnamed_animal_blank_mute_threshold == 0.85
+
+    def test_zero_is_valid_rollback_lever(self):
+        assert PerformanceConfig(
+            _env_file=None, unnamed_animal_blank_mute_threshold=0.0
+        ).unnamed_animal_blank_mute_threshold == 0.0
+
+    def test_one_is_valid(self):
+        assert PerformanceConfig(
+            _env_file=None, unnamed_animal_blank_mute_threshold=1.0
+        ).unnamed_animal_blank_mute_threshold == 1.0
+
+    def test_out_of_bounds_rejected(self):
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None, unnamed_animal_blank_mute_threshold=1.5)
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None, unnamed_animal_blank_mute_threshold=-0.1)
+
+    def test_loop_bounds_cannot_reach_the_animal_counter_example(self):
+        """The one animal-labelled blank-raw row scores 0.9722; the loop's
+        own upper bound must sit strictly below it."""
+        from loop.guardrails import BOUNDS
+        low, high = BOUNDS["PERFORMANCE_UNNAMED_ANIMAL_BLANK_MUTE_THRESHOLD"]
+        assert low == 0.0
+        assert high < 0.9722

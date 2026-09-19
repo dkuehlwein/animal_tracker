@@ -280,6 +280,35 @@ class PerformanceConfig(BaseSettings):
     # only a human editing the env file directly can set 0.0.
     blank_confidence_mute_threshold: float = 0.92
 
+    # Unnamed-Animal Blank-Raw Mute Gate (exp #32, 2026-09-19). SpeciesNet's
+    # fully-generic "<uuid>;;;;;;animal" rollup means "MegaDetector boxed
+    # something, the classifier could not name it"; it routes to IDENTIFIED
+    # and therefore fires a MAIN-channel species alert that bypasses every
+    # review-class mute path. Two such alerts landed on a demonstrably empty
+    # garden on 2026-09-19 (bursts 5365, 5374).
+    #
+    # Discriminator, measured over all 82 unnamed-animal rows corpus-wide
+    # (52 labelled): when the classifier's RAW top-1 over the crop NAMES an
+    # animal (bird, american crow, ...) the burst is real — 34/34 labelled
+    # rows are animals. When the raw top-1 is SpeciesNet's generic "blank"
+    # the two models disagree, and 6 of 8 labelled rows are false positives.
+    #
+    # The 2 blank-raw rows that ARE animals (ids 2212/2213, six minutes
+    # apart — effectively ONE visit, so n=1 independent counter-example)
+    # score 0.9722 and 0.9795. So the gate mutes only BELOW this threshold:
+    # it is a carve-out around a known counter-example, not an independently
+    # validated discriminator. At 0.90 it mutes 4/6 measured FPs (0.0561,
+    # 0.0594, 0.5901, 0.8411) and ZERO animal- or person-labelled rows, with
+    # a 0.072 margin under that counter-example. The protocol's mirrored
+    # rule min(animal)-0.02 would give 0.9522 and mute exactly the same four
+    # rows — nothing measured is given up by taking the wider margin, and
+    # lowering the threshold is the FN-safe direction for a mute-below gate.
+    #
+    # 0.0 DISABLES the gate (rollback lever), it does not mean "mute
+    # nothing by comparison" — wildlife_system.process_detection
+    # special-cases it, same convention as blank_confidence_mute_threshold.
+    unnamed_animal_blank_mute_threshold: float = 0.90
+
     # Leading-edge fix (2026-07-31): the human-proximity gate above is
     # backward-looking only (it mutes AFTER a HUMAN-status detection), so it
     # can never catch the LEADING EDGE of a human visit — burst 3909
@@ -456,6 +485,18 @@ class PerformanceConfig(BaseSettings):
         if not (low <= v <= high):
             raise ValueError(
                 f"PERFORMANCE_HUMAN_DEMOTED_WINDOW_SECONDS={v} out of allowed bounds [{low}, {high}]"
+            )
+        return v
+
+    @field_validator('unnamed_animal_blank_mute_threshold')
+    @classmethod
+    def validate_unnamed_animal_blank_mute_threshold_bounds(cls, v):
+        # Hardcoded [0.0, 1.0]; the loop's own tunable range is tighter (see
+        # loop.guardrails.BOUNDS). 0.0 is the human-only rollback lever.
+        low, high = 0.0, 1.0
+        if not (low <= v <= high):
+            raise ValueError(
+                f"PERFORMANCE_UNNAMED_ANIMAL_BLANK_MUTE_THRESHOLD={v} out of allowed bounds [{low}, {high}]"
             )
         return v
 

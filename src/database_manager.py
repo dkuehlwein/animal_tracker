@@ -72,6 +72,15 @@ class DatabaseManager:
         # on the initial INSERT (no detection_id dependency), same as
         # human_proximity_muted.
         "blank_confidence_muted": "BOOLEAN",
+        # Unnamed-Animal Blank-Raw Mute Gate (exp #32): True when an
+        # IDENTIFIED burst carrying SpeciesNet's fully-generic
+        # "<uuid>;;;;;;animal" rollup had a raw classifier top-1 of "blank"
+        # BELOW unnamed_animal_blank_mute_threshold (the two models
+        # disagree and the classifier is not even confident the crop is
+        # empty), False when the gate evaluated the burst and did not mute,
+        # NULL when the gate didn't apply (not an unnamed-animal burst, or
+        # disabled at threshold 0.0). Written on the initial INSERT.
+        "unnamed_animal_blank_muted": "BOOLEAN",
     }
 
     def init_database(self):
@@ -177,7 +186,8 @@ class DatabaseManager:
                      top_species_raw=None, top_species_score=None,
                      scene_similarity=None, scene_gate_muted=None,
                      review_sampled_out=None, human_proximity_muted=None,
-                     blank_confidence_muted=None) -> Optional[int]:
+                     blank_confidence_muted=None,
+                     unnamed_animal_blank_muted=None) -> Optional[int]:
         """Log a detection event to the database.
 
         The trailing keyword arguments are the Phase-1 richer-logging fields
@@ -200,6 +210,10 @@ class DatabaseManager:
         set directly on the initial INSERT. `blank_confidence_muted` is the
         Confident-Blank Mute Gate's decision (exp #29), same True/False/None
         convention and also set directly on the initial INSERT.
+        `unnamed_animal_blank_muted` is the Unnamed-Animal Blank-Raw Mute
+        Gate's decision (exp #32) — True/False only for IDENTIFIED bursts
+        carrying the generic ";;;;;;animal" rollup, None when the gate
+        didn't apply; also set on the initial INSERT.
         """
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -240,6 +254,7 @@ class DatabaseManager:
                     "review_sampled_out": review_sampled_out,
                     "human_proximity_muted": human_proximity_muted,
                     "blank_confidence_muted": blank_confidence_muted,
+                    "unnamed_animal_blank_muted": unnamed_animal_blank_muted,
                 }
                 columns = ", ".join(values)
                 placeholders = ", ".join("?" * len(values))
