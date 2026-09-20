@@ -315,50 +315,50 @@
   ],
   "last_heartbeat_loopday": "2026-09-20",
   "last_metrics": {
-    "date": "2026-09-19",
+    "date": "2026-09-20",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.6736564604120674,
-      0.9290737555663471
+      0.071479212752109,
+      0.5907245696898311
     ],
     "fp_claude_ci": [
-      0.8045593626380625,
-      0.9929037664980127
+      0.0,
+      0.43448246478317476
     ],
-    "fp_claude_count": 24,
-    "fp_claude_rate": 0.96,
-    "fp_count": 26,
+    "fp_claude_count": 0,
+    "fp_claude_rate": 0.0,
+    "fp_count": 2,
     "fp_human_ci": [
-      0.09677141110578041,
-      0.700006684861608
+      0.2076596008020477,
+      0.9385080552796037
     ],
     "fp_human_count": 2,
-    "fp_human_rate": 0.3333333333333333,
+    "fp_human_rate": 0.6666666666666666,
     "fp_md_ci": [
       0.0,
       1.0
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.8387096774193549,
+    "fp_rate": 0.25,
     "fp_trustworthy": true,
-    "labeled_triggers": 31,
+    "labeled_triggers": 8,
     "n_cant_tell": 0,
-    "n_claude": 25,
-    "n_human": 6,
+    "n_claude": 5,
+    "n_human": 3,
     "n_human_suppressed": 0,
     "n_md": 0,
-    "n_sampled_out": 12,
+    "n_sampled_out": 1,
     "n_unlabeled": 0,
-    "total_triggers": 31
+    "total_triggers": 8
   },
   "last_scene_change_alert_loopday": "2026-09-13",
   "last_tick_completed_day": "2026-09-19",
   "nightly_verdict": "Busy night: 31 alerts, and a blackbird visited the pond mid-morning \u2014 this time the camera recognised it in all four of its bursts, unlike yesterday. Every one of the other 26 alerts was wind in the bamboo. Two of those were announced as \"animal detected\" in the main channel on a plainly empty garden, so I shipped a fix that mutes exactly that kind of false alarm; checked against every such alert ever recorded, it would have silenced four real false alarms and no real animals.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5387
+  "watermark": 5395
 }
