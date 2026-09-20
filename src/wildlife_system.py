@@ -26,7 +26,7 @@ from database_manager import DatabaseManager
 from species_identifier import SpeciesIdentifier
 from notification_service import NotificationService
 from resource_manager import SystemMonitor, StorageManager
-from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnalyzer, get_species_emoji, extract_common_name, is_unnamed_animal_label, is_blank_label
+from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnalyzer, get_species_emoji, extract_common_name, is_unnamed_animal_label, is_blank_label, is_named_animal_label
 from feedback_protocol import build_feedback_keyboard
 from timelapse_writer import TimelapseWriter
 from data_models import DetectionStatus, is_review_detection, is_human_detection
@@ -132,6 +132,23 @@ class WildlifeSystem:
             logger.warning(
                 f"Human-proximity gate: failed to seed last-human timestamp at "
                 f"startup (continuing with no prior human detection): {e}"
+            )
+
+        # Animal-Proximity Review Exemption (exp #33,
+        # animal-proximity-review-exemption, 2026-09-20): timestamp of the
+        # most recent IDENTIFIED detection naming a real animal, seeded from
+        # the DB so a restart doesn't lose the look-back window. Fail-open by
+        # construction — a seeding error just leaves this at None, which
+        # process_detection treats identically to "no prior named-animal
+        # detection" (the exemption never fires).
+        self._last_animal_detection_at: Optional[datetime] = None
+        try:
+            self._last_animal_detection_at = self.database.get_last_animal_detection_time()
+        except Exception as e:
+            logger.warning(
+                f"Animal-proximity exemption: failed to seed last-animal "
+                f"timestamp at startup (continuing with no prior animal "
+                f"detection): {e}"
             )
 
         # Human-density condition (exp #11 extension, 2026-07-28): rolling
@@ -665,6 +682,21 @@ class WildlifeSystem:
                 self._recent_human_detection_times.append(timestamp)
                 self._count_recent_human_detections(timestamp)  # prune now, not just at use
 
+            # Animal-Proximity Review Exemption (exp #33,
+            # animal-proximity-review-exemption, 2026-09-20): track the most
+            # recent IDENTIFIED detection naming a real, specific animal (see
+            # utils.is_named_animal_label) so a shortly-following
+            # review-class burst can be exempted from the Review Sampling
+            # Gate below (SpeciesNet sometimes misses a plainly visible
+            # animal on one burst of a multi-burst visit while naming it on
+            # another — see PerformanceConfig.animal_proximity_window_seconds
+            # for the measured 5388/5389 case). Independent of the
+            # human-proximity if/elif chain above — IDENTIFIED is neither
+            # review-class nor HUMAN-status, so this never collides with it.
+            if (species_result.status == DetectionStatus.IDENTIFIED
+                    and is_named_animal_label(species_result.species_name)):
+                self._last_animal_detection_at = timestamp
+
             # Unnamed-Animal Blank-Raw Mute Gate (exp #32, 2026-09-19).
             # SpeciesNet's fully-generic "<uuid>;;;;;;animal" rollup routes
             # to IDENTIFIED, so it fires a MAIN-channel species alert that
@@ -745,6 +777,50 @@ class WildlifeSystem:
             logger.info(f"Detection {detection_id} logged: {species_result.species_name} "
                         f"(total time: {species_result.processing_time:.2f}s, motion: {motion_area} pixels)")
 
+            # Animal-Proximity Review Exemption (exp #33,
+            # animal-proximity-review-exemption, 2026-09-20): a review-class
+            # burst landing shortly after a named-animal IDENTIFIED detection
+            # is exempted from the Review Sampling Gate below ONLY — it does
+            # not touch any earlier-precedence mute gate (Human/Privacy,
+            # Human-Proximity, Blur, Confident-Blank, Scene), all of which
+            # were already computed above this point in process_detection and
+            # are persisted/consumed independently of review_sampled_out;
+            # this can only flip review_sampled_out from True to False, never
+            # override one of those gates' own mute flags. Deliberately not
+            # persisted as a new DB column — a burst's exemption is
+            # reconstructable offline since _review_sample_fraction is
+            # deterministic on detection_id.
+            #
+            # Measured, not guessed (see
+            # PerformanceConfig.animal_proximity_window_seconds): the Review
+            # Sampling Gate is the ONLY mute path that ever suppressed a
+            # review-class burst within 180s of a named-animal IDENTIFIED
+            # burst, corpus-wide; 3 of 6 such sampled-out rows are
+            # human/tier-2-labelled animal (closest gaps 25s), the nearest
+            # false_positive-labelled row sits at 206s.
+            #
+            # Fails open to today's (unexempted) behaviour on any exception,
+            # a None/zero window, or no prior named-animal detection.
+            animal_proximity_exempt = False
+            try:
+                animal_window = self.config.performance.animal_proximity_window_seconds
+                last_animal = self._last_animal_detection_at
+                if (is_review_detection(species_result.status)
+                        and animal_window > 0
+                        and last_animal is not None):
+                    elapsed_animal = (timestamp - last_animal).total_seconds()
+                    animal_proximity_exempt = bool(0 <= elapsed_animal <= animal_window)
+                    if animal_proximity_exempt:
+                        logger.info(
+                            f"[ANIMAL-PROXIMITY] Exempting detection "
+                            f"{detection_id} from the review sampling gate: "
+                            f"{elapsed_animal:.0f}s after last named-animal "
+                            f"detection (window {animal_window:.0f}s)"
+                        )
+            except Exception as e:
+                logger.error(f"Error computing animal-proximity review exemption: {e}")
+                animal_proximity_exempt = False
+
             # REVIEW-channel sampling gate: only a configurable fraction of
             # review-class bursts are actually sent to Telegram (everything
             # is still species-ID'd and DB-logged above, unconditionally).
@@ -755,9 +831,12 @@ class WildlifeSystem:
             # persisted via a small follow-up UPDATE instead.
             review_sampled_out = None
             if is_review_detection(species_result.status):
-                review_sampled_out = is_review_sampled_out(
-                    detection_id, self.config.performance.review_sample_rate
-                )
+                if animal_proximity_exempt:
+                    review_sampled_out = False
+                else:
+                    review_sampled_out = is_review_sampled_out(
+                        detection_id, self.config.performance.review_sample_rate
+                    )
                 if detection_id is not None:
                     self.database.update_review_sampled_out(detection_id, review_sampled_out)
 

@@ -815,6 +815,88 @@ def test_get_last_human_detection_time_no_rows_returns_none(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# get_last_animal_detection_time (Animal-Proximity Review Exemption, exp #33,
+# animal-proximity-review-exemption, 2026-09-20)
+# ---------------------------------------------------------------------------
+
+def test_get_last_animal_detection_time_returns_most_recent_named_animal_row(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    id_older = db.log_detection(
+        image_path="capture_older_animal.jpg", motion_area=10,
+        species_name="uuid;mammalia;carnivora;felidae;felis;catus;domestic cat",
+        detection_status="identified",
+    )
+    id_newer = db.log_detection(
+        image_path="capture_newer_animal.jpg", motion_area=10,
+        species_name="aves;;;;;bird",
+        detection_status="identified",
+    )
+    _age_row(db_path, id_older, hours_ago=2)
+    newer_ts = _age_row(db_path, id_newer, hours_ago=1)
+
+    result = db.get_last_animal_detection_time()
+
+    assert result == datetime.strptime(newer_ts, "%Y-%m-%d %H:%M:%S")
+
+
+def test_get_last_animal_detection_time_ignores_unnamed_animal_rollup(tmp_path):
+    """The fully-generic '<uuid>;;;;;;animal' rollup is IDENTIFIED-status but
+    not a NAMED animal — must not anchor the exemption window."""
+    db, db_path = _make_db(tmp_path)
+    id_unnamed = db.log_detection(
+        image_path="capture_unnamed.jpg", motion_area=10,
+        species_name="1f689929-d0e3-4ac6-8016-16aacd8d0dbe;;;;;;animal",
+        detection_status="identified",
+    )
+    _age_row(db_path, id_unnamed, hours_ago=1)
+
+    assert db.get_last_animal_detection_time() is None
+
+
+def test_get_last_animal_detection_time_ignores_blank_rollup(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    id_blank = db.log_detection(
+        image_path="capture_blank.jpg", motion_area=10,
+        species_name="uuid;;;;;;blank",
+        detection_status="identified",
+    )
+    _age_row(db_path, id_blank, hours_ago=1)
+
+    assert db.get_last_animal_detection_time() is None
+
+
+def test_get_last_animal_detection_time_ignores_homo_rows(tmp_path):
+    """A homo-taxonomy label should never anchor this gate, even if somehow
+    logged as IDENTIFIED (defensive — humans normally route to HUMAN)."""
+    db, db_path = _make_db(tmp_path)
+    id_homo = db.log_detection(
+        image_path="capture_homo.jpg", motion_area=10,
+        species_name="uuid;mammalia;primates;hominidae;homo;sapiens;human",
+        detection_status="identified",
+    )
+    _age_row(db_path, id_homo, hours_ago=1)
+
+    assert db.get_last_animal_detection_time() is None
+
+
+def test_get_last_animal_detection_time_ignores_non_identified_rows(tmp_path):
+    db, db_path = _make_db(tmp_path)
+    id_review = db.log_detection(
+        image_path="capture_review.jpg", motion_area=10,
+        species_name="uuid;mammalia;carnivora;felidae;felis;catus;domestic cat",
+        detection_status="no_animal",
+    )
+    _age_row(db_path, id_review, hours_ago=1)
+
+    assert db.get_last_animal_detection_time() is None
+
+
+def test_get_last_animal_detection_time_no_rows_returns_none(tmp_path):
+    db, _ = _make_db(tmp_path)
+    assert db.get_last_animal_detection_time() is None
+
+
+# ---------------------------------------------------------------------------
 # get_recent_human_detection_times (human-density condition, exp #11
 # extension, 2026-07-28)
 # ---------------------------------------------------------------------------

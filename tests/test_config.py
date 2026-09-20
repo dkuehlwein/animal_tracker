@@ -457,6 +457,45 @@ class TestHumanProximityWindowConfig:
         assert PerformanceConfig(_env_file=None).human_proximity_window_seconds == 600.0
 
 
+class TestAnimalProximityWindowConfig:
+    """Animal-Proximity Review Exemption config knob (exp #33,
+    animal-proximity-review-exemption, 2026-09-20): exempt a review-class
+    burst within N seconds of a named-animal IDENTIFIED detection from the
+    Review Sampling Gate only."""
+
+    def test_default(self):
+        from config import PerformanceConfig
+        assert PerformanceConfig().animal_proximity_window_seconds == 180.0
+
+    def test_env_override(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS", "60")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).animal_proximity_window_seconds == 60.0
+
+    def test_zero_disables_exemption_is_a_valid_value(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS", "0")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).animal_proximity_window_seconds == 0.0
+
+    def test_rejects_out_of_bounds(self, monkeypatch):
+        # BOUNDS["PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS"] = (0.0, 600.0)
+        monkeypatch.setenv("PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS", "700")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+    def test_rejects_below_bound(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS", "-1")
+        from config import PerformanceConfig
+        with pytest.raises(ValidationError):
+            PerformanceConfig(_env_file=None)
+
+    def test_accepts_upper_bound(self, monkeypatch):
+        monkeypatch.setenv("PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS", "600")
+        from config import PerformanceConfig
+        assert PerformanceConfig(_env_file=None).animal_proximity_window_seconds == 600.0
+
+
 class TestHumanDensityConfig:
     """Human-density condition (exp #11 mechanism extension, 2026-07-28):
     OR-ed onto the human-proximity gate to catch leaks that fall OUTSIDE the

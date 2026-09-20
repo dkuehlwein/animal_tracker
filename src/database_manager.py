@@ -7,6 +7,7 @@ from typing import List, Optional
 from config import Config
 from data_models import DetectionRecord
 from exceptions import DatabaseError, DatabaseConnectionError, DatabaseOperationError
+from utils import is_named_animal_label
 
 logger = logging.getLogger(__name__)
 
@@ -681,6 +682,45 @@ class DatabaseManager:
             raise DatabaseOperationError(f"Failed to get last human detection time: {e}") from e
         except Exception as e:
             raise DatabaseError(f"Unexpected error getting last human detection time: {e}") from e
+
+    def get_last_animal_detection_time(self) -> Optional[datetime]:
+        """Return the timestamp of the most recent IDENTIFIED detection whose
+        species_name names a real, specific animal — not SpeciesNet's
+        fully-generic unnamed-animal/blank rollups, and not a human/'homo'
+        taxonomy leak.
+
+        Used to seed the Animal-Proximity Review Exemption's in-memory state
+        (`WildlifeSystem._last_animal_detection_at`, exp #33,
+        animal-proximity-review-exemption) at startup, so a restart doesn't
+        lose the look-back window. Modeled on `get_last_human_detection_time`.
+
+        The SQL WHERE clause below is a loose pre-filter only (cheap to push
+        into SQLite, narrow enough to keep the scanned row count small) —
+        `utils.is_named_animal_label` is the actual authority and is applied
+        in Python to each candidate row, most-recent first, so a row that
+        merely slips past the SQL filter can never override the stricter
+        Python check.
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    SELECT timestamp, species_name
+                    FROM detections
+                    WHERE detection_status = 'identified'
+                      AND species_name IS NOT NULL
+                      AND species_name != ''
+                      AND LOWER(species_name) NOT LIKE '%homo%'
+                    ORDER BY timestamp DESC
+                ''')
+                for row in cursor.fetchall():
+                    if is_named_animal_label(row[1]):
+                        return datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
+                return None
+        except sqlite3.Error as e:
+            raise DatabaseOperationError(f"Failed to get last animal detection time: {e}") from e
+        except Exception as e:
+            raise DatabaseError(f"Unexpected error getting last animal detection time: {e}") from e
 
     def get_recent_human_detection_times(self, since: datetime) -> List[datetime]:
         """Return timestamps of all HUMAN-status detections at/after `since`.

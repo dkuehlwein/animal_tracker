@@ -149,6 +149,52 @@ def is_blank_label(taxonomy_label: str) -> bool:
     return not any(_strip_animal_label_sentinel(p) for p in parts[1:-1])
 
 
+def is_named_animal_label(taxonomy_label: str) -> bool:
+    """True when a SpeciesNet label names a specific animal — the inverse
+    shape-check from ``is_unnamed_animal_label``/``is_blank_label`` above,
+    used by the Animal-Proximity Review Exemption (exp #33,
+    animal-proximity-review-exemption, 2026-09-20) to find the most recent
+    IDENTIFIED detection worth anchoring a look-back window on.
+
+    A label counts as "named" when:
+      - it is NOT the fully-generic unnamed-animal rollup
+        (``is_unnamed_animal_label``, e.g. ``uuid;;;;;;animal``);
+      - it is NOT the explicit blank/empty-frame verdict
+        (``is_blank_label``, e.g. ``uuid;;;;;;blank``);
+      - it does not carry a human taxonomy segment (``homo``,
+        case-insensitive) — defensive: humans normally route to
+        ``DetectionStatus.HUMAN`` well before this helper is ever
+        consulted, but this is the privacy-adjacent anchor for a gate that
+        *unmutes* notifications, so it doesn't assume that has already
+        happened;
+      - at least one segment after the model's leading UUID segment is
+        non-empty and not one of SpeciesNet's sentinel values (``no cv
+        result``, ``blank``) — same sentinel-aware walk used by the two
+        siblings above, so a fully-empty or fully-sentinel label (e.g. from
+        a parse error) is correctly treated as NOT a named animal.
+
+    ``taxonomy_label``'s first segment is the model's UUID for the
+    prediction class, not taxonomy, and is ignored (except for the 'homo'
+    check, which scans every segment defensively).
+
+    Returns False for None, '', non-string, or otherwise malformed input;
+    never raises — this feeds a notification-routing gate, so it must fail
+    closed to "not a named animal" rather than blow up a detection.
+    """
+    try:
+        parts = [p.strip() for p in (taxonomy_label or '').split(';')]
+    except AttributeError:
+        return False
+    if len(parts) < 2:
+        return False
+    if is_unnamed_animal_label(taxonomy_label) or is_blank_label(taxonomy_label):
+        return False
+    if any(p.lower() == 'homo' for p in parts):
+        return False
+    # parts[0] is the model's UUID for the class, not taxonomy.
+    return any(_strip_animal_label_sentinel(p) for p in parts[1:])
+
+
 class PerformanceTimer:
     """Performance timing utility."""
 

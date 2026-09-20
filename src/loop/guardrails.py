@@ -124,6 +124,12 @@ BOUNDS: dict[str, tuple[float, float]] = {
     # it. The config-level field_validator still allows 0.0 so a human can
     # disable the gate by hand (the rollback lever).
     "PERFORMANCE_UNNAMED_ANIMAL_BLANK_MUTE_THRESHOLD": (0.0, 0.9522),
+    # Animal-Proximity Review Exemption (exp #33, 2026-09-20): a review-class
+    # burst within this many seconds of the most recent named-animal
+    # IDENTIFIED detection is exempted from the Review Sampling Gate only
+    # (see config.py's field comment for the measured 5388/5389 case and the
+    # corpus-wide 180s/206s margin). 0.0 = disabled (rollback lever).
+    "PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS": (0.0, 600.0),
 }
 
 FEEDBACK_STARVED_DAYS = 3

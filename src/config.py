@@ -309,6 +309,36 @@ class PerformanceConfig(BaseSettings):
     # special-cases it, same convention as blank_confidence_mute_threshold.
     unnamed_animal_blank_mute_threshold: float = 0.90
 
+    # Animal-Proximity Review Exemption (exp #33,
+    # animal-proximity-review-exemption, 2026-09-20). SpeciesNet sometimes
+    # misses a plainly visible animal on some bursts of a multi-burst visit
+    # while naming it on others: burst 5388 (09:12:59) was correctly
+    # IDENTIFIED as "aves;;;;;bird"; burst 5389, the same blackbird 25s
+    # later, came back unclassifiable (review-class), and the Review
+    # Sampling Gate then sampled it out — a silent false negative that
+    # never reached Telegram at all.
+    #
+    # Measured corpus-wide: the Review Sampling Gate is the ONLY mute path
+    # that ever suppresses a review-class burst shortly after a
+    # *named*-animal IDENTIFIED burst — the human-proximity, blur,
+    # confident-blank and scene gates muted zero such rows, ever. Six rows
+    # were sampled out within 180s of a named-animal identification; three
+    # are human/tier-2-labelled animal (gaps 25s, 25s, 124s). The nearest
+    # false_positive-labelled row sits at 206s, so a 180s window recovers
+    # every known animal with margin and stops short of the nearest known
+    # FP.
+    #
+    # A review-class burst landing within this many seconds after the most
+    # recent named-animal IDENTIFIED detection (see utils.is_named_animal_label)
+    # is exempted from the Review Sampling Gate ONLY — every earlier-precedence
+    # mute gate (Human/Privacy, Human-Proximity, Blur, Confident-Blank, Scene)
+    # is unaffected and still suppresses as before; this can only flip a
+    # burst's review_sampled_out from True to False, never override an
+    # earlier gate's own mute flag. 0.0 disables the exemption entirely
+    # (rollback lever) — the sampling gate then behaves exactly as before
+    # this change.
+    animal_proximity_window_seconds: float = 180.0
+
     # Leading-edge fix (2026-07-31): the human-proximity gate above is
     # backward-looking only (it mutes AFTER a HUMAN-status detection), so it
     # can never catch the LEADING EDGE of a human visit — burst 3909
@@ -511,6 +541,16 @@ class PerformanceConfig(BaseSettings):
         if not (low <= v <= high):
             raise ValueError(
                 f"PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD={v} out of allowed bounds [{low}, {high}]"
+            )
+        return v
+
+    @field_validator('animal_proximity_window_seconds')
+    @classmethod
+    def validate_animal_proximity_window_seconds_bounds(cls, v):
+        low, high = _BOUNDS["PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS"]
+        if not (low <= v <= high):
+            raise ValueError(
+                f"PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS={v} out of allowed bounds [{low}, {high}]"
             )
         return v
 

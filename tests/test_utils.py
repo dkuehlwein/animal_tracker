@@ -137,3 +137,82 @@ def test_is_blank_label_malformed_non_string_input_no_crash():
     from utils import is_blank_label
     assert is_blank_label(12345) is False
     assert is_blank_label(["not", "a", "string"]) is False
+
+
+# ---------------------------------------------------------------------------
+# is_named_animal_label (exp #33, animal-proximity-review-exemption,
+# 2026-09-20): the inverse shape-check from is_unnamed_animal_label/
+# is_blank_label above — True iff the label names a real, specific animal:
+# not the generic unnamed-animal rollup, not the blank verdict, no 'homo'
+# taxonomy segment, and at least one non-empty non-sentinel segment.
+# ---------------------------------------------------------------------------
+
+def test_is_named_animal_label_specific_species_is_named():
+    from utils import is_named_animal_label
+    assert is_named_animal_label(
+        "uuid;mammalia;carnivora;felidae;felis;catus;domestic cat"
+    ) is True
+
+
+def test_is_named_animal_label_generic_class_rollup_is_named():
+    """'aves;;;;;bird' names a class-level rollup (a bird) — still a real,
+    specific-enough animal name, distinct from the bare 'animal' rollup."""
+    from utils import is_named_animal_label
+    assert is_named_animal_label("aves;;;;;bird") is True
+
+
+def test_is_named_animal_label_unnamed_animal_rollup_not_named():
+    from utils import is_named_animal_label
+    assert is_named_animal_label(
+        "1f689929-d0e3-4ac6-8016-16aacd8d0dbe;;;;;;animal"
+    ) is False
+
+
+def test_is_named_animal_label_blank_prediction_not_named():
+    from utils import is_named_animal_label
+    assert is_named_animal_label("uuid;;;;;;blank") is False
+
+
+def test_is_named_animal_label_homo_segment_not_named():
+    from utils import is_named_animal_label
+    assert is_named_animal_label(
+        "uuid;mammalia;primates;hominidae;homo;sapiens;human"
+    ) is False
+
+
+def test_is_named_animal_label_homo_segment_case_insensitive_not_named():
+    from utils import is_named_animal_label
+    assert is_named_animal_label(
+        "uuid;mammalia;primates;hominidae;HOMO;sapiens;human"
+    ) is False
+
+
+def test_is_named_animal_label_all_sentinel_segments_not_named():
+    """Every taxonomy segment is a SpeciesNet sentinel ('no cv result') and
+    the last segment is also a sentinel — nothing real is named."""
+    from utils import is_named_animal_label
+    assert is_named_animal_label(
+        "uuid;no cv result;no cv result;no cv result;"
+        "no cv result;no cv result;no cv result"
+    ) is False
+
+
+def test_is_named_animal_label_empty_string():
+    from utils import is_named_animal_label
+    assert is_named_animal_label("") is False
+
+
+def test_is_named_animal_label_none():
+    from utils import is_named_animal_label
+    assert is_named_animal_label(None) is False
+
+
+def test_is_named_animal_label_single_segment_no_uuid_shape():
+    from utils import is_named_animal_label
+    assert is_named_animal_label("animal") is False
+
+
+def test_is_named_animal_label_malformed_non_string_input_no_crash():
+    from utils import is_named_animal_label
+    assert is_named_animal_label(12345) is False
+    assert is_named_animal_label(["not", "a", "string"]) is False
