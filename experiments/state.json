@@ -363,7 +363,7 @@
     "total_triggers": 8
   },
   "last_scene_change_alert_loopday": "2026-09-13",
-  "last_tick_completed_day": "2026-09-19",
+  "last_tick_completed_day": "2026-09-20",
   "nightly_verdict": "Very quiet day - only 8 alerts, and a blackbird came to the pond in the morning. The camera recognised it in one burst but not in the next one 25 seconds later, and that second burst was thrown away unseen by the random sampling that keeps the review channel small - so I shipped a change that always lets through the quiet 'nothing found' alerts that arrive within three minutes of a confirmed animal.",
   "paused": false,
   "pending_restart_at": "2026-09-21T03:25:00",
