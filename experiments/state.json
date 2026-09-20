@@ -224,6 +224,13 @@
       "slug": "unnamed-animal-blank-mute",
       "status": "running",
       "validation": "live"
+    },
+    {
+      "hypothesis": "ACTIVATED + SHIPPED 2026-09-20 (commit ea652bc, restart-gated 09-21T03:25). Second measured instance of backlog #31 in three days: burst 5389 held a blackbird plainly visible in-frame 25s after the SAME bird was correctly IDENTIFIED in 5388, came back 'unclassifiable', and was then discarded by the Review Sampling Gate's context-free coin flip -- it reached Telegram in no form at all. The pipeline miss (#31) has no env lever, but the SECOND failure does: sampling has no notion that an animal was on camera nine seconds ago. Measured corpus-wide over 166 named-animal IDENTIFIED anchors: of the review-class rows landing within 180s of one, the human-proximity, blur, confident-blank and scene gates have muted ZERO, ever -- sampling is the entire leak (6 rows), and 3 of those 6 are human/tier-2-labelled animal (gaps 25s, 25s, 124s) against the nearest false_positive-labelled row at 206s. So W=180 clears max(animal)=124 by 56s and stops 26s short of the nearest known FP, and exempting sampling ALONE is the complete fix for this class rather than a compromise. Cost ~6 extra REVIEW sends over the 8 weeks sampling has been live (~0.75/week) at a 50% animal hit rate, vs the 1-catch-per-155-pings ratio that motivated sampling; zero person-labelled rows in the newly-sent set. Exempts the Review Sampling Gate ONLY: precedence Human/Privacy > Human-Proximity > Unnamed-Animal-Blank > Blur > Confident-Blank > Scene > Review Sampling (this exemption) > Deferred Send is unchanged, and the code can only flip review_sampled_out True->False, never override an earlier gate's mute -- two regression tests assert it. New PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS (180.0, bounds [0.0,600.0], 0 = disable = rollback lever), utils.is_named_animal_label, DatabaseManager.get_last_animal_detection_time, one [ANIMAL-PROXIMITY] log per exemption, no new DB column (the decision is reconstructable -- _review_sample_fraction is deterministic). Fails open everywhere; 715 tests pass. Nightly duty: adjudicate every exempted burst. Kill condition: five consecutive exemptions with no animal in any -> shrink toward 120s before disabling. See runs/0024.",
+      "id": 33,
+      "slug": "animal-proximity-review-exemption",
+      "status": "running",
+      "validation": "live"
     }
   ],
   "baselines": {
@@ -357,8 +364,8 @@
   },
   "last_scene_change_alert_loopday": "2026-09-13",
   "last_tick_completed_day": "2026-09-19",
-  "nightly_verdict": "Busy night: 31 alerts, and a blackbird visited the pond mid-morning \u2014 this time the camera recognised it in all four of its bursts, unlike yesterday. Every one of the other 26 alerts was wind in the bamboo. Two of those were announced as \"animal detected\" in the main channel on a plainly empty garden, so I shipped a fix that mutes exactly that kind of false alarm; checked against every such alert ever recorded, it would have silenced four real false alarms and no real animals.",
+  "nightly_verdict": "Very quiet day - only 8 alerts, and a blackbird came to the pond in the morning. The camera recognised it in one burst but not in the next one 25 seconds later, and that second burst was thrown away unseen by the random sampling that keeps the review channel small - so I shipped a change that always lets through the quiet 'nothing found' alerts that arrive within three minutes of a confirmed animal.",
   "paused": false,
-  "pending_restart_at": null,
+  "pending_restart_at": "2026-09-21T03:25:00",
   "watermark": 5395
 }

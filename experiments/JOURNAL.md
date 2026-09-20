@@ -2913,3 +2913,49 @@ Sampling > Deferral, fails open, 17 new tests, 681 pass.
 Nightly duty from 09-20: adjudicate every `unnamed_animal_blank_muted=1` burst.
 Pre-registered kill condition — **one** animal-labelled row in the muted band
 retires the threshold, **two** retire the gate.
+
+## 2026-09-20 — exp #33 (animal-proximity-review-exemption) opened + shipped ea652bc
+
+8 triggers, quietest day since 09-11; calm, no bamboo wind, service up all day
+(03:30 restart → 19:34 sunset stop, 0 errors). 1 animal visit, 1 person visit
+(4 bursts, all HUMAN-suppressed, 5392 a close-pass blur at pc 0.306 carried by
+the raw homo taxonomy check), 2 FPs (5390's 63k motion area is an AE step, not
+a subject). Daniel labelled 5388/5390/5391; tier-2 agreed 3/3. fp 0.25 (n=8).
+
+**The night's finding — backlog #31 recurs, and exposes a separable second
+failure.** 5388 (09:12:59) named the blackbird (`aves;;;;;bird` @0.749) and
+alerted MAIN. 5389, 25s later, **same bird plainly visible in frame1**, came
+back `unclassifiable` (raw blank @0.512) → review-class → lost the Review
+Sampling coin flip → never sent in any form. The pipeline miss (#31) has no env
+lever. But sampling discarding an animal's own wake does: that gate hashes
+`detection_id` and is blind to the fact an animal was on camera 25s earlier.
+
+Measured over 166 named-animal IDENTIFIED anchors corpus-wide, review-class
+rows landing within 180s of one: **scene, confident-blank, blur and
+human-proximity have muted ZERO such rows, ever.** Sampling muted 6 — three of
+them human/tier-2-labelled `animal` at gaps 25s/25s/124s, against the nearest
+`false_positive`-labelled row at 206s. So sampling is the entire leak, W=180
+clears max(animal)=124 by 56s and stops 26s short of the nearest known FP, and
+exempting sampling alone is the complete fix for the class, not a compromise.
+Cost ~6 extra sends across the 8 weeks sampling has been live (~0.75/wk) at a
+50% animal hit rate vs the 1-per-155 ratio that motivated sampling; zero
+person-labelled rows in the newly-sent set (first appears only at W≥300).
+
+Gates clear: exemption sits at the sampling position, below every human gate,
+can only flip `review_sampled_out` True→False; 2 regression tests assert an
+earlier gate still wins. FN-veto inapplicable in the blocking direction (sends
+more, recovers 3 known FNs). fp_rate label-conditioned, unaffected. Shipped
+`ea652bc`, restart-gated 09-21T03:25, new
+`PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS` (180.0, `0` = rollback lever),
+no new DB column (reconstructable — `_review_sample_fraction` is
+deterministic), 715 tests pass.
+
+Mute-gate audit: 0 mutes of any kind tonight. Confident-blank evaluated 3 rows
+(0.512/0.862/0.738, T=0.92) — and 5389 is a **new animal-side data point at
+0.512**, well under the 0.8475 ceiling the threshold was built on. Scene gate
+0.736/0.829, nowhere near T=0.982. Exp #32 unexercised (no `;;;;;;animal`
+burst), as its ~1.5/month base rate predicts. Recorded against exp #32, not as
+a kill-condition event: 5389 shows a low-confidence blank raw top-1 CAN
+co-occur with a real animal — outside that gate's `;;;;;;animal` population, so
+the pre-registered condition has not fired, but it is the vulnerability its n=1
+carve-out was flagged for. Watch.
