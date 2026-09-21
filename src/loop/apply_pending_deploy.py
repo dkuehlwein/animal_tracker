@@ -20,6 +20,23 @@ if str(_SRC) not in sys.path:
 from loop import state as state_mod  # noqa: E402
 
 
+def _as_aware(ts: str) -> datetime:
+    """Parse an ISO stamp, treating an offset-naive one as local time.
+
+    pending_restart_at is stamped by loop.deploy for env deltas but written by
+    hand for code-only experiments, and a hand-written stamp easily omits the
+    UTC offset. Comparing naive against aware raises TypeError, which crashed
+    wildlife-deploy.service on 2026-09-21 and silently skipped the restart
+    (the stamp is only cleared on the success path, so it would have failed
+    every night thereafter). Local time is the right reading: every stamp this
+    loop writes is a local pre-sunrise wall-clock time.
+    """
+    dt = datetime.fromisoformat(ts)
+    if dt.tzinfo is None:
+        dt = dt.astimezone()
+    return dt
+
+
 def _restart_camera() -> None:
     subprocess.run(
         ["sudo", "-n", "systemctl", "restart", "wildlife-camera.service"], check=True
@@ -32,7 +49,7 @@ def apply(state_path, now_iso: str, restart_fn=_restart_camera) -> dict:
     pending = st.get("pending_restart_at")
     if not pending:
         return {"restarted": False, "reason": "no pending deploy"}
-    if datetime.fromisoformat(pending) > datetime.fromisoformat(now_iso):
+    if _as_aware(pending) > _as_aware(now_iso):
         return {"restarted": False, "reason": "pending deploy not due yet"}
 
     restart_fn()
