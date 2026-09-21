@@ -231,6 +231,20 @@
       "slug": "animal-proximity-review-exemption",
       "status": "running",
       "validation": "live"
+    },
+    {
+      "hypothesis": "ACTIVATED + SHIPPED 2026-09-21 (commit 6d13364, restart-gated 09-22T03:25+02:00). wildlife-deploy.service crashed at 03:30 on 09-21 with \"can't compare offset-naive and offset-aware datetimes\": apply_pending_deploy compared pending_restart_at against a tz-aware now, and last tick hand-wrote a naive stamp because exp #33 was code-only (no env delta => loop.deploy never ran => nothing normalised the stamp). The camera was NOT restarted, so exp #33 (ea652bc) never went live and has had zero measurement nights. Self-perpetuating: pending_restart_at is cleared only on the success path, so every subsequent night would have failed identically on the same string \u2014 a permanent silent halt of the loop's only actuator, invisible to the nightly report (which reads state.json, not systemd). Fixed at the READER (_as_aware coerces a naive stamp to local time), not the writer, since the reader is the single chokepoint every stamp passes through. 3 red-first regression tests; 718 passed. STANDING DUTY for every future tick: check `systemctl is-failed wildlife-deploy.service` before trusting that last tick's experiment is live. Rollback: git revert 6d13364.",
+      "id": 34,
+      "slug": "deploy-stamp-tz-crash",
+      "status": "running",
+      "validation": "live"
+    },
+    {
+      "hypothesis": "REJECTED ON MEASUREMENT 2026-09-21 \u2014 do not re-derive. Idea: 8 of 10 triggers on 09-21 (and a large share corpus-wide) put their dominant motion blob in the wind-blown bamboo in the upper-right corner, so exclude that corner from motion detection. Measured motion-blob centroids over all 248 labelled bursts with frames still on disk (220 FP / 23 animal / 5 person) BEFORE proposing it: every candidate zone costs animals. x>=0.72,y<=0.30 removes 73/220 FP (33%) but loses 3/23 animals (13%); x>=0.70,y<=0.35 loses 4/23 (17%); x>=0.65,y<=0.40 loses 4/23; even the tightest x>=0.75,y<=0.25 loses 3/23. The lost animals are 5125 (x=.896,y=.303), 5360 (.828/.125), 5362 (.848/.176), 5363 (.961/.238) \u2014 birds perch in the same bamboo that the wind moves. FN-veto: rejected. Distinct from exp #3, which rejected edge BANDS in June on an 18-row animal bucket and an older framing; this rejects the upper-right CORNER on the current framing with a 23-row bucket. Two independent measurements now agree: in this scene FP motion and animal motion are not spatially separable. See runs/0025.",
+      "id": 35,
+      "slug": "corner-roi-bamboo",
+      "status": "rejected-on-measurement",
+      "validation": "rejected"
     }
   ],
   "baselines": {
@@ -363,9 +377,9 @@
     "total_triggers": 10
   },
   "last_scene_change_alert_loopday": "2026-09-13",
-  "last_tick_completed_day": "2026-09-20",
-  "nightly_verdict": "Very quiet day - only 8 alerts, and a blackbird came to the pond in the morning. The camera recognised it in one burst but not in the next one 25 seconds later, and that second burst was thrown away unseen by the random sampling that keeps the review channel small - so I shipped a change that always lets through the quiet 'nothing found' alerts that arrive within three minutes of a confirmed animal.",
+  "last_tick_completed_day": "2026-09-21",
+  "nightly_verdict": "The camera quietly failed to restart this morning, so yesterday's improvement never actually went live \u2014 a date-format bug in the deploy step that would have blocked every future update too, silently. Fixed and tested; it and yesterday's change both go live overnight. The day itself was all wind: 10 alerts, every one the bamboo moving, no animals and no people.",
   "paused": false,
-  "pending_restart_at": "2026-09-21T03:25:00",
+  "pending_restart_at": "2026-09-22T03:25:00+02:00",
   "watermark": 5405
 }

@@ -2959,3 +2959,72 @@ a kill-condition event: 5389 shows a low-confidence blank raw top-1 CAN
 co-occur with a real animal — outside that gate's `;;;;;;animal` population, so
 the pre-registered condition has not fired, but it is the vulnerability its n=1
 carve-out was flagged for. Watch.
+
+## 2026-09-21 — exp #34 `deploy-stamp-tz-crash`: the loop's actuator was dead
+
+10 triggers, 10 tier-2 `false_positive`, fp 1.0 (CI 0.72-1.0), 0 human labels.
+Frame-differencing put 8 of 10 dominant motion blobs in the upper-right bamboo,
+2 on the yucca/wall. No animal, no person, in any frame. Windy-day signature.
+
+**The day's real content is that nothing has shipped since 09-20.**
+`wildlife-deploy.service` fired at 03:30:07 and exited 1 with
+`{"error": "can't compare offset-naive and offset-aware datetimes"}`.
+`apply_pending_deploy` compares `pending_restart_at` to
+`datetime.now().astimezone()` — always aware. The stamp is not always aware:
+`loop.deploy` normalises nothing, and for a **code-only experiment there is no
+env delta so `loop.deploy` never runs at all**, leaving last tick's
+hand-written `"2026-09-21T03:25:00"` bare. Every prior night carried `+02:00`.
+
+Three consequences, the second being the serious one:
+1. Exp #33 (ea652bc) never went live — `wildlife-camera` still shows
+   `ExecMainStartTimestamp=2026-09-20 03:30:07`, i.e. exp #32's build. Zero
+   measurement nights, not one.
+2. **Self-perpetuating.** `pending_restart_at` is cleared only *after*
+   `restart_fn()` returns, so the bad stamp survived its own crash and 09-22,
+   09-23, … would have raised the identical TypeError on the identical string.
+   Permanent silent halt of the loop's only actuator.
+3. **Unobservable from inside the loop.** The report reads `state.json`, not
+   systemd; a non-null `pending_restart_at` is indistinguishable from a healthy
+   pending deploy. The loop would have kept opening experiments, writing
+   notebooks and reporting verdicts forever while shipping nothing.
+
+Fixed at the **reader** (`_as_aware`, naive → local), not the writer: the
+writer is sometimes `loop.deploy` and sometimes a hand-written tick line, but
+the reader is the one chokepoint every stamp must cross. Local is correct, not
+a guess — every stamp this loop writes is local pre-sunrise wall-clock. 3
+red-first regression tests (the first reproduces the production TypeError
+verbatim; the second pins that coercion must not make a future naive stamp fire
+early), 718 pass. `6d13364`, re-stamped `2026-09-22T03:25:00+02:00`, verified
+by dry-run to fire at 03:29 and *not* at 21:00 tonight. Ships exp #34 and,
+finally, exp #33. `systemctl reset-failed` needs interactive auth and was not
+available; harmless — a timer starts a `failed` oneshot regardless.
+
+**Standing duty added:** check `systemctl is-failed wildlife-deploy.service`
+each tick before believing last tick's experiment is live.
+
+Mute-gate audit: 5399 blank-confidence muted (raw blank @0.941 ≥ 0.92), 5405
+blur muted (6.7 < 11.0), 5396/5398 sampled out — all four frames inspected,
+all empty, all correct. Scene gate muted 0 of 10 (sims 0.80-0.89 vs T=0.982);
+monitoring duty discharged vacuously. No HUMAN burst, so the human/proximity/
+deferral gates were inert by construction.
+
+Self-audit (protocol step 6): re-checked exp #30's scene-gate threshold on the
+enlarged corpus — 17 animal-labelled rows now carry `scene_similarity`, max
+0.9621 (id 5343), and the pre-registered `max(animal)+0.02` rule gives 0.9821
+against the deployed 0.982. Holds; no re-derivation. Note the shift: the gate
+was enabled 07-26 by human override *because* the animal bucket was empty and
+believed permanently so. 23 animal-labelled bursts now have frames on disk. The
+accepted-risk override has been retroactively earned.
+
+Rejected on measurement (backlog #35, `corner-roi-bamboo`): with 8/10 triggers
+in one bush, excluding that corner is the obvious move — measured first, and it
+dies. Over 248 labelled on-disk bursts (220 FP / 23 animal / 5 person), every
+zone costs animals: x≥0.72,y≤0.30 removes 33% of FP but 13% of animals; loosen
+it and animal loss hits 17%. The casualties are 5125/5360/5362/5363 — birds
+perch in the bamboo that the wind moves. Distinct from exp #3 (edge *bands*,
+June, 18-row bucket, older framing); this is the upper-right *corner* on the
+current framing with a 23-row bucket. Two independent measurements now agree:
+in this scene FP motion and animal motion are not spatially separable.
+
+No new behaviour experiment. Exp #33 lost its window to the crash and gets it
+back tonight; opening anything else would confound it.
