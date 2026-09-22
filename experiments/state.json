@@ -1,5 +1,5 @@
 {
-  "active_experiment_id": 21,
+  "active_experiment_id": 33,
   "backlog": [
     {
       "hypothesis": "CONCLUDED 2026-06-15 (keep). Same-channel \ud83d\udd0d REVIEW prefix on status\u2208{NO_ANIMAL,UNCLASSIFIABLE} flags 99% of FP at 0 FN; live since 06-12, location-agnostic. Second-channel routing is OUT per Daniel (no 2nd channel \u2014 adds overhead, won't click two). See runs/0001 + LEARNINGS.",
@@ -233,10 +233,10 @@
       "validation": "live"
     },
     {
-      "hypothesis": "ACTIVATED + SHIPPED 2026-09-21 (commit 6d13364, restart-gated 09-22T03:25+02:00). wildlife-deploy.service crashed at 03:30 on 09-21 with \"can't compare offset-naive and offset-aware datetimes\": apply_pending_deploy compared pending_restart_at against a tz-aware now, and last tick hand-wrote a naive stamp because exp #33 was code-only (no env delta => loop.deploy never ran => nothing normalised the stamp). The camera was NOT restarted, so exp #33 (ea652bc) never went live and has had zero measurement nights. Self-perpetuating: pending_restart_at is cleared only on the success path, so every subsequent night would have failed identically on the same string \u2014 a permanent silent halt of the loop's only actuator, invisible to the nightly report (which reads state.json, not systemd). Fixed at the READER (_as_aware coerces a naive stamp to local time), not the writer, since the reader is the single chokepoint every stamp passes through. 3 red-first regression tests; 718 passed. STANDING DUTY for every future tick: check `systemctl is-failed wildlife-deploy.service` before trusting that last tick's experiment is live. Rollback: git revert 6d13364.",
+      "hypothesis": "CONCLUDED 2026-09-22 (keep). An offset-naive pending_restart_at crashed wildlife-deploy.service before the camera restart, silently halting the loop's only actuator permanently (the bad stamp is cleared only on the success path, so it re-crashed every night). Fixed at the READER (_as_aware() coerces a naive stamp to local time), commit 6d13364, 3 red-first regression tests. Verified live 2026-09-22 03:30:03: service exit-0, {\"restarted\": true, \"reason\": \"applied deploy stamped 2026-09-22T03:25:00+02:00\"}, camera up on the new build, pending_restart_at back to null. Shipped both itself and the stranded exp #33. STANDING TICK PROCEDURE: read `systemctl is-failed wildlife-deploy.service` before trusting that the previous tick's experiment is live \u2014 state.json cannot tell you a deploy failed. See runs/0025.",
       "id": 34,
       "slug": "deploy-stamp-tz-crash",
-      "status": "running",
+      "status": "concluded",
       "validation": "live"
     },
     {
@@ -245,6 +245,13 @@
       "slug": "corner-roi-bamboo",
       "status": "rejected-on-measurement",
       "validation": "rejected"
+    },
+    {
+      "hypothesis": "OPENED 2026-09-22 as a mechanism candidate for backlog #31 (speciesnet-misses-visible-bird). Hypothesis: CAMERA_AE_EXPOSURE_MODE=short (shipped for the dusk fix, run 0006) now underexposes the scene enough to starve the species classifier, and that is why SpeciesNet misses plainly visible birds. MEASURED 2026-09-22 over all 286 labelled rows with frames still on disk (luma computed offline from the best frame): animal-labelled rows SpeciesNet identified (n=25) have luma min/med/max 17.5/73.4/97.2; animal-labelled rows it missed into review-class (n=6: 5176@57.7, 5214@74.7, 5342@56.5, 5344@52.0, 5345@50.6, 5389@17.4) median 54.3, five of six under 60. NOT SHIPPED and deliberately so: n=6, ranges overlap (hits reach 17.5), and the midday-luma-by-day series 09-01..09-22 is cloud-dominated not cleanly seasonal (45.5 -> 102.9 -> 49.0 -> 45.5). An exposure change alters EVERY captured frame and would confound exp #33 outright. CAMERA_AE_EXPOSURE_MODE is not in guardrails.BOUNDS. Re-measure when the miss bucket reaches ~15 rows. See runs/0024 night-1 section.",
+      "id": 36,
+      "slug": "underexposure-speciesnet-miss",
+      "status": "open",
+      "validation": "measured-underpowered"
     }
   ],
   "baselines": {
@@ -377,8 +384,8 @@
     "total_triggers": 7
   },
   "last_scene_change_alert_loopday": "2026-09-13",
-  "last_tick_completed_day": "2026-09-21",
-  "nightly_verdict": "The camera quietly failed to restart this morning, so yesterday's improvement never actually went live \u2014 a date-format bug in the deploy step that would have blocked every future update too, silently. Fixed and tested; it and yesterday's change both go live overnight. The day itself was all wind: 10 alerts, every one the bamboo moving, no animals and no people.",
+  "last_tick_completed_day": "2026-09-22",
+  "nightly_verdict": "This morning's restart worked, so yesterday's fix and the delayed improvement are both finally running. Best day yet: a blackbird visited the pond for three minutes and all five alerts came through correctly, while both false alarms were caught and silenced before reaching you.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5412

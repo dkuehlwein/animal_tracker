@@ -146,3 +146,130 @@ Nightly duty from 09-21: adjudicate every burst carrying an
 `[ANIMAL-PROXIMITY]` exemption. Pre-registered kill condition — if the
 exemption delivers **five consecutive** review-class bursts with no animal in
 any of them, the window is too wide; shrink toward 120s before disabling.
+
+---
+
+## Night 1 live (2026-09-22) — no firing opportunity, experiment continues
+
+Exp #33 shipped 09-20 but only reached the camera at **03:30:03 today**, when
+exp #34's `_as_aware()` fix let `wildlife-deploy.service` consume the stamp for
+the first time. This is its first measurement night, not its third.
+
+**The exemption did not fire, and could not have.** 7 triggers. The two
+review-class bursts sit 4.4h before (5406, 10:55) and 1.4h after (5412, 16:50)
+the day's only animal identification — nowhere near the 180s window. Zero
+`[ANIMAL-PROXIMITY]` lines in `wildlife.log`. The pre-registered kill condition
+(five consecutive exempted bursts with no animal) is untouched at 0. The
+experiment is neither confirmed nor refuted; it needs days on which a
+review-class burst actually lands inside the window.
+
+### What today did show: the FN class exp #33 exists to catch is real and recurring
+
+A single blackbird worked the pond edge from **15:22:08 to 15:25:11** — five
+consecutive bursts, 5407-5411, all adjudicated `animal` tier-2 on visual
+inspection. SpeciesNet identified all five and every one reached MAIN:
+
+| id | ensemble label | conf | raw top-1 | sharp | luma |
+|---|---|---|---|---|---|
+| 5407 | `aves;;;;;bird` | 0.662 | `aves;;;;;bird` 0.441 | 8.14 | 43.1 |
+| 5408 | `aves;;;;;bird` | 0.914 | blue whistling-thrush 0.499 | 8.35 | 43.7 |
+| 5409 | `aves;;;;;bird` | 0.747 | `aves;;;;;bird` 0.614 | 8.57 | 44.7 |
+| 5410 | `;;;;;;animal` | 0.651 | black woodpecker 0.188 | 8.76 | 45.5 |
+| 5411 | `;;;;;;animal` | 0.548 | `aves;;;;;bird` 0.317 | 9.03 | 46.6 |
+
+Two of the five degraded to the fully-generic `;;;;;;animal` rollup — the exact
+label exp #26 and exp #32 were built around — and the raw top-1 was a Himalayan
+congener on one burst and a woodpecker on another. The classifier was holding
+on by its fingernails across this visit. Had any burst tipped one step further
+to `unclassifiable`, as 5389 did on 09-20 with the same species at the same
+spot, it would have been a review-class burst 25-90s after a named-animal
+identification — precisely exp #33's case. The window did not open tonight, but
+the mechanism that opens it was visibly close all afternoon.
+
+### Monitoring duties, discharged
+
+- **Scene gate**: 0 bursts muted. Similarities 0.68-0.70, far under T=0.982.
+  Vacuous, as on 09-21.
+- **Blur gate**: 0 bursts muted — see the self-audit below, this is now
+  structural rather than incidental.
+- **Human/proximity/density/deferral gates**: no HUMAN-status burst today; all
+  inert by construction. `person_confidence` was 0.0 on all 7 rows.
+- **Confident-blank gate**: muted 5412 (raw top-1 blank @0.952 ≥ 0.92). Frame
+  and intra-burst motion blobs inspected — empty pond, bamboo and pond glint
+  only. Correct mute.
+- **Review sampling**: sampled out 5406. Inspected, empty. No loss.
+
+Net: **zero false positives reached Telegram today, and all five animal bursts
+did.** That is the best-separated day in the notebook.
+
+## Self-audit: the blur gate has been inert for three weeks, and that is load-bearing
+
+Prompted by today's numbers — every frame of every bird burst scored 8.1-9.2
+against a `min_sharpness_threshold` of 11.0, and the frame selector logged
+`fallback (none cleared sharpness floor)` on six of seven bursts.
+
+**`[BLUR]` has not fired since 2026-09-01.** Zero occurrences across
+`wildlife.log` and backups `.1`-`.3` (09-01 → now); the last 13 are all in
+`.4`/`.5`, dated 08-23 to 09-01. The cause is exp #8's luma guard: the garden's
+best-frame luma is now 43-53 through the afternoon, well under
+`blur_mute_min_luma=70`, so `luma_supports_blur_mute` is False and the mute
+never arms. Today only the 10:55 burst (luma 100.7) was even eligible.
+
+**This is doing real work, not idling.** The sharpness floor is not a valid FP
+discriminator on this corpus — measured over every row with a recorded
+`sharpness_score`:
+
+| review-class bucket | n | below floor |
+|---|---|---|
+| animal-labelled | 16 | **4 (25.0%)** |
+| false-positive-labelled | 497 | **99 (19.9%)** |
+
+Below-floor is *more* common among real animals than among false positives. A
+gate keyed on it alone would discard animals at a higher rate than FPs —
+strictly worse than a coin flip, the same "the discriminator does not
+discriminate" shape exp #16/#17 found for pixel similarity and exp #29 fixed by
+switching discriminators. Today's visit is the concrete case: all five bursts
+were below floor, all five held a clearly visible blackbird.
+
+The luma guard is the only thing standing between that statistic and real
+false negatives. Recorded as a standing caution: **`blur_mute_min_luma` must
+never be lowered, and `min_sharpness_threshold` must never be raised, on
+FP-reduction grounds.** Neither is in `loop.guardrails.BOUNDS`, so the loop
+cannot do it by accident — this note exists so no future tick argues for adding
+them.
+
+## Measured, not shipped: is underexposure what makes SpeciesNet miss? (→ backlog #36)
+
+Backlog #31 (`speciesnet-misses-visible-bird`) has no mechanism attached. The
+obvious candidate after today is light: `CAMERA_AE_EXPOSURE_MODE=short`, shipped
+for the dusk fix in run 0006, biases AE toward shorter exposures, and the scene
+is now dark enough mid-afternoon (luma 43-46 at 15:22) that this may be
+starving the classifier.
+
+Tested on every labelled row whose frame is still on disk (286 rows; luma
+computed offline from the best frame):
+
+| animal-labelled outcome | n | luma min / median / max |
+|---|---|---|
+| → `identified` (hit) | 25 | 17.5 / **73.4** / 97.2 |
+| → review-class (**miss**) | 6 | 17.4 / **54.3** / 74.7 |
+
+The six misses: 5176 (57.7), 5214 (74.7), 5342 (56.5), 5344 (52.0), 5345
+(50.6), 5389 (17.4). Median luma of a miss is 19 points below that of a hit,
+and every miss but one sits under 60.
+
+**Not actionable yet, deliberately.** n=6, the ranges overlap (hits reach as low
+as 17.5), and the midday-luma-by-day series over 09-01..09-22 is dominated by
+cloud cover rather than a clean seasonal slope (medians bounce 45.5 → 102.9 →
+49.0 → 45.5). A 6-row bucket cannot carry a change to the camera's exposure
+policy, which would alter *every* frame the system captures and confound exp
+#33's window outright. Filed as backlog #36 with the numbers attached, to be
+re-measured when the miss bucket reaches ~15 rows.
+
+## Status
+
+**Running.** Night 1 of a live window that has produced no test of the
+hypothesis. No change deployed, no `pending_restart_at` stamped. Exp #33 keeps
+the active slot; nothing new opened tonight for the same reason exp #34 gave
+last night — anything touching classification, exposure or review routing would
+confound the window before it has yielded a single data point.

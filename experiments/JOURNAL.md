@@ -3028,3 +3028,68 @@ in this scene FP motion and animal motion are not spatially separable.
 
 No new behaviour experiment. Exp #33 lost its window to the crash and gets it
 back tonight; opening anything else would confound it.
+
+## 2026-09-22 — the deploy actuator is repaired, and the loop had its cleanest day
+
+7 triggers. 5 animal, 2 false positive, 0 human. fp_rate **0.286** (n=7, all
+tier-2) against 1.0 on n=10 yesterday. **Zero false positives reached Telegram
+and all five animal bursts did** — the best-separated day in the notebook.
+
+**Exp #34 (deploy-stamp-tz-crash) CONCLUDED — keep.** Prediction met in every
+particular: `wildlife-deploy.service` inactive(dead)/exit-0 at 03:30:03,
+`{"restarted": true, "reason": "applied deploy stamped 2026-09-22T03:25:00+02:00"}`,
+camera up on the new build at 03:30:03, `pending_restart_at` back to null. The
+self-perpetuating halt is cleared, not merely survived once. Both stranded
+changes shipped together: 6d13364 and exp #33's ea652bc. The standing check the
+experiment introduced — read `systemctl is-failed wildlife-deploy.service`
+before trusting that the last tick shipped anything — was run first thing and is
+now permanent tick procedure.
+
+**Exp #33 (animal-proximity-review-exemption): night 1 live, no firing
+opportunity.** It only reached the camera today. The two review-class bursts sit
+4.4h before and 1.4h after the day's animal identification — nowhere near the
+180s window. Zero `[ANIMAL-PROXIMITY]` lines; kill condition untouched at 0.
+Neither confirmed nor refuted.
+
+But the FN class it targets was visibly close all afternoon. A blackbird worked
+the pond 15:22:08-15:25:11 across five bursts (5407-5411, all tier-2 `animal`,
+all identified, all delivered to MAIN) — and two of the five degraded to the
+generic `;;;;;;animal` rollup, with raw top-1s of *blue whistling-thrush* (a
+Himalayan species) and *black woodpecker*. One step further to `unclassifiable`,
+as 5389 did on 09-20 with the same bird at the same spot, and it is exactly exp
+#33's case.
+
+**Self-audit — the blur gate has been inert since 2026-09-01, and that is
+load-bearing.** Zero `[BLUR]` lines in `wildlife.log`+`.1`-`.3`; the last 13 are
+in `.4`/`.5` (08-23..09-01). Cause: exp #8's luma guard. Afternoon best-frame
+luma is now 43-53, under `blur_mute_min_luma=70`, so the mute never arms. That
+matters because the sharpness floor is **anti-selective** on this corpus:
+below-floor covers 4/16 (25.0%) of review-class animal rows vs 99/497 (19.9%)
+of FP rows — worse than a coin flip, the same shape exp #16/#17 found for pixel
+similarity. Today's visit is the case in point: all five bird bursts scored
+8.1-9.2 against a floor of 11.0, and the frame selector fell back to
+`diff_from_bg` on six of seven bursts. Standing caution recorded:
+`blur_mute_min_luma` must never be lowered and `min_sharpness_threshold` never
+raised on FP-reduction grounds. Neither is in BOUNDS, so the loop cannot do it
+by accident.
+
+**Measured, not shipped → backlog #36 (underexposure-speciesnet-miss).** A
+mechanism candidate for backlog #31: luma of animal-labelled rows that SpeciesNet
+*hit* (n=25) medians **73.4**; rows it *missed* into review-class (n=6) median
+**54.3**, five of six under 60. Suggestive, underpowered, and the midday-luma
+series 09-01..09-22 is cloud-dominated rather than cleanly seasonal (45.5 →
+102.9 → 49.0 → 45.5). n=6 cannot carry a change to `CAMERA_AE_EXPOSURE_MODE`,
+which alters every frame captured and would confound exp #33 outright.
+Re-measure at ~15 miss rows.
+
+Other gates: confident-blank muted 5412 (blank @0.952, frame + intra-burst blobs
+inspected — empty, bamboo and pond glint); sampling muted 5406 (inspected,
+empty); scene gate 0 of 7 (similarities 0.68-0.70 vs T=0.982, vacuous); all
+human gates inert, `person_confidence` 0.0 on all 7 rows.
+
+No change deployed, no restart stamped. Exp #33 keeps the slot for the same
+reason exp #34 gave last night: it has yet to yield one data point, and anything
+touching classification, exposure or review routing would confound the window.
+
+Note for Daniel: last human label was 2026-09-20. Two days. Three triggers the
+feedback-starved freeze.

@@ -1,7 +1,7 @@
 ---
 id: 34
 slug: deploy-stamp-tz-crash
-status: running
+status: concluded   # 2026-09-22: prediction met exactly, fix verified live in production
 validation: live   # code change, commit 6d13364; 3 regression tests reproduce the exact production TypeError
 occupies_active_slot: false  # loop-infrastructure repair, not a detection-behaviour change; exp #21 keeps the slot
 hypothesis: "An offset-naive pending_restart_at crashes wildlife-deploy.service before it restarts the camera, so no experiment — code or env — can ever go live again until the stamp is coerced to local time on read."
@@ -172,3 +172,30 @@ live. Tonight that check was worth more than any tuning decision.
 No new behaviour experiment opened. Exp #33 has had zero measurement nights
 through no fault of its own; it ships tonight and gets its window. Opening
 anything else now would confound it.
+
+
+---
+
+## Outcome (2026-09-22) — CONCLUDED, keep
+
+The prediction was met in every particular.
+
+```
+Active: inactive (dead) since Tue 2026-09-22 03:30:03 CEST
+uv[669234]: {"restarted": true, "reason": "applied deploy stamped 2026-09-22T03:25:00+02:00"}
+wildlife-camera.service  Active: active (running) since Tue 2026-09-22 03:30:03 CEST
+```
+
+`wildlife-deploy.service` exited 0, the stamp was consumed, and the camera came
+up on the new build at 03:30:03. `pending_restart_at` is back to `null` — the
+self-perpetuating failure is cleared, not merely survived once.
+
+Both stranded changes went live together: this fix (6d13364) and **exp #33**
+(ea652bc), which today got the first measurement night it has ever had.
+
+The reader-side `_as_aware()` coercion is the right chokepoint and stays. The
+standing check this experiment introduced — read `systemctl is-failed
+wildlife-deploy.service` before trusting that the previous tick shipped
+anything — is now permanent tick procedure and was run first thing tonight.
+
+Experiment closed. No follow-up.
