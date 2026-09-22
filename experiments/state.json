@@ -334,7 +334,7 @@
       "replaced_at": "2026-09-19T03:25:00+02:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-09-21",
+  "last_heartbeat_loopday": "2026-09-22",
   "last_metrics": {
     "date": "2026-09-21",
     "error_count": 0,
@@ -380,6 +380,6 @@
   "last_tick_completed_day": "2026-09-21",
   "nightly_verdict": "The camera quietly failed to restart this morning, so yesterday's improvement never actually went live \u2014 a date-format bug in the deploy step that would have blocked every future update too, silently. Fixed and tested; it and yesterday's change both go live overnight. The day itself was all wind: 10 alerts, every one the bamboo moving, no animals and no people.",
   "paused": false,
-  "pending_restart_at": "2026-09-22T03:25:00+02:00",
+  "pending_restart_at": null,
   "watermark": 5405
 }
