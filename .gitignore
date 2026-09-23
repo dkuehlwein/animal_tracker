@@ -39,3 +39,4 @@ raspberry5.private
 
 # Loop overlay is rendered from experiments/state.json (the committed source of truth)
 experiments/deployed_config.env
+.claude/worktrees/
