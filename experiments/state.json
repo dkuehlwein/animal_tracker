@@ -252,6 +252,20 @@
       "slug": "underexposure-speciesnet-miss",
       "status": "open",
       "validation": "measured-underpowered"
+    },
+    {
+      "hypothesis": "ACTIVATED + SHIPPED 2026-09-23 (commit 0bc9ec9, restart-gated 09-24T03:25+02:00). The human-proximity MUTE gate fires on window OR density OR demoted-band, but get_human_adjacent_review_detections re-tested every candidate \u2014 including rows already carrying human_proximity_muted=1 \u2014 against the narrow +/-240s human_retention_proximity_seconds window. So the system could decide 'this is a person, do not notify' and then decline to apply its own 48h human-photo retention policy to the same burst. Burst 5444 (2026-09-23) is the measured instance: a recognisable person at close range, person_confidence 0.063, muted by the DENSITY condition at 310s from the nearest HUMAN burst, retained for the full max_images rotation. 12 rows corpus-wide ever fell in this gap (~1.4/month); 5 still had frames on disk, incl. 5074/5075/5076 at 15 days and 5154 at 11 days against a 48h policy \u2014 4 of those 5 empty garden, 5444 the person. Fix: human_proximity_muted=1 rows are purge-eligible unconditionally; the +/-window test is unchanged for unmuted review-class rows (the leading-edge case it exists for, which by construction has the flag False). Strictly a superset, image files only, DB rows kept, no new knob, no notification/classification change. FN-veto N/A. Rollback: PERFORMANCE_HUMAN_RETENTION_PROXIMITY_SECONDS=0 + restart, or git revert 0bc9ec9. Monitoring duty: any human_proximity_muted=1 row older than human_retention_hours whose image_path still exists means the purge is not working. See runs/0026.",
+      "id": 37,
+      "slug": "human-proximity-purge-gap",
+      "status": "running",
+      "validation": "live"
+    },
+    {
+      "hypothesis": "OPENED 2026-09-23. loop.metrics counts person-labelled rows in the labeled_triggers denominator but never in fp_count, so a person-heavy night prints a flatteringly low fp_rate into metrics/daily.csv. 2026-09-23 is the first severe case: 32 triggers, 29 of them person, fp_rate 0.094 vs 0.286 the night before \u2014 an apparent 3x improvement that is entirely composition, not behaviour. The honest statement was '3 non-person triggers, 3 false positives, 0 animals'. Risk is self-poisoning: a future tick reads the dip as an FP win and credits whatever shipped that day. Candidate fix: exclude person-labelled rows from the fp_rate denominator the same way n_cant_tell and n_sampled_out already are, and surface them as their own report line (n_person). Cheap, no new data needed \u2014 the labels are already in detection_feedback. Not shipped 2026-09-23 (one change per tick; exp #35 took it).",
+      "id": 38,
+      "slug": "person-rows-dilute-fp-rate",
+      "status": "open",
+      "validation": "unvalidated"
     }
   ],
   "baselines": {
@@ -384,9 +398,9 @@
     "total_triggers": 32
   },
   "last_scene_change_alert_loopday": "2026-09-13",
-  "last_tick_completed_day": "2026-09-22",
-  "nightly_verdict": "This morning's restart worked, so yesterday's fix and the delayed improvement are both finally running. Best day yet: a blackbird visited the pond for three minutes and all five alerts came through correctly, while both false alarms were caught and silenced before reaching you.",
+  "last_tick_completed_day": "2026-09-23",
+  "nightly_verdict": "Quiet night for wildlife: 32 triggers, no animals, and for the first time not a single alert needed to reach you \u2014 a long gardening session plus three empty-garden false alarms, all correctly silenced. I found and fixed a privacy bug while checking them: one close-up photo of a person had been correctly hidden from you but was not being deleted on the 48-hour schedule, and 12 such bursts have slipped through since July.",
   "paused": false,
-  "pending_restart_at": null,
+  "pending_restart_at": "2026-09-24T03:25:00+02:00",
   "watermark": 5444
 }
