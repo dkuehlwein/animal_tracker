@@ -343,22 +343,22 @@
   ],
   "last_heartbeat_loopday": "2026-09-23",
   "last_metrics": {
-    "date": "2026-09-22",
+    "date": "2026-09-23",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.08221892400405678,
-      0.6410655481673808
+      0.032401551298366194,
+      0.24218154728387864
     ],
     "fp_claude_ci": [
-      0.08221892400405678,
-      0.6410655481673808
+      0.032401551298366194,
+      0.24218154728387864
     ],
-    "fp_claude_count": 2,
-    "fp_claude_rate": 0.2857142857142857,
-    "fp_count": 2,
+    "fp_claude_count": 3,
+    "fp_claude_rate": 0.09375,
+    "fp_count": 3,
     "fp_human_ci": [
       0.0,
       1.0
@@ -371,22 +371,22 @@
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.2857142857142857,
+    "fp_rate": 0.09375,
     "fp_trustworthy": true,
-    "labeled_triggers": 7,
+    "labeled_triggers": 32,
     "n_cant_tell": 0,
-    "n_claude": 7,
+    "n_claude": 32,
     "n_human": 0,
     "n_human_suppressed": 0,
     "n_md": 0,
-    "n_sampled_out": 2,
+    "n_sampled_out": 0,
     "n_unlabeled": 0,
-    "total_triggers": 7
+    "total_triggers": 32
   },
   "last_scene_change_alert_loopday": "2026-09-13",
   "last_tick_completed_day": "2026-09-22",
   "nightly_verdict": "This morning's restart worked, so yesterday's fix and the delayed improvement are both finally running. Best day yet: a blackbird visited the pond for three minutes and all five alerts came through correctly, while both false alarms were caught and silenced before reaching you.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5412
+  "watermark": 5444
 }
