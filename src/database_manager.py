@@ -524,6 +524,24 @@ class DatabaseManager:
         (the vast majority — named-species identifications) is unaffected
         and still purge-ineligible via this path.
 
+        `human_proximity_muted = 1` rows (review-class or IDENTIFIED) are
+        returned UNCONDITIONALLY, without the ±`window_seconds` time test
+        (exp #35, human-proximity-purge-gap, 2026-09-23). The mute gate
+        decides on window OR density OR demoted-band, so a burst it muted
+        can sit arbitrarily far from any single HUMAN row while still being
+        a burst the system judged human-adjacent — burst 5444 (2026-09-23)
+        was muted by the density condition at 310s from the nearest HUMAN
+        burst and holds a recognisable person at close range, yet the ±240s
+        test left its frames on disk for the full `max_images` rotation.
+        Purge eligibility follows the gate's own verdict; the time test
+        remains for unmuted review-class rows, which is the leading-edge
+        case it was built for (a burst BEFORE a visit's first HUMAN burst
+        necessarily has `human_proximity_muted` False). Measured corpus-wide:
+        12 rows ever fell in this gap, ~1.4/month. `window_seconds <= 0`
+        still disables the whole extension, including this path, so
+        PERFORMANCE_HUMAN_RETENTION_PROXIMITY_SECONDS=0 stays a complete
+        rollback lever.
+
         Perf note (2026-08-01): this was originally a single SQL query using
         a correlated EXISTS subquery with strftime('%s', ...) on both sides
         — SQLite can't use any index for that (it re-parses every timestamp
@@ -553,7 +571,7 @@ class DatabaseManager:
                 # Indexed range predicate (idx_detections_timestamp) — no
                 # per-row string reparsing, unlike the old EXISTS subquery.
                 cursor.execute('''
-                    SELECT id, image_path, timestamp
+                    SELECT id, image_path, timestamp, human_proximity_muted
                     FROM detections
                     WHERE (detection_status IN ('no_animal', 'unclassifiable')
                            OR (detection_status = 'identified' AND human_proximity_muted = 1))
@@ -583,11 +601,23 @@ class DatabaseManager:
                     continue
             human_times.sort()
 
-            if not human_times:
-                return []
-
             matches = []
-            for row_id, image_path, ts_str in review_rows:
+            for row_id, image_path, ts_str, proximity_muted in review_rows:
+                # A row the human-proximity gate already MUTED is
+                # human-adjacent by fiat — no time test (exp #35). That gate
+                # decides on window OR density OR demoted-band, so a burst it
+                # muted can legitimately sit far from any single HUMAN row
+                # (burst 5444, 2026-09-23, muted by density at 310s: a
+                # recognisable person at close range that this ±window test
+                # missed). Purge eligibility must follow the gate's own
+                # verdict, not a second, narrower rule.
+                if proximity_muted:
+                    matches.append((row_id, image_path, ts_str))
+                    continue
+
+                if not human_times:
+                    continue
+
                 try:
                     review_time = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
                 except (TypeError, ValueError):

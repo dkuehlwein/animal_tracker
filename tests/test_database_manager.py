@@ -663,6 +663,118 @@ def test_get_human_adjacent_review_detections_excludes_unmuted_identified_row(tm
 
 
 # ---------------------------------------------------------------------------
+# exp #35 (human-proximity-purge-gap, 2026-09-23): a row the human-proximity
+# mute gate already MUTED is human-adjacent by fiat, with no time test. That
+# gate fires on window OR density OR demoted-band, so a muted burst can sit
+# arbitrarily far from any single HUMAN row — burst 5444 was muted by the
+# density condition at 310s and holds a recognisable person at close range,
+# yet the ±240s purge test left its frames on disk for the full rotation.
+# ---------------------------------------------------------------------------
+
+def test_get_human_adjacent_review_detections_includes_far_muted_review_row(tmp_path):
+    """The exp #35 gap: a review-class row with human_proximity_muted=1 that
+    is FAR (500s) from the nearest HUMAN row is still purge-eligible, because
+    the gate muted it on the density condition."""
+    db, db_path = _make_db(tmp_path)
+    human_id = db.log_detection(
+        image_path="capture_human9.jpg", motion_area=10, detection_status="human"
+    )
+    review_id = db.log_detection(
+        image_path="capture_review9_frame1.jpg", motion_area=10,
+        detection_status="no_animal", human_proximity_muted=True,
+    )
+    _age_row(db_path, human_id, hours_ago=49)
+    review_ts = _age_row(db_path, review_id, hours_ago=49 + 500 / 3600)
+
+    cutoff = datetime.now() - timedelta(hours=48)
+    rows = db.get_human_adjacent_review_detections(cutoff, window_seconds=240)
+
+    assert rows == [(review_id, "capture_review9_frame1.jpg", review_ts)]
+
+
+def test_get_human_adjacent_review_detections_includes_far_muted_identified_row(tmp_path):
+    """Same fiat rule for the exp #26 IDENTIFIED shape: a muted
+    unnamed-animal row far from any HUMAN row is purge-eligible."""
+    db, db_path = _make_db(tmp_path)
+    human_id = db.log_detection(
+        image_path="capture_human10.jpg", motion_area=10, detection_status="human"
+    )
+    animal_id = db.log_detection(
+        image_path="capture_animal10.jpg", motion_area=10,
+        detection_status="identified", human_proximity_muted=True,
+    )
+    _age_row(db_path, human_id, hours_ago=49)
+    animal_ts = _age_row(db_path, animal_id, hours_ago=49 + 900 / 3600)
+
+    cutoff = datetime.now() - timedelta(hours=48)
+    rows = db.get_human_adjacent_review_detections(cutoff, window_seconds=240)
+
+    assert rows == [(animal_id, "capture_animal10.jpg", animal_ts)]
+
+
+def test_get_human_adjacent_review_detections_far_unmuted_review_row_still_excluded(tmp_path):
+    """The fiat rule does not widen the UNMUTED path: a review-class row with
+    human_proximity_muted=0 far from any HUMAN row stays excluded, so the
+    leading-edge ±window test is unchanged for the rows it was built for."""
+    db, db_path = _make_db(tmp_path)
+    human_id = db.log_detection(
+        image_path="capture_human11.jpg", motion_area=10, detection_status="human"
+    )
+    review_id = db.log_detection(
+        image_path="capture_review11_frame1.jpg", motion_area=10,
+        detection_status="no_animal", human_proximity_muted=False,
+    )
+    _age_row(db_path, human_id, hours_ago=49)
+    _age_row(db_path, review_id, hours_ago=49 + 500 / 3600)
+
+    cutoff = datetime.now() - timedelta(hours=48)
+    rows = db.get_human_adjacent_review_detections(cutoff, window_seconds=240)
+
+    assert rows == []
+
+
+def test_get_human_adjacent_review_detections_muted_row_newer_than_cutoff_excluded(tmp_path):
+    """The fiat rule does not bypass the retention cutoff: a muted row that
+    is still inside human_retention_hours is not yet purge-eligible."""
+    db, db_path = _make_db(tmp_path)
+    human_id = db.log_detection(
+        image_path="capture_human12.jpg", motion_area=10, detection_status="human"
+    )
+    review_id = db.log_detection(
+        image_path="capture_review12_frame1.jpg", motion_area=10,
+        detection_status="no_animal", human_proximity_muted=True,
+    )
+    _age_row(db_path, human_id, hours_ago=1)
+    _age_row(db_path, review_id, hours_ago=1)
+
+    cutoff = datetime.now() - timedelta(hours=48)
+    rows = db.get_human_adjacent_review_detections(cutoff, window_seconds=240)
+
+    assert rows == []
+
+
+def test_get_human_adjacent_review_detections_zero_window_still_disables_muted_path(tmp_path):
+    """window_seconds=0 remains a COMPLETE rollback lever: it disables the
+    fiat path too, so PERFORMANCE_HUMAN_RETENTION_PROXIMITY_SECONDS=0
+    restores pre-extension behaviour exactly."""
+    db, db_path = _make_db(tmp_path)
+    human_id = db.log_detection(
+        image_path="capture_human13.jpg", motion_area=10, detection_status="human"
+    )
+    review_id = db.log_detection(
+        image_path="capture_review13_frame1.jpg", motion_area=10,
+        detection_status="no_animal", human_proximity_muted=True,
+    )
+    _age_row(db_path, human_id, hours_ago=49)
+    _age_row(db_path, review_id, hours_ago=49)
+
+    cutoff = datetime.now() - timedelta(hours=48)
+    rows = db.get_human_adjacent_review_detections(cutoff, window_seconds=0)
+
+    assert rows == []
+
+
+# ---------------------------------------------------------------------------
 # get_recent_review_detections (Task 2: scene-unchanged gate seed query)
 # ---------------------------------------------------------------------------
 
