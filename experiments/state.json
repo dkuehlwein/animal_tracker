@@ -261,11 +261,11 @@
       "validation": "live"
     },
     {
-      "hypothesis": "OPENED 2026-09-23. loop.metrics counts person-labelled rows in the labeled_triggers denominator but never in fp_count, so a person-heavy night prints a flatteringly low fp_rate into metrics/daily.csv. 2026-09-23 is the first severe case: 32 triggers, 29 of them person, fp_rate 0.094 vs 0.286 the night before \u2014 an apparent 3x improvement that is entirely composition, not behaviour. The honest statement was '3 non-person triggers, 3 false positives, 0 animals'. Risk is self-poisoning: a future tick reads the dip as an FP win and credits whatever shipped that day. Candidate fix: exclude person-labelled rows from the fp_rate denominator the same way n_cant_tell and n_sampled_out already are, and surface them as their own report line (n_person). Cheap, no new data needed \u2014 the labels are already in detection_feedback. Not shipped 2026-09-23 (one change per tick; exp #35 took it).",
+      "hypothesis": "ACTIVATED + SHIPPED 2026-09-24 (commit 568746d, tick-side only, no restart needed). loop.metrics counted person-labelled rows in the labeled_triggers denominator but never in fp_count, so a privacy-gated person trigger scored as a correct wildlife detection. 71/3671 labelled rows corpus-wide (1.9%) but concentrated where it does damage: 2026-09-23 printed fp_rate 0.094 \u2014 the lowest value in the system's entire history \u2014 on a night when all 3 non-person triggers were false positives (1.000), written into daily.csv the night after exp #35 shipped and perfectly shaped for a later tick to misread as a 3x FP win. person now leaves the denominator and all three per-tier buckets exactly as cant_tell does, counted in a new n_person (report line + daily.csv column); the n_human+n_claude+n_md==labeled_triggers invariant is preserved and tested. History NOT rewritten \u2014 22 restated dates are tabulated in runs/0027 and daily.csv carries a definition change at 2026-09-24. 734 tests pass. Rollback: git revert 568746d (inert w.r.t. the running camera).",
       "id": 38,
       "slug": "person-rows-dilute-fp-rate",
-      "status": "open",
-      "validation": "unvalidated"
+      "status": "running",
+      "validation": "live"
     }
   ],
   "baselines": {
@@ -393,13 +393,14 @@
     "n_human": 0,
     "n_human_suppressed": 0,
     "n_md": 0,
+    "n_person": 0,
     "n_sampled_out": 2,
     "n_unlabeled": 0,
     "total_triggers": 3
   },
   "last_scene_change_alert_loopday": "2026-09-13",
-  "last_tick_completed_day": "2026-09-23",
-  "nightly_verdict": "Quiet night for wildlife: 32 triggers, no animals, and for the first time not a single alert needed to reach you \u2014 a long gardening session plus three empty-garden false alarms, all correctly silenced. I found and fixed a privacy bug while checking them: one close-up photo of a person had been correctly hidden from you but was not being deleted on the 48-hour schedule, and 12 such bursts have slipped through since July.",
+  "last_tick_completed_day": "2026-09-24",
+  "nightly_verdict": "Very quiet day: only 3 triggers, all empty garden with wind in the bamboo, no animals, no people, and nothing needed to reach you. I also fixed how the false-alarm rate is counted \u2014 busy gardening days were making the numbers look far better than they were, including yesterday's.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5447

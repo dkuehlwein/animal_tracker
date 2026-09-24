@@ -3093,3 +3093,43 @@ touching classification, exposure or review routing would confound the window.
 
 Note for Daniel: last human label was 2026-09-20. Two days. Three triggers the
 feedback-starved freeze.
+
+- **2026-09-24** — 3 triggers, the quietest night on record. All three empty
+  garden (bamboo in wind; 5445 also shows global frame translation, i.e. wind on
+  the mount). Zero animals, zero people, zero Telegram messages for the second
+  night running. Confident-blank muted 5445 (blank @0.982), sampling muted
+  5446/5447 — all three inspected at full resolution, all correct. Scene gate 0
+  of 2 (0.77/0.79 vs T=0.982, still vacuous). Human gates wholly inert
+  (`person_confidence` 0.0 throughout). Exp #33 still has had no firing
+  opportunity in four nights.
+
+  **Exp #35/#37 purge duty, first run after 0bc9ec9 went live at the 03:30
+  restart: clean.** 171 `human_proximity_muted=1` rows older than 48h, 0 still on
+  disk; 1779 HUMAN rows older than 48h, 0 still on disk. The five stranded rows
+  run 0026 listed (5074/5075/5076 at 15 days, 5154 at 11 days, 5444) are gone.
+
+  **Self-audit:** four human `animal` labels landed 09-23 at 21:09, after that
+  tick ran, on the 09-22 blackbird visit (5407-5410). Tier-2 had called all four
+  `animal` on the night. 5/5 agreement, no new FN implied, feedback-starved clock
+  reset.
+
+  **Shipped exp #38 (`person-rows-dilute-fp-rate`), commit `568746d`, run 0027.**
+  `compute_metrics` counted `person` rows in the FP denominator but never in the
+  numerator, scoring a privacy-gated person trigger as a correct wildlife
+  detection. 71/3671 labelled rows corpus-wide (1.9%), but concentrated where it
+  hurts: 2026-09-23 printed **fp_rate 0.094, the lowest value in the system's
+  entire history**, on a night when all 3 non-person triggers were false
+  positives (1.000) — written into daily.csv the night after exp #35 shipped, and
+  perfectly shaped to be misread by a later tick as a 3x FP win from a privacy
+  fix that cannot move fp_rate at all. `person` now leaves the denominator and
+  all three per-tier buckets exactly as `cant_tell` does, counted in a new
+  `n_person` (report line + CSV column). Invariant
+  `n_human+n_claude+n_md==labeled_triggers` re-verified on 09-23's rows. 734
+  tests pass. Tick-side only — `loop.metrics`/`loop.report` are not imported by
+  `wildlife_system`, so no restart stamped.
+
+  History not rewritten: 22 dates whose fp_rate moves are restated in a table in
+  run 0027, and `daily.csv` carries a **definition change at 2026-09-24** —
+  before it the denominator includes person rows, from it it does not. Note the
+  09-23→09-24 step 0.094→1.000 is this change plus an n=3 night, not a
+  regression.
