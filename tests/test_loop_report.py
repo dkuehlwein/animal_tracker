@@ -702,6 +702,59 @@ def test_summary_remainder_uses_n_unlabeled_when_present():
     assert "Not yet labelled: 4" in text2
 
 
+# ---------------------------------------------------------------------------
+# Backlog #38: person line in render_summary
+# ---------------------------------------------------------------------------
+
+def test_summary_person_line_when_present():
+    """A dedicated line renders when n_person > 0, distinct from a false alarm."""
+    m = _tier_metrics()
+    m["n_person"] = 29
+    text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
+    assert "Person (not counted as a false alarm): 29" in text
+
+
+def test_summary_person_line_absent_when_zero_or_missing():
+    m = _tier_metrics()
+    m["n_person"] = 0
+    assert "Person (not counted" not in report.render_summary(
+        metrics=m, state={"paused": False}, active_experiment={}
+    )
+    m2 = _tier_metrics()  # key absent entirely (backward compat, old last_metrics shape)
+    assert "Person (not counted" not in report.render_summary(
+        metrics=m2, state={"paused": False}, active_experiment={}
+    )
+
+
+def test_summary_remainder_fallback_excludes_person():
+    """Legacy arithmetic fallback (no n_unlabeled key) must subtract n_person
+    too, so person-labelled rows don't misread as unlabelled."""
+    # remainder = 42 - (2+0+38+2) = 0 -> line absent
+    m = _tier_metrics(total=42, n_human=2, fp_human=0, n_claude=0, fp_claude=0, n_md=38, fp_md=0)
+    m["n_person"] = 2
+    assert "n_unlabeled" not in m
+    text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
+    assert "Not yet labelled" not in text
+
+    # remainder = 42 - (2+0+38+1) = 1 -> line present with corrected count
+    m2 = _tier_metrics(total=42, n_human=2, fp_human=0, n_claude=0, fp_claude=0, n_md=38, fp_md=0)
+    m2["n_person"] = 1
+    text2 = report.render_summary(metrics=m2, state={"paused": False}, active_experiment={})
+    assert "Not yet labelled: 1" in text2
+
+
+def test_summary_person_line_order():
+    """Person line sits after the tier lines and before 'Not yet labelled'."""
+    m = _tier_metrics(total=50, n_human=2, fp_human=0, n_claude=0, fp_claude=0, n_md=38, fp_md=0)
+    m["n_person"] = 5
+    text = report.render_summary(metrics=m, state={"paused": False}, active_experiment={})
+    lines = text.splitlines()
+    md_idx = next(i for i, l in enumerate(lines) if "MegaDetector" in l)
+    person_idx = next(i for i, l in enumerate(lines) if "Person (not counted" in l)
+    remainder_idx = next(i for i, l in enumerate(lines) if "Not yet labelled" in l)
+    assert md_idx < person_idx < remainder_idx
+
+
 def test_summary_privacy_gate_line_order():
     """Privacy-gate line sits after the tier lines and before 'Not yet labelled'."""
     m = _tier_metrics(total=50, n_human=2, fp_human=0, n_claude=0, fp_claude=0, n_md=38, fp_md=0)

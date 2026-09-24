@@ -103,6 +103,17 @@ def render_summary(metrics: dict, state: dict, active_experiment: dict) -> str:
     if n_cant_tell > 0:
         lines.append(f"• Can't tell (unusable image): {n_cant_tell}")
 
+    # Person-labelled rows (backlog #38, 2026-09-24): a person trigger is
+    # neither a false alarm nor a wildlife detection — the privacy gate
+    # handles it on its own path — so it's excluded from fp_rate's
+    # denominator (metrics.compute_metrics) and surfaced here distinctly,
+    # same treatment as cant_tell above, so a person-heavy night (e.g.
+    # 2026-09-23's 29 person / 3 false_positive night) doesn't read as
+    # either "unlabelled" or as diluting the false-alarm rate.
+    n_person = metrics.get("n_person", 0)
+    if n_person > 0:
+        lines.append(f"• Person (not counted as a false alarm): {n_person}")
+
     # REVIEW-sampling gate (wildlife_system.is_review_sampled_out): these
     # review-class rows were muted for notification-volume reasons only and
     # never reached Telegram, so no human ever saw them to label. Surfaced
@@ -121,15 +132,22 @@ def render_summary(metrics: dict, state: dict, active_experiment: dict) -> str:
         lines.append(f"• Not sent (privacy gate): {n_human_suppressed}")
 
     # Remainder: images not yet labelled by any tier (cant_tell rows were
-    # labelled — just unusable — and sampled-out / privacy-gated rows were
-    # never sent for a human to label — so all are excluded here too).
-    # metrics.compute_metrics counts this directly when available; the
-    # arithmetic fallback is for last_metrics dicts written before
-    # backlog #19 (2026-09-07), which lack the key.
+    # labelled — just unusable — person rows were labelled — just not a false
+    # alarm — and sampled-out / privacy-gated rows were never sent for a
+    # human to label — so all are excluded here too). metrics.compute_metrics
+    # counts this directly when available (n_unlabeled already excludes
+    # person rows, since a person-labelled row carries a tier label and so
+    # fails compute_metrics's own _unlabeled() check); the arithmetic
+    # fallback is for last_metrics dicts written before backlog #19
+    # (2026-09-07), which lack the key — n_person must be added to it too
+    # (backlog #38) or a person-heavy night would double-count those rows
+    # into this remainder despite them having a real tier label.
     if "n_unlabeled" in metrics:
         remainder = metrics["n_unlabeled"]
     else:
-        remainder = total - (n_human + n_claude + n_md + n_cant_tell + n_sampled_out)
+        remainder = total - (
+            n_human + n_claude + n_md + n_cant_tell + n_person + n_sampled_out
+        )
     if remainder > 0:
         lines.append(f"• Not yet labelled: {remainder}")
 

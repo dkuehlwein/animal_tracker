@@ -689,10 +689,12 @@ def test_cant_tell_blocks_lower_tiers():
     assert m["n_md"] == 0
 
 
-@pytest.mark.parametrize("label", ["animal_wrong_id", "person", "wrong_species"])
+@pytest.mark.parametrize("label", ["animal_wrong_id", "wrong_species"])
 def test_new_labels_count_as_non_fp(label):
     """New non-FP human labels (and legacy wrong_species) land in the
-    denominator but are never counted as false_positive."""
+    denominator but are never counted as false_positive. "person" is NOT
+    parametrized here (backlog #38): unlike these labels it is excluded from
+    the denominator entirely — see test_person_excluded_from_fp_denominator."""
     rows = [_row(human=label)]
     m = metrics.compute_metrics(rows, fn_audit=None)
     assert m["labeled_triggers"] == 1
@@ -798,6 +800,141 @@ def _status_row(**kw):
          "detection_status": None, "review_sampled_out": None}
     r.update(kw)
     return r
+
+
+# ---------------------------------------------------------------------------
+# Backlog #38: person excluded from fp_rate denominator and tier buckets
+# ---------------------------------------------------------------------------
+
+def test_person_excluded_from_fp_denominator():
+    """A 'person' row must not count toward labeled_triggers or fp_count —
+    same treatment as cant_tell."""
+    rows = [
+        _row(human="false_positive"),
+        _row(human="person"),
+        _row(human="animal"),
+    ]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["labeled_triggers"] == 2
+    assert m["fp_count"] == 1
+    assert abs(m["fp_rate"] - 0.5) < 1e-9
+    assert m["n_person"] == 1
+
+
+def test_person_excluded_from_tier_buckets():
+    """A 'person' row must not land in any per-tier bucket, and the
+    invariant n_human + n_claude + n_md == labeled_triggers must still hold."""
+    rows = [
+        _row(human="false_positive"),
+        _row(tier2="person"),
+        _row(tier1="person"),
+        _row(human="animal"),
+    ]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_human"] + m["n_claude"] + m["n_md"] == m["labeled_triggers"]
+    assert m["labeled_triggers"] == 2
+    assert m["n_person"] == 2
+
+
+def test_2026_09_23_shape_person_heavy_night():
+    """Exact reproduction of the motivating shape: 29 person + 3 false_positive
+    → labeled_triggers==3, fp_rate==1.0, n_person==29 (not the diluted 0.094
+    the un-fixed denominator produced)."""
+    rows = (
+        [_row(human="person")] * 29
+        + [_row(human="false_positive")] * 3
+    )
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["labeled_triggers"] == 3
+    assert abs(m["fp_rate"] - 1.0) < 1e-9
+    assert m["n_person"] == 29
+
+
+def test_person_skipped_at_each_tier_invariant_holds():
+    """person wins reconciliation at each of the three tiers in turn and is
+    skipped there too; n_human + n_claude + n_md == labeled_triggers holds."""
+    rows = [
+        _row(human="person"),
+        _row(human="animal"),
+        _row(tier2="person"),
+        _row(tier2="animal"),
+        _row(tier1="person"),
+        _row(tier1="false_positive"),
+    ]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_person"] == 3
+    assert m["n_human"] == 1
+    assert m["n_claude"] == 1
+    assert m["n_md"] == 1
+    assert m["n_human"] + m["n_claude"] + m["n_md"] == m["labeled_triggers"]
+    assert m["labeled_triggers"] == 3
+
+
+def test_person_blocks_lower_tiers():
+    """human='person' wins reconciliation and the row is counted nowhere but
+    n_person, even though tier2/tier1 have real labels underneath."""
+    rows = [_row(human="person", tier2="false_positive", tier1="animal")]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["labeled_triggers"] == 0
+    assert m["n_human"] == 0
+    assert m["n_claude"] == 0
+    assert m["n_md"] == 0
+    assert m["n_person"] == 1
+
+
+def test_n_person_zero_when_none():
+    rows = [_row(human="animal"), _row(tier1="false_positive")]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    assert m["n_person"] == 0
+
+
+def test_csv_has_n_person_column(tmp_path):
+    """append_daily must write n_person to daily.csv."""
+    csv_path = tmp_path / "daily.csv"
+    rows = [_row(human="person")] * 5 + [_row(human="false_positive")]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    metrics.append_daily(csv_path, "2026-09-23", m)
+    with open(csv_path) as f:
+        reader = csv.DictReader(f)
+        fieldnames = reader.fieldnames
+        data_rows = list(reader)
+    assert "n_person" in fieldnames
+    assert data_rows[0]["n_person"] == "5"
+
+
+def test_csv_old_rows_get_blank_n_person(tmp_path):
+    """Old rows missing n_person get a blank value on rewrite, not backfilled."""
+    csv_path = tmp_path / "daily.csv"
+    old_fields = [
+        "date", "total_triggers", "labeled_triggers", "fp_count", "fp_rate",
+        "fp_ci_low", "fp_ci_high", "fn_rate", "fn_ci_low", "fn_ci_high",
+        "error_count",
+        "n_human", "fp_human_count", "fp_human_rate",
+        "n_claude", "fp_claude_count", "fp_claude_rate",
+        "n_md", "fp_md_count", "fp_md_rate",
+    ]
+    with open(csv_path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=old_fields)
+        writer.writeheader()
+        writer.writerow({
+            "date": "2026-06-01", "total_triggers": "10", "labeled_triggers": "8",
+            "fp_count": "3", "fp_rate": "0.375", "fp_ci_low": "0.1", "fp_ci_high": "0.7",
+            "fn_rate": "unmeasured", "fn_ci_low": "", "fn_ci_high": "",
+            "error_count": "0",
+            "n_human": "8", "fp_human_count": "3", "fp_human_rate": "0.375",
+            "n_claude": "0", "fp_claude_count": "0", "fp_claude_rate": "0",
+            "n_md": "0", "fp_md_count": "0", "fp_md_rate": "0",
+        })
+    rows = [_row(human="person"), _row(human="false_positive")]
+    m = metrics.compute_metrics(rows, fn_audit=None)
+    metrics.append_daily(csv_path, "2026-09-23", m)
+    with open(csv_path) as f:
+        data_rows = list(csv.DictReader(f))
+    assert len(data_rows) == 2
+    old_row = next(r for r in data_rows if r["date"] == "2026-06-01")
+    assert old_row["n_person"] == ""
+    new_row = next(r for r in data_rows if r["date"] == "2026-09-23")
+    assert new_row["n_person"] == "1"
 
 
 def test_compute_metrics_human_status_rows_split_out_of_unlabeled():

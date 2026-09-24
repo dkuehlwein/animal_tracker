@@ -1,8 +1,13 @@
 """Compute paired FP/FN with Wilson 95% CIs and append to daily.csv.
 
 FP comes from the labeled/captured set (triggers marked false_positive ÷ labeled
-triggers). FN comes from the timelapse audit channel; until a timelapse detector
-pass exists, FN is reported as "unmeasured" (NOT 0 — a zero would falsely clear
+triggers). "cant_tell" and "person" reconciled labels are excluded from that
+labeled set entirely (backlog #38) — a "can't tell" verdict means the frame
+was unusable, and a "person" verdict means the privacy gate correctly did its
+job, neither is a false alarm nor a wildlife detection, so counting either as
+a denominator "success" dilutes fp_rate on nights with a lot of foot traffic.
+FN comes from the timelapse audit channel; until a timelapse detector pass
+exists, FN is reported as "unmeasured" (NOT 0 — a zero would falsely clear
 the FN-veto). daily.csv is idempotent per date: a re-run for the same date
 overwrites that date's row, never duplicates.
 """
@@ -63,29 +68,40 @@ def _per_tier_partition(rows: list[dict]) -> dict:
     "n_cant_tell" so callers can surface them distinctly instead of letting
     them fall into an "unlabeled" bucket.
 
+    A row whose winning label is "person" is skipped the same way (backlog
+    #38): a person trigger is neither a false alarm nor a wildlife
+    detection — the privacy gate handles it on its own path — so it must
+    not inflate any tier's FP denominator either. Skipped rows are counted
+    once in "n_person", same treatment as "n_cant_tell".
+
     Returns a dict with nested {"n": int, "fp": int} for each bucket key
-    ("human", "claude", "md"), plus a top-level int "n_cant_tell".
+    ("human", "claude", "md"), plus top-level ints "n_cant_tell" and
+    "n_person".
     """
     buckets: dict[str, object] = {
         "human": {"n": 0, "fp": 0},
         "claude": {"n": 0, "fp": 0},
         "md": {"n": 0, "fp": 0},
         "n_cant_tell": 0,
+        "n_person": 0,
     }
     # Note: bucket assignment uses `is not None` which agrees with ingest's
     # truthiness-based reconciled_label assignment — and the invariant
     # n_human + n_claude + n_md == labeled_triggers holds — only because every
     # label in the vocabulary is a non-empty (truthy) string (e.g.
-    # "false_positive", "animal", "cant_tell") and "cant_tell" rows are
-    # excluded from both the labeled-triggers count (compute_metrics) and
-    # every bucket here (below) by the same check.  An empty-string label
-    # would be truthy for `is not None` but falsy for the reconciled_label
-    # filter, breaking the invariant.
+    # "false_positive", "animal", "cant_tell", "person") and "cant_tell"/
+    # "person" rows are excluded from both the labeled-triggers count
+    # (compute_metrics) and every bucket here (below) by the same check.  An
+    # empty-string label would be truthy for `is not None` but falsy for the
+    # reconciled_label filter, breaking the invariant.
     for r in rows:
         if r.get("human") is not None:
             winner = r["human"]
             if winner == "cant_tell":
                 buckets["n_cant_tell"] += 1
+                continue
+            if winner == "person":
+                buckets["n_person"] += 1
                 continue
             buckets["human"]["n"] += 1
             if winner == "false_positive":
@@ -95,6 +111,9 @@ def _per_tier_partition(rows: list[dict]) -> dict:
             if winner == "cant_tell":
                 buckets["n_cant_tell"] += 1
                 continue
+            if winner == "person":
+                buckets["n_person"] += 1
+                continue
             buckets["claude"]["n"] += 1
             if winner == "false_positive":
                 buckets["claude"]["fp"] += 1
@@ -102,6 +121,9 @@ def _per_tier_partition(rows: list[dict]) -> dict:
             winner = r["tier1"]
             if winner == "cant_tell":
                 buckets["n_cant_tell"] += 1
+                continue
+            if winner == "person":
+                buckets["n_person"] += 1
                 continue
             buckets["md"]["n"] += 1
             if winner == "false_positive":
@@ -115,14 +137,20 @@ def compute_metrics(rows: list[dict], fn_audit: Optional[dict]) -> dict:
 
     FP denominator = rows with a non-None reconciled_label, excluding
     "cant_tell" (a human "can't tell" verdict wins reconciliation but marks
-    the frame unusable, not a labeled trigger) — this is "labeled triggers".
+    the frame unusable, not a labeled trigger) and "person" (backlog #38: a
+    person trigger is neither a false alarm nor a wildlife detection — the
+    privacy gate handles it on its own path — so counting it as a "success"
+    in the denominator silently drags fp_rate toward 0 on person-heavy
+    nights, e.g. 2026-09-23's 29-person/3-FP night, where fp_rate would
+    otherwise have printed 0.094 instead of the true 1.000 over the 3 rows
+    that actually mattered) — this is "labeled triggers".
     FN is "unmeasured" unless fn_audit={"missed": int, "animal_frames": int} is
     supplied by a timelapse detector pass (NOT implemented this build).
     """
     labeled = [
         r for r in rows
         if r.get("reconciled_label") is not None
-        and r.get("reconciled_label") != "cant_tell"
+        and r.get("reconciled_label") not in ("cant_tell", "person")
     ]
     fp_count = sum(1 for r in labeled if r["reconciled_label"] == "false_positive")
     fp_rate = (fp_count / len(labeled)) if labeled else 0.0
@@ -166,6 +194,7 @@ def compute_metrics(rows: list[dict], fn_audit: Optional[dict]) -> dict:
     fp_md_ci = wilson_ci(fp_md_count, n_md)
 
     n_cant_tell = tier["n_cant_tell"]
+    n_person = tier["n_person"]
 
     # REVIEW-sampling gate (wildlife_system.is_review_sampled_out): rows
     # muted for notification-volume reasons only — still species-ID'd,
@@ -233,6 +262,13 @@ def compute_metrics(rows: list[dict], fn_audit: Optional[dict]) -> dict:
         # from _CSV_FIELDS: this is a report-surfacing concern, not a
         # trend-tracked metric.
         "n_cant_tell": n_cant_tell,
+        # Person-labelled rows (backlog #38, 2026-09-24): excluded from the FP
+        # denominator and every per-tier bucket above, same mechanism as
+        # n_cant_tell. Unlike n_cant_tell this DOES round-trip through
+        # _CSV_FIELDS/_row_for_csv — it's tracked as a trend, not just a
+        # report line, since person-heavy nights are common (gardening,
+        # deliveries) and materially reshape fp_rate.
+        "n_person": n_person,
         # Same treatment as n_cant_tell above (own report line, excluded
         # from the CSV trend schema) — see the comment where it's computed.
         "n_sampled_out": n_sampled_out,
@@ -251,6 +287,7 @@ _CSV_FIELDS = [
     "n_human", "fp_human_count", "fp_human_rate",
     "n_claude", "fp_claude_count", "fp_claude_rate",
     "n_md", "fp_md_count", "fp_md_rate",
+    "n_person",
 ]
 
 
@@ -278,6 +315,12 @@ def _row_for_csv(date: str, m: dict) -> dict:
         "n_md": m.get("n_md", ""),
         "fp_md_count": m.get("fp_md_count", ""),
         "fp_md_rate": m.get("fp_md_rate", ""),
+        # Historical rows predating backlog #38 (2026-09-24) get "" via
+        # restval on the DictWriter rewrite in append_daily — intentional,
+        # not backfilled: whether a pre-#38 row's rows were person-labelled
+        # is genuinely unknown without re-ingesting, and this column tracks
+        # only what compute_metrics counted at write time.
+        "n_person": m.get("n_person", ""),
     }
 
 
