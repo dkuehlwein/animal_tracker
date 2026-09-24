@@ -355,7 +355,7 @@
       "replaced_at": "2026-09-19T03:25:00+02:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-09-23",
+  "last_heartbeat_loopday": "2026-09-24",
   "last_metrics": {
     "date": "2026-09-23",
     "error_count": 0,
@@ -401,6 +401,6 @@
   "last_tick_completed_day": "2026-09-23",
   "nightly_verdict": "Quiet night for wildlife: 32 triggers, no animals, and for the first time not a single alert needed to reach you \u2014 a long gardening session plus three empty-garden false alarms, all correctly silenced. I found and fixed a privacy bug while checking them: one close-up photo of a person had been correctly hidden from you but was not being deleted on the 48-hour schedule, and 12 such bursts have slipped through since July.",
   "paused": false,
-  "pending_restart_at": "2026-09-24T03:25:00+02:00",
+  "pending_restart_at": null,
   "watermark": 5444
 }
