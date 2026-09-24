@@ -357,21 +357,21 @@
   ],
   "last_heartbeat_loopday": "2026-09-24",
   "last_metrics": {
-    "date": "2026-09-23",
+    "date": "2026-09-24",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.032401551298366194,
-      0.24218154728387864
+      0.4385029682449546,
+      1.0
     ],
     "fp_claude_ci": [
-      0.032401551298366194,
-      0.24218154728387864
+      0.4385029682449546,
+      1.0
     ],
     "fp_claude_count": 3,
-    "fp_claude_rate": 0.09375,
+    "fp_claude_rate": 1.0,
     "fp_count": 3,
     "fp_human_ci": [
       0.0,
@@ -385,22 +385,22 @@
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.09375,
+    "fp_rate": 1.0,
     "fp_trustworthy": true,
-    "labeled_triggers": 32,
+    "labeled_triggers": 3,
     "n_cant_tell": 0,
-    "n_claude": 32,
+    "n_claude": 3,
     "n_human": 0,
     "n_human_suppressed": 0,
     "n_md": 0,
-    "n_sampled_out": 0,
+    "n_sampled_out": 2,
     "n_unlabeled": 0,
-    "total_triggers": 32
+    "total_triggers": 3
   },
   "last_scene_change_alert_loopday": "2026-09-13",
   "last_tick_completed_day": "2026-09-23",
   "nightly_verdict": "Quiet night for wildlife: 32 triggers, no animals, and for the first time not a single alert needed to reach you \u2014 a long gardening session plus three empty-garden false alarms, all correctly silenced. I found and fixed a privacy bug while checking them: one close-up photo of a person had been correctly hidden from you but was not being deleted on the 48-hour schedule, and 12 such bursts have slipped through since July.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5444
+  "watermark": 5447
 }
