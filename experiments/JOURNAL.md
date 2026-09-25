@@ -3133,3 +3133,74 @@ feedback-starved freeze.
   before it the denominator includes person rows, from it it does not. Note the
   09-23→09-24 step 0.094→1.000 is this change plus an n=3 night, not a
   regression.
+
+## 2026-09-25 — exp #39 (leading-edge-animal-proximity) opened + shipped 657a30c
+
+**The first zero-false-positive night in the loop's history.** 8 triggers, 7
+labelled, `fp_rate 0.000` (95% CI 0.000–0.354). A cat at 07:36–07:37 (5448–5450),
+a Eurasian blackbird at 11:07–11:09 (5451–5454, four MAIN alerts, all correct),
+a person at 15:44 (5455, `person_confidence` 0.758, correctly suppressed). Not
+one empty-garden trigger. Daniel human-labelled 5454 `animal` at 19:40 before
+this tick ran: **1/1 agreement with tier-2**, feedback clock reset.
+
+**The one FN is the whole story.** 5448 (07:36:43, `unclassifiable`) held the cat
+at close range and was suppressed by a coin flip —
+`[REVIEW-SAMPLE] ... rate=0.500`. 37s later 5449 named the same cat
+`mammalia;carnivora;;;;carnivorous mammal`. Exp #33's Animal-Proximity Review
+Exemption exists for exactly this miss but is **backward-looking**, so it could
+not reach a burst that precedes the naming. This is the precise mirror of the
+human-side gap exp #11 fixed with the Deferred REVIEW Send Gate (burst 3909
+leaked a face 81s *before* the visit's first HUMAN burst). Corroboration that
+the backward half was the wrong half: **`[ANIMAL-PROXIMITY]` has never fired
+once** across every log rotation in the five nights since exp #33 shipped.
+
+Which gate muted it was checked, not assumed. `below_sharpness_floor=1` makes
+the Blur Gate the obvious suspect and it is wrong — exp #8's
+`blur_mute_min_luma=70` correctly disarmed it (the 07:36 scene is far under luma
+70). `human_proximity_muted=0`, `scene_gate_muted=0`, `blank_confidence_muted=0`.
+
+**Shipped exp #39 (`leading-edge-animal-proximity`), commit `657a30c`, run
+0028.** A sampled-out review-class burst is no longer dropped on the spot: it is
+handed to `_deferred_review_send` with `require_animal_proximity=True`, which
+sleeps `animal_proximity_window_seconds`, re-reads
+`self._last_animal_detection_at`, and sends as REVIEW only if a named-animal
+IDENTIFIED detection landed inside `(burst, burst+window]` — persisting
+`review_sampled_out=False` so the row records what happened. Waking exactly at
+`burst+window` is what makes the test trivially sound. Privacy precedence is
+preserved: a recovered burst then sleeps only the *remaining* defer time and
+runs the unchanged cancel-on-human check over its full window. Fail-open
+direction differs by phase on purpose — an exception before the animal decision
+**suppresses** (a sampled-out burst is already a deliberate drop; a bug must not
+manufacture volume), after it **sends**. No new config field, no new DB column,
+no new rollback lever: `PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS=0` still
+disables both halves at once.
+
+**Measured before shipping, not after.** Replayed over 484 `review_sampled_out=1`
+rows against 175 `is_named_animal_label` IDENTIFIED rows: a 180s forward window
+un-mutes **2 rows corpus-wide** — 5448 (37s, tonight's cat) and 5359 (72s, tier-2
+`false_positive`). One extra REVIEW message per two months to recover a confirmed
+animal. Flat from 120s to 240s, so 180s is not a knife-edge; it is exp #33's
+already-measured value, reused. The change can only ADD notifications, never
+mute one, so FN cannot rise — FN-veto passes by construction.
+
+**Exp #33 CONCLUDED (keep).** Five nights, zero firings, zero cost; still correct
+for the trailing edge (its 5388/5389 case was a 25s trailing miss). It is now one
+half of a symmetric pair. Slot passes to exp #39.
+
+**Sharpness collapse investigated and dismissed.** All 8 rows below the 11.0
+floor, daylight ceiling 6.98 vs a typical 20–28 — the lowest in the series, and a
+focus drift would be a hardware problem. It is not one: a fixed static region
+(bamboo wall, x 1100–1700 / y 100–500) scores lapvar 33.4 @ luma 107.6 on 09-21,
+11.9 @ 49.2 on 09-24, 5.7 @ 32.8 tonight. The scene is **3.3x darker**; Laplacian
+variance scales with contrast, and CLAHE-normalising tonight's frames restores
+bamboo-leaf edge detail comparable to 09-21. Exp #7's finding reconfirmed
+(`min_sharpness_threshold` on raw Laplacian variance is a brightness gate), and
+`blur_mute_min_luma=70` absorbed it exactly as designed. No action. Standing
+caution from run 0024 holds: never lower `blur_mute_min_luma`, never raise
+`min_sharpness_threshold`.
+
+Other gates: Blur 0 mutes despite 8/8 below-floor; Scene 0 of 4 evaluated
+(0.807–0.840 vs T=0.982, still vacuous); Confident-Blank, Unnamed-Animal-Blank
+and Human-Proximity had no firing opportunity; exp #35/#37 purge duty had no
+`human_proximity_muted=1` row to sweep. Restart stamped 2026-09-26T03:25:00+02:00 (verified:
+exp #37's 0bc9ec9 went live at the 09-24 03:30 restart, camera up since).
