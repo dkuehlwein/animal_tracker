@@ -1274,6 +1274,11 @@ async def test_review_sampled_out_suppresses_notification(system, tmp_path, capl
     burst gets a DB row (species-ID'd and logged as always) but no Telegram
     send, and a [REVIEW-SAMPLE] log line."""
     system.config.performance.review_sample_rate = 0.0
+    # exp #39 (leading-edge-animal-proximity): disable the forward
+    # animal-proximity deferral so a sampled-out burst is still dropped
+    # immediately here — this test is about the sampling gate in isolation,
+    # not the deferral tested separately below.
+    system.config.performance.animal_proximity_window_seconds = 0.0
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     system.species_identifier.identify_species = MagicMock(
@@ -3373,8 +3378,17 @@ async def test_animal_proximity_exempt_within_window_sends_review(system, tmp_pa
 @pytest.mark.asyncio
 async def test_animal_proximity_no_exempt_outside_window(system, tmp_path, caplog):
     """A review-class burst well outside the animal-proximity window is not
-    exempted — it is sampled out as usual at review_sample_rate=0.0."""
+    exempted by the backward exemption in process_detection — it is sampled
+    out at review_sample_rate=0.0. Since exp #39 (leading-edge-animal-
+    proximity), a sampled-out burst is no longer dropped immediately but
+    handed to the forward deferral instead (animal_proximity_window_seconds
+    shrunk to 0.01 here purely so the test doesn't block on a real 180s
+    sleep); with no animal landing AFTER it either, the deferred task ends up
+    logging the same [REVIEW-SAMPLE] suppression the immediate path used to,
+    and review_sampled_out stays True — the end state this test asserts is
+    unchanged, only the path to it is now asynchronous."""
     system.config.performance.review_sample_rate = 0.0
+    system.config.performance.animal_proximity_window_seconds = 0.01
     system._last_animal_detection_at = datetime.now() - timedelta(seconds=200)
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
@@ -3388,11 +3402,16 @@ async def test_animal_proximity_no_exempt_outside_window(system, tmp_path, caplo
 
     with caplog.at_level("INFO"):
         await system._process_and_notify_detection(img, 5000)
+        assert not any("[REVIEW-SAMPLE]" in r.message for r in caplog.records)
+        assert len(system._pending_review_tasks) == 1
+        task = next(iter(system._pending_review_tasks))
+        await task
 
     telegram.send_photo_with_caption.assert_not_called()
     telegram.send_media_group.assert_not_called()
     assert any("[REVIEW-SAMPLE]" in r.message for r in caplog.records)
     assert not any("[ANIMAL-PROXIMITY]" in r.message for r in caplog.records)
+    assert not any("[ANIMAL-DEFER]" in r.message for r in caplog.records)
 
     with sqlite3.connect(system.database.db_path) as conn:
         conn.row_factory = sqlite3.Row
@@ -3428,9 +3447,13 @@ async def test_animal_proximity_zero_window_disables_exemption(system, tmp_path,
 @pytest.mark.asyncio
 async def test_animal_proximity_no_exempt_without_prior_animal(system, tmp_path, caplog):
     """No prior named-animal IDENTIFIED detection recorded (fresh system) —
-    the exemption never fires."""
+    the exemption never fires. Shrinks animal_proximity_window_seconds so the
+    exp #39 forward deferral this now falls into (review_sample_rate=0.0 with
+    no exemption) doesn't leave a ~180s background task sleeping past the end
+    of this test."""
     assert system._last_animal_detection_at is None
     system.config.performance.review_sample_rate = 0.0
+    system.config.performance.animal_proximity_window_seconds = 0.01
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     system.species_identifier.identify_species = MagicMock(
@@ -3443,6 +3466,9 @@ async def test_animal_proximity_no_exempt_without_prior_animal(system, tmp_path,
 
     with caplog.at_level("INFO"):
         await system._process_and_notify_detection(img, 5000)
+        assert len(system._pending_review_tasks) == 1
+        task = next(iter(system._pending_review_tasks))
+        await task
 
     telegram.send_photo_with_caption.assert_not_called()
     telegram.send_media_group.assert_not_called()
@@ -3591,3 +3617,229 @@ def test_human_status_does_not_update_last_animal_detection_at(system):
     system.species_identifier.identify_species = MagicMock(return_value=_identification_human())
     system.process_detection("capture.jpg", 5000, None)
     assert system._last_animal_detection_at is None
+
+
+# ---------------------------------------------------------------------------
+# Leading-edge Animal-Proximity Deferral (exp #39, leading-edge-animal-
+# proximity, 2026-09-25): the backward Animal-Proximity Review Exemption
+# above (exp #33) can only exempt a review-class burst landing AFTER a
+# named-animal IDENTIFIED detection. Burst 5448 (07:36:43, a real calico cat
+# at extreme close range, status=unclassifiable) was dropped by the Review
+# Sampling Gate; burst 5449, the same cat, was correctly IDENTIFIED 37s
+# later — the naming happened AFTER the sampled-out burst, exactly the case
+# the backward exemption structurally cannot catch. A sampled-out
+# review-class burst is now handed to the SAME deferred-send machinery the
+# human leading-edge fix (exp #11) uses (`_deferred_review_send`), with
+# `require_animal_proximity=True`: it sleeps animal_proximity_window_seconds,
+# then only sends if a named-animal IDENTIFIED detection landed within that
+# window afterward. Reuses the existing knob — no new config field, no new
+# DB column; `0` disables both halves (this forward deferral and the exp #33
+# backward exemption) at once, the single rollback lever.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_animal_proximity_deferral_recovers_sampled_out_burst(system, tmp_path, caplog):
+    """A sampled-out review-class burst is recovered when a named-animal
+    IDENTIFIED detection lands within animal_proximity_window_seconds
+    afterward — the leading-edge mirror of burst 5448/5449 (tonight's cat).
+    The notification is sent, [ANIMAL-DEFER] is logged, and
+    update_review_sampled_out(id, False) is called exactly once so the DB
+    row matches what actually happened (same convention exp #33 uses for its
+    own, backward-looking exemption)."""
+    system.config.performance.review_sample_rate = 0.0
+    system.config.performance.animal_proximity_window_seconds = 0.01
+    captured = _spy_process_detection(system)
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+    update_spy = MagicMock(side_effect=system.database.update_review_sampled_out)
+    system.database.update_review_sampled_out = update_spy
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+        assert len(system._pending_review_tasks) == 1
+
+        # process_detection's own follow-up UPDATE already recorded the
+        # initial sampled-out=True write above (see the "Observability
+        # columns" bullet's review_sampled_out description) — reset the spy
+        # so the assertion below isolates the call the DEFERRED recovery
+        # itself makes, not that unrelated earlier one.
+        update_spy.reset_mock()
+
+        # A named-animal IDENTIFIED detection lands 1ms after this burst —
+        # comfortably inside the 10ms animal-proximity window configured
+        # above, regardless of how long the real asyncio.sleep(0.01) below
+        # actually takes wall-clock-wise (same pattern as the human deferral
+        # tests earlier in this file).
+        system._last_animal_detection_at = captured['timestamp'] + timedelta(milliseconds=1)
+
+        task = next(iter(system._pending_review_tasks))
+        await task
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    assert any("[ANIMAL-DEFER]" in r.message for r in caplog.records)
+    assert not any("[REVIEW-SAMPLE]" in r.message for r in caplog.records)
+    update_spy.assert_called_once_with(captured['detection_id'], False)
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM detections WHERE id = ?", (captured['detection_id'],)
+        ).fetchone()
+    assert row['review_sampled_out'] == 0
+
+
+@pytest.mark.asyncio
+async def test_animal_proximity_deferral_no_recovery_stays_suppressed(system, tmp_path, caplog):
+    """No named-animal IDENTIFIED detection lands within the window — the
+    deferred task ends up suppressing the notification exactly like the
+    immediate REVIEW-SAMPLE drop used to, and never calls
+    update_review_sampled_out (the DB row stays sampled_out=True, matching
+    what process_detection already wrote — this is the common case, and it
+    must stay silent on Telegram)."""
+    system.config.performance.review_sample_rate = 0.0
+    system.config.performance.animal_proximity_window_seconds = 0.01
+    captured = _spy_process_detection(system)
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+    update_spy = MagicMock(side_effect=system.database.update_review_sampled_out)
+    system.database.update_review_sampled_out = update_spy
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+        assert len(system._pending_review_tasks) == 1
+        # Isolate the deferred task's own behaviour from process_detection's
+        # unrelated initial sampled-out=True write, same as the recovery
+        # test above.
+        update_spy.reset_mock()
+        task = next(iter(system._pending_review_tasks))
+        await task
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    assert any("[REVIEW-SAMPLE]" in r.message for r in caplog.records)
+    assert not any("[ANIMAL-DEFER]" in r.message for r in caplog.records)
+    update_spy.assert_not_called()
+
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM detections WHERE id = ?", (captured['detection_id'],)
+        ).fetchone()
+    assert row['review_sampled_out'] == 1
+
+
+@pytest.mark.asyncio
+async def test_animal_proximity_deferral_disabled_immediate_drop(system, tmp_path, caplog):
+    """animal_proximity_window_seconds == 0 (the rollback lever, shared with
+    the exp #33 backward exemption) preserves pre-exp-#39 behaviour exactly:
+    a sampled-out burst is dropped immediately with a [REVIEW-SAMPLE] log, no
+    background task is ever scheduled."""
+    system.config.performance.review_sample_rate = 0.0
+    system.config.performance.animal_proximity_window_seconds = 0.0
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    assert any("[REVIEW-SAMPLE]" in r.message for r in caplog.records)
+    assert len(system._pending_review_tasks) == 0
+
+
+@pytest.mark.asyncio
+async def test_animal_proximity_deferral_still_cancelled_by_human(system, tmp_path, caplog):
+    """Privacy precedence is preserved even for a recovered burst: a named
+    animal lands within the animal-proximity window, recovering the burst
+    (Phase 1), but a HUMAN-status detection then lands within the FULL
+    review_defer_seconds window measured from the burst's own timestamp
+    (Phase 2, unchanged) — the send is still cancelled, human_proximity_muted
+    is persisted True, and nothing reaches Telegram. A person arriving after
+    the burst wins even over a recovered animal."""
+    system.config.performance.review_sample_rate = 0.0
+    system.config.performance.animal_proximity_window_seconds = 0.01
+    system.config.performance.review_defer_seconds = 0.03
+    captured = _spy_process_detection(system)
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+    human_spy = MagicMock(side_effect=system.database.update_human_proximity_muted)
+    system.database.update_human_proximity_muted = human_spy
+
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+        assert len(system._pending_review_tasks) == 1
+
+        # Both land immediately after scheduling, before the task's own
+        # sleeps run their course — same pattern as the deferral tests
+        # above. The animal lands well inside the 10ms animal-proximity
+        # window (Phase 1); the human lands inside the FULL 30ms
+        # review_defer_seconds window measured from the burst's own
+        # timestamp (Phase 2's unchanged check), i.e. still inside the
+        # ~20ms remaining after Phase 1 recovers and consumes its 10ms.
+        system._last_animal_detection_at = captured['timestamp'] + timedelta(milliseconds=1)
+        system._last_human_detection_at = captured['timestamp'] + timedelta(milliseconds=20)
+
+        task = next(iter(system._pending_review_tasks))
+        await task
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    assert any("[ANIMAL-DEFER]" in r.message for r in caplog.records)
+    assert any("[REVIEW-DEFER]" in r.message for r in caplog.records)
+    human_spy.assert_called_once_with(captured['detection_id'], True)
+
+
+@pytest.mark.asyncio
+async def test_ordinary_review_burst_unaffected_by_animal_proximity_deferral(system, tmp_path):
+    """A review-class burst that was NOT sampled out (review_sample_rate=1.0,
+    the fixture default) takes the ordinary review_defer_seconds path
+    unchanged by exp #39: require_animal_proximity is False for it, so
+    Phase 1 never runs and the send proceeds exactly as it did before this
+    change."""
+    system.config.performance.review_sample_rate = 1.0
+    system.config.performance.review_defer_seconds = 0.01
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    await system._process_and_notify_detection(img, 5000)
+    assert len(system._pending_review_tasks) == 1
+    task = next(iter(system._pending_review_tasks))
+    await task
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called

@@ -1476,7 +1476,13 @@ class WildlifeSystem:
                 f"threshold={self.config.performance.scene_gate_similarity_threshold:.3f}, "
                 f"no animal found)"
             )
-        elif is_sampled_out_review:
+        elif is_sampled_out_review and self.config.performance.animal_proximity_window_seconds <= 0:
+            # exp #39 (leading-edge-animal-proximity, 2026-09-25): with the
+            # forward half of the animal-proximity gate disabled (0 = the
+            # rollback lever, shared with the backward exemption in
+            # process_detection), a sampled-out burst is dropped immediately
+            # exactly as before this change — byte-for-byte, no task ever
+            # scheduled.
             logger.info(
                 f"[REVIEW-SAMPLE] Suppressing notification for detection "
                 f"{species_result.get('detection_id')} "
@@ -1547,7 +1553,39 @@ class WildlifeSystem:
             # self.last_motion_result — which mutate on the NEXT loop
             # iteration) and every value the deferred send needs is now a
             # plain local variable, safe to hand to a background task.
-            if (self.config.performance.review_defer_seconds > 0
+            if is_sampled_out_review:
+                # Leading-edge animal-proximity deferral (exp #39,
+                # leading-edge-animal-proximity, 2026-09-25): burst 5448
+                # (07:36:43, a real calico cat at extreme close range,
+                # status=unclassifiable) was dropped by the Review Sampling
+                # Gate; burst 5449, the same cat, was correctly IDENTIFIED
+                # 37s later. The backward Animal-Proximity Review Exemption
+                # above (exp #33) can never catch this — it only exempts a
+                # review-class burst landing AFTER a named-animal detection,
+                # and here the naming happens AFTER the sampled-out burst,
+                # not before it. This is the structural mirror of the
+                # leading-edge human fix already below
+                # (_deferred_review_send's cancel-on-human): rather than an
+                # immediate drop, hand the burst to the SAME deferred-send
+                # machinery with require_animal_proximity=True, so a
+                # same-visit IDENTIFIED burst arriving within
+                # animal_proximity_window_seconds can still recover it.
+                # Reuses the existing animal_proximity_window_seconds knob —
+                # no new config field, no new DB column — and is only
+                # reached at all when that window is > 0 (see the elif
+                # above); a sampled-out burst therefore ALWAYS defers here,
+                # never sends immediately, regardless of review_defer_seconds.
+                # Measured over the full corpus (see
+                # PerformanceConfig.animal_proximity_window_seconds): this
+                # recovers exactly 2 sampled-out rows corpus-wide (one a
+                # confirmed animal, tonight's cat) — it can only ever ADD a
+                # notification, never mute one that would otherwise send.
+                self._schedule_deferred_review_send(
+                    species_result, motion_area, timestamp,
+                    image_path, annotated_path, document_path,
+                    require_animal_proximity=True,
+                )
+            elif (self.config.performance.review_defer_seconds > 0
                     and is_review_detection(species_result.get('detection_status'))):
                 self._schedule_deferred_review_send(
                     species_result, motion_area, timestamp,
@@ -1569,10 +1607,22 @@ class WildlifeSystem:
     def _schedule_deferred_review_send(self, species_result: dict, motion_area: int,
                                         timestamp: datetime, image_path: Path,
                                         annotated_path: Optional[Path],
-                                        document_path: Optional[Path]) -> None:
+                                        document_path: Optional[Path],
+                                        require_animal_proximity: bool = False) -> None:
         """Fire off a background task that delays a review-class Telegram
         send by `review_defer_seconds`, cancelling it if a HUMAN-status
         detection lands within that window (see `_deferred_review_send`).
+
+        `require_animal_proximity=True` (exp #39, leading-edge-animal-
+        proximity, 2026-09-25) additionally makes the send conditional on a
+        named-animal IDENTIFIED detection landing within
+        `animal_proximity_window_seconds` AFTER this burst — used for
+        review-class bursts the Review Sampling Gate would otherwise have
+        dropped immediately (see the call site in
+        `_process_and_notify_detection`). It is the leading-edge counterpart
+        to the backward-looking Animal-Proximity Review Exemption already
+        computed in `process_detection`. See `_deferred_review_send` for the
+        two-phase sleep/check this implies.
 
         Deliberately NOT awaited here — `_process_and_notify_detection` must
         not block the main detection loop for up to `review_defer_seconds`.
@@ -1584,7 +1634,8 @@ class WildlifeSystem:
         task = asyncio.create_task(
             self._deferred_review_send(
                 species_result, motion_area, timestamp,
-                image_path, annotated_path, document_path
+                image_path, annotated_path, document_path,
+                require_animal_proximity=require_animal_proximity,
             )
         )
         self._pending_review_tasks.add(task)
@@ -1593,30 +1644,121 @@ class WildlifeSystem:
     async def _deferred_review_send(self, species_result: dict, motion_area: int,
                                      timestamp: datetime, image_path: Path,
                                      annotated_path: Optional[Path],
-                                     document_path: Optional[Path]) -> None:
-        """Sleep `review_defer_seconds`, then either cancel or send.
+                                     document_path: Optional[Path],
+                                     require_animal_proximity: bool = False) -> None:
+        """Sleep, then either cancel or send.
 
-        Cancels the send when a HUMAN-status detection has landed AFTER this
-        burst but still within the defer window
-        (``burst_timestamp < last_human_at <= burst_timestamp + review_defer_seconds``)
-        — the leading-edge counterpart to the (backward-looking)
-        human-proximity mute gate in `process_detection`. On cancel, persists
-        the mute via `update_human_proximity_muted` so the DB row matches
-        what actually happened (same convention as a normal proximity mute).
+        Two independent phases, both reusing `animal_proximity_window_seconds`
+        (exp #39, leading-edge-animal-proximity, 2026-09-25 — no new config
+        field, no new DB column; `0` remains the single rollback lever that
+        disables BOTH the backward exemption in `process_detection` and this
+        forward half of the gate):
 
-        FAIL-OPEN by construction: any exception here (scheduling already
-        happened by the time this runs; sleeping, the human check, or the DB
-        update could still fail) is caught and results in the notification
-        being SENT, never silently dropped — a bug in this gate must never
-        cost a real detection. A deliberate cancellation of this task itself
-        (e.g. system shutdown) raises asyncio.CancelledError, which is a
-        BaseException, not Exception — it propagates past the except clause
-        below untouched, so a shutdown never triggers a spurious send.
+        Phase 1 (only when `require_animal_proximity` is True — this burst
+        was already sampled out by the Review Sampling Gate and had no
+        qualifying animal BEFORE it): sleep `animal_proximity_window_seconds`,
+        then check whether a named-animal IDENTIFIED detection
+        (`self._last_animal_detection_at`) landed strictly within
+        ``(timestamp, timestamp + animal_proximity_window_seconds]`` — the
+        leading-edge mirror of burst 5448/5449 (2026-09-25: a real calico cat
+        sampled out at 07:36:43, correctly named 37s later). If nothing
+        landed, this is the common case: log the same [REVIEW-SAMPLE]
+        suppression the immediate path would have logged, and return without
+        sending — `review_sampled_out` stays True, exactly as if this
+        deferral had never been scheduled. If a named animal did land, log
+        [ANIMAL-DEFER], persist `update_review_sampled_out(id, False)` (same
+        convention as the backward exemption) and fall through to Phase 2
+        with only the REMAINING human-defer budget
+        (`review_defer_seconds` minus the animal-proximity sleep already
+        spent), so the total look-forward for a human never exceeds
+        `review_defer_seconds` measured from the burst's own timestamp.
+
+        Phase 2 (always — whether reached directly, when
+        `require_animal_proximity` is False, or via a successful Phase 1):
+        identical to the original leading-edge human fix (2026-07-31) —
+        cancel the send if a HUMAN-status detection lands within
+        `review_defer_seconds` of the burst
+        (``timestamp < last_human_at <= timestamp + review_defer_seconds``),
+        logging [REVIEW-DEFER] and persisting `update_human_proximity_muted`.
+        A person arriving after the burst still wins even over a recovered
+        animal — privacy precedence is unconditional and untouched by Phase 1.
+
+        FAIL-OPEN DIRECTION IS PHASE-DEPENDENT, unlike the pre-exp-#39
+        version of this function:
+          - An exception during Phase 1, i.e. before the animal decision is
+            made, falls back to SUPPRESS, not send: a sampled-out burst is
+            already a deliberate drop, so a bug in the recovery path must not
+            manufacture notification volume that wouldn't otherwise exist.
+          - Once Phase 1 has said "recover" (or wasn't required at all — the
+            pre-existing behaviour), any later exception (Phase 2's human
+            check, either DB update) falls open to SEND, exactly as this
+            function always has — a bug must never cost a real detection
+            that was already going to send.
+        `asyncio.CancelledError` is a BaseException, not Exception, in both
+        phases — it propagates untouched past every `except Exception` clause
+        below, so a shutdown cancellation (see `run()`'s shutdown path) never
+        triggers a spurious send.
         """
         detection_id = species_result.get('detection_id')
         should_cancel = False
+
+        if require_animal_proximity:
+            animal_window = self.config.performance.animal_proximity_window_seconds
+            try:
+                await asyncio.sleep(animal_window)
+                last_animal = self._last_animal_detection_at
+                recovered = bool(
+                    last_animal is not None
+                    and timestamp < last_animal <= timestamp + timedelta(seconds=animal_window)
+                )
+            except Exception as e:
+                # Fail CLOSED here: this burst was already a deliberate drop
+                # (Review Sampling Gate), and this is the phase that would
+                # turn that drop into a send. A bug here must not manufacture
+                # notification volume that wouldn't otherwise exist.
+                logger.error(
+                    f"Error in deferred animal-proximity check for detection "
+                    f"{detection_id} (suppressing, fail-closed): {e}",
+                    exc_info=True
+                )
+                return
+
+            if not recovered:
+                logger.info(
+                    f"[REVIEW-SAMPLE] Suppressing notification for detection "
+                    f"{detection_id} (sampled out, rate="
+                    f"{self.config.performance.review_sample_rate:.3f}; no "
+                    f"named-animal detection landed within {animal_window:.0f}s)"
+                )
+                return
+
+            gap_seconds = (last_animal - timestamp).total_seconds()
+            logger.info(
+                f"[ANIMAL-DEFER] Recovering sampled-out detection "
+                f"{detection_id}: named-animal detection landed "
+                f"{gap_seconds:.0f}s later (window {animal_window:.0f}s)"
+            )
+            # From here on, failures fall OPEN (send) — same convention as
+            # the rest of this function — the decision to recover this burst
+            # has already been made and logged above.
+            try:
+                if detection_id is not None:
+                    self.database.update_review_sampled_out(detection_id, False)
+            except Exception as e:
+                logger.error(
+                    f"Error persisting animal-proximity recovery for "
+                    f"detection {detection_id} (sending anyway, fail-open): "
+                    f"{e}", exc_info=True
+                )
+            remaining_defer = max(
+                0.0,
+                self.config.performance.review_defer_seconds - animal_window
+            )
+        else:
+            remaining_defer = self.config.performance.review_defer_seconds
+
         try:
-            await asyncio.sleep(self.config.performance.review_defer_seconds)
+            await asyncio.sleep(remaining_defer)
 
             last_human = self._last_human_detection_at
             window = timedelta(seconds=self.config.performance.review_defer_seconds)
