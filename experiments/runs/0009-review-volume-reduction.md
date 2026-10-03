@@ -1,7 +1,8 @@
 ---
 id: 10
 slug: review-volume-reduction
-status: running           # deployed 2026-07-26 by human directive, outside a nightly tick
+status: concluded
+outcome: "human-directed config change (review sampling at 0.5, scene gate); scene half RETIRED 2026-10-03; review sampling KEPT."
 validation: live          # scene gate ENABLED T=0.97 + review sampling 0.25
 occupies_active_slot: false  # NOT a loop experiment — a human-directed config change.
                              # exp #9 (runs/0008) keeps active_experiment_id; the

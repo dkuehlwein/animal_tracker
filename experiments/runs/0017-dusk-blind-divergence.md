@@ -1,7 +1,8 @@
 ---
 id: 24
 slug: dusk-blind-divergence
-status: running
+status: concluded
+outcome: "KEPT - gate/mechanism still live after the 2026-10-03 prune; closed with no further observation duty."
 validation: live   # code change + paired env delta, restart-gated; verified end-to-end on the real leak frames
 occupies_active_slot: false  # defect repair of exp #21's shipped mechanism, not a new tuning lever — exp #21 keeps the slot
 hypothesis: "Exp #21's burst human sweep cannot fire in low light. Its trigger counts pixels differing by >40 RAW grey levels, so it measures the scene's dynamic range as much as its content: at a frame mean of 11/255 almost no pixel pair can clear 40 levels, however different the pictures are. Dusk is precisely when motion blur makes the selected frame likeliest to misread a person, so the sweep is blind where it matters most. Normalising each frame to a canonical mean/contrast before differencing restores the measure to content."

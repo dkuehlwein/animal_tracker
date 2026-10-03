@@ -1,7 +1,8 @@
 ---
 id: 26
 slug: unnamed-animal-main-leak
-status: running
+status: concluded
+outcome: "KEPT - gate/mechanism still live after the 2026-10-03 prune; closed with no further observation duty."
 validation: live   # code change, restart-gated; FN cost measured over the full 78-row corpus of this label shape
 occupies_active_slot: false  # scope repair of the Human-Proximity Gate (exp #10/#11), same precedent as exp #23 vs #9 and exp #24 vs #21
 hypothesis: "SpeciesNet's fully-generic rollup `<uuid>;;;;;;animal` means 'something is there, I cannot name it'. It is routed to IDENTIFIED, so it fires a MAIN-channel species alert that bypasses EVERY review-class mute path — human-proximity, blur, scene, sampling, deferral. A person photographed at extreme close range is exactly the input that produces it: MegaDetector boxes a torso/leg filling the frame, the classifier cannot name it, and the burst is delivered as 'animal detected'. Gating this one label shape (and only this one) on the existing Human-Proximity Gate closes the leak at zero measured FN cost."

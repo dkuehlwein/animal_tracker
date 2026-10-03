@@ -1,7 +1,8 @@
 ---
 id: 35
 slug: human-proximity-purge-gap
-status: running
+status: concluded
+outcome: "KEPT - gate/mechanism still live after the 2026-10-03 prune; closed with no further observation duty."
 validation: live   # code change, commit 0bc9ec9; replayed over the full corpus before shipping
 occupies_active_slot: false  # retention/privacy fix on a leak path, same shape as exp #26/#29/#32; exp #33 keeps the slot
 hypothesis: "A burst the human-proximity mute gate already muted is human-adjacent by the system's own verdict, so its frames must follow the 48h human-photo policy — not a second, narrower ±240s time test that the gate's density and demoted-band conditions can legitimately fall outside of."

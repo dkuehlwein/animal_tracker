@@ -1,7 +1,8 @@
 ---
 id: 28
 slug: geofenced-best-guess
-status: running
+status: concluded
+outcome: "KEPT - gate/mechanism still live after the 2026-10-03 prune; closed with no further observation duty."
 validation: live   # code change, restart-gated; caption text only — no routing, no FP/FN surface
 occupies_active_slot: false  # notification-caption quality fix; the animal-bucket slot (exp #21) is unchanged
 hypothesis: "The 'Best guess' caption line reads the classifier's RAW top-1 (metadata['top_classifier_prediction']) — the label before geofencing and before rollup. That is the one prediction we know is unfiltered for region, so on the rare bursts that actually contain an animal it renders either a species that cannot occur in Germany or a tautology of the verdict itself. metadata['best_geofenced_species'] — the first species-level candidate in the classifier top-k that SpeciesNet's own geofence allows in DEU/NW — is already computed on every identification and simply never shown. Preferring it turns the line from misinformation into the correct species at zero routing risk."

@@ -1,7 +1,8 @@
 ---
 id: 39
 slug: leading-edge-animal-proximity
-status: running
+status: retired
+outcome: "RETIRED 2026-10-03 (human-led prune) - Animal-Proximity Review Exemption forward half removed; DB columns kept."
 validation: live   # code change, commit 657a30c; replayed over the full corpus before shipping
 occupies_active_slot: true   # takes the slot from exp #33, concluded KEEP tonight (see below)
 hypothesis: "The Animal-Proximity Review Exemption is backward-looking, so it cannot save the LEADING edge of an animal visit: a review-class burst that the Review Sampling Gate mutes seconds BEFORE SpeciesNet names the same animal is a silent false negative. Deferring the sampled-out burst by animal_proximity_window_seconds and re-checking for a named-animal detection recovers it."
