@@ -40,7 +40,6 @@ Use VIM, not nano, for console edits.
 - **`camera_manager.py`**: dual-stream Picamera2 (high-res capture + low-res motion stream); `MockCameraManager` for tests
 - **`motion_detector.py`**: MOG2 background subtraction, central-region weighting, consecutive-detection filter, optional color-variance filter
 - **`species_identifier.py`**: SpeciesNet wrapper; assigns `DetectionStatus` (human gate, blank routing, etc.); `MockSpeciesIdentifier` for tests
-- **`scene_gate.py`**: Scene-Unchanged Gate frame comparator + rolling reference set
 - **`database_manager.py`**: SQLite (WAL) detection log, observability columns, `detection_feedback` labels
 - **`notification_service.py`**: Telegram send + caption formatting
 - **`feedback_protocol.py`**: shared inline-keyboard `callback_data` ↔ label mapping
@@ -72,21 +71,19 @@ Notification precedence (first match wins, exactly one suppression log per burst
 
 1. `[HUMAN-GATE]` Human/Privacy — HUMAN status never notifies (upstream: `[HUMAN-SWEEP]` escalates review-class bursts whose sibling frames hold a person)
 2. `[HUMAN-PROXIMITY]` Human-Proximity — window OR density OR demoted-band; also covers `;;;;;;animal` IDENTIFIED bursts
-3. `[UNNAMED-BLANK]` Unnamed-Animal Blank-Raw — `;;;;;;animal` with raw top-1 `blank` below 0.90
-4. `[BLUR]` Blur — below sharpness floor AND luma ≥ 70, review-class only
-5. `[BLANK-CONF]` Confident-Blank — raw top-1 `blank` ≥ 0.92, review-class only
-6. `[SCENE-GATE]` Scene-Unchanged — similarity ≥ T vs recent empty frames
-7. `[REVIEW-SAMPLE]` Review Sampling — deterministic fraction sent; `[ANIMAL-PROXIMITY]`/`[ANIMAL-DEFER]` un-mute bursts near a named-animal ID
-8. `[REVIEW-DEFER]` Deferred send — surviving REVIEW sends held 240s, cancelled if a HUMAN burst lands
+3. `[BLUR]` Blur — below sharpness floor AND luma ≥ 70, review-class only
+4. `[BLANK-CONF]` Confident-Blank — raw top-1 `blank` ≥ 0.92, review-class only
+5. `[REVIEW-SAMPLE]` Review Sampling — deterministic fraction sent
+6. `[REVIEW-DEFER]` Deferred send — surviving REVIEW sends held 240s, cancelled if a HUMAN burst lands
 
 MAIN-channel (non-review, non-human) alerts are never delayed. Photos of HUMAN and human-adjacent/human-proximity-muted bursts are purged after 48h; DB rows are kept.
 
 ### Standing rulings the loop must obey
 
 - **No human pre-approval step exists.** If a change passes the guardrails, ship it (PROTOCOL.md "Autonomy"). Daniel's levers are post-hoc: `/pause`, `/rollback`, `git revert`.
-- **Scene gate is human-ruled ON** (2026-07-26 override). Do not disable it or re-derive T on the grounds that the animal bucket is empty. Raise T on positive evidence of a muted animal; adjudicate every `scene_gate_muted=1` burst nightly (PROTOCOL.md "Scene-gate ownership"; exp #30 set T=0.982).
+- **Scene gate, Unnamed-Animal Blank-Raw gate and Animal-Proximity exemption were retired by Daniel 2026-10-03** (docs/detection-gates.md §15). The earlier "scene gate is human-ruled ON" ruling is void; do not re-add them without new evidence. DB columns remain (NULL on new rows).
 - **Review sampling is a volume lever, not an FP lever.** Never credit it with an fp_rate change; fewer labels is intended, not a freeze trigger (PROTOCOL.md "Review sampling").
-- **Mute thresholds the loop may not cross**: `BLANK_CONFIDENCE_MUTE_THRESHOLD` loop range `[0.87, 1.0]`; `UNNAMED_ANIMAL_BLANK_MUTE_THRESHOLD` `[0.0, 0.9522]`; `HUMAN_DETECTION_CONFIDENCE` `[0.3, 0.7]`. Setting either mute threshold to `0` (disable) is human-only. All ranges: `src/loop/guardrails.py::BOUNDS`.
+- **Mute thresholds the loop may not cross**: `BLANK_CONFIDENCE_MUTE_THRESHOLD` loop range `[0.87, 1.0]`; `HUMAN_DETECTION_CONFIDENCE` `[0.3, 0.7]`. Setting the blank-confidence threshold to `0` (disable) is human-only. All ranges: `src/loop/guardrails.py::BOUNDS`.
 - **Auto-labels are not truth.** Headline fp_rate uses human labels only; `cant_tell` and `person` are excluded from its denominator.
 - **No second Telegram channel** — likely-FPs use the same-channel 🔍 REVIEW prefix.
 - **Analyze existing data first** (DB rows + frames on disk + labels) before proposing new instrumentation (`experiments/loop.md`).

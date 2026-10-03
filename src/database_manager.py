@@ -7,7 +7,6 @@ from typing import List, Optional
 from config import Config
 from data_models import DetectionRecord
 from exceptions import DatabaseError, DatabaseConnectionError, DatabaseOperationError
-from utils import is_named_animal_label
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +42,8 @@ class DatabaseManager:
         # notification caption both see the more specific guess.
         "top_species_raw": "TEXT",
         "top_species_score": "REAL",
-        # Task 2 (scene-unchanged gate): the frame comparator's similarity
+        # RETIRED 2026-10-03 (scene-unchanged gate; column kept, no longer
+        # written, NULL on new rows): the frame comparator's similarity
         # score against the rolling empty-scene reference set, and whether
         # that score crossed the mute threshold — persisted so the gate's
         # decision is auditable and the nightly tuning loop can attribute
@@ -69,11 +69,12 @@ class DatabaseManager:
         # label at or above blank_confidence_mute_threshold, False when
         # review-class and evaluated but not muted, NULL when the status
         # isn't review-class or the gate is disabled (threshold 0.0). Same
-        # NULL-for-non-review-class convention as scene_gate_muted; written
+        # NULL-for-non-review-class convention as the retired scene_gate_muted; written
         # on the initial INSERT (no detection_id dependency), same as
         # human_proximity_muted.
         "blank_confidence_muted": "BOOLEAN",
-        # Unnamed-Animal Blank-Raw Mute Gate (exp #32): True when an
+        # RETIRED 2026-10-03 (Unnamed-Animal Blank-Raw Mute Gate, exp #32;
+        # column kept, no longer written, NULL on new rows): True when an
         # IDENTIFIED burst carrying SpeciesNet's fully-generic
         # "<uuid>;;;;;;animal" rollup had a raw classifier top-1 of "blank"
         # BELOW unnamed_animal_blank_mute_threshold (the two models
@@ -185,10 +186,8 @@ class DatabaseManager:
                      detection_status=None, sharpness_score=None,
                      below_sharpness_floor=None, person_confidence=None,
                      top_species_raw=None, top_species_score=None,
-                     scene_similarity=None, scene_gate_muted=None,
                      review_sampled_out=None, human_proximity_muted=None,
-                     blank_confidence_muted=None,
-                     unnamed_animal_blank_muted=None) -> Optional[int]:
+                     blank_confidence_muted=None) -> Optional[int]:
         """Log a detection event to the database.
 
         The trailing keyword arguments are the Phase-1 richer-logging fields
@@ -198,10 +197,7 @@ class DatabaseManager:
         observability fields (already computed upstream, now persisted).
         `top_species_raw`/`top_species_score` are Task 3's: the classifier's
         raw top-1 prediction label/score, distinct from the (possibly
-        rolled-up) ensemble `species_name`. `scene_similarity`/
-        `scene_gate_muted` are Task 2's: the scene-unchanged gate's
-        comparator score against the empty-scene reference set and whether
-        it crossed the mute threshold. `review_sampled_out` is the
+        rolled-up) ensemble `species_name`. `review_sampled_out` is the
         REVIEW-channel sampling gate's decision; callers normally leave it
         None here (the detection id it's keyed on doesn't exist until this
         INSERT returns) and set it afterwards via update_review_sampled_out.
@@ -211,10 +207,9 @@ class DatabaseManager:
         set directly on the initial INSERT. `blank_confidence_muted` is the
         Confident-Blank Mute Gate's decision (exp #29), same True/False/None
         convention and also set directly on the initial INSERT.
-        `unnamed_animal_blank_muted` is the Unnamed-Animal Blank-Raw Mute
-        Gate's decision (exp #32) — True/False only for IDENTIFIED bursts
-        carrying the generic ";;;;;;animal" rollup, None when the gate
-        didn't apply; also set on the initial INSERT.
+        The retired gates' columns (`scene_similarity`, `scene_gate_muted`,
+        `unnamed_animal_blank_muted`) stay in the schema (append-only) but
+        are no longer written; new rows leave them NULL.
         """
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -250,12 +245,9 @@ class DatabaseManager:
                     "person_confidence": person_confidence,
                     "top_species_raw": top_species_raw,
                     "top_species_score": top_species_score,
-                    "scene_similarity": scene_similarity,
-                    "scene_gate_muted": scene_gate_muted,
                     "review_sampled_out": review_sampled_out,
                     "human_proximity_muted": human_proximity_muted,
                     "blank_confidence_muted": blank_confidence_muted,
-                    "unnamed_animal_blank_muted": unnamed_animal_blank_muted,
                 }
                 columns = ", ".join(values)
                 placeholders = ", ".join("?" * len(values))
@@ -652,38 +644,6 @@ class DatabaseManager:
                 f"Unexpected error getting human-adjacent review detections: {e}"
             ) from e
 
-    def get_recent_review_detections(self, limit: int, max_age_hours: float) -> List[tuple]:
-        """Return (image_path, timestamp) for recent review-class detections.
-
-        Used to seed the scene-unchanged gate's rolling empty-scene reference
-        set: review-class rows (`detection_status` in `no_animal` or
-        `unclassifiable` — i.e. no animal was found) within the last
-        `max_age_hours`, newest first, capped at `limit`. Modeled on
-        `get_human_detections_older_than`; `timestamp` is stored as a local
-        wall-clock string in "%Y-%m-%d %H:%M:%S" format, so a plain string
-        comparison against a cutoff formatted the same way is correct here.
-        """
-        cutoff_str = (datetime.now() - timedelta(hours=max_age_hours)).strftime("%Y-%m-%d %H:%M:%S")
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute('''
-                    SELECT image_path, timestamp
-                    FROM detections
-                    WHERE detection_status IN ('no_animal', 'unclassifiable')
-                      AND timestamp >= ?
-                    ORDER BY timestamp DESC
-                    LIMIT ?
-                ''', (cutoff_str, limit))
-                return [
-                    (row[0], datetime.strptime(row[1], "%Y-%m-%d %H:%M:%S"))
-                    for row in cursor.fetchall()
-                ]
-        except sqlite3.Error as e:
-            raise DatabaseOperationError(f"Failed to get recent review detections: {e}") from e
-        except Exception as e:
-            raise DatabaseError(f"Unexpected error getting recent review detections: {e}") from e
-
     def get_last_human_detection_time(self) -> Optional[datetime]:
         """Return the timestamp of the most recent HUMAN-status detection, or
         None if there is none.
@@ -712,45 +672,6 @@ class DatabaseManager:
             raise DatabaseOperationError(f"Failed to get last human detection time: {e}") from e
         except Exception as e:
             raise DatabaseError(f"Unexpected error getting last human detection time: {e}") from e
-
-    def get_last_animal_detection_time(self) -> Optional[datetime]:
-        """Return the timestamp of the most recent IDENTIFIED detection whose
-        species_name names a real, specific animal — not SpeciesNet's
-        fully-generic unnamed-animal/blank rollups, and not a human/'homo'
-        taxonomy leak.
-
-        Used to seed the Animal-Proximity Review Exemption's in-memory state
-        (`WildlifeSystem._last_animal_detection_at`, exp #33,
-        animal-proximity-review-exemption) at startup, so a restart doesn't
-        lose the look-back window. Modeled on `get_last_human_detection_time`.
-
-        The SQL WHERE clause below is a loose pre-filter only (cheap to push
-        into SQLite, narrow enough to keep the scanned row count small) —
-        `utils.is_named_animal_label` is the actual authority and is applied
-        in Python to each candidate row, most-recent first, so a row that
-        merely slips past the SQL filter can never override the stricter
-        Python check.
-        """
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute('''
-                    SELECT timestamp, species_name
-                    FROM detections
-                    WHERE detection_status = 'identified'
-                      AND species_name IS NOT NULL
-                      AND species_name != ''
-                      AND LOWER(species_name) NOT LIKE '%homo%'
-                    ORDER BY timestamp DESC
-                ''')
-                for row in cursor.fetchall():
-                    if is_named_animal_label(row[1]):
-                        return datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
-                return None
-        except sqlite3.Error as e:
-            raise DatabaseOperationError(f"Failed to get last animal detection time: {e}") from e
-        except Exception as e:
-            raise DatabaseError(f"Unexpected error getting last animal detection time: {e}") from e
 
     def get_recent_human_detection_times(self, since: datetime) -> List[datetime]:
         """Return timestamps of all HUMAN-status detections at/after `since`.

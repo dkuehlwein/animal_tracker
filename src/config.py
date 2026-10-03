@@ -173,24 +173,6 @@ class PerformanceConfig(BaseSettings):
     timelapse_interval: float = 20.0  # seconds between saved frames
     timelapse_max_files: int = 10000  # ~2 days @ 20s; oldest pruned beyond this
 
-    # Scene-unchanged gate: mute captures whose burst frame is near-identical
-    # to a recent reference frame (empty-scene FP reduction; see scene_gate.py).
-    # Task 5 (offline validation, 2026-07-17): disabled by default. The
-    # labeled corpus has ZERO human 'animal'/'animal_wrong_id' review-class
-    # rows whose frame still exists on disk (all 17 predate the ~100-burst
-    # retention window vs. 53 on-disk review-class frames) — no threshold
-    # can be picked with any evidence it won't mute a real animal. Ship
-    # disabled until more labeled animal frames survive retention long
-    # enough to be replayed; see scripts/validate_scene_gate.py and
-    # .superpowers/sdd/task-5-report.md. Flip to True (with a threshold set
-    # from a re-run of the validation script) once that data exists.
-    scene_gate_enabled: bool = False
-    # Conservative placeholder — kept at 0.97 pending a validated default
-    # (see scene_gate_enabled note above).
-    scene_gate_similarity_threshold: float = 0.97
-    scene_gate_ref_count: int = 3
-    scene_gate_ref_max_age_hours: float = 6.0
-
     # Blur-mute (below-floor + no-animal) only fires when best-frame mean
     # luma >= this; below it, darkness (not blur) explains the low score,
     # so the burst flows to REVIEW instead of being muted (exp #8,
@@ -279,65 +261,6 @@ class PerformanceConfig(BaseSettings):
     # and can never deploy a value at or below the measured animal ceiling;
     # only a human editing the env file directly can set 0.0.
     blank_confidence_mute_threshold: float = 0.92
-
-    # Unnamed-Animal Blank-Raw Mute Gate (exp #32, 2026-09-19). SpeciesNet's
-    # fully-generic "<uuid>;;;;;;animal" rollup means "MegaDetector boxed
-    # something, the classifier could not name it"; it routes to IDENTIFIED
-    # and therefore fires a MAIN-channel species alert that bypasses every
-    # review-class mute path. Two such alerts landed on a demonstrably empty
-    # garden on 2026-09-19 (bursts 5365, 5374).
-    #
-    # Discriminator, measured over all 82 unnamed-animal rows corpus-wide
-    # (52 labelled): when the classifier's RAW top-1 over the crop NAMES an
-    # animal (bird, american crow, ...) the burst is real — 34/34 labelled
-    # rows are animals. When the raw top-1 is SpeciesNet's generic "blank"
-    # the two models disagree, and 6 of 8 labelled rows are false positives.
-    #
-    # The 2 blank-raw rows that ARE animals (ids 2212/2213, six minutes
-    # apart — effectively ONE visit, so n=1 independent counter-example)
-    # score 0.9722 and 0.9795. So the gate mutes only BELOW this threshold:
-    # it is a carve-out around a known counter-example, not an independently
-    # validated discriminator. At 0.90 it mutes 4/6 measured FPs (0.0561,
-    # 0.0594, 0.5901, 0.8411) and ZERO animal- or person-labelled rows, with
-    # a 0.072 margin under that counter-example. The protocol's mirrored
-    # rule min(animal)-0.02 would give 0.9522 and mute exactly the same four
-    # rows — nothing measured is given up by taking the wider margin, and
-    # lowering the threshold is the FN-safe direction for a mute-below gate.
-    #
-    # 0.0 DISABLES the gate (rollback lever), it does not mean "mute
-    # nothing by comparison" — wildlife_system.process_detection
-    # special-cases it, same convention as blank_confidence_mute_threshold.
-    unnamed_animal_blank_mute_threshold: float = 0.90
-
-    # Animal-Proximity Review Exemption (exp #33,
-    # animal-proximity-review-exemption, 2026-09-20). SpeciesNet sometimes
-    # misses a plainly visible animal on some bursts of a multi-burst visit
-    # while naming it on others: burst 5388 (09:12:59) was correctly
-    # IDENTIFIED as "aves;;;;;bird"; burst 5389, the same blackbird 25s
-    # later, came back unclassifiable (review-class), and the Review
-    # Sampling Gate then sampled it out — a silent false negative that
-    # never reached Telegram at all.
-    #
-    # Measured corpus-wide: the Review Sampling Gate is the ONLY mute path
-    # that ever suppresses a review-class burst shortly after a
-    # *named*-animal IDENTIFIED burst — the human-proximity, blur,
-    # confident-blank and scene gates muted zero such rows, ever. Six rows
-    # were sampled out within 180s of a named-animal identification; three
-    # are human/tier-2-labelled animal (gaps 25s, 25s, 124s). The nearest
-    # false_positive-labelled row sits at 206s, so a 180s window recovers
-    # every known animal with margin and stops short of the nearest known
-    # FP.
-    #
-    # A review-class burst landing within this many seconds after the most
-    # recent named-animal IDENTIFIED detection (see utils.is_named_animal_label)
-    # is exempted from the Review Sampling Gate ONLY — every earlier-precedence
-    # mute gate (Human/Privacy, Human-Proximity, Blur, Confident-Blank, Scene)
-    # is unaffected and still suppresses as before; this can only flip a
-    # burst's review_sampled_out from True to False, never override an
-    # earlier gate's own mute flag. 0.0 disables the exemption entirely
-    # (rollback lever) — the sampling gate then behaves exactly as before
-    # this change.
-    animal_proximity_window_seconds: float = 180.0
 
     # Leading-edge fix (2026-07-31): the human-proximity gate above is
     # backward-looking only (it mutes AFTER a HUMAN-status detection), so it
@@ -438,16 +361,6 @@ class PerformanceConfig(BaseSettings):
             )
         return v
 
-    @field_validator('scene_gate_similarity_threshold')
-    @classmethod
-    def validate_scene_gate_similarity_threshold_bounds(cls, v):
-        low, high = _BOUNDS["PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD"]
-        if not (low <= v <= high):
-            raise ValueError(
-                f"PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD={v} out of allowed bounds [{low}, {high}]"
-            )
-        return v
-
     @field_validator('blur_mute_min_luma')
     @classmethod
     def validate_blur_mute_min_luma_bounds(cls, v):
@@ -518,18 +431,6 @@ class PerformanceConfig(BaseSettings):
             )
         return v
 
-    @field_validator('unnamed_animal_blank_mute_threshold')
-    @classmethod
-    def validate_unnamed_animal_blank_mute_threshold_bounds(cls, v):
-        # Hardcoded [0.0, 1.0]; the loop's own tunable range is tighter (see
-        # loop.guardrails.BOUNDS). 0.0 is the human-only rollback lever.
-        low, high = 0.0, 1.0
-        if not (low <= v <= high):
-            raise ValueError(
-                f"PERFORMANCE_UNNAMED_ANIMAL_BLANK_MUTE_THRESHOLD={v} out of allowed bounds [{low}, {high}]"
-            )
-        return v
-
     @field_validator('blank_confidence_mute_threshold')
     @classmethod
     def validate_blank_confidence_mute_threshold_bounds(cls, v):
@@ -541,16 +442,6 @@ class PerformanceConfig(BaseSettings):
         if not (low <= v <= high):
             raise ValueError(
                 f"PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD={v} out of allowed bounds [{low}, {high}]"
-            )
-        return v
-
-    @field_validator('animal_proximity_window_seconds')
-    @classmethod
-    def validate_animal_proximity_window_seconds_bounds(cls, v):
-        low, high = _BOUNDS["PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS"]
-        if not (low <= v <= high):
-            raise ValueError(
-                f"PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS={v} out of allowed bounds [{low}, {high}]"
             )
         return v
 

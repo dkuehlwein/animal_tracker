@@ -11,7 +11,7 @@ sample from 3-7 days ago. The comparison is done on **edge structure**, not
 raw intensity: a re-aim changes what's in the frame (structure), while sun
 position, shadows, and auto-exposure change how bright it is (intensity).
 Comparing edge structure is what gives this detector its margin — do not
-"simplify" it back to intensity, `src/scene_gate.py`'s intensity comparator
+"simplify" it back to intensity, the retired scene-unchanged gate's intensity comparator
 was measured on this same corpus and does NOT separate the classes here.
 
 Calibrated on the real 4-week image corpus (do not re-derive): a wide gap
