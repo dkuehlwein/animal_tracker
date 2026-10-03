@@ -556,6 +556,12 @@ class WildlifeSystem:
                         fail_closed_reason = (
                             f"processing error after classification: {fail_closed_reason}"
                         )
+                else:
+                    fail_closed_reason = self._unclassified_fail_closed_reason(timestamp)
+                    if fail_closed_reason:
+                        fail_closed_reason = (
+                            f"species identification failed: {fail_closed_reason}"
+                        )
             # Return fallback result
             return {
                 'species_name': 'Unknown species',
@@ -597,6 +603,20 @@ class WildlifeSystem:
             if muted:
                 return f"inside human {reason}"
             return None
+        except Exception as e:
+            return f"privacy check failed ({e})"
+
+    def _unclassified_fail_closed_reason(self, timestamp: datetime) -> Optional[str]:
+        """Fail-closed check when species identification itself raised, so
+        nothing is known about the burst: fail closed only if a HUMAN
+        detection puts it inside the human window or density condition at
+        its capture time; otherwise None (fail open, the ERROR photo is
+        sent as before). If that check itself errors, fail closed."""
+        try:
+            muted, reason = evaluate_human_proximity(
+                timestamp, None, self._human_events, self.config.performance,
+            )
+            return f"inside human {reason}" if muted else None
         except Exception as e:
             return f"privacy check failed ({e})"
 
@@ -1017,7 +1037,15 @@ class WildlifeSystem:
         # already species-ID'd and DB-logged above regardless of outcome.
         decision = decide(self._build_gate_context(species_result, sharpness_info))
         if decision.action == Action.MUTE:
-            logger.info(decision.log_line(species_result.get('detection_id')))
+            detection_id = species_result.get('detection_id')
+            # A fail-closed burst has no detection_id (the DB write may
+            # never have happened), so name it by its photo and capture time.
+            burst_ref = (
+                f"detection {detection_id}" if detection_id is not None
+                else f"burst {Path(image_path).name} captured "
+                     f"{timestamp:%Y-%m-%d %H:%M:%S}"
+            )
+            logger.info(decision.log_line(burst_ref))
         else:
             # Annotated image: combined motion overlay + MegaDetector
             # species box. Sent whenever a detection box exists (default-on);

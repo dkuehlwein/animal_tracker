@@ -76,7 +76,7 @@ def test_fail_closed_mutes_after_human_gate_and_before_everything_else():
 
 def test_decision_log_line_format():
     d = Decision(Action.MUTE, Channel.REVIEW, 'BLUR', 'sharpness=5.0')
-    assert d.log_line(7) == "[BLUR] Suppressing notification for detection 7 (sharpness=5.0)"
+    assert d.log_line("detection 7") == "[BLUR] Suppressing notification for detection 7 (sharpness=5.0)"
 
 
 @pytest.mark.parametrize('reason,fragment', [

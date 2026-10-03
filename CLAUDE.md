@@ -71,7 +71,7 @@ Statuses: `IDENTIFIED`, `ANIMAL_UNCERTAIN`, `NO_ANIMAL`, `UNCLASSIFIABLE`, `HUMA
 Notification precedence — implemented once, in `notification_gate.decide()` (first match wins, exactly one suppression log per burst; every gate fails open except HUMAN and FAIL-CLOSED):
 
 1. `[HUMAN-GATE]` Human/Privacy — HUMAN status never notifies (upstream: `[HUMAN-SWEEP]` escalates review-class bursts whose sibling frames hold a person)
-   - `[FAIL-CLOSED]` — processing error after classification on a review-class / unnamed-animal / human-window burst: muted instead of sent as an ERROR photo
+   - `[FAIL-CLOSED]` — processing error on a review-class / unnamed-animal burst, or on any burst (incl. a species-ID failure) inside a human window/density: muted instead of sent as an ERROR photo
 2. `[HUMAN-PROXIMITY]` Human-Proximity — window OR density OR demoted-band; also covers `;;;;;;animal` IDENTIFIED bursts
 3. `[BLUR]` Blur — below sharpness floor AND luma ≥ 70, review-class only
 4. `[BLANK-CONF]` Confident-Blank — raw top-1 `blank` ≥ 0.92, review-class only

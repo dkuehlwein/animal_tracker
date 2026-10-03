@@ -5,8 +5,10 @@ burst is sent to Telegram, muted, or deferred.
 `decide(ctx)` walks an ordered gate list and returns the FIRST match:
 
     HUMAN-GATE       status is HUMAN and suppress_human_alerts is on
-    FAIL-CLOSED      processing failed after classification on a burst a
-                     privacy/review gate could have muted (see
+    FAIL-CLOSED      processing failed on a burst a privacy/review gate could
+                     have muted: after classification (review-class,
+                     unnamed-animal, human window/density) or in species ID
+                     itself inside a human window/density (see
                      WildlifeSystem.process_detection's error path)
     HUMAN-PROXIMITY  human_proximity_muted, for a review-class burst or an
                      IDENTIFIED burst with the generic unnamed-animal label
@@ -62,9 +64,10 @@ class Decision:
     gate: Optional[str] = None  # log tag without brackets; None for SEND/DEFER
     reason: str = ""
 
-    def log_line(self, detection_id) -> str:
-        return (f"[{self.gate}] Suppressing notification for detection "
-                f"{detection_id} ({self.reason})")
+    def log_line(self, burst_ref: str) -> str:
+        """`burst_ref` names the burst, e.g. "detection 42"."""
+        return (f"[{self.gate}] Suppressing notification for {burst_ref} "
+                f"({self.reason})")
 
 
 @dataclass(frozen=True)

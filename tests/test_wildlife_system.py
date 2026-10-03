@@ -1773,9 +1773,6 @@ def test_recent_human_detection_times_seeded_at_startup(monkeypatch, tmp_path):
     seeded_times = [datetime.now() - timedelta(seconds=30)]
 
     class _FakeDB:
-        def get_last_human_detection_time(self):
-            return seeded_times[0]
-
         def get_recent_human_detection_times(self, since):
             return list(seeded_times)
 
@@ -1805,9 +1802,6 @@ def test_recent_human_detection_times_seeding_db_error_fails_open(monkeypatch):
     from wildlife_system import WildlifeSystem
 
     class _FakeDB:
-        def get_last_human_detection_time(self):
-            return None
-
         def get_recent_human_detection_times(self, since):
             raise RuntimeError("db is on fire")
 
@@ -3218,3 +3212,63 @@ async def test_post_classification_error_still_fails_open_for_named_animal(
     )
     assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
     assert _gate_log_lines(caplog) == []
+
+
+@pytest.mark.asyncio
+async def test_identify_species_error_fails_closed_inside_human_window(
+    system, tmp_path, caplog
+):
+    """identify_species itself raising (no classification at all) inside a
+    human window must not send the ERROR photo — one [FAIL-CLOSED] line that
+    names the burst instead of 'detection None'."""
+    img = tmp_path / "capture_20261003_120000_frame1.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_human()
+    )
+    system.process_detection(img, 5000, None)  # records a HUMAN just now
+
+    system.species_identifier.identify_species = MagicMock(
+        side_effect=Exception("model crashed")
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    lines = _gate_log_lines(caplog)
+    assert len(lines) == 1 and "[FAIL-CLOSED]" in lines[0]
+    assert img.name in lines[0]
+    assert "detection None" not in lines[0]
+
+
+@pytest.mark.asyncio
+async def test_identify_species_error_outside_human_window_still_sends(
+    system, tmp_path, caplog
+):
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        side_effect=Exception("model crashed")
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    assert _gate_log_lines(caplog) == []
+
+
+@pytest.mark.asyncio
+async def test_fail_closed_log_names_the_burst_after_db_error(system, tmp_path, caplog):
+    await _run_with_db_failure(system, tmp_path, _identification_no_animal(), caplog)
+    lines = _gate_log_lines(caplog)
+    assert len(lines) == 1 and "photo.jpg" in lines[0]
+    assert "detection None" not in lines[0]
