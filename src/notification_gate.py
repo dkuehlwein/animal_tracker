@@ -173,32 +173,43 @@ class RecentHumanEvents:
         self._times = sorted(times)
 
     def add(self, t: datetime) -> None:
-        bisect.insort(self._times, t)
+        times = list(self._times)
+        bisect.insort(times, t)
+        self._times = times
 
     def prune(self, reference: datetime, horizon_seconds: float) -> None:
         cutoff = reference - timedelta(seconds=horizon_seconds)
         self._times = self._times[bisect.bisect_left(self._times, cutoff):]
 
+    # Readers take one local reference to the list: the store is written from
+    # the species-ID executor thread and read from the event loop, and prune()
+    # rebinds the list rather than mutating it, so a single snapshot is
+    # always internally consistent.
+
     def latest(self) -> Optional[datetime]:
-        return self._times[-1] if self._times else None
+        times = self._times
+        return times[-1] if times else None
 
     def latest_in(self, start: datetime, end: datetime) -> Optional[datetime]:
         """Most recent timestamp in the closed interval [start, end]."""
-        i = bisect.bisect_right(self._times, end)
-        if i and self._times[i - 1] >= start:
-            return self._times[i - 1]
+        times = self._times
+        i = bisect.bisect_right(times, end)
+        if i and times[i - 1] >= start:
+            return times[i - 1]
         return None
 
     def first_after(self, start: datetime, end: datetime) -> Optional[datetime]:
         """Earliest timestamp in the half-open interval (start, end]."""
-        i = bisect.bisect_right(self._times, start)
-        if i < len(self._times) and self._times[i] <= end:
-            return self._times[i]
+        times = self._times
+        i = bisect.bisect_right(times, start)
+        if i < len(times) and times[i] <= end:
+            return times[i]
         return None
 
     def count_in(self, start: datetime, end: datetime) -> int:
         """Number of timestamps in the closed interval [start, end]."""
-        return bisect.bisect_right(self._times, end) - bisect.bisect_left(self._times, start)
+        times = self._times
+        return bisect.bisect_right(times, end) - bisect.bisect_left(times, start)
 
     def __len__(self) -> int:
         return len(self._times)
