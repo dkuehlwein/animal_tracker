@@ -2974,7 +2974,9 @@ def _golden_expected_outcome(status, suppress, unnamed, prox, blur, blank, sampl
     below_floor, luma = blur
     if suppress and status == 'human':
         return ('MUTE', '[HUMAN-GATE]')
-    if prox and (review or unnamed):
+    # Scope widened deliberately in Task 3 fix round 1: ERROR and
+    # ANIMAL_UNCERTAIN bursts are also covered by Human-Proximity.
+    if prox and (review or unnamed or status in ('error', 'animal_uncertain')):
         return ('MUTE', '[HUMAN-PROXIMITY]')
     if review and below_floor and luma is not None and luma >= min_luma:
         return ('MUTE', '[BLUR]')
@@ -3272,3 +3274,79 @@ async def test_fail_closed_log_names_the_burst_after_db_error(system, tmp_path, 
     lines = _gate_log_lines(caplog)
     assert len(lines) == 1 and "photo.jpg" in lines[0]
     assert "detection None" not in lines[0]
+
+
+# ---------------------------------------------------------------------------
+# Task 3 fix round 1: ERROR and ANIMAL_UNCERTAIN results returned normally by
+# identify_species (it catches inference failures internally) bypassed every
+# human gate — a failed-inference burst 30s after a HUMAN burst was sent to
+# MAIN as a "Species ID failed" photo of the person. The Human-Proximity
+# gate's scope now includes both statuses.
+# ---------------------------------------------------------------------------
+
+def _identification_with_status(status):
+    from data_models import IdentificationResult, DetectionResult
+    det = DetectionResult(
+        animals_detected=status == 'animal_uncertain',
+        detection_count=1 if status == 'animal_uncertain' else 0,
+        bounding_boxes=[{'confidence': 0.6, 'category': '1'}]
+        if status == 'animal_uncertain' else [],
+        detections=[],
+        processing_time=0.1,
+    )
+    return IdentificationResult(
+        species_name="uuid;mammalia;carnivora;canidae;vulpes;vulpes;red fox"
+        if status == 'animal_uncertain' else "Unknown species",
+        confidence=0.3 if status == 'animal_uncertain' else 0.0,
+        api_success=status != 'error',
+        processing_time=0.5,
+        detection_result=det,
+        animals_detected=status == 'animal_uncertain',
+        status=status,
+        fallback_reason="inference failed" if status == 'error' else None,
+    )
+
+
+async def _run_status_burst(system, tmp_path, status, caplog, human_seconds_ago):
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    if human_seconds_ago is not None:
+        system._human_events.add(datetime.now() - timedelta(seconds=human_seconds_ago))
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_with_status(status)
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    return telegram, row
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["error", "animal_uncertain"])
+async def test_status_burst_after_human_is_muted_by_human_proximity(
+    system, tmp_path, caplog, status
+):
+    telegram, row = await _run_status_burst(system, tmp_path, status, caplog, 30)
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    lines = _gate_log_lines(caplog)
+    assert len(lines) == 1 and "[HUMAN-PROXIMITY]" in lines[0]
+    assert row['detection_status'] == status
+    assert row['human_proximity_muted'] == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["error", "animal_uncertain"])
+async def test_status_burst_without_nearby_human_still_sends(
+    system, tmp_path, caplog, status
+):
+    telegram, row = await _run_status_burst(system, tmp_path, status, caplog, None)
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    assert _gate_log_lines(caplog) == []
+    assert row['human_proximity_muted'] == 0

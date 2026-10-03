@@ -10,8 +10,9 @@ burst is sent to Telegram, muted, or deferred.
                      unnamed-animal, human window/density) or in species ID
                      itself inside a human window/density (see
                      WildlifeSystem.process_detection's error path)
-    HUMAN-PROXIMITY  human_proximity_muted, for a review-class burst or an
-                     IDENTIFIED burst with the generic unnamed-animal label
+    HUMAN-PROXIMITY  human_proximity_muted, for a review-class, ERROR or
+                     ANIMAL_UNCERTAIN burst, or an IDENTIFIED burst with the
+                     generic unnamed-animal label
     BLUR             review-class, below the sharpness floor, and the frame
                      is bright enough (luma known and >= blur_mute_min_luma)
     BLANK-CONF       review-class and blank_confidence_muted
@@ -40,7 +41,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Iterable, Iterator, List, Optional, Tuple
 
-from data_models import is_human_detection, is_review_detection
+from data_models import DetectionStatus, is_human_detection, is_review_detection
 from utils import is_blank_label
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,9 @@ class Channel:
 
 @dataclass(frozen=True)
 class Decision:
+    """One routing decision. `channel` is informational (logs/tests): the
+    🔍 REVIEW prefix is still derived from the detection status by
+    `WildlifeSystem.send_notification`, not from this field."""
     action: str
     channel: str
     gate: Optional[str] = None  # log tag without brackets; None for SEND/DEFER
@@ -108,6 +112,22 @@ def _human_proximity_detail(reason: Optional[str], cfg) -> str:
             f"of last human detection")
 
 
+# Non-review, non-human statuses that would otherwise bypass every human
+# gate: an inference failure (ERROR, returned normally by identify_species)
+# and a low-confidence animal (ANIMAL_UNCERTAIN).
+_HUMAN_PROXIMITY_EXTRA_STATUSES = frozenset({
+    DetectionStatus.ERROR, DetectionStatus.ANIMAL_UNCERTAIN,
+})
+
+
+def is_human_proximity_scope(status, unnamed_animal: bool) -> bool:
+    """Whether the Human-Proximity gate applies to a burst: review-class,
+    ERROR, ANIMAL_UNCERTAIN, or the generic unnamed-animal IDENTIFIED label."""
+    return (is_review_detection(status)
+            or status in _HUMAN_PROXIMITY_EXTRA_STATUSES
+            or bool(unnamed_animal))
+
+
 def decide(ctx: GateContext) -> Decision:
     """Ordered gate list, first match wins. Pure: reads only `ctx`."""
     cfg = ctx.config
@@ -123,7 +143,7 @@ def decide(ctx: GateContext) -> Decision:
     if ctx.fail_closed_reason:
         return mute("FAIL-CLOSED", ctx.fail_closed_reason)
 
-    if ctx.human_proximity_muted and (review or ctx.unnamed_animal):
+    if ctx.human_proximity_muted and is_human_proximity_scope(ctx.status, ctx.unnamed_animal):
         return mute("HUMAN-PROXIMITY",
                     f"{_human_proximity_detail(ctx.human_proximity_reason, cfg)}, "
                     f"no animal found")

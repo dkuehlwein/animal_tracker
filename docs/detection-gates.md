@@ -39,7 +39,7 @@ in `src/config.py`; **deployed** values are from `experiments/deployed_config.en
 | 1 | Human/Privacy | Suppress HUMAN-status bursts entirely | `SPECIES_HUMAN_DETECTION_CONFIDENCE` 0.3 (**0.5**); `PERFORMANCE_SUPPRESS_HUMAN_ALERTS` true | `detection_status='human'`, `person_confidence` | `[HUMAN-GATE]` | `PERFORMANCE_SUPPRESS_HUMAN_ALERTS=false` | runs/0004, 0008, 0012, 0016 |
 | 1a | Burst human sweep (upstream) | Re-ID divergent sibling frames of a review-class burst; escalate to HUMAN | `PERFORMANCE_HUMAN_SWEEP_DIVERGENCE_THRESHOLD` 0.03; `PERFORMANCE_HUMAN_SWEEP_MAX_FRAMES` 2 (**4**) | (status becomes `human`) | `[HUMAN-SWEEP]` | either `=0` | runs/0015, 0017 |
 | 1b | Fail-closed on processing error (Task 3, 2026-10-03) | If `process_detection` raises, the ERROR-photo fallback is not sent when: *after* species ID (e.g. the DB write failed) the burst is review-class, unnamed-animal, already human-proximity-muted, or inside a human window/density; or species ID *itself* raised and the burst's capture time is inside a human window/density (read from the recent-human store). Also fails closed if that human check itself errors. Otherwise (e.g. a named animal, or an ID failure with no human around) the ERROR photo still sends. A HUMAN result still falls back to HUMAN (row 1). The log line names the burst by photo file and capture time, since it has no detection id | — | — (row may not exist) | `[FAIL-CLOSED]` | `git revert` | review bug MEDIUM-2 |
-| 2 | Human-Proximity (window OR density, demoted-band widening) | Mute review-class / unnamed-animal bursts near or amid human activity | `PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS` 120 (**240**); `..._HUMAN_DENSITY_WINDOW_SECONDS` 1800; `..._HUMAN_DENSITY_COUNT` 8; `..._HUMAN_DEMOTED_PERSON_FLOOR` 0.3; `..._HUMAN_DEMOTED_WINDOW_SECONDS` 1800 | `human_proximity_muted` | `[HUMAN-PROXIMITY]` | window `=0`; density count `=0`; demoted window `=0` | runs/0010, 0018, 0019 |
+| 2 | Human-Proximity (window OR density, demoted-band widening) | Mute review-class, ERROR, ANIMAL_UNCERTAIN and unnamed-animal bursts near or amid human activity | `PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS` 120 (**240**); `..._HUMAN_DENSITY_WINDOW_SECONDS` 1800; `..._HUMAN_DENSITY_COUNT` 8; `..._HUMAN_DEMOTED_PERSON_FLOOR` 0.3; `..._HUMAN_DEMOTED_WINDOW_SECONDS` 1800 | `human_proximity_muted` | `[HUMAN-PROXIMITY]` | window `=0`; density count `=0`; demoted window `=0` | runs/0010, 0018, 0019 |
 | 3 | Blur (luma-conditioned) | Mute below-sharpness-floor review-class bursts, only when bright enough that low sharpness means blur | `PERFORMANCE_MIN_SHARPNESS_THRESHOLD` 11.0; `PERFORMANCE_BLUR_MUTE_MIN_LUMA` 70 | `sharpness_score`, `below_sharpness_floor` | `[BLUR]` | no dedicated lever; `PERFORMANCE_BLUR_MUTE_MIN_LUMA=255` effectively disables, or `git revert 683f5f3` | runs/0005, 0007 |
 | 4 | Confident-Blank | Mute review-class bursts whose raw top-1 is `blank` at ≥ threshold | `PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD` 0.92 | `blank_confidence_muted` | `[BLANK-CONF]` | `=0` (human only; loop bounds 0.87–1.0) | runs/0021 |
 | 5 | Review Sampling | Send only a deterministic fraction of surviving review-class bursts | `PERFORMANCE_REVIEW_SAMPLE_RATE` 0.25 (**0.5**) | `review_sampled_out` | `[REVIEW-SAMPLE]` | rate `=1.0` | runs/0009 |
@@ -143,7 +143,13 @@ confidence, so such bursts land `no_animal` and leak a person to REVIEW (ids 354
 IDENTIFIED bursts whose label `is_unnamed_animal_label`. A person at close range produces
 exactly that rollup (bursts 5222/5270 reached MAIN as "animal detected"); re-routing the
 label was FN-vetoed (18/78 such rows are human-labelled animals), so the gate's scope
-was widened instead — mutes 4/78, zero labelled animals.
+was widened instead — mutes 4/78, zero labelled animals. **Plus** (Task 3 fix round 1,
+2026-10-03) ERROR and ANIMAL_UNCERTAIN bursts: `identify_species` returns ERROR normally
+when inference fails, and neither status was covered by any human gate, so a failed
+burst 30s after a HUMAN burst went to MAIN as a "Species ID failed" photo of the person.
+Scope test: `notification_gate.is_human_proximity_scope`. `human_proximity_muted` is
+`True`/`False` on all covered rows (NULL = the gate didn't apply: HUMAN and named-species
+IDENTIFIED rows).
 
 **Mute if window OR density** (`notification_gate.evaluate_human_proximity`, called from
 `process_detection`, persisted on INSERT; both conditions read the recent-human store
@@ -170,7 +176,7 @@ The store is a sorted list of HUMAN capture times, seeded at startup via
 longest window any check needs (`human_events_horizon_seconds`: longest backward window
 + defer + 600s slack; pruning is only a memory bound). Log reason text is
 `window` / `density` / `demoted-band window` (the last only when widening alone caused
-the mute). Muted rows are purged on the 48h human policy (§13). Validation: the closest
+the mute). Muted rows of any covered status are purged on the 48h human policy (§13). Validation: the closest
 of the 12 human-labelled animal review rows (since the gate went live 2026-07-08) is 329s
 from a preceding HUMAN burst.
 

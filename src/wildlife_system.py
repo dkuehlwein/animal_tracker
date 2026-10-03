@@ -32,7 +32,7 @@ from timelapse_writer import TimelapseWriter
 from data_models import DetectionStatus, is_review_detection, is_human_detection
 from notification_gate import (
     Action, GateContext, RecentHumanEvents, decide, evaluate_blank_confidence,
-    evaluate_human_proximity, human_events_horizon_seconds,
+    evaluate_human_proximity, human_events_horizon_seconds, is_human_proximity_scope,
 )
 
 logger = logging.getLogger(__name__)
@@ -440,18 +440,21 @@ class WildlifeSystem:
                 blank_confidence_muted = False
 
             # Human-Proximity Mute Gate (window | demoted-band | density, read
-            # from the recent-human store). Evaluated for review-class bursts
-            # and for IDENTIFIED bursts carrying SpeciesNet's fully-generic
-            # "<uuid>;;;;;;animal" rollup (exp #26) — that status otherwise
-            # bypasses every review-class mute path. None = gate didn't
-            # apply. Fails open to False. `human_proximity_mute_reason` is
-            # not persisted; it only feeds the [HUMAN-PROXIMITY] log reason.
+            # from the recent-human store). Evaluated for review-class bursts,
+            # IDENTIFIED bursts carrying SpeciesNet's fully-generic
+            # "<uuid>;;;;;;animal" rollup (exp #26), and ERROR /
+            # ANIMAL_UNCERTAIN bursts (Task 3 fix round 1: a failed-inference
+            # burst 30s after a HUMAN was sent to MAIN as a photo of the
+            # person) — all of these otherwise bypass every human gate.
+            # None = gate didn't apply. Fails open to False.
+            # `human_proximity_mute_reason` is not persisted; it only feeds
+            # the [HUMAN-PROXIMITY] log reason.
             is_unnamed_animal = (
                 not is_review_detection(species_result.status)
                 and not is_human_detection(species_result.status)
                 and is_unnamed_animal_label(species_result.species_name)
             )
-            if is_review_detection(species_result.status) or is_unnamed_animal:
+            if is_human_proximity_scope(species_result.status, is_unnamed_animal):
                 try:
                     human_proximity_muted, human_proximity_mute_reason = (
                         evaluate_human_proximity(

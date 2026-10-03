@@ -514,9 +514,11 @@ class DatabaseManager:
         DB status happens to be `identified` rather than a review-class
         status. An IDENTIFIED row with `human_proximity_muted` False or NULL
         (the vast majority — named-species identifications) is unaffected
-        and still purge-ineligible via this path.
+        and still purge-ineligible via this path. ERROR and ANIMAL_UNCERTAIN
+        rows are treated the same way: the gate covers them too since Task 3
+        fix round 1 (2026-10-03).
 
-        `human_proximity_muted = 1` rows (review-class or IDENTIFIED) are
+        `human_proximity_muted = 1` rows (any covered status) are
         returned UNCONDITIONALLY, without the ±`window_seconds` time test
         (exp #35, human-proximity-purge-gap, 2026-09-23). The mute gate
         decides on window OR density OR demoted-band, so a burst it muted
@@ -566,7 +568,8 @@ class DatabaseManager:
                     SELECT id, image_path, timestamp, human_proximity_muted
                     FROM detections
                     WHERE (detection_status IN ('no_animal', 'unclassifiable')
-                           OR (detection_status = 'identified' AND human_proximity_muted = 1))
+                           OR (detection_status IN ('identified', 'error', 'animal_uncertain')
+                               AND human_proximity_muted = 1))
                       AND timestamp < ?
                 ''', (cutoff_str,))
                 review_rows = cursor.fetchall()

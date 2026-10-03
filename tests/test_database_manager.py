@@ -939,3 +939,27 @@ def test_migration_adds_unnamed_animal_blank_muted_column_to_old_schema(tmp_path
         cursor = conn.execute("PRAGMA table_info(detections)")
         columns = {row[1] for row in cursor.fetchall()}
     assert "unnamed_animal_blank_muted" in columns
+
+
+@pytest.mark.parametrize("status", ["error", "animal_uncertain"])
+def test_get_human_adjacent_review_detections_includes_muted_error_and_uncertain_rows(
+    tmp_path, status
+):
+    """Task 3 fix round 1: the human-proximity gate now also mutes ERROR and
+    ANIMAL_UNCERTAIN bursts, so a muted row of either status gets the same
+    48h human-retention purge as a muted review-class/IDENTIFIED row."""
+    db, db_path = _make_db(tmp_path)
+    human_id = db.log_detection(
+        image_path="capture_human9.jpg", motion_area=10, detection_status="human"
+    )
+    row_id = db.log_detection(
+        image_path="capture_x9.jpg", motion_area=10, detection_status=status,
+        human_proximity_muted=True,
+    )
+    _age_row(db_path, human_id, hours_ago=49)
+    ts = _age_row(db_path, row_id, hours_ago=49 + 10 / 3600)
+
+    cutoff = datetime.now() - timedelta(hours=48)
+    rows = db.get_human_adjacent_review_detections(cutoff, window_seconds=240)
+
+    assert rows == [(row_id, "capture_x9.jpg", ts)]
