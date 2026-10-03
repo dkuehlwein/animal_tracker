@@ -3,7 +3,6 @@ id: 34
 slug: deploy-stamp-tz-crash
 status: concluded   # 2026-09-22: prediction met exactly, fix verified live in production
 validation: live   # code change, commit 6d13364; 3 regression tests reproduce the exact production TypeError
-occupies_active_slot: false  # loop-infrastructure repair, not a detection-behaviour change; exp #21 keeps the slot
 hypothesis: "An offset-naive pending_restart_at crashes wildlife-deploy.service before it restarts the camera, so no experiment — code or env — can ever go live again until the stamp is coerced to local time on read."
 created: 2026-09-21
 promoted_from: "night of 2026-09-21: wildlife-deploy.service found in `failed` state, 16h after the 03:30 fire, with {\"error\": \"can't compare offset-naive and offset-aware datetimes\"}. Exp #33 (ea652bc) had not gone live."

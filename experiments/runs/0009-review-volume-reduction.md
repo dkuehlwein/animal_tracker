@@ -3,11 +3,7 @@ id: 10
 slug: review-volume-reduction
 status: concluded
 outcome: "human-directed config change (review sampling at 0.5, scene gate); scene half RETIRED 2026-10-03; review sampling KEPT."
-validation: live          # scene gate ENABLED T=0.97 + review sampling 0.25
-occupies_active_slot: false  # NOT a loop experiment — a human-directed config change.
-                             # exp #9 (runs/0008) keeps active_experiment_id; the
-                             # "one active experiment at a time" rule is not in play here.
-                             # The loop's duty for THIS doc is monitoring, not arbitration.
+validation: concluded        # scene gate ENABLED T=0.97 + review sampling 0.25
 hypothesis: "REVIEW-channel notification volume (~44/night) is not worth its false-negative yield: over 2026-07-12..26 it cost ~618 REVIEW messages to surface 4 missed animals (~1 catch per 155 pings). Cutting volume ~6x via two independent, already-built mute paths (scene-unchanged gate at T=0.97, plus a deterministic 1/4 sampling gate) restores a manageable channel. Accepted risk: FN detection power falls with label supply; the post-enable adjudication duty is the compensating control."
 created: 2026-07-26
 promoted_from: "Daniel, direct instruction 2026-07-26 — not loop-originated. Supersedes the scene-gate FN-veto HOLD recorded in PROTOCOL.md 'Scene-gate ownership'."

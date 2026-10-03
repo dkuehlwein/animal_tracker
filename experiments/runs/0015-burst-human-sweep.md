@@ -4,7 +4,6 @@ slug: burst-human-sweep
 status: concluded
 outcome: "KEPT - gate/mechanism still live after the 2026-10-03 prune; closed with no further observation duty."
 validation: live   # shipped as a code change; measured against both real leak bursts before deploy
-occupies_active_slot: true  # exp #18 (runs/0014) concluded this tick; this takes the slot
 hypothesis: "Every human/privacy gate in this system judges exactly ONE frame per burst — the sharpest — but sharpness is uncorrelated with whether a person is visible. A burst whose sibling frames diverge from the selected one is not represented by that frame's verdict, so a person can be present, saved to disk, and sent to REVIEW without any gate ever scoring a person box. Re-identifying the most divergent siblings of a review-class burst closes the hole."
 created: 2026-09-09
 promoted_from: "found during night-5 tier-2 adjudication of exp #18: burst 5119 reached REVIEW with a recognisable child's face in its saved frames."

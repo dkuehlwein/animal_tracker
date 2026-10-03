@@ -4,7 +4,6 @@ slug: new-scene-regime
 status: concluded
 outcome: "CONCLUDED 2026-10-03 - loop-infrastructure item, closed; ledger cleanup."
 validation: observational   # no code or env change shipped this tick; every trigger-side lever is FN-vetoed for lack of in-scene animal evidence
-occupies_active_slot: true  # exp #15 (runs/0013) concluded KEEP this tick; this takes the slot
 hypothesis: "The camera was physically re-aimed during the 2026-09-01 outage, from a wide garden view to a tight close-up of the pond and its running fountain. Every scene-derived conclusion in this notebook — the ROI entanglement measurement (#3), the scene-gate similarity distribution (#17), and the volume baseline — was measured in the OLD scene and does not transfer. The new scene's dominant false-positive source is continuously moving water, and it contains zero animal bursts so far, so no trigger-side threshold can be validated in it yet."
 created: 2026-09-05
 promoted_from: "opened by the 2026-09-05 tick after two consecutive 100%-false-positive days (48 + 33 triggers, 0 animals) forced the question of what changed."

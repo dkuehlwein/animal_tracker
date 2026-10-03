@@ -4,7 +4,6 @@ slug: demoted-band-proximity-leak
 status: concluded
 outcome: "KEPT - gate/mechanism still live after the 2026-10-03 prune; closed with no further observation duty."
 validation: live   # code change, restart-gated; FN cost measured over the full 3103-row review-class+unnamed corpus
-occupies_active_slot: false  # scope repair of the Human-Proximity Gate (exp #10/#11/#26), same precedent as exp #23 vs #9, #24 vs #21, #26 vs #21
 hypothesis: "Exp #14 raised SPECIES_HUMAN_DETECTION_CONFIDENCE 0.3 -> 0.5 on the explicit promise that 'the layered proximity/deferral/density gates still mute the real people who score in the demoted band'. Tonight that promise failed for the first time: burst 5305 scored person_confidence 0.436 — a real person's clothing filling the lens — and was missed by BOTH layered conditions (480 s > the 240 s window; 5 human bursts < the density count of 8). It reached Telegram's doorstep and was held back only by the 50% review-sampling coin flip. A sub-threshold person score is not noise when a human visit is already in progress: conditioning the proximity window on the demoted band closes the leak at zero measured FN cost, because no human-labelled animal row in the entire corpus scores above person_confidence 0.079."
 created: 2026-09-15
 promoted_from: "tier-2 adjudication of 2026-09-15: burst 5305, a close-up of clothing during a 21-burst gardening session, survived every privacy gate."

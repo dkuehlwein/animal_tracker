@@ -4,7 +4,6 @@ slug: human-proximity-review-leak
 status: concluded
 outcome: "KEPT - gate/mechanism still live after the 2026-10-03 prune; closed with no further observation duty."
 validation: live          # shipped 2026-07-27, live at the 2026-07-28T03:25 restart
-occupies_active_slot: true   # exp #9 (runs/0008) concluded KEEP this tick; this takes the slot
 hypothesis: "The human/privacy gate has a fourth leak path none of its three triggers cover: MegaDetector scores extreme close-up / motion-blurred PARTIAL human bodies (legs, an arm, a torso filling the frame) at ~0.02-0.15 person confidence, and SpeciesNet calls them no_animal, so they reach Telegram as REVIEW notifications showing a recognisable person. Such bursts are, however, temporally clustered with correctly-gated human bursts. Muting review-class bursts that land within 120s of a HUMAN-status detection closes the leak at zero measured false-negative cost."
 created: 2026-07-27
 promoted_from: "Loop tick 2026-07-27 — three confirmed person-in-REVIEW leaks found while adjudicating the night's sent review-class bursts (ids 3544, 3553, 3554)."

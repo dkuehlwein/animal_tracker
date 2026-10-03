@@ -4,7 +4,6 @@ slug: unnamed-animal-blank-mute
 status: retired
 outcome: "RETIRED 2026-10-03 (human-led prune) - Unnamed-Animal Blank-Raw gate removed; DB columns kept."
 validation: live   # code change, commit f4d7730; replayed over the full corpus before shipping
-occupies_active_slot: false  # notification-routing fix on a leak path, same shape as exp #26/#29; exp #21 keeps the slot
 hypothesis: "An IDENTIFIED burst carrying SpeciesNet's fully-generic ';;;;;;animal' rollup is a false positive when the classifier's raw top-1 over the crop is 'blank' at low confidence — the two models disagree and the classifier isn't even sure the crop is empty. Mute those, and only those."
 created: 2026-09-19
 promoted_from: "night of 2026-09-19: bursts 5365 and 5374, both MAIN-channel 'animal detected' alerts on a demonstrably empty garden — the only two FPs all night that reached the main channel."

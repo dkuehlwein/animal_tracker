@@ -169,7 +169,10 @@ protocol never required.)
 
 `PERFORMANCE_REVIEW_SAMPLE_RATE` (default `0.25`, in `BOUNDS`) sends only a
 deterministic ~1/4 sample of review-class bursts that survive the mute gates
-to Telegram. Precedence: Human > Blur > Confident-Blank > Sampling (the scene gate is retired). Suppressed bursts
+to Telegram. Precedence is defined by `src/notification_gate.py::decide()`
+(first match wins): HUMAN-GATE > FAIL-CLOSED > HUMAN-PROXIMITY > BLUR >
+BLANK-CONF > REVIEW-SAMPLE > deferred REVIEW send (cancel-on-human) > send (the
+scene gate is retired). Suppressed bursts
 are still species-ID'd and DB-logged with `review_sampled_out=1`; nothing is
 lost from the corpus, only from Daniel's inbox.
 

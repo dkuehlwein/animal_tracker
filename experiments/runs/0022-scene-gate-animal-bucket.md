@@ -4,7 +4,6 @@ slug: scene-gate-animal-bucket
 status: retired
 outcome: "RETIRED 2026-10-03 (human-led prune) - scene gate threshold retune removed; DB columns kept."
 validation: live   # env delta, bounded; threshold derived from the protocol's own pre-registered rule
-occupies_active_slot: false  # post-enable monitoring duty on the scene gate (PROTOCOL "Scene-gate ownership"); exp #21 keeps the slot
 hypothesis: "The scene gate's animal-labelled bucket — empty since the 2026-07-26 human override, and the reason its threshold has never been validated — is now populated with frames on disk. Apply the pre-registered threshold rule T = max(animal similarity) + 0.02 to the live-recorded scores."
 created: 2026-09-18
 promoted_from: "night of 2026-09-18: a five-burst blackbird visit, three of whose bursts landed review-class with live scene_similarity 0.9572-0.9621 — 0.008 below the live mute threshold."
