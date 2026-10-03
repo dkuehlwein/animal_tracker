@@ -362,7 +362,7 @@
       "replaced_at": "2026-09-19T03:25:00+02:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-09-25",
+  "last_heartbeat_loopday": "2026-10-02",
   "last_metrics": {
     "date": "2026-09-25",
     "error_count": 0,
@@ -406,9 +406,10 @@
     "total_triggers": 8
   },
   "last_scene_change_alert_loopday": "2026-09-13",
+  "last_staleness_alert_loopday": "2026-10-02",
   "last_tick_completed_day": "2026-09-25",
   "nightly_verdict": "A perfect day for the camera: 8 alerts, every single one a real visitor \u2014 a cat at dawn, a blackbird late morning, and one person (kept private, as always). No false alarms at all, the first time that has ever happened. One miss, though: a photo of the cat was thrown away by a coin flip 37 seconds before the camera recognised that same cat, so I taught it to wait a few minutes and keep such photos when the animal turns up right after.",
   "paused": false,
-  "pending_restart_at": "2026-09-26T03:25:00+02:00",
+  "pending_restart_at": null,
   "watermark": 5455
 }
