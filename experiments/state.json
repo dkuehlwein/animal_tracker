@@ -378,46 +378,46 @@
   ],
   "last_heartbeat_loopday": "2026-10-03",
   "last_metrics": {
-    "date": "2026-09-25",
+    "date": "2026-10-03",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.0,
-      0.35433043506668743
+      0.023818614832318334,
+      0.14572908678564217
     ],
     "fp_claude_ci": [
-      0.0,
-      0.3903342879021653
+      0.08507676632916253,
+      0.43334278443814167
     ],
-    "fp_claude_count": 0,
-    "fp_claude_rate": 0.0,
-    "fp_count": 0,
+    "fp_claude_count": 4,
+    "fp_claude_rate": 0.21052631578947367,
+    "fp_count": 4,
     "fp_human_ci": [
       0.0,
-      0.7934506856227626
+      0.4898908364545973
     ],
     "fp_human_count": 0,
     "fp_human_rate": 0.0,
     "fp_md_ci": [
       0.0,
-      1.0
+      0.08200980322579117
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.0,
+    "fp_rate": 0.06060606060606061,
     "fp_trustworthy": true,
-    "labeled_triggers": 7,
-    "n_cant_tell": 0,
-    "n_claude": 6,
-    "n_human": 1,
-    "n_human_suppressed": 0,
-    "n_md": 0,
+    "labeled_triggers": 66,
+    "n_cant_tell": 3,
+    "n_claude": 19,
+    "n_human": 4,
+    "n_human_suppressed": 18,
+    "n_md": 43,
     "n_person": 1,
-    "n_sampled_out": 1,
+    "n_sampled_out": 3,
     "n_unlabeled": 0,
-    "total_triggers": 8
+    "total_triggers": 88
   },
   "last_scene_change_alert_loopday": "2026-09-13",
   "last_staleness_alert_loopday": "2026-10-03",
@@ -425,5 +425,5 @@
   "nightly_verdict": "A perfect day for the camera: 8 alerts, every single one a real visitor \u2014 a cat at dawn, a blackbird late morning, and one person (kept private, as always). No false alarms at all, the first time that has ever happened. One miss, though: a photo of the cat was thrown away by a coin flip 37 seconds before the camera recognised that same cat, so I taught it to wait a few minutes and keep such photos when the animal turns up right after.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5455
+  "watermark": 5543
 }
