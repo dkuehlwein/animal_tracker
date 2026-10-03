@@ -2992,3 +2992,126 @@ async def test_ordinary_review_burst_unaffected_by_animal_proximity_deferral(sys
     await task
 
     assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+
+
+# ---------------------------------------------------------------------------
+# Notification-gate precedence golden test (Task 3, 2026-10-03): enumerates
+# every relevant combination of status x per-gate flags x config levers,
+# drives each through the real `_process_and_notify_detection` (with
+# process_detection stubbed to return that combination), and asserts the
+# routing outcome matches `_golden_expected_outcome` — a literal transcription
+# of the post-Task-2 precedence:
+#   HUMAN-GATE > HUMAN-PROXIMITY > BLUR > BLANK-CONF > REVIEW-SAMPLE
+#   > (review-class & defer>0 -> DEFER) > SEND
+# This test was written and passing against the old inline flag-recombination
+# chains BEFORE they were replaced by notification_gate.decide(), so it pins
+# that decide() reproduces the previous precedence exactly.
+# ---------------------------------------------------------------------------
+
+import itertools as _itertools
+
+_GOLDEN_STATUSES = (
+    'human', 'no_animal', 'unclassifiable', 'identified', 'animal_uncertain', 'error',
+)
+# (below_sharpness_floor, luma) — luma None = unknown, 30 = dark, 80 = bright
+_GOLDEN_BLUR = ((False, 80.0), (True, None), (True, 30.0), (True, 80.0))
+_GOLDEN_TAGS = (
+    "[HUMAN-GATE]", "[HUMAN-PROXIMITY]", "[BLUR]", "[BLANK-CONF]",
+    "[REVIEW-SAMPLE]", "[REVIEW-DEFER]", "[FAIL-CLOSED]",
+)
+
+
+def _golden_combos():
+    return _itertools.product(
+        _GOLDEN_STATUSES,
+        (True, False),          # suppress_human_alerts
+        (False, True),          # unnamed_animal
+        (False, True),          # human_proximity_muted
+        _GOLDEN_BLUR,
+        (False, True),          # blank_confidence_muted
+        (False, True),          # review_sampled_out
+        (0.0, 240.0),           # review_defer_seconds
+    )
+
+
+def _golden_expected_outcome(status, suppress, unnamed, prox, blur, blank, sampled, defer,
+                             min_luma=70.0):
+    review = status in ('no_animal', 'unclassifiable')
+    below_floor, luma = blur
+    if suppress and status == 'human':
+        return ('MUTE', '[HUMAN-GATE]')
+    if prox and (review or unnamed):
+        return ('MUTE', '[HUMAN-PROXIMITY]')
+    if review and below_floor and luma is not None and luma >= min_luma:
+        return ('MUTE', '[BLUR]')
+    if review and blank:
+        return ('MUTE', '[BLANK-CONF]')
+    if review and sampled:
+        return ('MUTE', '[REVIEW-SAMPLE]')
+    if review and defer > 0:
+        return ('DEFER', None)
+    return ('SEND', None)
+
+
+@pytest.mark.asyncio
+async def test_golden_notification_precedence(system, tmp_path, caplog):
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.cleanup_old_images = MagicMock()
+    system.system_monitor = MagicMock()
+    system.send_notification = AsyncMock()
+    system._schedule_deferred_review_send = MagicMock()
+    min_luma = system.config.performance.blur_mute_min_luma
+
+    mismatches = []
+    n = 0
+    for combo in _golden_combos():
+        status, suppress, unnamed, prox, blur, blank, sampled, defer = combo
+        below_floor, luma = blur
+        system.config.performance.suppress_human_alerts = suppress
+        system.config.performance.review_defer_seconds = defer
+        fake_result = {
+            'species_name': 'x', 'confidence': 0.5, 'api_success': True,
+            'processing_time': 0.1, 'fallback_reason': None,
+            'animals_detected': False, 'detection_count': 0,
+            'detection_result': None, 'metadata': {},
+            'detection_id': 42, 'detection_status': status,
+            'unnamed_animal': unnamed,
+            'human_proximity_muted': prox,
+            'human_proximity_mute_reason': 'window' if prox else None,
+            'blank_confidence_muted': blank,
+            'top_species_raw': 'uuid;;;;;;blank', 'top_species_score': 0.95,
+            'review_sampled_out': sampled,
+        }
+        sharpness_info = {
+            'sharpness_score': 5.0 if below_floor else 25.0,
+            'below_sharpness_floor': below_floor,
+            'all_frame_paths': [],
+        }
+        if luma is not None:
+            sharpness_info['luma'] = luma
+        system.process_detection = MagicMock(return_value=(fake_result, datetime.now()))
+        system.send_notification.reset_mock()
+        system._schedule_deferred_review_send.reset_mock()
+        caplog.clear()
+        with caplog.at_level("INFO"):
+            await system._process_and_notify_detection(img, 10, sharpness_info=sharpness_info)
+
+        tags = [t for r in caplog.records for t in _GOLDEN_TAGS if t in r.message]
+        sent = system.send_notification.await_count
+        deferred = system._schedule_deferred_review_send.call_count
+        if sent == 1 and deferred == 0 and not tags:
+            actual = ('SEND', None)
+        elif deferred == 1 and sent == 0 and not tags:
+            actual = ('DEFER', None)
+        elif sent == 0 and deferred == 0 and len(tags) == 1:
+            actual = ('MUTE', tags[0])
+        else:
+            actual = ('BROKEN', (sent, deferred, tags))
+        expected = _golden_expected_outcome(*combo, min_luma=min_luma)
+        if actual != expected:
+            mismatches.append((combo, expected, actual))
+        n += 1
+
+    assert n == 1536
+    assert not mismatches, mismatches[:10]
