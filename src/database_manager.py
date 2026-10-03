@@ -648,9 +648,9 @@ class DatabaseManager:
         """Return the timestamp of the most recent HUMAN-status detection, or
         None if there is none.
 
-        Used to seed the human-proximity mute gate's in-memory state
-        (`WildlifeSystem._last_human_detection_at`) at startup, so a restart
-        doesn't lose the look-back window. Modeled on
+        No longer used by WildlifeSystem (which seeds its recent-human store
+        from `get_recent_human_detection_times`); kept for ad-hoc analysis.
+        Modeled on
         `get_recent_review_detections`; `timestamp` is stored as a local
         wall-clock string in "%Y-%m-%d %H:%M:%S" format.
         """
@@ -676,10 +676,10 @@ class DatabaseManager:
     def get_recent_human_detection_times(self, since: datetime) -> List[datetime]:
         """Return timestamps of all HUMAN-status detections at/after `since`.
 
-        Used to seed the human-density condition's in-memory state
-        (`WildlifeSystem._recent_human_detection_times`) at startup, so a
-        restart doesn't lose track of an in-progress "garden is occupied"
-        streak. Modeled on `get_last_human_detection_time`; `timestamp` is
+        Used to seed `WildlifeSystem._human_events` (the recent-human store
+        read by the human-proximity window/density checks and the deferred
+        cancel-on-human check) at startup, so a restart doesn't lose an
+        in-progress human visit. Modeled on `get_last_human_detection_time`; `timestamp` is
         stored as a local wall-clock string in "%Y-%m-%d %H:%M:%S" format, so
         a plain string comparison against a cutoff formatted the same way is
         correct here. Returns oldest-first (no particular ordering is

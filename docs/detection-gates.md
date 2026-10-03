@@ -8,11 +8,13 @@ and `experiments/LEARNINGS.md`.
 **Universal invariants** (true of every mute gate below unless stated otherwise):
 
 - Every burst is species-ID'd and DB-logged. A gate only skips the Telegram send.
-- Exactly one suppression log per burst: the earliest-precedence gate wins, and every
-  later gate's `is_*` flag is ANDed with `not <every earlier gate>`
-  (`WildlifeSystem._process_and_notify_detection`).
+- Exactly one suppression log per burst: `notification_gate.decide()` is the single
+  source of precedence — an ordered gate list, first match wins, returning one
+  `Decision` (action SEND/MUTE/DEFER, channel MAIN/REVIEW, gate, reason) that
+  `WildlifeSystem._process_and_notify_detection` executes and logs.
 - Gates fail **open** (never mute) on any exception, missing input, or a `0`/disabled
-  setting. Exceptions are called out explicitly (exp #39 Phase 1).
+  setting. Exceptions: the Human/Privacy gate, and `[FAIL-CLOSED]` (row 1b) for
+  processing errors after classification.
 - Mute-gate DB columns use one convention: `True`/`False` when the gate evaluated the
   row, `NULL` when the gate didn't apply (wrong status, disabled, or row predates the
   column). No backfill.
@@ -24,7 +26,11 @@ and `experiments/LEARNINGS.md`.
 
 ## 1. Notification precedence table
 
-Order is the `if/elif` chain in `_process_and_notify_detection`. "Default" = code default
+Order is the gate list in `notification_gate.decide()` (pinned by the golden test
+`tests/test_wildlife_system.py::test_golden_notification_precedence`, which enumerates
+status × flags × levers). The per-gate DB flags are computed earlier, in
+`WildlifeSystem.process_detection`, and persisted with the semantics below; `decide()`
+only turns them into one routing decision. "Default" = code default
 in `src/config.py`; **deployed** values are from `experiments/deployed_config.env`
 (as of 2026-10-03) where they differ.
 
@@ -32,6 +38,7 @@ in `src/config.py`; **deployed** values are from `experiments/deployed_config.en
 |---|------|--------------|-------------------------------------|-----------|---------|----------------|--------|
 | 1 | Human/Privacy | Suppress HUMAN-status bursts entirely | `SPECIES_HUMAN_DETECTION_CONFIDENCE` 0.3 (**0.5**); `PERFORMANCE_SUPPRESS_HUMAN_ALERTS` true | `detection_status='human'`, `person_confidence` | `[HUMAN-GATE]` | `PERFORMANCE_SUPPRESS_HUMAN_ALERTS=false` | runs/0004, 0008, 0012, 0016 |
 | 1a | Burst human sweep (upstream) | Re-ID divergent sibling frames of a review-class burst; escalate to HUMAN | `PERFORMANCE_HUMAN_SWEEP_DIVERGENCE_THRESHOLD` 0.03; `PERFORMANCE_HUMAN_SWEEP_MAX_FRAMES` 2 (**4**) | (status becomes `human`) | `[HUMAN-SWEEP]` | either `=0` | runs/0015, 0017 |
+| 1b | Fail-closed on post-classification error (Task 3, 2026-10-03) | If `process_detection` raises *after* species ID (e.g. the DB write), don't send the ERROR-photo fallback when the burst is review-class, unnamed-animal, already human-proximity-muted, or inside a human window/density (also if that check itself errors). A named animal outside any human window still sends; an error *before* classification still sends as ERROR. A HUMAN result still falls back to HUMAN (row 1) | — | — (row may not exist) | `[FAIL-CLOSED]` | `git revert` | review bug MEDIUM-2 |
 | 2 | Human-Proximity (window OR density, demoted-band widening) | Mute review-class / unnamed-animal bursts near or amid human activity | `PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS` 120 (**240**); `..._HUMAN_DENSITY_WINDOW_SECONDS` 1800; `..._HUMAN_DENSITY_COUNT` 8; `..._HUMAN_DEMOTED_PERSON_FLOOR` 0.3; `..._HUMAN_DEMOTED_WINDOW_SECONDS` 1800 | `human_proximity_muted` | `[HUMAN-PROXIMITY]` | window `=0`; density count `=0`; demoted window `=0` | runs/0010, 0018, 0019 |
 | 3 | Blur (luma-conditioned) | Mute below-sharpness-floor review-class bursts, only when bright enough that low sharpness means blur | `PERFORMANCE_MIN_SHARPNESS_THRESHOLD` 11.0; `PERFORMANCE_BLUR_MUTE_MIN_LUMA` 70 | `sharpness_score`, `below_sharpness_floor` | `[BLUR]` | no dedicated lever; `PERFORMANCE_BLUR_MUTE_MIN_LUMA=255` effectively disables, or `git revert 683f5f3` | runs/0005, 0007 |
 | 4 | Confident-Blank | Mute review-class bursts whose raw top-1 is `blank` at ≥ threshold | `PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD` 0.92 | `blank_confidence_muted` | `[BLANK-CONF]` | `=0` (human only; loop bounds 0.87–1.0) | runs/0021 |
@@ -74,8 +81,7 @@ order (first match wins):
 Label helpers in `utils.py` (all treat sentinel segments `no cv result`/`blank` as empty,
 per exp #23's lesson): `is_blank_label`, `is_unnamed_animal_label` (last segment
 `animal`, all taxonomy empty — `aves;;;;;bird` does *not* match),
-`is_named_animal_label` (not unnamed, not blank, no `homo` segment, at least one
-non-empty non-sentinel segment), `extract_common_name`.
+`extract_common_name`.
 
 ## 3. Human/Privacy Gate
 
@@ -101,8 +107,9 @@ floored at the old default, capped so the loop can't gut the gate. The 0.3–0.5
 **Effects.** `PERFORMANCE_SUPPRESS_HUMAN_ALERTS` (true): no Telegram at all (not even
 REVIEW). Still DB-logged; HUMAN row metadata carries `person_confidence` and the raw
 top-1 (exp #23) so a later tick can tell *which* trigger fired. Photos purged after
-48h (§13). Each HUMAN classification updates `_last_human_detection_at` and
-`_recent_human_detection_times` (anchors for §4 and §11).
+48h (§13). Each HUMAN classification adds its capture time to `WildlifeSystem._human_events`
+(`notification_gate.RecentHumanEvents`), the single store every human-relative check
+reads (§4 and §10).
 
 `person_confidence` is recorded on every parsed result (0.0 when no person box), not
 only on HUMAN rows.
@@ -138,9 +145,11 @@ exactly that rollup (bursts 5222/5270 reached MAIN as "animal detected"); re-rou
 label was FN-vetoed (18/78 such rows are human-labelled animals), so the gate's scope
 was widened instead — mutes 4/78, zero labelled animals.
 
-**Mute if window OR density** (computed in `process_detection`, persisted on INSERT):
+**Mute if window OR density** (`notification_gate.evaluate_human_proximity`, called from
+`process_detection`, persisted on INSERT; both conditions read the recent-human store
+`_human_events`):
 
-- **Window**: `0 <= burst_time − _last_human_detection_at <= W`, W =
+- **Window**: any HUMAN detection in `[burst_time − W, burst_time]`, W =
   `PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS`. Code default 120; **deployed 240** since
   2026-07-28 (exp #11 extension; nearest human-labelled animal review row sits 329s after
   a HUMAN burst, so 240 keeps a 37% margin). BOUNDS `(0, 600)`.
@@ -154,11 +163,12 @@ was widened instead — mutes 4/78, zero labelled animals.
 - **Density** (exp #11 extension, 2026-07-28): ≥ `PERFORMANCE_HUMAN_DENSITY_COUNT` (8)
   HUMAN detections in the trailing `PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS` (1800) —
   "the garden is occupied" (long gardening sessions produced leaks 432s/732s after the
-  last human burst). List seeded at startup via
-  `DatabaseManager.get_recent_human_detection_times`, pruned before every use.
-  Rollback: count `=0` (window condition untouched).
+  last human burst). Rollback: count `=0` (window condition untouched).
 
-Anchors are seeded at startup (`get_last_human_detection_time`). Log reason text is
+The store is a sorted list of HUMAN capture times, seeded at startup via
+`DatabaseManager.get_recent_human_detection_times` and pruned on each insert to the
+longest window any check needs (`human_events_horizon_seconds`: longest backward window
++ defer + 600s slack; pruning is only a memory bound). Log reason text is
 `window` / `density` / `demoted-band window` (the last only when widening alone caused
 the mute). Muted rows are purged on the 48h human policy (§13). Validation: the closest
 of the 12 human-labelled animal review rows (since the gate went live 2026-07-08) is 329s
@@ -221,8 +231,8 @@ close-up smear classified `no_animal`, first HUMAN burst seconds later: 3829/386
 75/51/81s before; 3909 shows a face). A review-class send that survives every gate is
 held: `_schedule_deferred_review_send` builds the annotated image synchronously (it
 depends on `last_motion_frame`), then a background task sleeps
-`PERFORMANCE_REVIEW_DEFER_SECONDS` (240) and cancels if
-`burst_time < _last_human_detection_at <= burst_time + defer` — logs `[REVIEW-DEFER]`,
+`PERFORMANCE_REVIEW_DEFER_SECONDS` (240) and cancels if **any** HUMAN detection in the
+store lies in `(burst_time, burst_time + defer]` — logs `[REVIEW-DEFER]`,
 persists via `update_human_proximity_muted`. Tasks tracked in `_pending_review_tasks`,
 cancelled on shutdown. MAIN alerts are never delayed. Fails open (sends) on error.
 FN cost: nearest labelled animal review row is 1846s before the next HUMAN burst; cancels

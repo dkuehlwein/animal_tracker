@@ -35,7 +35,8 @@ Use VIM, not nano, for console edits.
 
 ## Architecture
 
-- **`wildlife_system.py`**: main orchestrator and event loop; owns `process_detection` (species ID, burst human sweep, gate decisions, DB write) and `_process_and_notify_detection` (notification gate chain, deferred REVIEW sends)
+- **`wildlife_system.py`**: main orchestrator and event loop; owns `process_detection` (species ID, burst human sweep, per-gate flags, DB write) and `_process_and_notify_detection` (executes the `decide()` result, deferred REVIEW sends)
+- **`notification_gate.py`**: `decide(ctx) -> Decision` — the single ordered source of notification-gate precedence; `RecentHumanEvents` store of HUMAN timestamps; the human-proximity / blank-confidence evaluators
 - **`config.py`**: pydantic-settings dataclasses (`CameraConfig`, `MotionConfig`, `PerformanceConfig`, `StorageConfig`, `SpeciesConfig`, `LocationConfig`); env-var overrides; validators consume `loop/guardrails.BOUNDS`; `Config.create_test_config()` for tests
 - **`camera_manager.py`**: dual-stream Picamera2 (high-res capture + low-res motion stream); `MockCameraManager` for tests
 - **`motion_detector.py`**: MOG2 background subtraction, central-region weighting, consecutive-detection filter, optional color-variance filter
@@ -48,7 +49,7 @@ Use VIM, not nano, for console edits.
 - **`resource_manager.py`**: memory monitoring, storage cleanup, human-photo purge
 - **`data_models.py`**: `MotionResult`, `DetectionResult`, `IdentificationResult`, `DetectionRecord`, `DetectionStatus` (named `data_models` to avoid clashing with YOLO's `models`)
 - **`exceptions.py`**: unified exception hierarchy
-- **`utils.py`**: `PerformanceTimer`, `MotionVisualizer`, `SharpnessAnalyzer`, `SunChecker`, `extract_common_name`, taxonomy-label helpers (`is_blank_label`, `is_unnamed_animal_label`, `is_named_animal_label`)
+- **`utils.py`**: `PerformanceTimer`, `MotionVisualizer`, `SharpnessAnalyzer`, `SunChecker`, `extract_common_name`, taxonomy-label helpers (`is_blank_label`, `is_unnamed_animal_label`)
 - **`src/loop/`**: deterministic, token-free loop tools — `nightgate` (pre-gate + heartbeat), `ingest`, `metrics` (FP/FN with Wilson CIs, owns the watermark), `report`, `deploy` (only writer of live config → `experiments/deployed_config.env`), `apply_pending_deploy` (pre-sunrise restart, `wildlife-deploy.timer`), `guardrails` (BOUNDS, FN-veto, freeze), `checkpoint`, `endtick`, `state`, `scene_watch` (camera re-aim watchdog), `replay` (stub)
 
 ### Data Flow
@@ -67,14 +68,15 @@ Full reference — mechanisms, evidence, DB columns, log tags, rollback levers, 
 
 Statuses: `IDENTIFIED`, `ANIMAL_UNCERTAIN`, `NO_ANIMAL`, `UNCLASSIFIABLE`, `HUMAN`, `ERROR`. **Review-class** = `NO_ANIMAL`/`UNCLASSIFIABLE` (sent with 🔍 REVIEW prefix in the same channel). Routing in `species_identifier`: human gate first; SpeciesNet's `blank` verdict → `NO_ANIMAL`; `no cv result` → `UNCLASSIFIABLE`; the generic `;;;;;;animal` rollup is `IDENTIFIED`.
 
-Notification precedence (first match wins, exactly one suppression log per burst; every gate fails open):
+Notification precedence — implemented once, in `notification_gate.decide()` (first match wins, exactly one suppression log per burst; every gate fails open except HUMAN and FAIL-CLOSED):
 
 1. `[HUMAN-GATE]` Human/Privacy — HUMAN status never notifies (upstream: `[HUMAN-SWEEP]` escalates review-class bursts whose sibling frames hold a person)
+   - `[FAIL-CLOSED]` — processing error after classification on a review-class / unnamed-animal / human-window burst: muted instead of sent as an ERROR photo
 2. `[HUMAN-PROXIMITY]` Human-Proximity — window OR density OR demoted-band; also covers `;;;;;;animal` IDENTIFIED bursts
 3. `[BLUR]` Blur — below sharpness floor AND luma ≥ 70, review-class only
 4. `[BLANK-CONF]` Confident-Blank — raw top-1 `blank` ≥ 0.92, review-class only
 5. `[REVIEW-SAMPLE]` Review Sampling — deterministic fraction sent
-6. `[REVIEW-DEFER]` Deferred send — surviving REVIEW sends held 240s, cancelled if a HUMAN burst lands
+6. `[REVIEW-DEFER]` Deferred send — surviving REVIEW sends held 240s, cancelled if any HUMAN burst lands in that window
 
 MAIN-channel (non-review, non-human) alerts are never delayed. Photos of HUMAN and human-adjacent/human-proximity-muted bursts are purged after 48h; DB rows are kept.
 
@@ -123,4 +125,4 @@ All parameters have env-var overrides with prefixes `CAMERA_`, `MOTION_`, `PERFO
 
 ## Testing
 
-pytest + asyncio; files `tests/test_*.py`. Mocks (`MockCameraManager`, `MockSpeciesIdentifier`) allow running without hardware or SpeciesNet. Gate behaviour is covered mainly in `test_wildlife_system.py`, `test_species_identifier.py`, `test_scene_gate.py` and `test_loop_*.py`; run the full suite after any change.
+pytest + asyncio; files `tests/test_*.py`. Mocks (`MockCameraManager`, `MockSpeciesIdentifier`) allow running without hardware or SpeciesNet. Gate behaviour is covered mainly in `test_wildlife_system.py` (incl. the precedence golden test), `test_notification_gate.py`, `test_species_identifier.py` and `test_loop_*.py`; run the full suite after any change.
