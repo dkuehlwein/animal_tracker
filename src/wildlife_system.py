@@ -542,11 +542,20 @@ class WildlifeSystem:
             # privacy suppression gate still fires downstream — reporting
             # ERROR here would let the human's photo leak to Telegram.
             fallback_reason = f'Processing error: {e}'
+            fail_closed_reason = None
             if species_result is not None and is_human_detection(species_result.status):
                 fallback_status = DetectionStatus.HUMAN
                 fallback_reason = f'Processing error after human detection (fail-closed): {e}'
             else:
                 fallback_status = DetectionStatus.ERROR
+                if species_result is not None:
+                    fail_closed_reason = self._post_classification_fail_closed_reason(
+                        species_result, timestamp, human_proximity_muted
+                    )
+                    if fail_closed_reason:
+                        fail_closed_reason = (
+                            f"processing error after classification: {fail_closed_reason}"
+                        )
             # Return fallback result
             return {
                 'species_name': 'Unknown species',
@@ -558,7 +567,38 @@ class WildlifeSystem:
                 'detection_count': 0,
                 'detection_id': None,
                 'detection_status': fallback_status,
+                'fail_closed_reason': fail_closed_reason,
             }, timestamp
+
+    def _post_classification_fail_closed_reason(self, species_result, timestamp: datetime,
+                                                human_proximity_muted) -> Optional[str]:
+        """Why a burst whose processing failed AFTER classification must not
+        be sent as an ERROR photo (review bug MEDIUM-2), or None to keep
+        failing open. Fail closed when a privacy/review gate could have muted
+        it: review-class, the generic unnamed-animal label, a privacy flag
+        already computed True, or a HUMAN detection inside the window/density
+        horizon. A named animal outside any human window still sends. If the
+        human-window check itself errors, fail closed — this path is already
+        an error path and the photo may show a person.
+        """
+        try:
+            status = species_result.status
+            if is_review_detection(status):
+                return f"review-class burst (status={status})"
+            if is_unnamed_animal_label(species_result.species_name):
+                return "unnamed-animal burst"
+            if human_proximity_muted:
+                return "human-proximity mute already decided"
+            metadata = species_result.metadata or {}
+            muted, reason = evaluate_human_proximity(
+                timestamp, metadata.get('person_confidence'),
+                self._human_events, self.config.performance,
+            )
+            if muted:
+                return f"inside human {reason}"
+            return None
+        except Exception as e:
+            return f"privacy check failed ({e})"
 
     @staticmethod
     def _summarize_detection(detection_result) -> tuple:
@@ -937,6 +977,7 @@ class WildlifeSystem:
             status=species_result.get('detection_status'),
             config=self.config.performance,
             unnamed_animal=bool(species_result.get('unnamed_animal')),
+            fail_closed_reason=species_result.get('fail_closed_reason'),
             human_proximity_muted=bool(species_result.get('human_proximity_muted')),
             human_proximity_reason=species_result.get('human_proximity_mute_reason'),
             below_sharpness_floor=bool(sharpness_info.get('below_sharpness_floor')),

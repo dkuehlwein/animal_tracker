@@ -3135,3 +3135,86 @@ async def test_review_defer_cancels_when_later_human_overwrites_in_window_human(
     telegram.send_photo_with_caption.assert_not_called()
     telegram.send_media_group.assert_not_called()
     assert any("[REVIEW-DEFER]" in r.message for r in caplog.records)
+
+
+# ---------------------------------------------------------------------------
+# Review bug MEDIUM-2 (Task 3): an exception after classification (e.g. the
+# DB write failing) used to fall back to an ERROR-status photo SEND for every
+# non-HUMAN burst — leaking review-class / unnamed-animal / human-window
+# bursts that the gates would have muted. Fail closed for those; keep
+# failing open for a named animal outside any human window.
+# ---------------------------------------------------------------------------
+
+def _gate_log_lines(caplog):
+    return [r.message for r in caplog.records
+            if any(t in r.message for t in _GOLDEN_TAGS)]
+
+
+async def _run_with_db_failure(system, tmp_path, identification, caplog):
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(return_value=identification)
+    system.database.log_detection = MagicMock(side_effect=Exception("disk full"))
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+    return telegram
+
+
+@pytest.mark.asyncio
+async def test_post_classification_error_fails_closed_for_review_class(
+    system, tmp_path, caplog
+):
+    telegram = await _run_with_db_failure(
+        system, tmp_path, _identification_no_animal(), caplog
+    )
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    assert not system._pending_review_tasks
+    assert len(_gate_log_lines(caplog)) == 1
+
+
+@pytest.mark.asyncio
+async def test_post_classification_error_fails_closed_for_unnamed_animal(
+    system, tmp_path, caplog
+):
+    telegram = await _run_with_db_failure(
+        system, tmp_path, _identification_unnamed_animal(), caplog
+    )
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    assert len(_gate_log_lines(caplog)) == 1
+
+
+@pytest.mark.asyncio
+async def test_post_classification_error_fails_closed_inside_human_window(
+    system, tmp_path, caplog
+):
+    """Even a named animal fails closed when a human was seen moments ago."""
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_human()
+    )
+    system.process_detection(img, 5000, None)  # records a HUMAN just now
+
+    telegram = await _run_with_db_failure(
+        system, tmp_path, _identification_named_species(), caplog
+    )
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    assert len(_gate_log_lines(caplog)) == 1
+
+
+@pytest.mark.asyncio
+async def test_post_classification_error_still_fails_open_for_named_animal(
+    system, tmp_path, caplog
+):
+    telegram = await _run_with_db_failure(
+        system, tmp_path, _identification_named_species(), caplog
+    )
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    assert _gate_log_lines(caplog) == []

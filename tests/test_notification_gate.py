@@ -65,6 +65,15 @@ def test_decide_channel_follows_status():
                   ).channel == Channel.REVIEW
 
 
+def test_fail_closed_mutes_after_human_gate_and_before_everything_else():
+    ctx = GateContext(status='error', config=_cfg(), fail_closed_reason='boom',
+                      review_sampled_out=True)
+    d = decide(ctx)
+    assert (d.action, d.gate, d.reason) == (Action.MUTE, 'FAIL-CLOSED', 'boom')
+    human = decide(GateContext(status='human', config=_cfg(), fail_closed_reason='boom'))
+    assert human.gate == 'HUMAN-GATE'
+
+
 def test_decision_log_line_format():
     d = Decision(Action.MUTE, Channel.REVIEW, 'BLUR', 'sharpness=5.0')
     assert d.log_line(7) == "[BLUR] Suppressing notification for detection 7 (sharpness=5.0)"
