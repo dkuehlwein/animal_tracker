@@ -644,42 +644,13 @@ class DatabaseManager:
                 f"Unexpected error getting human-adjacent review detections: {e}"
             ) from e
 
-    def get_last_human_detection_time(self) -> Optional[datetime]:
-        """Return the timestamp of the most recent HUMAN-status detection, or
-        None if there is none.
-
-        No longer used by WildlifeSystem (which seeds its recent-human store
-        from `get_recent_human_detection_times`); kept for ad-hoc analysis.
-        Modeled on
-        `get_recent_review_detections`; `timestamp` is stored as a local
-        wall-clock string in "%Y-%m-%d %H:%M:%S" format.
-        """
-        try:
-            with sqlite3.connect(self.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute('''
-                    SELECT timestamp
-                    FROM detections
-                    WHERE detection_status = 'human'
-                    ORDER BY timestamp DESC
-                    LIMIT 1
-                ''')
-                row = cursor.fetchone()
-                if row is None:
-                    return None
-                return datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
-        except sqlite3.Error as e:
-            raise DatabaseOperationError(f"Failed to get last human detection time: {e}") from e
-        except Exception as e:
-            raise DatabaseError(f"Unexpected error getting last human detection time: {e}") from e
-
     def get_recent_human_detection_times(self, since: datetime) -> List[datetime]:
         """Return timestamps of all HUMAN-status detections at/after `since`.
 
         Used to seed `WildlifeSystem._human_events` (the recent-human store
         read by the human-proximity window/density checks and the deferred
         cancel-on-human check) at startup, so a restart doesn't lose an
-        in-progress human visit. Modeled on `get_last_human_detection_time`; `timestamp` is
+        in-progress human visit. `timestamp` is
         stored as a local wall-clock string in "%Y-%m-%d %H:%M:%S" format, so
         a plain string comparison against a cutoff formatted the same way is
         correct here. Returns oldest-first (no particular ordering is
