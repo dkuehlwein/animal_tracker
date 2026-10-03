@@ -1,9 +1,9 @@
 ---
 id: 23
 slug: raw-homo-sentinel-guard
-status: running
+status: concluded
+outcome: "KEPT - gate/mechanism still live after the 2026-10-03 prune; closed with no further observation duty."
 validation: live   # code change, restart-gated; verified end-to-end on the real leak frames before deploy
-occupies_active_slot: false  # defect repair of exp #9's shipped mechanism, not a new tuning lever — exp #21 keeps the slot
 hypothesis: "Exp #9's raw-classifier homo-leak trigger has been inert since it shipped. Its guard `_is_specific_animal_taxon` tests genus/species segments for literal non-emptiness, but SpeciesNet writes the string 'no cv result' into EVERY taxonomy segment when the crop is unreadable — so the unclassifiable sentinel reads as a genus+species, the guard reports 'confident specific animal', and the trigger is disabled on precisely the label shape it was built for. Treating sentinel segments as empty restores the measured behaviour exp #9 shipped."
 created: 2026-09-11
 promoted_from: "found during night-2 tier-2 adjudication of exp #21: burst 5137 carried a homo-sapiens raw classifier top-1 at 0.512 and still routed to `unclassifiable`."

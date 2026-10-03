@@ -332,65 +332,6 @@ def test_logs_dir_property_follows_log_dir_override(monkeypatch):
     assert StorageConfig().logs_dir == Path("custom/log/path")
 
 
-class TestSceneGateConfig:
-    """Scene-unchanged gate config knobs (Task 3, feat/scene-gate)."""
-
-    def test_defaults(self):
-        from config import PerformanceConfig
-        config = PerformanceConfig()
-        # Task 5 (offline validation, 2026-07-17): disabled by default — the
-        # labeled corpus had zero on-disk animal-labeled review-class frames
-        # to validate a threshold against. See scripts/validate_scene_gate.py
-        # and .superpowers/sdd/task-5-report.md.
-        assert config.scene_gate_enabled is False
-        assert config.scene_gate_similarity_threshold == 0.97
-        assert config.scene_gate_ref_count == 3
-        assert config.scene_gate_ref_max_age_hours == 6.0
-
-    def test_scene_gate_enabled_env_override(self, monkeypatch):
-        monkeypatch.setenv("PERFORMANCE_SCENE_GATE_ENABLED", "false")
-        from config import PerformanceConfig
-        assert PerformanceConfig(_env_file=None).scene_gate_enabled is False
-
-    def test_scene_gate_similarity_threshold_env_override(self, monkeypatch):
-        monkeypatch.setenv("PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD", "0.9")
-        from config import PerformanceConfig
-        assert PerformanceConfig(_env_file=None).scene_gate_similarity_threshold == 0.9
-
-    def test_scene_gate_ref_count_env_override(self, monkeypatch):
-        monkeypatch.setenv("PERFORMANCE_SCENE_GATE_REF_COUNT", "5")
-        from config import PerformanceConfig
-        assert PerformanceConfig(_env_file=None).scene_gate_ref_count == 5
-
-    def test_scene_gate_ref_max_age_hours_env_override(self, monkeypatch):
-        monkeypatch.setenv("PERFORMANCE_SCENE_GATE_REF_MAX_AGE_HOURS", "12.5")
-        from config import PerformanceConfig
-        assert PerformanceConfig(_env_file=None).scene_gate_ref_max_age_hours == 12.5
-
-    def test_similarity_threshold_rejects_below_bound(self, monkeypatch):
-        # BOUNDS["PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD"] = (0.80, 1.0)
-        monkeypatch.setenv("PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD", "0.5")
-        from config import PerformanceConfig
-        with pytest.raises(ValidationError):
-            PerformanceConfig(_env_file=None)
-
-    def test_similarity_threshold_rejects_above_bound(self, monkeypatch):
-        monkeypatch.setenv("PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD", "1.5")
-        from config import PerformanceConfig
-        with pytest.raises(ValidationError):
-            PerformanceConfig(_env_file=None)
-
-    def test_similarity_threshold_accepts_lower_bound(self, monkeypatch):
-        monkeypatch.setenv("PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD", "0.80")
-        from config import PerformanceConfig
-        assert PerformanceConfig(_env_file=None).scene_gate_similarity_threshold == 0.80
-
-    def test_similarity_threshold_accepts_upper_bound(self, monkeypatch):
-        monkeypatch.setenv("PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD", "1.0")
-        from config import PerformanceConfig
-        assert PerformanceConfig(_env_file=None).scene_gate_similarity_threshold == 1.0
-
-
 class TestBlurMuteMinLumaConfig:
     """Blur-mute luma gate (exp #8, sharpness-floor-is-a-brightness-gate):
     the blur-mute path should only fire in adequate light, since raw
@@ -455,45 +396,6 @@ class TestHumanProximityWindowConfig:
         monkeypatch.setenv("PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS", "600")
         from config import PerformanceConfig
         assert PerformanceConfig(_env_file=None).human_proximity_window_seconds == 600.0
-
-
-class TestAnimalProximityWindowConfig:
-    """Animal-Proximity Review Exemption config knob (exp #33,
-    animal-proximity-review-exemption, 2026-09-20): exempt a review-class
-    burst within N seconds of a named-animal IDENTIFIED detection from the
-    Review Sampling Gate only."""
-
-    def test_default(self):
-        from config import PerformanceConfig
-        assert PerformanceConfig().animal_proximity_window_seconds == 180.0
-
-    def test_env_override(self, monkeypatch):
-        monkeypatch.setenv("PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS", "60")
-        from config import PerformanceConfig
-        assert PerformanceConfig(_env_file=None).animal_proximity_window_seconds == 60.0
-
-    def test_zero_disables_exemption_is_a_valid_value(self, monkeypatch):
-        monkeypatch.setenv("PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS", "0")
-        from config import PerformanceConfig
-        assert PerformanceConfig(_env_file=None).animal_proximity_window_seconds == 0.0
-
-    def test_rejects_out_of_bounds(self, monkeypatch):
-        # BOUNDS["PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS"] = (0.0, 600.0)
-        monkeypatch.setenv("PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS", "700")
-        from config import PerformanceConfig
-        with pytest.raises(ValidationError):
-            PerformanceConfig(_env_file=None)
-
-    def test_rejects_below_bound(self, monkeypatch):
-        monkeypatch.setenv("PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS", "-1")
-        from config import PerformanceConfig
-        with pytest.raises(ValidationError):
-            PerformanceConfig(_env_file=None)
-
-    def test_accepts_upper_bound(self, monkeypatch):
-        monkeypatch.setenv("PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS", "600")
-        from config import PerformanceConfig
-        assert PerformanceConfig(_env_file=None).animal_proximity_window_seconds == 600.0
 
 
 class TestHumanDensityConfig:
@@ -762,44 +664,34 @@ class TestBlankConfidenceMuteThresholdGuardrailsBounds:
         validate_param("PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD", 0.92)
 
 
+class TestRetiredGateEnvVarsIgnored:
+    """Gates retired 2026-10-03 (scene, unnamed-animal-blank, animal-proximity)
+    must not break startup when their env vars are still set (deployed_config.env
+    / .env on the Pi still carry them until a later cleanup)."""
+
+    def test_retired_env_vars_do_not_break_config_load(self, monkeypatch):
+        from config import Config
+        monkeypatch.setenv("PERFORMANCE_SCENE_GATE_ENABLED", "true")
+        monkeypatch.setenv("PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD", "0.982")
+        monkeypatch.setenv("PERFORMANCE_SCENE_GATE_REF_COUNT", "3")
+        monkeypatch.setenv("PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS", "180")
+        monkeypatch.setenv("PERFORMANCE_UNNAMED_ANIMAL_BLANK_MUTE_THRESHOLD", "0.9")
+        cfg = PerformanceConfig(_env_file=None)
+        assert not hasattr(cfg, "scene_gate_enabled")
+        assert not hasattr(cfg, "animal_proximity_window_seconds")
+        assert not hasattr(cfg, "unnamed_animal_blank_mute_threshold")
+        Config()  # full load must also succeed
+
+    def test_retired_keys_removed_from_guardrail_bounds(self):
+        from loop.guardrails import BOUNDS
+        for key in ("PERFORMANCE_SCENE_GATE_ENABLED",
+                    "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD",
+                    "PERFORMANCE_UNNAMED_ANIMAL_BLANK_MUTE_THRESHOLD",
+                    "PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS"):
+            assert key not in BOUNDS
+
+
 if __name__ == '__main__':
     pytest.main([__file__])
 
 
-class TestUnnamedAnimalBlankMuteThreshold:
-    """Unnamed-Animal Blank-Raw Mute Gate (exp #32, 2026-09-19). Mutes BELOW
-    the threshold, so unlike every other gate here the FN-safe direction is
-    DOWN; 0.0 disables the gate entirely (the human-only rollback lever)."""
-
-    def test_default(self):
-        assert PerformanceConfig().unnamed_animal_blank_mute_threshold == 0.90
-
-    def test_env_override(self, monkeypatch):
-        monkeypatch.setenv("PERFORMANCE_UNNAMED_ANIMAL_BLANK_MUTE_THRESHOLD", "0.85")
-        assert PerformanceConfig(
-            _env_file=None
-        ).unnamed_animal_blank_mute_threshold == 0.85
-
-    def test_zero_is_valid_rollback_lever(self):
-        assert PerformanceConfig(
-            _env_file=None, unnamed_animal_blank_mute_threshold=0.0
-        ).unnamed_animal_blank_mute_threshold == 0.0
-
-    def test_one_is_valid(self):
-        assert PerformanceConfig(
-            _env_file=None, unnamed_animal_blank_mute_threshold=1.0
-        ).unnamed_animal_blank_mute_threshold == 1.0
-
-    def test_out_of_bounds_rejected(self):
-        with pytest.raises(ValidationError):
-            PerformanceConfig(_env_file=None, unnamed_animal_blank_mute_threshold=1.5)
-        with pytest.raises(ValidationError):
-            PerformanceConfig(_env_file=None, unnamed_animal_blank_mute_threshold=-0.1)
-
-    def test_loop_bounds_cannot_reach_the_animal_counter_example(self):
-        """The one animal-labelled blank-raw row scores 0.9722; the loop's
-        own upper bound must sit strictly below it."""
-        from loop.guardrails import BOUNDS
-        low, high = BOUNDS["PERFORMANCE_UNNAMED_ANIMAL_BLANK_MUTE_THRESHOLD"]
-        assert low == 0.0
-        assert high < 0.9722

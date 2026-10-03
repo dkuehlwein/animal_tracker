@@ -1,9 +1,9 @@
 ---
 id: 13
 slug: blank-ensemble-main-alert
-status: running
+status: concluded
+outcome: "KEPT - gate/mechanism still live after the 2026-10-03 prune; closed with no further observation duty."
 validation: live          # shipped 2026-08-02 (commit 55234f1), live at the 2026-08-03T03:25 restart
-occupies_active_slot: true   # exp #11 (runs/0010) concluded KEEP this tick; this takes the slot
 hypothesis: "SpeciesNet's explicit empty-frame verdict — the fully-generic label '<uuid>;;;;;;blank' — scores ~0.99, so it clears unknown_species_threshold and is reported as DetectionStatus.IDENTIFIED. That sends a MAIN-channel species alert on a frame the model itself called empty, and (worse) bypasses the entire review-class mute stack. Routing a blank ensemble prediction to NO_ANIMAL removes a pure-FP MAIN alert class at zero measured false-negative cost."
 created: 2026-08-02
 promoted_from: "Loop tick 2026-08-02 — id 4175 surfaced while adjudicating the night's non-review-class rows: detection_status='identified', species_name='f1856211-...;;;;;;blank', confidence 0.9985, five frames of empty garden."

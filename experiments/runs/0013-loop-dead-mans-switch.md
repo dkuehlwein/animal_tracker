@@ -1,9 +1,9 @@
 ---
 id: 15
 slug: loop-dead-mans-switch
-status: running
+status: concluded
+outcome: "CONCLUDED 2026-10-03 - loop-infrastructure item, closed; ledger cleanup."
 validation: live          # shipped 2026-09-02 commit 2f469fa; loop-side code, live on the NEXT nightgate invocation (no camera restart needed)
-occupies_active_slot: true   # exp #14 (runs/0012) concluded KEEP this tick; this takes the slot
 hypothesis: "The loop cannot report its own death. loop.nightgate heartbeats only on GATED-OUT ticks, so a tick that passes the gate and then dies is completely silent, and a dead camera is silent too because nothing checks it. Two best-effort checks inside nightgate — loop staleness and camera liveness, each alerting once per loop-day — convert both silent-failure modes into a Telegram alert without adding any way for the gate itself to fail."
 created: 2026-09-02
 promoted_from: "backlog #15, opened 2026-08-30 after the 27-night OAuth outage (2026-08-04..29) was discovered only because Daniel happened to look. Second confirming incident 2026-09-01: camera manually stopped, down ~20 h, also silent."

@@ -16,7 +16,7 @@ import cv2
 import numpy as np
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 from concurrent.futures import ThreadPoolExecutor
 
 from config import Config
@@ -26,11 +26,14 @@ from database_manager import DatabaseManager
 from species_identifier import SpeciesIdentifier
 from notification_service import NotificationService
 from resource_manager import SystemMonitor, StorageManager
-from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnalyzer, get_species_emoji, extract_common_name, is_unnamed_animal_label, is_blank_label, is_named_animal_label
+from utils import PerformanceTimer, SunChecker, MotionVisualizer, SharpnessAnalyzer, get_species_emoji, extract_common_name, is_unnamed_animal_label
 from feedback_protocol import build_feedback_keyboard
 from timelapse_writer import TimelapseWriter
 from data_models import DetectionStatus, is_review_detection, is_human_detection
-from scene_gate import SceneReferenceSet
+from notification_gate import (
+    Action, GateContext, RecentHumanEvents, decide, evaluate_blank_confidence,
+    evaluate_human_proximity, human_events_horizon_seconds, is_human_proximity_scope,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -97,81 +100,23 @@ class WildlifeSystem:
         self.file_manager.ensure_directories()
         self.telegram_service.set_database_reference(self.database)
 
-        # Scene-unchanged gate (Task 4): rolling reference set of recent
-        # known-empty scenes, seeded from the DB at startup. Fail-open by
-        # construction — disabled config or a seeding error just leaves
-        # `scene_reference_set` at None/empty, which process_detection
-        # treats identically to "gate never mutes anything".
-        self.scene_reference_set: Optional[SceneReferenceSet] = None
-        if self.config.performance.scene_gate_enabled:
-            self.scene_reference_set = SceneReferenceSet(
-                max_refs=self.config.performance.scene_gate_ref_count,
-                max_age_hours=self.config.performance.scene_gate_ref_max_age_hours,
-            )
-            try:
-                rows = self.database.get_recent_review_detections(
-                    self.config.performance.scene_gate_ref_count,
-                    self.config.performance.scene_gate_ref_max_age_hours,
-                )
-                self.scene_reference_set.seed(rows)
-            except Exception as e:
-                logger.warning(
-                    f"Scene-gate: failed to seed reference set at startup "
-                    f"(continuing with an empty reference set): {e}"
-                )
-
-        # Human-proximity mute gate: timestamp of the most recent
-        # HUMAN-status detection, seeded from the DB so a restart doesn't
-        # lose the look-back window. Fail-open by construction — a seeding
-        # error just leaves this at None, which process_detection treats
-        # identically to "no prior human detection" (gate never mutes).
-        self._last_human_detection_at: Optional[datetime] = None
-        try:
-            self._last_human_detection_at = self.database.get_last_human_detection_time()
-        except Exception as e:
-            logger.warning(
-                f"Human-proximity gate: failed to seed last-human timestamp at "
-                f"startup (continuing with no prior human detection): {e}"
-            )
-
-        # Animal-Proximity Review Exemption (exp #33,
-        # animal-proximity-review-exemption, 2026-09-20): timestamp of the
-        # most recent IDENTIFIED detection naming a real animal, seeded from
-        # the DB so a restart doesn't lose the look-back window. Fail-open by
-        # construction — a seeding error just leaves this at None, which
-        # process_detection treats identically to "no prior named-animal
-        # detection" (the exemption never fires).
-        self._last_animal_detection_at: Optional[datetime] = None
-        try:
-            self._last_animal_detection_at = self.database.get_last_animal_detection_time()
-        except Exception as e:
-            logger.warning(
-                f"Animal-proximity exemption: failed to seed last-animal "
-                f"timestamp at startup (continuing with no prior animal "
-                f"detection): {e}"
-            )
-
-        # Human-density condition (exp #11 extension, 2026-07-28): rolling
-        # list of recent HUMAN-status detection timestamps, OR-ed onto the
-        # window condition above to catch leaks that fall OUTSIDE the
-        # look-back window during a long human-occupied session (measured
-        # gaps of 432s/732s past the last human burst during a gardening
-        # day). Seeded from the DB so a restart doesn't lose an in-progress
-        # streak; fails open exactly like the seeding above — a seeding
-        # error just leaves this empty, which is the same as "no recent
-        # human detections" (gate never mutes on density alone).
-        self._recent_human_detection_times: List[datetime] = []
+        # Recent HUMAN-status detection timestamps (capture time), the one
+        # store every human-relative check reads: the Human-Proximity gate's
+        # backward window / demoted-band / density conditions and the
+        # deferred REVIEW send's forward cancel-on-human check (see
+        # notification_gate.RecentHumanEvents). Seeded from the DB so a
+        # restart doesn't lose an in-progress visit. Fail-open: a seeding
+        # error leaves the store empty, i.e. "no recent humans".
+        self._human_events = RecentHumanEvents()
         try:
             since = datetime.now() - timedelta(
-                seconds=self.config.performance.human_density_window_seconds
+                seconds=human_events_horizon_seconds(self.config.performance)
             )
-            self._recent_human_detection_times = (
-                self.database.get_recent_human_detection_times(since)
-            )
+            self._human_events.seed(self.database.get_recent_human_detection_times(since))
         except Exception as e:
             logger.warning(
-                f"Human-density gate: failed to seed recent-human timestamps "
-                f"at startup (continuing with an empty list): {e}"
+                f"Human events: failed to seed recent HUMAN timestamps at "
+                f"startup (continuing with an empty store): {e}"
             )
 
         # Deferred REVIEW send / cancel-on-human gate (leading-edge fix,
@@ -270,21 +215,14 @@ class WildlifeSystem:
         except Exception as e:
             logger.error(f"Error in cleanup: {e}", exc_info=True)
     
-    def _count_recent_human_detections(self, reference_time: datetime) -> int:
-        """Prune `self._recent_human_detection_times` to entries within
-        `human_density_window_seconds` of `reference_time` (so the list
-        cannot grow unbounded) and return the surviving count.
-
-        Used by both the density condition's mute decision and by
-        `process_detection`'s HUMAN-status bookkeeping (to prune eagerly on
-        append, not just at the next review-class evaluation).
-        """
-        window = self.config.performance.human_density_window_seconds
-        self._recent_human_detection_times = [
-            t for t in self._recent_human_detection_times
-            if 0 <= (reference_time - t).total_seconds() <= window
-        ]
-        return len(self._recent_human_detection_times)
+    def _record_human_detection(self, timestamp: datetime) -> None:
+        """Add a HUMAN-status capture time to the store and prune it to the
+        longest window any human-relative check needs."""
+        self._human_events.add(timestamp)
+        self._human_events.prune(
+            self._human_events.latest(),
+            human_events_horizon_seconds(self.config.performance),
+        )
 
     # Divergence is measured after normalising each frame to this contrast, so
     # the >40-level test means "differs by more than 0.8 standard deviations of
@@ -407,6 +345,8 @@ class WildlifeSystem:
         """
         timestamp = datetime.now()
         species_result = None
+        human_proximity_muted = None
+        human_proximity_mute_reason = None
 
         try:
             # Two-stage species identification with performance timing
@@ -445,13 +385,7 @@ class WildlifeSystem:
                 logger.info(f"Identified: {species_result.species_name} "
                             f"(confidence: {species_result.confidence:.2f})")
 
-            # Shadow-mode notification gate (ADR-004): record what the gate WOULD
-            # suppress (no animal found) without changing send behaviour. We still
-            # send everything; this only measures the gate's future FN cost.
             gate_would_suppress = not species_result.animals_detected
-            if gate_would_suppress:
-                logger.info("[GATE-SHADOW] Would suppress (no animal detected) — "
-                            "sending anyway in shadow mode")
 
             # Pull the richer detection metadata for ground-truth analysis.
             detection_count, max_detection_confidence = self._summarize_detection(
@@ -487,263 +421,53 @@ class WildlifeSystem:
                 top_classifier_prediction.get('score') if top_classifier_prediction else None
             )
 
-            # Confident-Blank Mute Gate (exp #29, 2026-09-17): mute a
-            # review-class burst when the classifier's RAW top-1 prediction
-            # is SpeciesNet's fully-generic "blank" (empty frame) label at or
-            # above blank_confidence_mute_threshold. Measured over all 182
-            # review-class rows with a blank raw top-1: the 5 rows ever
-            # human-labelled animal/animal_wrong_id score 0.6431-0.8475
-            # (ceiling 0.8475), while 42 human-confirmed false positives
-            # score median 0.9219, max 0.9825 — the default 0.92 threshold
-            # mutes 52/182 (29%) of blank review-class bursts corpus-wide
-            # with zero animal-labelled and zero person-labelled rows caught.
+            # Per-gate flags, persisted to their own DB columns (the nightly
+            # loop's metrics read them). Routing itself is decided later, in
+            # one place: notification_gate.decide(). See
+            # docs/detection-gates.md for each gate's evidence and levers.
             #
-            # None ("gate didn't apply") when the status isn't review-class
-            # or the threshold is 0.0 (disabled — the rollback lever; a
-            # literal `score >= 0.0` comparison would be the dangerous
-            # direction, so this is special-cased rather than relying on the
-            # comparison alone) — same convention as scene_gate_muted.
-            # Otherwise True/False. Wrapped defensively: any error here must
-            # never block a notification, so it fails open to False (not
-            # muted), never to True.
-            blank_confidence_muted = None
+            # Confident-Blank Mute Gate (exp #29): the classifier's RAW top-1
+            # is the generic blank label at/above
+            # blank_confidence_mute_threshold. None = gate didn't apply (not
+            # review-class, or threshold 0.0 = disabled). Fails open to False.
             try:
-                blank_threshold = self.config.performance.blank_confidence_mute_threshold
-                if blank_threshold > 0.0 and is_review_detection(species_result.status):
-                    blank_confidence_muted = bool(
-                        top_species_raw
-                        and is_blank_label(top_species_raw)
-                        and top_species_score is not None
-                        and top_species_score >= blank_threshold
-                    )
+                blank_confidence_muted = evaluate_blank_confidence(
+                    species_result.status, top_species_raw, top_species_score,
+                    self.config.performance.blank_confidence_mute_threshold,
+                )
             except Exception as e:
                 logger.error(f"Error computing blank-confidence mute gate: {e}")
                 blank_confidence_muted = False
 
-            # Task 4 (scene-unchanged gate). Two separable things happen here:
-            #
-            #   1. `scene_similarity` is MEASURED for every status when the
-            #      gate is enabled (2026-09-04, backlog #17). It is pure
-            #      observability — a number in a DB column, no routing effect.
-            #      Recording it only for review-class rows made the gate's own
-            #      threshold unvalidatable: the FN question is "what does a
-            #      burst containing a real animal score against a recent empty
-            #      reference?", and IDENTIFIED rows are the only large supply
-            #      of animal-containing bursts, so leaving them NULL meant the
-            #      animal bucket could never fill. Frames roll off disk within
-            #      ~300 bursts, so this cannot be reconstructed after the fact.
-            #   2. `scene_gate_muted` — the DECISION — is still evaluated only
-            #      for review-class statuses (no_animal/unclassifiable).
-            #      Everything else (IDENTIFIED/HUMAN/ERROR) leaves it None,
-            #      which is the same "gate never mutes" behaviour as before.
-            #      A mute requires an affirmatively computed similarity >=
-            #      threshold; None never mutes (fail-open).
-            scene_similarity = None
-            scene_gate_muted = None
-            if (self.config.performance.scene_gate_enabled
-                    and self.scene_reference_set is not None):
-                scene_similarity = self.scene_reference_set.best_similarity(image_path, timestamp)
-                if is_review_detection(species_result.status):
-                    scene_gate_muted = (
-                        scene_similarity is not None
-                        and scene_similarity
-                        >= self.config.performance.scene_gate_similarity_threshold
-                    )
-                    # Reference-set update happens after the mute decision
-                    # above, and includes muted bursts — a muted burst IS a
-                    # recently confirmed empty scene, so it's exactly the kind
-                    # of frame future comparisons should be checked against.
-                    # HUMAN and IDENTIFIED/ERROR statuses are measured against
-                    # the reference set but never become references themselves.
-                    self.scene_reference_set.add(image_path, timestamp)
-
-            # Human-proximity mute gate: mute review-class bursts that land
-            # shortly after a HUMAN-status detection (extreme close-up /
-            # motion-blurred partial human bodies can score too low on
-            # MegaDetector's person confidence to trip the Human/Privacy Gate
-            # itself — see PerformanceConfig.human_proximity_window_seconds).
-            # Extended (exp #11, 2026-07-28) with a second, OR-ed "garden is
-            # occupied" density condition: leaks were found OUTSIDE the
-            # look-back window (gaps of 432s/732s) during a long gardening
-            # session, so a burst is also muted when
-            # human_density_count-or-more HUMAN-status detections occurred
-            # in the trailing human_density_window_seconds.
-            #
-            # Widened (exp #26, unnamed-animal-main-leak, 2026-09-14): also
-            # evaluated for IDENTIFIED bursts carrying SpeciesNet's
-            # fully-generic "<uuid>;;;;;;animal" rollup label — an
-            # IDENTIFIED status bypasses every review-class mute path
-            # (blur/scene/sampling/deferral all check is_review_detection),
-            # so two extreme close-ups of a person's clothing/leg reached
-            # MAIN as "animal detected" tonight. Gating this corpus-wide on
-            # this same window-OR-density test mutes exactly the known
-            # human-labelled/confirmed-person rows and zero known animal
-            # false negatives. DB-convention note: `human_proximity_muted`
-            # is therefore now True/False (not always NULL) for some
-            # IDENTIFIED rows too — non-review-class rows where it stays
-            # NULL are simply the ones this widened check didn't apply to
-            # (named-species / no-detection IDENTIFIED bursts).
-            #
-            # Only evaluated for review-class statuses or this unnamed-animal
-            # case, same None-for-everything-else convention as
-            # scene_gate_muted otherwise. Wrapped defensively — any error
-            # here must never block a notification, so it fails open to "not
-            # muted". `human_proximity_mute_reason`
-            # ('window'/'demoted-band window'/'density') is not persisted to
-            # the DB (same human_proximity_muted column as before) — it only
-            # drives which reason the suppression log below reports.
-            #
-            # Demoted-band widening (exp #27, 2026-09-15): the window
-            # condition's look-back is widened to
-            # max(human_proximity_window_seconds, human_demoted_window_seconds)
-            # when THIS burst's own person_confidence clears
-            # human_demoted_person_floor — MegaDetector saw something
-            # person-shaped, just not confidently enough to trip the
-            # Human/Privacy Gate (0.3-0.5). Burst 5305 (person_confidence
-            # 0.436) landed 480s after the last HUMAN detection, past both
-            # the 240s window and the density streak — a plain widening of
-            # either global lever costs a known human-labelled animal FN, but
-            # gating the widening on this burst's own person score does not
-            # (see runs/0019). Fails open to the unwidened window on any
-            # error, a missing/None person_confidence, or
-            # human_demoted_window_seconds == 0.0 (rollback lever).
-            human_proximity_muted = None
-            human_proximity_mute_reason = None
+            # Human-Proximity Mute Gate (window | demoted-band | density, read
+            # from the recent-human store). Evaluated for review-class bursts,
+            # IDENTIFIED bursts carrying SpeciesNet's fully-generic
+            # "<uuid>;;;;;;animal" rollup (exp #26), and ERROR /
+            # ANIMAL_UNCERTAIN bursts (Task 3 fix round 1: a failed-inference
+            # burst 30s after a HUMAN was sent to MAIN as a photo of the
+            # person) — all of these otherwise bypass every human gate.
+            # None = gate didn't apply. Fails open to False.
+            # `human_proximity_mute_reason` is not persisted; it only feeds
+            # the [HUMAN-PROXIMITY] log reason.
             is_unnamed_animal = (
                 not is_review_detection(species_result.status)
                 and not is_human_detection(species_result.status)
                 and is_unnamed_animal_label(species_result.species_name)
             )
-            if is_review_detection(species_result.status) or is_unnamed_animal:
+            if is_human_proximity_scope(species_result.status, is_unnamed_animal):
                 try:
-                    window = self.config.performance.human_proximity_window_seconds
-                    last_human = self._last_human_detection_at
-
-                    demoted_active = False
-                    try:
-                        demoted_floor = self.config.performance.human_demoted_person_floor
-                        demoted_window = self.config.performance.human_demoted_window_seconds
-                        demoted_active = bool(
-                            demoted_window > 0
-                            and person_confidence is not None
-                            and person_confidence >= demoted_floor
+                    human_proximity_muted, human_proximity_mute_reason = (
+                        evaluate_human_proximity(
+                            timestamp, person_confidence, self._human_events,
+                            self.config.performance,
                         )
-                    except Exception:
-                        demoted_active = False  # fail open to the base window
-
-                    effective_window = (
-                        max(window, demoted_window) if demoted_active else window
                     )
-
-                    elapsed = (
-                        (timestamp - last_human).total_seconds()
-                        if last_human is not None else None
-                    )
-                    window_muted = bool(
-                        effective_window > 0
-                        and elapsed is not None
-                        and 0 <= elapsed <= effective_window
-                    )
-                    # Distinguish the reason for diagnosability: only call it
-                    # "demoted-band window" when the widened window is what
-                    # actually caused the mute (i.e. the flat window alone
-                    # would not have).
-                    demoted_band_muted = bool(
-                        window_muted
-                        and demoted_active
-                        and not (0 <= elapsed <= window)
-                    )
-
-                    density_count_threshold = self.config.performance.human_density_count
-                    recent_human_count = self._count_recent_human_detections(timestamp)
-                    density_muted = bool(
-                        density_count_threshold > 0
-                        and recent_human_count >= density_count_threshold
-                    )
-
-                    human_proximity_muted = window_muted or density_muted
-                    if human_proximity_muted:
-                        if window_muted:
-                            human_proximity_mute_reason = (
-                                "demoted-band window" if demoted_band_muted else "window"
-                            )
-                        else:
-                            human_proximity_mute_reason = "density"
                 except Exception as e:
                     logger.error(f"Error computing human-proximity gate: {e}")
                     human_proximity_muted = False
                     human_proximity_mute_reason = None
             elif is_human_detection(species_result.status):
-                # Track the most recent HUMAN-status detection (both the
-                # single timestamp used by the window condition and the
-                # rolling list used by the density condition) so the NEXT
-                # review-class burst can be measured against it.
-                self._last_human_detection_at = timestamp
-                self._recent_human_detection_times.append(timestamp)
-                self._count_recent_human_detections(timestamp)  # prune now, not just at use
-
-            # Animal-Proximity Review Exemption (exp #33,
-            # animal-proximity-review-exemption, 2026-09-20): track the most
-            # recent IDENTIFIED detection naming a real, specific animal (see
-            # utils.is_named_animal_label) so a shortly-following
-            # review-class burst can be exempted from the Review Sampling
-            # Gate below (SpeciesNet sometimes misses a plainly visible
-            # animal on one burst of a multi-burst visit while naming it on
-            # another — see PerformanceConfig.animal_proximity_window_seconds
-            # for the measured 5388/5389 case). Independent of the
-            # human-proximity if/elif chain above — IDENTIFIED is neither
-            # review-class nor HUMAN-status, so this never collides with it.
-            if (species_result.status == DetectionStatus.IDENTIFIED
-                    and is_named_animal_label(species_result.species_name)):
-                self._last_animal_detection_at = timestamp
-
-            # Unnamed-Animal Blank-Raw Mute Gate (exp #32, 2026-09-19).
-            # SpeciesNet's fully-generic "<uuid>;;;;;;animal" rollup routes
-            # to IDENTIFIED, so it fires a MAIN-channel species alert that
-            # bypasses every review-class mute path (Blur/Confident-Blank/
-            # Scene/Sampling/Deferral all test is_review_detection). Exp #26
-            # widened the human-proximity gate to cover the PRIVACY leak of
-            # this shape; the plain false-positive leak was still unhandled,
-            # and bursts 5365 and 5374 on 2026-09-19 were both MAIN "animal
-            # detected" alerts on a demonstrably empty garden.
-            #
-            # The discriminator is the classifier's own raw top-1 over the
-            # crop MegaDetector boxed. When it NAMES an animal the burst is
-            # real (34/34 labelled rows corpus-wide are animals). When it is
-            # SpeciesNet's generic "blank" the two models disagree, and 6 of
-            # 8 labelled rows are false positives. The 2 that are animals
-            # (ids 2212/2213, six minutes apart — one visit, so n=1
-            # independent counter-example) score 0.9722/0.9795, so the mute
-            # fires only BELOW the threshold. This is a carve-out around a
-            # known counter-example, not an independently validated
-            # discriminator: an animal that ever lands in the muted band is
-            # an FN-veto event (lower the threshold, or disable at 0.0).
-            #
-            # Measured at the 0.90 default over the whole observability-era
-            # corpus: mutes 4 false positives (0.0561, 0.0594, 0.5901,
-            # 0.8411), ZERO animal-labelled and ZERO person-labelled rows.
-            #
-            # None ("gate didn't apply") when the burst isn't an
-            # unnamed-animal rollup or the threshold is 0.0 (disabled — the
-            # rollback lever, special-cased rather than relying on a
-            # `score < 0.0` comparison), otherwise True/False. Fails open to
-            # False (never mutes) on any error — same convention as the
-            # Confident-Blank Mute Gate above.
-            unnamed_animal_blank_muted = None
-            try:
-                unnamed_blank_threshold = (
-                    self.config.performance.unnamed_animal_blank_mute_threshold
-                )
-                if unnamed_blank_threshold > 0.0 and is_unnamed_animal:
-                    unnamed_animal_blank_muted = bool(
-                        top_species_raw
-                        and is_blank_label(top_species_raw)
-                        and top_species_score is not None
-                        and top_species_score < unnamed_blank_threshold
-                    )
-            except Exception as e:
-                logger.error(f"Error computing unnamed-animal blank mute gate: {e}")
-                unnamed_animal_blank_muted = False
+                self._record_human_detection(timestamp)
 
             # Log to database (richer Phase-1 fields included)
             detection_id = self.database.log_detection(
@@ -767,59 +491,12 @@ class WildlifeSystem:
                 person_confidence=person_confidence,
                 top_species_raw=top_species_raw,
                 top_species_score=top_species_score,
-                scene_similarity=scene_similarity,
-                scene_gate_muted=scene_gate_muted,
                 human_proximity_muted=human_proximity_muted,
                 blank_confidence_muted=blank_confidence_muted,
-                unnamed_animal_blank_muted=unnamed_animal_blank_muted,
             )
 
             logger.info(f"Detection {detection_id} logged: {species_result.species_name} "
                         f"(total time: {species_result.processing_time:.2f}s, motion: {motion_area} pixels)")
-
-            # Animal-Proximity Review Exemption (exp #33,
-            # animal-proximity-review-exemption, 2026-09-20): a review-class
-            # burst landing shortly after a named-animal IDENTIFIED detection
-            # is exempted from the Review Sampling Gate below ONLY — it does
-            # not touch any earlier-precedence mute gate (Human/Privacy,
-            # Human-Proximity, Blur, Confident-Blank, Scene), all of which
-            # were already computed above this point in process_detection and
-            # are persisted/consumed independently of review_sampled_out;
-            # this can only flip review_sampled_out from True to False, never
-            # override one of those gates' own mute flags. Deliberately not
-            # persisted as a new DB column — a burst's exemption is
-            # reconstructable offline since _review_sample_fraction is
-            # deterministic on detection_id.
-            #
-            # Measured, not guessed (see
-            # PerformanceConfig.animal_proximity_window_seconds): the Review
-            # Sampling Gate is the ONLY mute path that ever suppressed a
-            # review-class burst within 180s of a named-animal IDENTIFIED
-            # burst, corpus-wide; 3 of 6 such sampled-out rows are
-            # human/tier-2-labelled animal (closest gaps 25s), the nearest
-            # false_positive-labelled row sits at 206s.
-            #
-            # Fails open to today's (unexempted) behaviour on any exception,
-            # a None/zero window, or no prior named-animal detection.
-            animal_proximity_exempt = False
-            try:
-                animal_window = self.config.performance.animal_proximity_window_seconds
-                last_animal = self._last_animal_detection_at
-                if (is_review_detection(species_result.status)
-                        and animal_window > 0
-                        and last_animal is not None):
-                    elapsed_animal = (timestamp - last_animal).total_seconds()
-                    animal_proximity_exempt = bool(0 <= elapsed_animal <= animal_window)
-                    if animal_proximity_exempt:
-                        logger.info(
-                            f"[ANIMAL-PROXIMITY] Exempting detection "
-                            f"{detection_id} from the review sampling gate: "
-                            f"{elapsed_animal:.0f}s after last named-animal "
-                            f"detection (window {animal_window:.0f}s)"
-                        )
-            except Exception as e:
-                logger.error(f"Error computing animal-proximity review exemption: {e}")
-                animal_proximity_exempt = False
 
             # REVIEW-channel sampling gate: only a configurable fraction of
             # review-class bursts are actually sent to Telegram (everything
@@ -831,12 +508,9 @@ class WildlifeSystem:
             # persisted via a small follow-up UPDATE instead.
             review_sampled_out = None
             if is_review_detection(species_result.status):
-                if animal_proximity_exempt:
-                    review_sampled_out = False
-                else:
-                    review_sampled_out = is_review_sampled_out(
-                        detection_id, self.config.performance.review_sample_rate
-                    )
+                review_sampled_out = is_review_sampled_out(
+                    detection_id, self.config.performance.review_sample_rate
+                )
                 if detection_id is not None:
                     self.database.update_review_sampled_out(detection_id, review_sampled_out)
 
@@ -853,14 +527,11 @@ class WildlifeSystem:
                 'metadata': species_result.metadata,  # Include classification metadata
                 'detection_id': detection_id,  # For feedback-button callback_data
                 'detection_status': species_result.status,
-                'scene_similarity': scene_similarity,
-                'scene_gate_muted': scene_gate_muted,
                 'review_sampled_out': review_sampled_out,
                 'human_proximity_muted': human_proximity_muted,
                 'human_proximity_mute_reason': human_proximity_mute_reason,
                 'unnamed_animal': is_unnamed_animal,
                 'blank_confidence_muted': blank_confidence_muted,
-                'unnamed_animal_blank_muted': unnamed_animal_blank_muted,
                 'top_species_raw': top_species_raw,
                 'top_species_score': top_species_score,
             }
@@ -874,11 +545,26 @@ class WildlifeSystem:
             # privacy suppression gate still fires downstream — reporting
             # ERROR here would let the human's photo leak to Telegram.
             fallback_reason = f'Processing error: {e}'
+            fail_closed_reason = None
             if species_result is not None and is_human_detection(species_result.status):
                 fallback_status = DetectionStatus.HUMAN
                 fallback_reason = f'Processing error after human detection (fail-closed): {e}'
             else:
                 fallback_status = DetectionStatus.ERROR
+                if species_result is not None:
+                    fail_closed_reason = self._post_classification_fail_closed_reason(
+                        species_result, timestamp, human_proximity_muted
+                    )
+                    if fail_closed_reason:
+                        fail_closed_reason = (
+                            f"processing error after classification: {fail_closed_reason}"
+                        )
+                else:
+                    fail_closed_reason = self._unclassified_fail_closed_reason(timestamp)
+                    if fail_closed_reason:
+                        fail_closed_reason = (
+                            f"species identification failed: {fail_closed_reason}"
+                        )
             # Return fallback result
             return {
                 'species_name': 'Unknown species',
@@ -890,7 +576,52 @@ class WildlifeSystem:
                 'detection_count': 0,
                 'detection_id': None,
                 'detection_status': fallback_status,
+                'fail_closed_reason': fail_closed_reason,
             }, timestamp
+
+    def _post_classification_fail_closed_reason(self, species_result, timestamp: datetime,
+                                                human_proximity_muted) -> Optional[str]:
+        """Why a burst whose processing failed AFTER classification must not
+        be sent as an ERROR photo (review bug MEDIUM-2), or None to keep
+        failing open. Fail closed when a privacy/review gate could have muted
+        it: review-class, the generic unnamed-animal label, a privacy flag
+        already computed True, or a HUMAN detection inside the window/density
+        horizon. A named animal outside any human window still sends. If the
+        human-window check itself errors, fail closed — this path is already
+        an error path and the photo may show a person.
+        """
+        try:
+            status = species_result.status
+            if is_review_detection(status):
+                return f"review-class burst (status={status})"
+            if is_unnamed_animal_label(species_result.species_name):
+                return "unnamed-animal burst"
+            if human_proximity_muted:
+                return "human-proximity mute already decided"
+            metadata = species_result.metadata or {}
+            muted, reason = evaluate_human_proximity(
+                timestamp, metadata.get('person_confidence'),
+                self._human_events, self.config.performance,
+            )
+            if muted:
+                return f"inside human {reason}"
+            return None
+        except Exception as e:
+            return f"privacy check failed ({e})"
+
+    def _unclassified_fail_closed_reason(self, timestamp: datetime) -> Optional[str]:
+        """Fail-closed check when species identification itself raised, so
+        nothing is known about the burst: fail closed only if a HUMAN
+        detection puts it inside the human window or density condition at
+        its capture time; otherwise None (fail open, the ERROR photo is
+        sent as before). If that check itself errors, fail closed."""
+        try:
+            muted, reason = evaluate_human_proximity(
+                timestamp, None, self._human_events, self.config.performance,
+            )
+            return f"inside human {reason}" if muted else None
+        except Exception as e:
+            return f"privacy check failed ({e})"
 
     @staticmethod
     def _summarize_detection(detection_result) -> tuple:
@@ -1260,6 +991,27 @@ class WildlifeSystem:
                 species_result, motion_area, timestamp, temperature
             )
 
+    def _build_gate_context(self, species_result: dict,
+                            sharpness_info: Optional[dict]) -> GateContext:
+        """Collect what notification_gate.decide() reads from the
+        process_detection result dict, the burst's sharpness_info and config."""
+        sharpness_info = sharpness_info or {}
+        return GateContext(
+            status=species_result.get('detection_status'),
+            config=self.config.performance,
+            unnamed_animal=bool(species_result.get('unnamed_animal')),
+            fail_closed_reason=species_result.get('fail_closed_reason'),
+            human_proximity_muted=bool(species_result.get('human_proximity_muted')),
+            human_proximity_reason=species_result.get('human_proximity_mute_reason'),
+            below_sharpness_floor=bool(sharpness_info.get('below_sharpness_floor')),
+            sharpness_score=sharpness_info.get('sharpness_score'),
+            luma=sharpness_info.get('luma'),
+            blank_confidence_muted=bool(species_result.get('blank_confidence_muted')),
+            top_species_raw=species_result.get('top_species_raw'),
+            top_species_score=species_result.get('top_species_score'),
+            review_sampled_out=bool(species_result.get('review_sampled_out')),
+        )
+
     async def _process_and_notify_detection(self, image_path: Path, motion_area: int,
                                              sharpness_info: Optional[dict] = None) -> None:
         """Run species ID + DB logging for a captured burst, then notify
@@ -1283,211 +1035,20 @@ class WildlifeSystem:
         if sharpness_info:
             species_result['sharpness_info'] = sharpness_info
 
-        # Human-privacy gate (Task 2): the detection is already logged to the
-        # DB above (process_detection does that unconditionally); here we
-        # only decide whether to bother building annotations and sending the
-        # Telegram notification. Family members walking through the garden
-        # shouldn't flood the channel.
-        #
-        # Blur gate (Task 4): the sharpness floor used to silently drop the
-        # whole burst (no DB row, no notification) whenever the best frame
-        # was too blurry. process_detection now always logs the burst; here
-        # we only suppress Telegram for blurry bursts where nothing was
-        # found (review-class status), so REVIEW-channel volume doesn't
-        # increase. A blurry animal still alerts — human-gate takes
-        # precedence so a blurry human gets exactly one suppression log.
-        is_human = (self.config.performance.suppress_human_alerts
-                    and is_human_detection(species_result.get('detection_status')))
-        # Human-proximity mute gate: process_detection already computed and
-        # DB-persisted human_proximity_muted for every review-class burst
-        # that reaches here, AND (exp #26, unnamed-animal-main-leak,
-        # 2026-09-14) for IDENTIFIED bursts carrying SpeciesNet's
-        # fully-generic "<uuid>;;;;;;animal" rollup label — that status
-        # otherwise bypasses every review-class mute path below (Blur/
-        # Scene/Sampling all additionally require is_review_detection, so
-        # they can never fire for one of these bursts regardless of this
-        # widening — a muted unnamed-animal burst still gets exactly one
-        # suppression log). Precedence: right after the Human/Privacy Gate,
-        # before Blur/Scene/Sampling — a burst that gate would already
-        # suppress (e.g. HUMAN itself) must not also produce this log.
-        is_human_proximity_review = (
-            not is_human
-            and bool(species_result.get('human_proximity_muted'))
-            and (is_review_detection(species_result.get('detection_status'))
-                 or bool(species_result.get('unnamed_animal')))
-        )
-        # Unnamed-Animal Blank-Raw Mute Gate (exp #32, 2026-09-19):
-        # process_detection already computed and DB-persisted
-        # unnamed_animal_blank_muted — True only for an IDENTIFIED burst
-        # carrying SpeciesNet's fully-generic "<uuid>;;;;;;animal" rollup
-        # whose raw classifier top-1 was "blank" BELOW
-        # unnamed_animal_blank_mute_threshold. This shape is never
-        # review-class, so it can never collide with the Blur/
-        # Confident-Blank/Scene/Sampling gates below (all of which
-        # additionally require is_review_detection); it is placed here,
-        # right after the Human-Proximity gate, so that a burst that gate
-        # already mutes for privacy reasons produces exactly one
-        # suppression log.
-        is_unnamed_animal_blank = (
-            not is_human
-            and not is_human_proximity_review
-            and bool(species_result.get('unnamed_animal_blank_muted'))
-        )
-        # Luma gate (exp #8, sharpness-floor-is-a-brightness-gate): the
-        # sharpness floor is a raw Laplacian-variance statistic that's
-        # confounded by scene brightness — at dusk almost every frame scores
-        # below floor regardless of real blur, so muting on floor alone can
-        # silently drop a real animal the classifier missed. Only mute when
-        # luma is known AND bright enough that below-floor plausibly means
-        # actual blur; unknown/missing luma defaults to NOT muting (FN-safe).
-        best_frame_luma = sharpness_info.get('luma') if sharpness_info else None
-        luma_supports_blur_mute = (
-            best_frame_luma is not None
-            and best_frame_luma >= self.config.performance.blur_mute_min_luma
-        )
-        is_blurry_review = (
-            not is_human
-            and not is_human_proximity_review
-            and not is_unnamed_animal_blank
-            and bool(sharpness_info)
-            and sharpness_info.get('below_sharpness_floor')
-            and is_review_detection(species_result.get('detection_status'))
-            and luma_supports_blur_mute
-        )
-        # Confident-Blank Mute Gate (exp #29, 2026-09-17): process_detection
-        # already computed and DB-persisted blank_confidence_muted for every
-        # review-class burst that reaches here — True when the classifier's
-        # RAW top-1 prediction was SpeciesNet's generic "blank" label at or
-        # above blank_confidence_mute_threshold. The is_review_detection
-        # check here is kept as defense-in-depth (same pattern as the
-        # neighbouring gates), even though process_detection only ever sets
-        # it for review-class statuses. Precedence: human gate first,
-        # human-proximity gate second, blur gate third, THIS gate fourth,
-        # scene gate fifth — a below-floor OR HUMAN OR human-proximity-muted
-        # burst gets exactly one suppression log regardless of what this gate
-        # would have said.
-        is_blank_confidence_review = (
-            not is_human
-            and not is_human_proximity_review
-            and not is_unnamed_animal_blank
-            and not is_blurry_review
-            and bool(species_result.get('blank_confidence_muted'))
-            and is_review_detection(species_result.get('detection_status'))
-        )
-        # Scene-unchanged gate (Task 4): process_detection only ever sets
-        # scene_gate_muted for review-class statuses, but the
-        # is_review_detection check here is kept as defense-in-depth (same
-        # pattern as is_blurry_review above) rather than trusting that
-        # invariant blindly. Precedence: human gate first, human-proximity
-        # gate second, blur gate third, blank-confidence gate fourth, scene
-        # gate fifth — a below-floor OR HUMAN OR human-proximity-muted OR
-        # blank-confidence-muted burst gets exactly one suppression log
-        # regardless of what the scene gate would have said.
-        is_scene_unchanged_review = (
-            not is_human
-            and not is_human_proximity_review
-            and not is_unnamed_animal_blank
-            and not is_blurry_review
-            and not is_blank_confidence_review
-            and bool(species_result.get('scene_gate_muted'))
-            and is_review_detection(species_result.get('detection_status'))
-        )
-        # REVIEW-sampling gate (last in precedence): process_detection
-        # already computed and DB-persisted review_sampled_out for every
-        # review-class burst that reaches here (see the follow-up UPDATE in
-        # process_detection). This is a pure notification-volume lever, not
-        # a quality gate — the burst is still species-ID'd and DB-logged
-        # regardless. It must come last, after
-        # Human/Proximity/Blur/Blank-Confidence/Scene, so a burst that any of
-        # those gates would already suppress still produces exactly ONE
-        # suppression log instead of a second, redundant one.
-        is_sampled_out_review = (
-            not is_human
-            and not is_human_proximity_review
-            and not is_unnamed_animal_blank
-            and not is_blurry_review
-            and not is_blank_confidence_review
-            and not is_scene_unchanged_review
-            and bool(species_result.get('review_sampled_out'))
-            and is_review_detection(species_result.get('detection_status'))
-        )
-        if is_human:
-            logger.info(
-                f"[HUMAN-GATE] Suppressing notification for detection "
-                f"{species_result.get('detection_id')} (status=human)"
+        # Routing: one ordered gate list, first match wins — see
+        # notification_gate.decide() for the precedence. The burst is
+        # already species-ID'd and DB-logged above regardless of outcome.
+        decision = decide(self._build_gate_context(species_result, sharpness_info))
+        if decision.action == Action.MUTE:
+            detection_id = species_result.get('detection_id')
+            # A fail-closed burst has no detection_id (the DB write may
+            # never have happened), so name it by its photo and capture time.
+            burst_ref = (
+                f"detection {detection_id}" if detection_id is not None
+                else f"burst {Path(image_path).name} captured "
+                     f"{timestamp:%Y-%m-%d %H:%M:%S}"
             )
-        elif is_human_proximity_review:
-            mute_reason = species_result.get('human_proximity_mute_reason') or "window"
-            if mute_reason == "density":
-                reason_detail = (
-                    f"reason=density: >= {self.config.performance.human_density_count} "
-                    f"human detections in the last "
-                    f"{self.config.performance.human_density_window_seconds:.0f}s"
-                )
-            elif mute_reason == "demoted-band window":
-                reason_detail = (
-                    f"reason=demoted-band window: within "
-                    f"{max(self.config.performance.human_proximity_window_seconds, self.config.performance.human_demoted_window_seconds):.0f}s "
-                    f"of last human detection (person_confidence >= "
-                    f"{self.config.performance.human_demoted_person_floor})"
-                )
-            else:
-                reason_detail = (
-                    f"reason=window: within "
-                    f"{self.config.performance.human_proximity_window_seconds:.0f}s "
-                    f"of last human detection"
-                )
-            logger.info(
-                f"[HUMAN-PROXIMITY] Suppressing notification for detection "
-                f"{species_result.get('detection_id')} "
-                f"({reason_detail}, no animal found)"
-            )
-        elif is_unnamed_animal_blank:
-            logger.info(
-                f"[UNNAMED-BLANK] Suppressing notification for detection "
-                f"{species_result.get('detection_id')} "
-                f"(generic ';;;;;;animal' rollup, raw_top1="
-                f"{species_result.get('top_species_raw')}, "
-                f"score={species_result.get('top_species_score'):.3f} < "
-                f"threshold="
-                f"{self.config.performance.unnamed_animal_blank_mute_threshold:.3f})"
-            )
-        elif is_blurry_review:
-            logger.info(
-                f"[BLUR] Suppressing notification for detection "
-                f"{species_result.get('detection_id')} "
-                f"(sharpness={sharpness_info.get('sharpness_score'):.1f}, "
-                f"luma={best_frame_luma:.1f}, no animal found)"
-            )
-        elif is_blank_confidence_review:
-            logger.info(
-                f"[BLANK-CONF] Suppressing notification for detection "
-                f"{species_result.get('detection_id')} "
-                f"(raw_top1={species_result.get('top_species_raw')}, "
-                f"score={species_result.get('top_species_score'):.3f} >= "
-                f"threshold={self.config.performance.blank_confidence_mute_threshold:.3f}, "
-                f"no animal found)"
-            )
-        elif is_scene_unchanged_review:
-            logger.info(
-                f"[SCENE-GATE] Suppressing notification for detection "
-                f"{species_result.get('detection_id')} "
-                f"(similarity={species_result.get('scene_similarity'):.3f} >= "
-                f"threshold={self.config.performance.scene_gate_similarity_threshold:.3f}, "
-                f"no animal found)"
-            )
-        elif is_sampled_out_review and self.config.performance.animal_proximity_window_seconds <= 0:
-            # exp #39 (leading-edge-animal-proximity, 2026-09-25): with the
-            # forward half of the animal-proximity gate disabled (0 = the
-            # rollback lever, shared with the backward exemption in
-            # process_detection), a sampled-out burst is dropped immediately
-            # exactly as before this change — byte-for-byte, no task ever
-            # scheduled.
-            logger.info(
-                f"[REVIEW-SAMPLE] Suppressing notification for detection "
-                f"{species_result.get('detection_id')} "
-                f"(sampled out, rate={self.config.performance.review_sample_rate:.3f})"
-            )
+            logger.info(decision.log_line(burst_ref))
         else:
             # Annotated image: combined motion overlay + MegaDetector
             # species box. Sent whenever a detection box exists (default-on);
@@ -1539,54 +1100,15 @@ class WildlifeSystem:
             # box exists (i.e. an actual animal detection), not for FP motion.
             document_path = image_path if species_boxes else None
 
-            # Deferred REVIEW send / cancel-on-human gate (leading-edge fix,
-            # 2026-07-31): only review-class (no_animal/unclassifiable)
-            # bursts that reach this final branch — i.e. survived every
-            # earlier gate above — are eligible. The human-proximity gate
-            # (above) is backward-looking only: it mutes a review-class
-            # burst that lands AFTER a HUMAN-status detection, but can never
-            # catch the LEADING EDGE of a visit (burst 3909, 2026-07-31,
-            # sent to REVIEW 81s BEFORE the first HUMAN burst, with a
-            # recognisable face in its saved frames). Rather than block the
-            # main detection loop, the annotated image is already built
-            # above (synchronously, from self.last_motion_frame /
-            # self.last_motion_result — which mutate on the NEXT loop
-            # iteration) and every value the deferred send needs is now a
-            # plain local variable, safe to hand to a background task.
-            if is_sampled_out_review:
-                # Leading-edge animal-proximity deferral (exp #39,
-                # leading-edge-animal-proximity, 2026-09-25): burst 5448
-                # (07:36:43, a real calico cat at extreme close range,
-                # status=unclassifiable) was dropped by the Review Sampling
-                # Gate; burst 5449, the same cat, was correctly IDENTIFIED
-                # 37s later. The backward Animal-Proximity Review Exemption
-                # above (exp #33) can never catch this — it only exempts a
-                # review-class burst landing AFTER a named-animal detection,
-                # and here the naming happens AFTER the sampled-out burst,
-                # not before it. This is the structural mirror of the
-                # leading-edge human fix already below
-                # (_deferred_review_send's cancel-on-human): rather than an
-                # immediate drop, hand the burst to the SAME deferred-send
-                # machinery with require_animal_proximity=True, so a
-                # same-visit IDENTIFIED burst arriving within
-                # animal_proximity_window_seconds can still recover it.
-                # Reuses the existing animal_proximity_window_seconds knob —
-                # no new config field, no new DB column — and is only
-                # reached at all when that window is > 0 (see the elif
-                # above); a sampled-out burst therefore ALWAYS defers here,
-                # never sends immediately, regardless of review_defer_seconds.
-                # Measured over the full corpus (see
-                # PerformanceConfig.animal_proximity_window_seconds): this
-                # recovers exactly 2 sampled-out rows corpus-wide (one a
-                # confirmed animal, tonight's cat) — it can only ever ADD a
-                # notification, never mute one that would otherwise send.
-                self._schedule_deferred_review_send(
-                    species_result, motion_area, timestamp,
-                    image_path, annotated_path, document_path,
-                    require_animal_proximity=True,
-                )
-            elif (self.config.performance.review_defer_seconds > 0
-                    and is_review_detection(species_result.get('detection_status'))):
+            # DEFER (review-class, review_defer_seconds > 0): the
+            # Human-Proximity gate only looks backward, so it can't catch the
+            # LEADING edge of a human visit (burst 3909 reached REVIEW 81s
+            # before the visit's first HUMAN burst). Hold the send and cancel
+            # it if a HUMAN lands within the defer window. The annotated
+            # image is built above, synchronously, because last_motion_frame
+            # / last_motion_result mutate on the next loop iteration; the
+            # background task only gets plain local values.
+            if decision.action == Action.DEFER:
                 self._schedule_deferred_review_send(
                     species_result, motion_area, timestamp,
                     image_path, annotated_path, document_path
@@ -1607,22 +1129,10 @@ class WildlifeSystem:
     def _schedule_deferred_review_send(self, species_result: dict, motion_area: int,
                                         timestamp: datetime, image_path: Path,
                                         annotated_path: Optional[Path],
-                                        document_path: Optional[Path],
-                                        require_animal_proximity: bool = False) -> None:
+                                        document_path: Optional[Path]) -> None:
         """Fire off a background task that delays a review-class Telegram
         send by `review_defer_seconds`, cancelling it if a HUMAN-status
         detection lands within that window (see `_deferred_review_send`).
-
-        `require_animal_proximity=True` (exp #39, leading-edge-animal-
-        proximity, 2026-09-25) additionally makes the send conditional on a
-        named-animal IDENTIFIED detection landing within
-        `animal_proximity_window_seconds` AFTER this burst — used for
-        review-class bursts the Review Sampling Gate would otherwise have
-        dropped immediately (see the call site in
-        `_process_and_notify_detection`). It is the leading-edge counterpart
-        to the backward-looking Animal-Proximity Review Exemption already
-        computed in `process_detection`. See `_deferred_review_send` for the
-        two-phase sleep/check this implies.
 
         Deliberately NOT awaited here — `_process_and_notify_detection` must
         not block the main detection loop for up to `review_defer_seconds`.
@@ -1635,7 +1145,6 @@ class WildlifeSystem:
             self._deferred_review_send(
                 species_result, motion_area, timestamp,
                 image_path, annotated_path, document_path,
-                require_animal_proximity=require_animal_proximity,
             )
         )
         self._pending_review_tasks.add(task)
@@ -1644,127 +1153,32 @@ class WildlifeSystem:
     async def _deferred_review_send(self, species_result: dict, motion_area: int,
                                      timestamp: datetime, image_path: Path,
                                      annotated_path: Optional[Path],
-                                     document_path: Optional[Path],
-                                     require_animal_proximity: bool = False) -> None:
-        """Sleep, then either cancel or send.
+                                     document_path: Optional[Path]) -> None:
+        """Sleep `review_defer_seconds`, then either cancel or send.
 
-        Two independent phases, both reusing `animal_proximity_window_seconds`
-        (exp #39, leading-edge-animal-proximity, 2026-09-25 — no new config
-        field, no new DB column; `0` remains the single rollback lever that
-        disables BOTH the backward exemption in `process_detection` and this
-        forward half of the gate):
-
-        Phase 1 (only when `require_animal_proximity` is True — this burst
-        was already sampled out by the Review Sampling Gate and had no
-        qualifying animal BEFORE it): sleep `animal_proximity_window_seconds`,
-        then check whether a named-animal IDENTIFIED detection
-        (`self._last_animal_detection_at`) landed strictly within
-        ``(timestamp, timestamp + animal_proximity_window_seconds]`` — the
-        leading-edge mirror of burst 5448/5449 (2026-09-25: a real calico cat
-        sampled out at 07:36:43, correctly named 37s later). If nothing
-        landed, this is the common case: log the same [REVIEW-SAMPLE]
-        suppression the immediate path would have logged, and return without
-        sending — `review_sampled_out` stays True, exactly as if this
-        deferral had never been scheduled. If a named animal did land, log
-        [ANIMAL-DEFER], persist `update_review_sampled_out(id, False)` (same
-        convention as the backward exemption) and fall through to Phase 2
-        with only the REMAINING human-defer budget
-        (`review_defer_seconds` minus the animal-proximity sleep already
-        spent), so the total look-forward for a human never exceeds
-        `review_defer_seconds` measured from the burst's own timestamp.
-
-        Phase 2 (always — whether reached directly, when
-        `require_animal_proximity` is False, or via a successful Phase 1):
-        identical to the original leading-edge human fix (2026-07-31) —
-        cancel the send if a HUMAN-status detection lands within
-        `review_defer_seconds` of the burst
-        (``timestamp < last_human_at <= timestamp + review_defer_seconds``),
-        logging [REVIEW-DEFER] and persisting `update_human_proximity_muted`.
-        A person arriving after the burst still wins even over a recovered
-        animal — privacy precedence is unconditional and untouched by Phase 1.
-
-        FAIL-OPEN DIRECTION IS PHASE-DEPENDENT, unlike the pre-exp-#39
-        version of this function:
-          - An exception during Phase 1, i.e. before the animal decision is
-            made, falls back to SUPPRESS, not send: a sampled-out burst is
-            already a deliberate drop, so a bug in the recovery path must not
-            manufacture notification volume that wouldn't otherwise exist.
-          - Once Phase 1 has said "recover" (or wasn't required at all — the
-            pre-existing behaviour), any later exception (Phase 2's human
-            check, either DB update) falls open to SEND, exactly as this
-            function always has — a bug must never cost a real detection
-            that was already going to send.
-        `asyncio.CancelledError` is a BaseException, not Exception, in both
-        phases — it propagates untouched past every `except Exception` clause
-        below, so a shutdown cancellation (see `run()`'s shutdown path) never
-        triggers a spurious send.
+        Cancel the send if ANY HUMAN-status detection landed in
+        ``(timestamp, timestamp + review_defer_seconds]`` (read from the
+        recent-human store, so a later out-of-window human cannot mask an
+        in-window one — review bug HIGH-1), logging [REVIEW-DEFER] and
+        persisting `update_human_proximity_muted`.
+        Fails open: any exception sends the notification.
+        `asyncio.CancelledError` is a BaseException and propagates untouched
+        past every `except Exception` clause, so a shutdown cancellation
+        (see `run()`'s shutdown path) never triggers a spurious send.
         """
         detection_id = species_result.get('detection_id')
         should_cancel = False
-
-        if require_animal_proximity:
-            animal_window = self.config.performance.animal_proximity_window_seconds
-            try:
-                await asyncio.sleep(animal_window)
-                last_animal = self._last_animal_detection_at
-                recovered = bool(
-                    last_animal is not None
-                    and timestamp < last_animal <= timestamp + timedelta(seconds=animal_window)
-                )
-            except Exception as e:
-                # Fail CLOSED here: this burst was already a deliberate drop
-                # (Review Sampling Gate), and this is the phase that would
-                # turn that drop into a send. A bug here must not manufacture
-                # notification volume that wouldn't otherwise exist.
-                logger.error(
-                    f"Error in deferred animal-proximity check for detection "
-                    f"{detection_id} (suppressing, fail-closed): {e}",
-                    exc_info=True
-                )
-                return
-
-            if not recovered:
-                logger.info(
-                    f"[REVIEW-SAMPLE] Suppressing notification for detection "
-                    f"{detection_id} (sampled out, rate="
-                    f"{self.config.performance.review_sample_rate:.3f}; no "
-                    f"named-animal detection landed within {animal_window:.0f}s)"
-                )
-                return
-
-            gap_seconds = (last_animal - timestamp).total_seconds()
-            logger.info(
-                f"[ANIMAL-DEFER] Recovering sampled-out detection "
-                f"{detection_id}: named-animal detection landed "
-                f"{gap_seconds:.0f}s later (window {animal_window:.0f}s)"
-            )
-            # From here on, failures fall OPEN (send) — same convention as
-            # the rest of this function — the decision to recover this burst
-            # has already been made and logged above.
-            try:
-                if detection_id is not None:
-                    self.database.update_review_sampled_out(detection_id, False)
-            except Exception as e:
-                logger.error(
-                    f"Error persisting animal-proximity recovery for "
-                    f"detection {detection_id} (sending anyway, fail-open): "
-                    f"{e}", exc_info=True
-                )
-            remaining_defer = max(
-                0.0,
-                self.config.performance.review_defer_seconds - animal_window
-            )
-        else:
-            remaining_defer = self.config.performance.review_defer_seconds
+        defer_seconds = self.config.performance.review_defer_seconds
 
         try:
-            await asyncio.sleep(remaining_defer)
+            await asyncio.sleep(defer_seconds)
 
-            last_human = self._last_human_detection_at
-            window = timedelta(seconds=self.config.performance.review_defer_seconds)
-            if last_human is not None and timestamp < last_human <= timestamp + window:
+            human_at = self._human_events.first_after(
+                timestamp, timestamp + timedelta(seconds=defer_seconds)
+            )
+            if human_at is not None:
                 should_cancel = True
-                gap_seconds = (last_human - timestamp).total_seconds()
+                gap_seconds = (human_at - timestamp).total_seconds()
                 logger.info(
                     f"[REVIEW-DEFER] Suppressing notification for detection "
                     f"{detection_id} (human detected {gap_seconds:.0f}s after "

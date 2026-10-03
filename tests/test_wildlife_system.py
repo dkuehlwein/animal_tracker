@@ -27,20 +27,14 @@ def system(monkeypatch, tmp_path):
     monkeypatch.setenv('TELEGRAM_CHAT_ID', 'test_chat')
     monkeypatch.setenv('MOTION_WARMUP_SECONDS', '0')
     monkeypatch.setenv('PERFORMANCE_ENABLE_TIMELAPSE', 'false')
-    # Task 4 scene-gate tests below assume system.scene_reference_set is a
-    # real (non-None) SceneReferenceSet. Force this independently of
-    # PerformanceConfig's production default (Task 5, 2026-07-17, flipped
-    # scene_gate_enabled's default to False) so this fixture's behavior
-    # doesn't drift if that default changes again.
-    monkeypatch.setenv('PERFORMANCE_SCENE_GATE_ENABLED', 'true')
     # REVIEW-sampling gate: default rate (0.25) would nondeterministically
     # (from this fixture's perspective) sample out review-class bursts,
     # since each test gets a fresh DB whose detection_id sequence restarts
     # at 1 — is_review_sampled_out(1, 0.25) is a fixed coin flip, not a
     # per-test-run random one, so it would silently flip pre-existing
-    # blur/scene-gate tests that never asked to exercise sampling. Force
-    # rate=1.0 (never sample out) as this fixture's default, same pattern as
-    # PERFORMANCE_SCENE_GATE_ENABLED above; sampling-gate tests override
+    # blur-gate tests that never asked to exercise sampling. Force
+    # rate=1.0 (never sample out) as this fixture's default; sampling-gate
+    # tests override
     # system.config.performance.review_sample_rate directly per-test.
     monkeypatch.setenv('PERFORMANCE_REVIEW_SAMPLE_RATE', '1.0')
     # Deferred REVIEW send / cancel-on-human gate (2026-07-31 leading-edge
@@ -889,242 +883,6 @@ async def test_blurry_human_suppressed_via_human_gate_single_log(system, tmp_pat
     assert "HUMAN-GATE" in gate_logs[0]
 
 
-@pytest.mark.asyncio
-async def test_scene_unchanged_review_suppresses_notification(system, tmp_path, caplog):
-    """Task 4 (a): a review-class burst whose similarity to a recent
-    reference is >= threshold is muted — no Telegram send, a [SCENE-GATE]
-    log line, and the DB row records scene_gate_muted + the similarity.
-    """
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal()
-    )
-    system.scene_reference_set.best_similarity = MagicMock(return_value=0.99)
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    with caplog.at_level("INFO"):
-        await system._process_and_notify_detection(img, 5000)
-
-    telegram.send_photo_with_caption.assert_not_called()
-    telegram.send_media_group.assert_not_called()
-    telegram.send_detection_notification.assert_not_called()
-    telegram.send_document.assert_not_called()
-    system.cleanup_old_images.assert_called_once()
-    assert any("[SCENE-GATE]" in r.message for r in caplog.records)
-
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
-    assert row is not None
-    assert row['scene_gate_muted'] == 1
-    assert row['scene_similarity'] == pytest.approx(0.99)
-
-
-@pytest.mark.asyncio
-async def test_scene_below_threshold_still_notifies(system, tmp_path):
-    """Task 4 (b): a review-class burst whose similarity is below threshold
-    is not muted by the scene gate — it still notifies (REVIEW-prefixed, as
-    today).
-    """
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal()
-    )
-    system.scene_reference_set.best_similarity = MagicMock(return_value=0.5)
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    await system._process_and_notify_detection(img, 5000)
-
-    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
-    system.cleanup_old_images.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_scene_gate_never_touches_identified_animal(system, tmp_path):
-    """Task 4 (c): an IDENTIFIED animal frame near-identical to a reference
-    still notifies — the scene gate only ever MUTES review-class statuses.
-    Since 2026-09-04 the similarity is still measured (observability, see
-    backlog #17), but it can never turn into a mute here.
-    """
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification(True, boxes=[{'confidence': 0.7}])
-    )
-    system.scene_reference_set.best_similarity = MagicMock(return_value=0.99)
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    await system._process_and_notify_detection(img, 5000)
-
-    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
-    # Measured for observability, but never a mute on a non-review status.
-    system.scene_reference_set.best_similarity.assert_called_once()
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
-    assert row['scene_similarity'] == pytest.approx(0.99)
-    assert row['scene_gate_muted'] is None
-
-
-@pytest.mark.asyncio
-async def test_scene_gate_would_match_human_suppressed_via_human_gate_single_log(system, tmp_path, caplog):
-    """Task 4 (d): a HUMAN burst that would match the scene is suppressed by
-    the human gate, not the scene gate — precedence, single log line, and
-    the scene gate never evaluates a HUMAN status.
-    """
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(return_value=_identification_human())
-    system.scene_reference_set.best_similarity = MagicMock(return_value=0.99)
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    with caplog.at_level("INFO"):
-        await system._process_and_notify_detection(img, 5000)
-
-    telegram.send_photo_with_caption.assert_not_called()
-    telegram.send_media_group.assert_not_called()
-    system.cleanup_old_images.assert_called_once()
-    # Measured (observability) but never muting: the HUMAN gate owns this row.
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
-    assert row['scene_similarity'] == pytest.approx(0.99)
-    assert row['scene_gate_muted'] is None
-
-    gate_logs = [
-        r.message for r in caplog.records
-        if "HUMAN-GATE" in r.message or "[BLUR]" in r.message or "[SCENE-GATE]" in r.message
-    ]
-    assert len(gate_logs) == 1
-    assert "HUMAN-GATE" in gate_logs[0]
-
-
-@pytest.mark.asyncio
-async def test_scene_gate_would_match_blurry_review_blur_wins_single_log(system, tmp_path, caplog):
-    """Task 4 (e): a blurry review-class burst that would also match the
-    scene is suppressed via the blur gate — precedence, single log line.
-    """
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal()
-    )
-    system.scene_reference_set.best_similarity = MagicMock(return_value=0.99)
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    with caplog.at_level("INFO"):
-        await system._process_and_notify_detection(
-            img, 5000, sharpness_info=_below_floor_sharpness_info()
-        )
-
-    telegram.send_photo_with_caption.assert_not_called()
-    telegram.send_media_group.assert_not_called()
-    system.cleanup_old_images.assert_called_once()
-
-    gate_logs = [
-        r.message for r in caplog.records
-        if "HUMAN-GATE" in r.message or "[BLUR]" in r.message or "[SCENE-GATE]" in r.message
-    ]
-    assert len(gate_logs) == 1
-    assert "[BLUR]" in gate_logs[0]
-
-
-@pytest.mark.asyncio
-async def test_scene_gate_no_references_fails_open(system, tmp_path):
-    """Task 4 (f): no references seeded (fresh reference set, nothing added
-    yet) — best_similarity naturally returns None, so the gate never mutes
-    and the review-class burst notifies as it does today.
-    """
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal()
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    await system._process_and_notify_detection(img, 5000)
-
-    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
-    system.cleanup_old_images.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_scene_gate_disabled_via_config_fails_open(system, tmp_path):
-    """Task 4 (g): scene_gate_enabled=False — behavior identical to today
-    even if the (unused) comparator would have matched.
-    """
-    system.config.performance.scene_gate_enabled = False
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal()
-    )
-    system.scene_reference_set.best_similarity = MagicMock(return_value=0.99)
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    await system._process_and_notify_detection(img, 5000)
-
-    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
-    system.scene_reference_set.best_similarity.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_scene_gate_reference_set_update_review_yes_human_no(system, tmp_path):
-    """Task 4 (h): a review-class detection joins the reference set for the
-    next call; a HUMAN detection never does.
-    """
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.scene_reference_set.add = MagicMock()
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal()
-    )
-    await system._process_and_notify_detection(img, 5000)
-    system.scene_reference_set.add.assert_called_once_with(img, ANY)
-
-    system.scene_reference_set.add.reset_mock()
-    system.species_identifier.identify_species = MagicMock(return_value=_identification_human())
-    await system._process_and_notify_detection(img, 5000)
-    system.scene_reference_set.add.assert_not_called()
-
-    # ... and neither does an IDENTIFIED animal, even though its similarity is
-    # now measured for observability (2026-09-04, backlog #17).
-    system.scene_reference_set.add.reset_mock()
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification(True, boxes=[{'confidence': 0.7}])
-    )
-    await system._process_and_notify_detection(img, 5000)
-    system.scene_reference_set.add.assert_not_called()
-
-
 def test_capture_and_select_best_frame_below_floor_returns_path_not_none(system, tmp_path, monkeypatch):
     """Task 4: a below-floor best frame must NOT be silently discarded —
     the burst still yields a usable path + sharpness_info tagged
@@ -1218,8 +976,9 @@ def test_capture_and_select_best_frame_populates_luma(system, tmp_path, monkeypa
 
 # ---------------------------------------------------------------------------
 # REVIEW-sampling gate (wildlife_system._review_sample_fraction /
-# is_review_sampled_out / notification wiring). Precedence: Human > Blur >
-# Scene > Sampling — a notification-volume lever only, the burst is still
+# is_review_sampled_out / notification wiring). Precedence (see
+# notification_gate.decide): Human > Human-Proximity > Blur > Confident-Blank
+# > Sampling — a notification-volume lever only, the burst is still
 # species-ID'd and DB-logged regardless of whether it's sent.
 # ---------------------------------------------------------------------------
 
@@ -1274,11 +1033,6 @@ async def test_review_sampled_out_suppresses_notification(system, tmp_path, capl
     burst gets a DB row (species-ID'd and logged as always) but no Telegram
     send, and a [REVIEW-SAMPLE] log line."""
     system.config.performance.review_sample_rate = 0.0
-    # exp #39 (leading-edge-animal-proximity): disable the forward
-    # animal-proximity deferral so a sampled-out burst is still dropped
-    # immediately here — this test is about the sampling gate in isolation,
-    # not the deferral tested separately below.
-    system.config.performance.animal_proximity_window_seconds = 0.0
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     system.species_identifier.identify_species = MagicMock(
@@ -1298,6 +1052,8 @@ async def test_review_sampled_out_suppresses_notification(system, tmp_path, capl
     telegram.send_document.assert_not_called()
     system.cleanup_old_images.assert_called_once()
     assert any("[REVIEW-SAMPLE]" in r.message for r in caplog.records)
+    # Dropped immediately: no deferred background task is scheduled.
+    assert not system._pending_review_tasks
 
     with sqlite3.connect(system.database.db_path) as conn:
         conn.row_factory = sqlite3.Row
@@ -1395,42 +1151,9 @@ async def test_blur_wins_over_sampling_single_log(system, tmp_path, caplog):
 
 
 @pytest.mark.asyncio
-async def test_scene_gate_wins_over_sampling_single_log(system, tmp_path, caplog):
-    """A scene-gate-muted review-class burst is suppressed via the scene
-    gate, not double-suppressed or mis-attributed to sampling, even at
-    rate=0.0."""
-    system.config.performance.review_sample_rate = 0.0
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal()
-    )
-    system.scene_reference_set.best_similarity = MagicMock(return_value=0.99)
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    with caplog.at_level("INFO"):
-        await system._process_and_notify_detection(img, 5000)
-
-    telegram.send_photo_with_caption.assert_not_called()
-    telegram.send_media_group.assert_not_called()
-    system.cleanup_old_images.assert_called_once()
-
-    gate_logs = [
-        r.message for r in caplog.records
-        if "HUMAN-GATE" in r.message or "[BLUR]" in r.message
-        or "[SCENE-GATE]" in r.message or "[REVIEW-SAMPLE]" in r.message
-    ]
-    assert len(gate_logs) == 1
-    assert "[SCENE-GATE]" in gate_logs[0]
-
-
-@pytest.mark.asyncio
 async def test_sampled_out_flag_ignored_for_non_review_status(system, tmp_path):
     """Defence-in-depth: is_review_detection() gates the sampling branch
-    just like the blur/scene gates above — even if review_sampled_out were
+    just like the blur gate above — even if review_sampled_out were
     somehow True on a non-review-class (e.g. identified) result, it must
     not suppress the notification.
     """
@@ -1450,8 +1173,6 @@ async def test_sampled_out_flag_ignored_for_non_review_status(system, tmp_path):
         'metadata': {},
         'detection_id': 999,
         'detection_status': DetectionStatus.IDENTIFIED,
-        'scene_similarity': None,
-        'scene_gate_muted': False,
         'review_sampled_out': True,  # wrongly set — must be ignored here
     }
     system.process_detection = MagicMock(return_value=(fake_result, datetime.now()))
@@ -1471,7 +1192,7 @@ async def test_sampled_out_flag_ignored_for_non_review_status(system, tmp_path):
 # Human/Privacy Gate itself, so such bursts leak a recognizable person to
 # REVIEW as no_animal. Mute review-class bursts that land within
 # human_proximity_window_seconds of the most recent HUMAN-status detection.
-# Precedence: Human > Human-Proximity > Blur > Scene > Sampling.
+# Precedence: Human > Human-Proximity > Blur > Confident-Blank > Sampling.
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
@@ -1479,7 +1200,7 @@ async def test_human_proximity_mute_within_window(system, tmp_path, caplog):
     """A review-class burst landing shortly after a HUMAN-status detection is
     muted — no Telegram send, a [HUMAN-PROXIMITY] log line, and the DB row
     records human_proximity_muted."""
-    system._last_human_detection_at = datetime.now() - timedelta(seconds=60)
+    system._human_events.add(datetime.now() - timedelta(seconds=60))
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     system.species_identifier.identify_species = MagicMock(
@@ -1511,7 +1232,7 @@ async def test_human_proximity_mute_within_window(system, tmp_path, caplog):
 async def test_human_proximity_no_mute_outside_window(system, tmp_path):
     """A review-class burst well outside the look-back window is not muted —
     it still notifies (REVIEW-prefixed, as today)."""
-    system._last_human_detection_at = datetime.now() - timedelta(seconds=200)
+    system._human_events.add(datetime.now() - timedelta(seconds=200))
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     system.species_identifier.identify_species = MagicMock(
@@ -1538,7 +1259,7 @@ async def test_human_proximity_no_mute_when_window_zero(system, tmp_path):
     """PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS=0 disables the gate (the
     rollback lever) even with a very recent human detection."""
     system.config.performance.human_proximity_window_seconds = 0.0
-    system._last_human_detection_at = datetime.now() - timedelta(seconds=1)
+    system._human_events.add(datetime.now() - timedelta(seconds=1))
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     system.species_identifier.identify_species = MagicMock(
@@ -1558,7 +1279,7 @@ async def test_human_proximity_no_mute_when_window_zero(system, tmp_path):
 async def test_human_proximity_no_mute_without_prior_human(system, tmp_path):
     """No prior HUMAN-status detection recorded (fresh system) — the gate
     never mutes."""
-    assert system._last_human_detection_at is None
+    assert system._human_events.latest() is None
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     system.species_identifier.identify_species = MagicMock(
@@ -1590,7 +1311,7 @@ async def test_human_demoted_band_mutes_at_480s(system, tmp_path, caplog):
     (0.3), so the look-back widens to human_demoted_window_seconds (1800s)
     and a burst 480s after the last HUMAN detection is muted, logged as
     'demoted-band window'."""
-    system._last_human_detection_at = datetime.now() - timedelta(seconds=480)
+    system._human_events.add(datetime.now() - timedelta(seconds=480))
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     system.species_identifier.identify_species = MagicMock(
@@ -1621,7 +1342,7 @@ async def test_human_demoted_band_no_mute_beyond_demoted_window(system, tmp_path
     """Same elevated person_confidence, but 2000s since the last HUMAN
     detection — beyond even the widened 1800s demoted window — is NOT
     muted."""
-    system._last_human_detection_at = datetime.now() - timedelta(seconds=2000)
+    system._human_events.add(datetime.now() - timedelta(seconds=2000))
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     system.species_identifier.identify_species = MagicMock(
@@ -1647,7 +1368,7 @@ async def test_human_demoted_band_no_mute_below_floor(system, tmp_path):
     """person_confidence below human_demoted_person_floor (0.3) does not
     widen the window — 480s since the last HUMAN detection is unchanged
     (not muted), same as today."""
-    system._last_human_detection_at = datetime.now() - timedelta(seconds=480)
+    system._human_events.add(datetime.now() - timedelta(seconds=480))
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     system.species_identifier.identify_species = MagicMock(
@@ -1674,7 +1395,7 @@ async def test_human_demoted_window_zero_restores_flat_window(system, tmp_path):
     disables the widening even with an elevated person_confidence — flat
     240s window behaviour is restored, so 480s is NOT muted."""
     system.config.performance.human_demoted_window_seconds = 0.0
-    system._last_human_detection_at = datetime.now() - timedelta(seconds=480)
+    system._human_events.add(datetime.now() - timedelta(seconds=480))
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     system.species_identifier.identify_species = MagicMock(
@@ -1700,7 +1421,7 @@ async def test_human_demoted_band_person_confidence_none_fails_open(system, tmp_
     """A missing person_confidence (metadata absent, e.g. an error-path
     result) must not raise and must not mute at 480s — same as before this
     change existed."""
-    system._last_human_detection_at = datetime.now() - timedelta(seconds=480)
+    system._human_events.add(datetime.now() - timedelta(seconds=480))
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     result = _identification_no_animal()
@@ -1725,7 +1446,7 @@ def test_human_proximity_muted_none_for_non_review_status(system):
     """process_detection only ever sets human_proximity_muted for review-class
     statuses — an IDENTIFIED animal always persists NULL, even with a very
     recent prior human detection."""
-    system._last_human_detection_at = datetime.now() - timedelta(seconds=1)
+    system._human_events.add(datetime.now() - timedelta(seconds=1))
     system.species_identifier.identify_species = MagicMock(
         return_value=_identification(True, boxes=[{'confidence': 0.7}])
     )
@@ -1739,13 +1460,13 @@ def test_human_proximity_muted_none_for_non_review_status(system):
     assert row['human_proximity_muted'] is None
 
 
-def test_human_status_updates_last_human_detection_at(system):
+def test_human_status_updates_human_events_store(system):
     """Processing a HUMAN-status burst updates the in-memory tracker so the
     NEXT review-class burst (moments later) is measured against it."""
-    assert system._last_human_detection_at is None
+    assert system._human_events.latest() is None
     system.species_identifier.identify_species = MagicMock(return_value=_identification_human())
     _, human_ts = system.process_detection("capture.jpg", 5000, None)
-    assert system._last_human_detection_at == human_ts
+    assert system._human_events.latest() == human_ts
 
     system.species_identifier.identify_species = MagicMock(
         return_value=_identification_no_animal()
@@ -1759,7 +1480,7 @@ async def test_human_wins_over_human_proximity_single_log(system, tmp_path, capl
     """A HUMAN-status burst is suppressed by the human gate itself, not the
     proximity gate — single suppression log (the proximity gate never
     evaluates a non-review-class status)."""
-    system._last_human_detection_at = datetime.now() - timedelta(seconds=10)
+    system._human_events.add(datetime.now() - timedelta(seconds=10))
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     system.species_identifier.identify_species = MagicMock(return_value=_identification_human())
@@ -1790,7 +1511,7 @@ async def test_human_proximity_wins_over_blur_single_log(system, tmp_path, caplo
     """A below-floor review-class burst that also falls inside the
     human-proximity window is suppressed via the proximity gate, not
     double-handled by the blur gate — single suppression log."""
-    system._last_human_detection_at = datetime.now() - timedelta(seconds=60)
+    system._human_events.add(datetime.now() - timedelta(seconds=60))
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     system.species_identifier.identify_species = MagicMock(
@@ -1826,7 +1547,7 @@ async def test_human_proximity_wins_over_sampling_single_log(system, tmp_path, c
     the proximity gate, not double-attributed to sampling, even at
     review_sample_rate=0.0."""
     system.config.performance.review_sample_rate = 0.0
-    system._last_human_detection_at = datetime.now() - timedelta(seconds=60)
+    system._human_events.add(datetime.now() - timedelta(seconds=60))
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     system.species_identifier.identify_species = MagicMock(
@@ -1866,15 +1587,14 @@ async def test_human_proximity_wins_over_sampling_single_log(system, tmp_path, c
 # ---------------------------------------------------------------------------
 
 def _seed_recent_humans(system, count, spacing_seconds=60, end_offset_seconds=500):
-    """Populate system._recent_human_detection_times with `count` timestamps,
+    """Seed system._human_events with `count` timestamps,
     the most recent `end_offset_seconds` in the past (outside the default
     120s window condition), spaced `spacing_seconds` apart before that."""
     now = datetime.now()
     latest = now - timedelta(seconds=end_offset_seconds)
     times = [latest - timedelta(seconds=spacing_seconds * i) for i in range(count)]
     times.reverse()
-    system._recent_human_detection_times = times
-    system._last_human_detection_at = times[-1] if times else None
+    system._human_events.seed(times)
     return times
 
 
@@ -1943,8 +1663,7 @@ async def test_human_density_no_mute_below_threshold(system, tmp_path):
 async def test_window_condition_alone_still_mutes_regression(system, tmp_path, caplog):
     """Regression: the plain window condition (no density streak at all)
     still mutes on its own, reported as 'window' in the log line."""
-    system._last_human_detection_at = datetime.now() - timedelta(seconds=60)
-    system._recent_human_detection_times = [system._last_human_detection_at]
+    system._human_events.add(datetime.now() - timedelta(seconds=60))
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     system.species_identifier.identify_species = MagicMock(
@@ -2013,44 +1732,37 @@ async def test_human_density_count_zero_disables_density_condition(system, tmp_p
     assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
 
 
-def test_human_density_pruning_drops_out_of_window_timestamps(system):
-    """_count_recent_human_detections prunes entries older than
-    human_density_window_seconds relative to the reference time."""
-    system.config.performance.human_density_window_seconds = 1800.0
+def test_human_events_store_pruned_to_horizon_on_record(system):
+    """Recording a HUMAN prunes the store to the longest window any check
+    needs (memory bound only — queries filter by their own interval)."""
+    from notification_gate import human_events_horizon_seconds
+    horizon = human_events_horizon_seconds(system.config.performance)
     now = datetime.now()
-    system._recent_human_detection_times = [
-        now - timedelta(seconds=100),   # inside window
-        now - timedelta(seconds=1000),  # inside window
-        now - timedelta(seconds=2000),  # outside window -> pruned
-    ]
+    system._human_events.seed([
+        now - timedelta(seconds=horizon + 100),  # beyond horizon -> pruned
+        now - timedelta(seconds=1000),
+    ])
 
-    count = system._count_recent_human_detections(now)
+    system._record_human_detection(now)
 
-    assert count == 2
-    assert len(system._recent_human_detection_times) == 2
-    assert all(
-        (now - t).total_seconds() <= 1800.0
-        for t in system._recent_human_detection_times
-    )
+    assert list(system._human_events) == [now - timedelta(seconds=1000), now]
 
 
-def test_human_status_updates_recent_human_detection_times(system):
+def test_human_status_appends_to_human_events_store(system):
     """Processing a HUMAN-status burst appends to the density-condition
     list, not just the single last-human timestamp."""
-    assert system._recent_human_detection_times == []
+    assert list(system._human_events) == []
     system.species_identifier.identify_species = MagicMock(return_value=_identification_human())
     _, human_ts = system.process_detection("capture.jpg", 5000, None)
-    assert system._recent_human_detection_times == [human_ts]
+    assert list(system._human_events) == [human_ts]
 
 
 def test_recent_human_detection_times_seeded_at_startup(monkeypatch, tmp_path):
-    """WildlifeSystem seeds self._recent_human_detection_times from the DB at
-    startup, same pattern as _last_human_detection_at."""
+    """WildlifeSystem seeds its recent-human store from the DB at startup."""
     monkeypatch.setenv('TELEGRAM_BOT_TOKEN', 'test_token')
     monkeypatch.setenv('TELEGRAM_CHAT_ID', 'test_chat')
     monkeypatch.setenv('MOTION_WARMUP_SECONDS', '0')
     monkeypatch.setenv('PERFORMANCE_ENABLE_TIMELAPSE', 'false')
-    monkeypatch.setenv('PERFORMANCE_SCENE_GATE_ENABLED', 'true')
     monkeypatch.setenv('PERFORMANCE_REVIEW_SAMPLE_RATE', '1.0')
     for mod in ('wildlife_system', 'config'):
         sys.modules.pop(mod, None)
@@ -2061,9 +1773,6 @@ def test_recent_human_detection_times_seeded_at_startup(monkeypatch, tmp_path):
     seeded_times = [datetime.now() - timedelta(seconds=30)]
 
     class _FakeDB:
-        def get_last_human_detection_time(self):
-            return seeded_times[0]
-
         def get_recent_human_detection_times(self, since):
             return list(seeded_times)
 
@@ -2075,7 +1784,7 @@ def test_recent_human_detection_times_seeded_at_startup(monkeypatch, tmp_path):
 
     sys_obj = WildlifeSystem()
 
-    assert sys_obj._recent_human_detection_times == seeded_times
+    assert list(sys_obj._human_events) == seeded_times
 
 
 def test_recent_human_detection_times_seeding_db_error_fails_open(monkeypatch):
@@ -2086,7 +1795,6 @@ def test_recent_human_detection_times_seeding_db_error_fails_open(monkeypatch):
     monkeypatch.setenv('TELEGRAM_CHAT_ID', 'test_chat')
     monkeypatch.setenv('MOTION_WARMUP_SECONDS', '0')
     monkeypatch.setenv('PERFORMANCE_ENABLE_TIMELAPSE', 'false')
-    monkeypatch.setenv('PERFORMANCE_SCENE_GATE_ENABLED', 'true')
     monkeypatch.setenv('PERFORMANCE_REVIEW_SAMPLE_RATE', '1.0')
     for mod in ('wildlife_system', 'config'):
         sys.modules.pop(mod, None)
@@ -2094,9 +1802,6 @@ def test_recent_human_detection_times_seeding_db_error_fails_open(monkeypatch):
     from wildlife_system import WildlifeSystem
 
     class _FakeDB:
-        def get_last_human_detection_time(self):
-            return None
-
         def get_recent_human_detection_times(self, since):
             raise RuntimeError("db is on fire")
 
@@ -2106,7 +1811,7 @@ def test_recent_human_detection_times_seeding_db_error_fails_open(monkeypatch):
 
     sys_obj = WildlifeSystem()
 
-    assert sys_obj._recent_human_detection_times == []
+    assert list(sys_obj._human_events) == []
 
 
 @pytest.mark.asyncio
@@ -2175,7 +1880,7 @@ def _spy_process_detection(system):
     """Wrap system.process_detection so the real pipeline still runs (DB
     write, status, detection_id) but the exact full-precision timestamp it
     returns is captured. The deferred-send tests below need to place
-    _last_human_detection_at a few milliseconds relative to the burst's own
+    a HUMAN timestamp a few milliseconds relative to the burst's own
     timestamp — the DB's stored timestamp only has whole-second resolution
     (see database_manager.log_detection), which isn't precise enough to do
     that race-free, so we capture the in-memory datetime object directly
@@ -2273,7 +1978,7 @@ async def test_review_defer_cancels_when_human_lands_in_window(system, tmp_path,
     # A HUMAN-status detection lands 1ms after this burst — comfortably
     # inside the 10ms defer window configured above, regardless of how long
     # the real asyncio.sleep(0.01) below actually takes wall-clock-wise.
-    system._last_human_detection_at = captured['timestamp'] + timedelta(milliseconds=1)
+    system._human_events.add(captured['timestamp'] + timedelta(milliseconds=1))
 
     task = next(iter(system._pending_review_tasks))
     with caplog.at_level("INFO"):
@@ -2357,7 +2062,7 @@ async def test_review_defer_fail_open_on_internal_error(system, tmp_path, caplog
     assert len(system._pending_review_tasks) == 1
 
     # Human lands inside the window (would normally cancel the send)...
-    system._last_human_detection_at = captured['timestamp'] + timedelta(milliseconds=1)
+    system._human_events.add(captured['timestamp'] + timedelta(milliseconds=1))
     # ...but persisting that decision is broken.
     system.database.update_human_proximity_muted = MagicMock(
         side_effect=RuntimeError("db is on fire")
@@ -2686,7 +2391,7 @@ async def test_unnamed_animal_muted_within_human_proximity_window(system, tmp_pa
     human-proximity gate: no Telegram send, a [HUMAN-PROXIMITY] log line,
     and the DB row records human_proximity_muted=1 even though its status
     is 'identified', not review-class."""
-    system._last_human_detection_at = datetime.now() - timedelta(seconds=60)
+    system._human_events.add(datetime.now() - timedelta(seconds=60))
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     system.species_identifier.identify_species = MagicMock(
@@ -2728,7 +2433,7 @@ async def test_unnamed_animal_not_muted_without_recent_human(system, tmp_path):
     """The same generic '<uuid>;;;;;;animal' burst, with no recent
     HUMAN-status detection, still notifies as before and DB-records
     human_proximity_muted=0 (evaluated-but-not-muted), not NULL."""
-    assert system._last_human_detection_at is None
+    assert system._human_events.latest() is None
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     system.species_identifier.identify_species = MagicMock(
@@ -2757,7 +2462,7 @@ async def test_named_species_unaffected_by_unnamed_animal_widening(system, tmp_p
     generic unnamed-animal rollup label, never to a real identification.
     human_proximity_muted stays NULL (not evaluated at all), same as any
     other non-review-class, non-unnamed-animal status."""
-    system._last_human_detection_at = datetime.now() - timedelta(seconds=60)
+    system._human_events.add(datetime.now() - timedelta(seconds=60))
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     system.species_identifier.identify_species = MagicMock(
@@ -2784,7 +2489,7 @@ async def test_named_species_unaffected_by_unnamed_animal_widening(system, tmp_p
 # when the classifier's RAW top-1 prediction is SpeciesNet's fully-generic
 # "blank" label at or above blank_confidence_mute_threshold (default 0.92).
 # Precedence: Human/Privacy > Human-Proximity > Blur > Confident-Blank >
-# Scene > Review Sampling > Deferred Send.
+# Review Sampling > Deferred Send.
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
@@ -3009,47 +2714,6 @@ async def test_blur_wins_over_blank_confidence_single_log(system, tmp_path, capl
 
 
 @pytest.mark.asyncio
-async def test_blank_confidence_wins_over_scene_gate_single_log(system, tmp_path, caplog):
-    """A blank-confident review-class burst that would ALSO match the scene
-    reference is suppressed via the blank-confidence gate only — exactly one
-    suppression log, [BLANK-CONF], not [SCENE-GATE]."""
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal_with_top1("uuid;;;;;;blank", 0.99)
-    )
-    system.scene_reference_set.best_similarity = MagicMock(return_value=0.99)
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    with caplog.at_level("INFO"):
-        await system._process_and_notify_detection(img, 5000)
-
-    telegram.send_photo_with_caption.assert_not_called()
-    telegram.send_media_group.assert_not_called()
-
-    gate_logs = [
-        r.message for r in caplog.records
-        if "HUMAN-GATE" in r.message or "[HUMAN-PROXIMITY]" in r.message
-        or "[BLUR]" in r.message or "[BLANK-CONF]" in r.message
-        or "[SCENE-GATE]" in r.message or "[REVIEW-SAMPLE]" in r.message
-    ]
-    assert len(gate_logs) == 1
-    assert "[BLANK-CONF]" in gate_logs[0]
-
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
-    # process_detection computes scene_gate_muted independently of the
-    # blank-confidence gate (same as it does for the blur gate) — it may
-    # legitimately also be True here. What matters is precedence in the
-    # notification layer, asserted above via the single [BLANK-CONF] log.
-    assert row['blank_confidence_muted'] == 1
-
-
-@pytest.mark.asyncio
 async def test_blank_confidence_wins_over_sampling_single_log(system, tmp_path, caplog):
     """A blank-confident review-class burst is suppressed via the
     blank-confidence gate, not double-suppressed or mis-attributed to
@@ -3114,15 +2778,10 @@ async def test_human_wins_over_blank_confidence_single_log(system, tmp_path, cap
     assert "HUMAN-GATE" in gate_logs[0]
 
 
-# ---------------------------------------------------------------------------
-# Unnamed-Animal Blank-Raw Mute Gate (exp #32, 2026-09-19): an IDENTIFIED
-# burst carrying SpeciesNet's fully-generic "<uuid>;;;;;;animal" rollup fires
-# a MAIN-channel species alert that bypasses every review-class mute path.
-# When the classifier's RAW top-1 over the crop is "blank" BELOW
-# unnamed_animal_blank_mute_threshold (default 0.90) the two models disagree
-# and the classifier isn't even confident the crop is empty — mute it.
-# Precedence: Human/Privacy > Human-Proximity > Unnamed-Animal-Blank > Blur >
-# Confident-Blank > Scene > Review Sampling > Deferred Send.
+# Retired Unnamed-Animal Blank-Raw Mute Gate (exp #32, removed 2026-10-03):
+# regression checks that its column stays NULL and no [UNNAMED-BLANK] log
+# is ever produced; the Human-Proximity gate still owns unnamed-animal
+# bursts near a human.
 # ---------------------------------------------------------------------------
 
 def _unnamed_animal_with_top1(label, score, confidence=0.58):
@@ -3130,135 +2789,6 @@ def _unnamed_animal_with_top1(label, score, confidence=0.58):
     result = _identification_unnamed_animal(confidence=confidence)
     result.metadata = {'top_classifier_prediction': {'label': label, 'score': score}}
     return result
-
-
-@pytest.mark.asyncio
-async def test_unnamed_animal_blank_below_threshold_suppresses_notification(
-    system, tmp_path, caplog
-):
-    """Burst 5374's shape: generic ';;;;;;animal' rollup with a low-confidence
-    blank raw top-1. No Telegram send, one [UNNAMED-BLANK] log, DB records
-    unnamed_animal_blank_muted."""
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_unnamed_animal_with_top1("f1856211;;;;;;blank", 0.0561)
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    with caplog.at_level("INFO"):
-        await system._process_and_notify_detection(img, 5000)
-
-    telegram.send_photo_with_caption.assert_not_called()
-    telegram.send_media_group.assert_not_called()
-    telegram.send_detection_notification.assert_not_called()
-    telegram.send_document.assert_not_called()
-    assert sum("[UNNAMED-BLANK]" in r.message for r in caplog.records) == 1
-
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
-    assert row['unnamed_animal_blank_muted'] == 1
-    assert row['top_species_raw'] == "f1856211;;;;;;blank"
-
-
-@pytest.mark.asyncio
-async def test_unnamed_animal_blank_at_threshold_still_notifies(system, tmp_path):
-    """The gate mutes strictly BELOW the threshold — a score exactly at it
-    must still alert (the known animal counter-example sits above)."""
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_unnamed_animal_with_top1("uuid;;;;;;blank", 0.90)
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    await system._process_and_notify_detection(img, 5000)
-
-    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
-    assert row['unnamed_animal_blank_muted'] == 0
-
-
-@pytest.mark.asyncio
-async def test_unnamed_animal_high_confidence_blank_still_notifies(system, tmp_path):
-    """The n=1 animal counter-example (ids 2212/2213, blank @ 0.9722): a
-    high-confidence blank raw top-1 on this shape is NOT muted."""
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_unnamed_animal_with_top1("uuid;;;;;;blank", 0.9722)
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    await system._process_and_notify_detection(img, 5000)
-
-    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
-    assert row['unnamed_animal_blank_muted'] == 0
-
-
-@pytest.mark.asyncio
-async def test_unnamed_animal_named_raw_top1_never_muted(system, tmp_path):
-    """34/34 labelled rows whose raw top-1 NAMES an animal are real animals —
-    a named raw top-1 must never be muted, however low its score."""
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_unnamed_animal_with_top1(
-            "87fdd451;aves;passeriformes;corvidae;corvus;brachyrhynchos;american crow",
-            0.2306,
-        )
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    await system._process_and_notify_detection(img, 5000)
-
-    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
-    assert row['unnamed_animal_blank_muted'] == 0
-
-
-@pytest.mark.asyncio
-async def test_unnamed_animal_blank_threshold_zero_disables_gate(system, tmp_path):
-    """0.0 DISABLES the gate (rollback lever) — it does not mean 'mute
-    nothing by comparison': the column stays NULL ('gate didn't apply')."""
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.config.performance.unnamed_animal_blank_mute_threshold = 0.0
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_unnamed_animal_with_top1("uuid;;;;;;blank", 0.05)
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    await system._process_and_notify_detection(img, 5000)
-
-    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
-    assert row['unnamed_animal_blank_muted'] is None
 
 
 @pytest.mark.asyncio
@@ -3291,7 +2821,7 @@ async def test_human_proximity_wins_over_unnamed_animal_blank_single_log(
     mutes produces exactly one suppression log ([HUMAN-PROXIMITY])."""
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
-    system._last_human_detection_at = datetime.now()
+    system._human_events.add(datetime.now())
     system.species_identifier.identify_species = MagicMock(
         return_value=_unnamed_animal_with_top1("uuid;;;;;;blank", 0.05)
     )
@@ -3309,178 +2839,16 @@ async def test_human_proximity_wins_over_unnamed_animal_blank_single_log(
     assert not any("[UNNAMED-BLANK]" in r.message for r in caplog.records)
 
 
+# Retired Animal-Proximity Review Exemption (exp #33/#39, removed
+# 2026-10-03): regression checks that nothing of it survives — no
+# [ANIMAL-PROXIMITY] log, and a privacy mute is never overridden.
 # ---------------------------------------------------------------------------
-# Animal-Proximity Review Exemption (exp #33, animal-proximity-review-
-# exemption, 2026-09-20): a review-class (NO_ANIMAL/UNCLASSIFIABLE) burst
-# landing within animal_proximity_window_seconds after the most recent
-# named-animal IDENTIFIED detection is exempted from the Review Sampling
-# Gate ONLY — it always sends as a REVIEW message instead of being sampled
-# out. Every earlier-precedence mute gate (Human/Privacy, Human-Proximity,
-# Blur, Confident-Blank, Scene) is unaffected.
-# ---------------------------------------------------------------------------
-
-def _identification_blank_species():
-    """An IDENTIFIED result whose species_name is a populated blank verdict
-    (uuid;;;;;;blank) — status stays IDENTIFIED (distinct from
-    _identification_no_animal's NO_ANIMAL status), used to verify a blank
-    label never anchors the Animal-Proximity Review Exemption even if it
-    somehow reaches IDENTIFIED status."""
-    from data_models import IdentificationResult, DetectionResult
-    det = DetectionResult(
-        animals_detected=True,
-        detection_count=1,
-        bounding_boxes=[{'confidence': 0.4, 'category': '1'}],
-        detections=[],
-        processing_time=0.1,
-    )
-    return IdentificationResult(
-        species_name="uuid;;;;;;blank",
-        confidence=0.4,
-        api_success=True,
-        processing_time=0.5,
-        detection_result=det,
-        animals_detected=True,
-    )
-
-
-@pytest.mark.asyncio
-async def test_animal_proximity_exempt_within_window_sends_review(system, tmp_path, caplog):
-    """A review-class burst landing shortly after a named-animal IDENTIFIED
-    detection is exempted from the Review Sampling Gate — it sends as a
-    REVIEW message even at review_sample_rate=0.0 (which would otherwise
-    sample out every review-class burst), and review_sampled_out is
-    persisted as False."""
-    system.config.performance.review_sample_rate = 0.0
-    system._last_animal_detection_at = datetime.now() - timedelta(seconds=25)
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal()
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    with caplog.at_level("INFO"):
-        await system._process_and_notify_detection(img, 5000)
-
-    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
-    assert any("[ANIMAL-PROXIMITY]" in r.message for r in caplog.records)
-    assert not any("[REVIEW-SAMPLE]" in r.message for r in caplog.records)
-
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
-    assert row['review_sampled_out'] == 0
-
-
-@pytest.mark.asyncio
-async def test_animal_proximity_no_exempt_outside_window(system, tmp_path, caplog):
-    """A review-class burst well outside the animal-proximity window is not
-    exempted by the backward exemption in process_detection — it is sampled
-    out at review_sample_rate=0.0. Since exp #39 (leading-edge-animal-
-    proximity), a sampled-out burst is no longer dropped immediately but
-    handed to the forward deferral instead (animal_proximity_window_seconds
-    shrunk to 0.01 here purely so the test doesn't block on a real 180s
-    sleep); with no animal landing AFTER it either, the deferred task ends up
-    logging the same [REVIEW-SAMPLE] suppression the immediate path used to,
-    and review_sampled_out stays True — the end state this test asserts is
-    unchanged, only the path to it is now asynchronous."""
-    system.config.performance.review_sample_rate = 0.0
-    system.config.performance.animal_proximity_window_seconds = 0.01
-    system._last_animal_detection_at = datetime.now() - timedelta(seconds=200)
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal()
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    with caplog.at_level("INFO"):
-        await system._process_and_notify_detection(img, 5000)
-        assert not any("[REVIEW-SAMPLE]" in r.message for r in caplog.records)
-        assert len(system._pending_review_tasks) == 1
-        task = next(iter(system._pending_review_tasks))
-        await task
-
-    telegram.send_photo_with_caption.assert_not_called()
-    telegram.send_media_group.assert_not_called()
-    assert any("[REVIEW-SAMPLE]" in r.message for r in caplog.records)
-    assert not any("[ANIMAL-PROXIMITY]" in r.message for r in caplog.records)
-    assert not any("[ANIMAL-DEFER]" in r.message for r in caplog.records)
-
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
-    assert row['review_sampled_out'] == 1
-
-
-@pytest.mark.asyncio
-async def test_animal_proximity_zero_window_disables_exemption(system, tmp_path, caplog):
-    """PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS=0 disables the exemption
-    (the rollback lever) even with a very recent named-animal anchor."""
-    system.config.performance.review_sample_rate = 0.0
-    system.config.performance.animal_proximity_window_seconds = 0.0
-    system._last_animal_detection_at = datetime.now() - timedelta(seconds=1)
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal()
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    with caplog.at_level("INFO"):
-        await system._process_and_notify_detection(img, 5000)
-
-    telegram.send_photo_with_caption.assert_not_called()
-    telegram.send_media_group.assert_not_called()
-    assert not any("[ANIMAL-PROXIMITY]" in r.message for r in caplog.records)
-
-
-@pytest.mark.asyncio
-async def test_animal_proximity_no_exempt_without_prior_animal(system, tmp_path, caplog):
-    """No prior named-animal IDENTIFIED detection recorded (fresh system) —
-    the exemption never fires. Shrinks animal_proximity_window_seconds so the
-    exp #39 forward deferral this now falls into (review_sample_rate=0.0 with
-    no exemption) doesn't leave a ~180s background task sleeping past the end
-    of this test."""
-    assert system._last_animal_detection_at is None
-    system.config.performance.review_sample_rate = 0.0
-    system.config.performance.animal_proximity_window_seconds = 0.01
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal()
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    with caplog.at_level("INFO"):
-        await system._process_and_notify_detection(img, 5000)
-        assert len(system._pending_review_tasks) == 1
-        task = next(iter(system._pending_review_tasks))
-        await task
-
-    telegram.send_photo_with_caption.assert_not_called()
-    telegram.send_media_group.assert_not_called()
-    assert not any("[ANIMAL-PROXIMITY]" in r.message for r in caplog.records)
-
 
 def test_animal_proximity_exemption_does_not_apply_to_non_review_status(system, caplog):
     """The exemption only ever touches review_sampled_out for review-class
     statuses — an IDENTIFIED unnamed-animal burst is untouched (no
     [ANIMAL-PROXIMITY] log, review_sampled_out stays NULL) even with a very
     recent prior named-animal detection."""
-    system._last_animal_detection_at = datetime.now() - timedelta(seconds=5)
     system.species_identifier.identify_species = MagicMock(
         return_value=_identification_unnamed_animal()
     )
@@ -3494,51 +2862,6 @@ def test_animal_proximity_exemption_does_not_apply_to_non_review_status(system, 
 
 
 @pytest.mark.asyncio
-async def test_animal_proximity_exemption_does_not_override_blur_gate(system, tmp_path, caplog):
-    """A below-floor review-class burst is suppressed by the blur gate even
-    when it also qualifies for the animal-proximity exemption (recent
-    named-animal anchor) — the exemption can only flip review_sampled_out,
-    never bypass an earlier-precedence gate. Single suppression log."""
-    system.config.performance.review_sample_rate = 0.0
-    system._last_animal_detection_at = datetime.now() - timedelta(seconds=30)
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal()
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    with caplog.at_level("INFO"):
-        await system._process_and_notify_detection(
-            img, 5000, sharpness_info=_below_floor_sharpness_info()
-        )
-
-    telegram.send_photo_with_caption.assert_not_called()
-    telegram.send_media_group.assert_not_called()
-
-    gate_logs = [
-        r.message for r in caplog.records
-        if "HUMAN-GATE" in r.message or "[HUMAN-PROXIMITY]" in r.message
-        or "[BLUR]" in r.message or "[BLANK-CONF]" in r.message
-        or "[SCENE-GATE]" in r.message or "[REVIEW-SAMPLE]" in r.message
-    ]
-    assert len(gate_logs) == 1
-    assert "[BLUR]" in gate_logs[0]
-
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
-    # The exemption still flips review_sampled_out (it only ever touches
-    # that one flag) but the blur gate's own independent flag is what
-    # actually suppressed the send — confirming precedence held.
-    assert row['review_sampled_out'] == 0
-    assert row['below_sharpness_floor'] == 1
-
-
-@pytest.mark.asyncio
 async def test_animal_proximity_exemption_does_not_override_human_proximity_gate(
     system, tmp_path, caplog
 ):
@@ -3547,8 +2870,7 @@ async def test_animal_proximity_exemption_does_not_override_human_proximity_gate
     the human-proximity gate — the exemption never overrides a privacy
     mute."""
     system.config.performance.review_sample_rate = 0.0
-    system._last_human_detection_at = datetime.now() - timedelta(seconds=60)
-    system._last_animal_detection_at = datetime.now() - timedelta(seconds=30)
+    system._human_events.add(datetime.now() - timedelta(seconds=60))
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     system.species_identifier.identify_species = MagicMock(
@@ -3575,256 +2897,17 @@ async def test_animal_proximity_exemption_does_not_override_human_proximity_gate
     assert "[HUMAN-PROXIMITY]" in gate_logs[0]
 
 
-def test_named_species_updates_last_animal_detection_at(system):
-    """Processing a named-species IDENTIFIED burst updates the in-memory
-    tracker so the NEXT review-class burst (moments later) can be measured
-    against it."""
-    assert system._last_animal_detection_at is None
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_named_species()
-    )
-    _, ts = system.process_detection("capture.jpg", 5000, None)
-    assert system._last_animal_detection_at == ts
-
-
-def test_unnamed_animal_does_not_update_last_animal_detection_at(system):
-    """The generic '<uuid>;;;;;;animal' rollup is IDENTIFIED-status but not a
-    NAMED animal — must not anchor the exemption window."""
-    assert system._last_animal_detection_at is None
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_unnamed_animal()
-    )
-    system.process_detection("capture.jpg", 5000, None)
-    assert system._last_animal_detection_at is None
-
-
-def test_blank_species_does_not_update_last_animal_detection_at(system):
-    """A populated blank verdict ('uuid;;;;;;blank') must not anchor the
-    exemption window even if it somehow reaches IDENTIFIED status."""
-    assert system._last_animal_detection_at is None
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_blank_species()
-    )
-    system.process_detection("capture.jpg", 5000, None)
-    assert system._last_animal_detection_at is None
-
-
-def test_human_status_does_not_update_last_animal_detection_at(system):
-    """A HUMAN-status detection must never anchor the exemption window,
-    however confidently 'Homo sapiens' is named — status isn't IDENTIFIED at
-    all, so the check short-circuits before the label is even inspected."""
-    assert system._last_animal_detection_at is None
-    system.species_identifier.identify_species = MagicMock(return_value=_identification_human())
-    system.process_detection("capture.jpg", 5000, None)
-    assert system._last_animal_detection_at is None
-
-
-# ---------------------------------------------------------------------------
-# Leading-edge Animal-Proximity Deferral (exp #39, leading-edge-animal-
-# proximity, 2026-09-25): the backward Animal-Proximity Review Exemption
-# above (exp #33) can only exempt a review-class burst landing AFTER a
-# named-animal IDENTIFIED detection. Burst 5448 (07:36:43, a real calico cat
-# at extreme close range, status=unclassifiable) was dropped by the Review
-# Sampling Gate; burst 5449, the same cat, was correctly IDENTIFIED 37s
-# later — the naming happened AFTER the sampled-out burst, exactly the case
-# the backward exemption structurally cannot catch. A sampled-out
-# review-class burst is now handed to the SAME deferred-send machinery the
-# human leading-edge fix (exp #11) uses (`_deferred_review_send`), with
-# `require_animal_proximity=True`: it sleeps animal_proximity_window_seconds,
-# then only sends if a named-animal IDENTIFIED detection landed within that
-# window afterward. Reuses the existing knob — no new config field, no new
-# DB column; `0` disables both halves (this forward deferral and the exp #33
-# backward exemption) at once, the single rollback lever.
+# Ordinary deferred review send (the retired exp #39 two-phase deferral is
+# gone; a review burst that survives every gate takes the single-phase
+# cancel-on-human path).
 # ---------------------------------------------------------------------------
 
-@pytest.mark.asyncio
-async def test_animal_proximity_deferral_recovers_sampled_out_burst(system, tmp_path, caplog):
-    """A sampled-out review-class burst is recovered when a named-animal
-    IDENTIFIED detection lands within animal_proximity_window_seconds
-    afterward — the leading-edge mirror of burst 5448/5449 (tonight's cat).
-    The notification is sent, [ANIMAL-DEFER] is logged, and
-    update_review_sampled_out(id, False) is called exactly once so the DB
-    row matches what actually happened (same convention exp #33 uses for its
-    own, backward-looking exemption)."""
-    system.config.performance.review_sample_rate = 0.0
-    system.config.performance.animal_proximity_window_seconds = 0.01
-    captured = _spy_process_detection(system)
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal()
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-    update_spy = MagicMock(side_effect=system.database.update_review_sampled_out)
-    system.database.update_review_sampled_out = update_spy
-
-    with caplog.at_level("INFO"):
-        await system._process_and_notify_detection(img, 5000)
-        assert len(system._pending_review_tasks) == 1
-
-        # process_detection's own follow-up UPDATE already recorded the
-        # initial sampled-out=True write above (see the "Observability
-        # columns" bullet's review_sampled_out description) — reset the spy
-        # so the assertion below isolates the call the DEFERRED recovery
-        # itself makes, not that unrelated earlier one.
-        update_spy.reset_mock()
-
-        # A named-animal IDENTIFIED detection lands 1ms after this burst —
-        # comfortably inside the 10ms animal-proximity window configured
-        # above, regardless of how long the real asyncio.sleep(0.01) below
-        # actually takes wall-clock-wise (same pattern as the human deferral
-        # tests earlier in this file).
-        system._last_animal_detection_at = captured['timestamp'] + timedelta(milliseconds=1)
-
-        task = next(iter(system._pending_review_tasks))
-        await task
-
-    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
-    assert any("[ANIMAL-DEFER]" in r.message for r in caplog.records)
-    assert not any("[REVIEW-SAMPLE]" in r.message for r in caplog.records)
-    update_spy.assert_called_once_with(captured['detection_id'], False)
-
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            "SELECT * FROM detections WHERE id = ?", (captured['detection_id'],)
-        ).fetchone()
-    assert row['review_sampled_out'] == 0
-
 
 @pytest.mark.asyncio
-async def test_animal_proximity_deferral_no_recovery_stays_suppressed(system, tmp_path, caplog):
-    """No named-animal IDENTIFIED detection lands within the window — the
-    deferred task ends up suppressing the notification exactly like the
-    immediate REVIEW-SAMPLE drop used to, and never calls
-    update_review_sampled_out (the DB row stays sampled_out=True, matching
-    what process_detection already wrote — this is the common case, and it
-    must stay silent on Telegram)."""
-    system.config.performance.review_sample_rate = 0.0
-    system.config.performance.animal_proximity_window_seconds = 0.01
-    captured = _spy_process_detection(system)
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal()
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-    update_spy = MagicMock(side_effect=system.database.update_review_sampled_out)
-    system.database.update_review_sampled_out = update_spy
-
-    with caplog.at_level("INFO"):
-        await system._process_and_notify_detection(img, 5000)
-        assert len(system._pending_review_tasks) == 1
-        # Isolate the deferred task's own behaviour from process_detection's
-        # unrelated initial sampled-out=True write, same as the recovery
-        # test above.
-        update_spy.reset_mock()
-        task = next(iter(system._pending_review_tasks))
-        await task
-
-    telegram.send_photo_with_caption.assert_not_called()
-    telegram.send_media_group.assert_not_called()
-    assert any("[REVIEW-SAMPLE]" in r.message for r in caplog.records)
-    assert not any("[ANIMAL-DEFER]" in r.message for r in caplog.records)
-    update_spy.assert_not_called()
-
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute(
-            "SELECT * FROM detections WHERE id = ?", (captured['detection_id'],)
-        ).fetchone()
-    assert row['review_sampled_out'] == 1
-
-
-@pytest.mark.asyncio
-async def test_animal_proximity_deferral_disabled_immediate_drop(system, tmp_path, caplog):
-    """animal_proximity_window_seconds == 0 (the rollback lever, shared with
-    the exp #33 backward exemption) preserves pre-exp-#39 behaviour exactly:
-    a sampled-out burst is dropped immediately with a [REVIEW-SAMPLE] log, no
-    background task is ever scheduled."""
-    system.config.performance.review_sample_rate = 0.0
-    system.config.performance.animal_proximity_window_seconds = 0.0
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal()
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    with caplog.at_level("INFO"):
-        await system._process_and_notify_detection(img, 5000)
-
-    telegram.send_photo_with_caption.assert_not_called()
-    telegram.send_media_group.assert_not_called()
-    assert any("[REVIEW-SAMPLE]" in r.message for r in caplog.records)
-    assert len(system._pending_review_tasks) == 0
-
-
-@pytest.mark.asyncio
-async def test_animal_proximity_deferral_still_cancelled_by_human(system, tmp_path, caplog):
-    """Privacy precedence is preserved even for a recovered burst: a named
-    animal lands within the animal-proximity window, recovering the burst
-    (Phase 1), but a HUMAN-status detection then lands within the FULL
-    review_defer_seconds window measured from the burst's own timestamp
-    (Phase 2, unchanged) — the send is still cancelled, human_proximity_muted
-    is persisted True, and nothing reaches Telegram. A person arriving after
-    the burst wins even over a recovered animal."""
-    system.config.performance.review_sample_rate = 0.0
-    system.config.performance.animal_proximity_window_seconds = 0.01
-    system.config.performance.review_defer_seconds = 0.03
-    captured = _spy_process_detection(system)
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal()
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-    human_spy = MagicMock(side_effect=system.database.update_human_proximity_muted)
-    system.database.update_human_proximity_muted = human_spy
-
-    with caplog.at_level("INFO"):
-        await system._process_and_notify_detection(img, 5000)
-        assert len(system._pending_review_tasks) == 1
-
-        # Both land immediately after scheduling, before the task's own
-        # sleeps run their course — same pattern as the deferral tests
-        # above. The animal lands well inside the 10ms animal-proximity
-        # window (Phase 1); the human lands inside the FULL 30ms
-        # review_defer_seconds window measured from the burst's own
-        # timestamp (Phase 2's unchanged check), i.e. still inside the
-        # ~20ms remaining after Phase 1 recovers and consumes its 10ms.
-        system._last_animal_detection_at = captured['timestamp'] + timedelta(milliseconds=1)
-        system._last_human_detection_at = captured['timestamp'] + timedelta(milliseconds=20)
-
-        task = next(iter(system._pending_review_tasks))
-        await task
-
-    telegram.send_photo_with_caption.assert_not_called()
-    telegram.send_media_group.assert_not_called()
-    assert any("[ANIMAL-DEFER]" in r.message for r in caplog.records)
-    assert any("[REVIEW-DEFER]" in r.message for r in caplog.records)
-    human_spy.assert_called_once_with(captured['detection_id'], True)
-
-
-@pytest.mark.asyncio
-async def test_ordinary_review_burst_unaffected_by_animal_proximity_deferral(system, tmp_path):
+async def test_ordinary_review_burst_deferred_then_sent(system, tmp_path):
     """A review-class burst that was NOT sampled out (review_sample_rate=1.0,
-    the fixture default) takes the ordinary review_defer_seconds path
-    unchanged by exp #39: require_animal_proximity is False for it, so
-    Phase 1 never runs and the send proceeds exactly as it did before this
-    change."""
+    the fixture default) is deferred for review_defer_seconds and then sent
+    when no HUMAN lands in the window."""
     system.config.performance.review_sample_rate = 1.0
     system.config.performance.review_defer_seconds = 0.01
     img = tmp_path / "photo.jpg"
@@ -3843,3 +2926,427 @@ async def test_ordinary_review_burst_unaffected_by_animal_proximity_deferral(sys
     await task
 
     assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+
+
+# ---------------------------------------------------------------------------
+# Notification-gate precedence golden test (Task 3, 2026-10-03): enumerates
+# every relevant combination of status x per-gate flags x config levers,
+# drives each through the real `_process_and_notify_detection` (with
+# process_detection stubbed to return that combination), and asserts the
+# routing outcome matches `_golden_expected_outcome` — a literal transcription
+# of the post-Task-2 precedence:
+#   HUMAN-GATE > HUMAN-PROXIMITY > BLUR > BLANK-CONF > REVIEW-SAMPLE
+#   > (review-class & defer>0 -> DEFER) > SEND
+# This test was written and passing against the old inline flag-recombination
+# chains BEFORE they were replaced by notification_gate.decide(), so it pins
+# that decide() reproduces the previous precedence exactly.
+# ---------------------------------------------------------------------------
+
+import itertools as _itertools
+
+_GOLDEN_STATUSES = (
+    'human', 'no_animal', 'unclassifiable', 'identified', 'animal_uncertain', 'error',
+)
+# (below_sharpness_floor, luma) — luma None = unknown, 30 = dark, 80 = bright
+_GOLDEN_BLUR = ((False, 80.0), (True, None), (True, 30.0), (True, 80.0))
+_GOLDEN_TAGS = (
+    "[HUMAN-GATE]", "[HUMAN-PROXIMITY]", "[BLUR]", "[BLANK-CONF]",
+    "[REVIEW-SAMPLE]", "[REVIEW-DEFER]", "[FAIL-CLOSED]",
+)
+
+
+def _golden_combos():
+    return _itertools.product(
+        _GOLDEN_STATUSES,
+        (True, False),          # suppress_human_alerts
+        (False, True),          # unnamed_animal
+        (False, True),          # human_proximity_muted
+        _GOLDEN_BLUR,
+        (False, True),          # blank_confidence_muted
+        (False, True),          # review_sampled_out
+        (0.0, 240.0),           # review_defer_seconds
+    )
+
+
+def _golden_expected_outcome(status, suppress, unnamed, prox, blur, blank, sampled, defer,
+                             min_luma=70.0):
+    review = status in ('no_animal', 'unclassifiable')
+    below_floor, luma = blur
+    if suppress and status == 'human':
+        return ('MUTE', '[HUMAN-GATE]')
+    # Scope widened deliberately in Task 3 fix round 1: ERROR and
+    # ANIMAL_UNCERTAIN bursts are also covered by Human-Proximity.
+    if prox and (review or unnamed or status in ('error', 'animal_uncertain')):
+        return ('MUTE', '[HUMAN-PROXIMITY]')
+    if review and below_floor and luma is not None and luma >= min_luma:
+        return ('MUTE', '[BLUR]')
+    if review and blank:
+        return ('MUTE', '[BLANK-CONF]')
+    if review and sampled:
+        return ('MUTE', '[REVIEW-SAMPLE]')
+    if review and defer > 0:
+        return ('DEFER', None)
+    return ('SEND', None)
+
+
+@pytest.mark.asyncio
+async def test_golden_notification_precedence(system, tmp_path, caplog):
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.cleanup_old_images = MagicMock()
+    system.system_monitor = MagicMock()
+    system.send_notification = AsyncMock()
+    system._schedule_deferred_review_send = MagicMock()
+    min_luma = system.config.performance.blur_mute_min_luma
+
+    mismatches = []
+    n = 0
+    for combo in _golden_combos():
+        status, suppress, unnamed, prox, blur, blank, sampled, defer = combo
+        below_floor, luma = blur
+        system.config.performance.suppress_human_alerts = suppress
+        system.config.performance.review_defer_seconds = defer
+        fake_result = {
+            'species_name': 'x', 'confidence': 0.5, 'api_success': True,
+            'processing_time': 0.1, 'fallback_reason': None,
+            'animals_detected': False, 'detection_count': 0,
+            'detection_result': None, 'metadata': {},
+            'detection_id': 42, 'detection_status': status,
+            'unnamed_animal': unnamed,
+            'human_proximity_muted': prox,
+            'human_proximity_mute_reason': 'window' if prox else None,
+            'blank_confidence_muted': blank,
+            'top_species_raw': 'uuid;;;;;;blank', 'top_species_score': 0.95,
+            'review_sampled_out': sampled,
+        }
+        sharpness_info = {
+            'sharpness_score': 5.0 if below_floor else 25.0,
+            'below_sharpness_floor': below_floor,
+            'all_frame_paths': [],
+        }
+        if luma is not None:
+            sharpness_info['luma'] = luma
+        system.process_detection = MagicMock(return_value=(fake_result, datetime.now()))
+        system.send_notification.reset_mock()
+        system._schedule_deferred_review_send.reset_mock()
+        caplog.clear()
+        with caplog.at_level("INFO"):
+            await system._process_and_notify_detection(img, 10, sharpness_info=sharpness_info)
+
+        tags = [t for r in caplog.records for t in _GOLDEN_TAGS if t in r.message]
+        sent = system.send_notification.await_count
+        deferred = system._schedule_deferred_review_send.call_count
+        if sent == 1 and deferred == 0 and not tags:
+            actual = ('SEND', None)
+        elif deferred == 1 and sent == 0 and not tags:
+            actual = ('DEFER', None)
+        elif sent == 0 and deferred == 0 and len(tags) == 1:
+            actual = ('MUTE', tags[0])
+        else:
+            actual = ('BROKEN', (sent, deferred, tags))
+        expected = _golden_expected_outcome(*combo, min_luma=min_luma)
+        if actual != expected:
+            mismatches.append((combo, expected, actual))
+        n += 1
+
+    assert n == 1536
+    assert not mismatches, mismatches[:10]
+
+
+# ---------------------------------------------------------------------------
+# Review bug HIGH-1 (Task 3): the deferred cancel-on-human check used to read
+# only the single most-recent HUMAN timestamp. A human landing inside the
+# defer window, followed by a second human AFTER the window but before the
+# deferred task woke, overwrote that value — the check then saw only the
+# out-of-window one and SENT the leading-edge burst. The check must ask
+# "did ANY human land in (t, t + review_defer_seconds]".
+# ---------------------------------------------------------------------------
+
+class _FakeClock:
+    """Patches wildlife_system.datetime so process_detection's capture-time
+    timestamp is test-controlled."""
+
+    def __init__(self, monkeypatch, start):
+        import wildlife_system
+        clock = self
+
+        class _Dt(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return clock.t
+
+        self.t = start
+        monkeypatch.setattr(wildlife_system, 'datetime', _Dt)
+
+
+@pytest.mark.asyncio
+async def test_review_defer_cancels_when_later_human_overwrites_in_window_human(
+    system, tmp_path, monkeypatch, caplog
+):
+    import wildlife_system
+
+    t0 = datetime(2026, 10, 3, 12, 0, 0)
+    clock = _FakeClock(monkeypatch, t0)
+    system.config.performance.review_defer_seconds = 240.0
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+
+    # The deferred task's sleep blocks until the test releases it.
+    release = asyncio.Event()
+    real_sleep = asyncio.sleep
+
+    async def _gated_sleep(delay, *a, **kw):
+        if delay == 240.0:
+            await release.wait()
+        else:
+            await real_sleep(delay, *a, **kw)
+
+    monkeypatch.setattr(wildlife_system.asyncio, 'sleep', _gated_sleep)
+
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_no_animal()
+    )
+    await system._process_and_notify_detection(img, 5000)
+    assert len(system._pending_review_tasks) == 1
+
+    # Human at t+60 (inside the window), then another at t+250 (outside),
+    # both before the deferred task wakes.
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_human()
+    )
+    clock.t = t0 + timedelta(seconds=60)
+    system.process_detection(img, 5000, None)
+    clock.t = t0 + timedelta(seconds=250)
+    system.process_detection(img, 5000, None)
+
+    release.set()
+    task = next(iter(system._pending_review_tasks))
+    with caplog.at_level("INFO"):
+        await task
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    assert any("[REVIEW-DEFER]" in r.message for r in caplog.records)
+
+
+# ---------------------------------------------------------------------------
+# Review bug MEDIUM-2 (Task 3): an exception after classification (e.g. the
+# DB write failing) used to fall back to an ERROR-status photo SEND for every
+# non-HUMAN burst — leaking review-class / unnamed-animal / human-window
+# bursts that the gates would have muted. Fail closed for those; keep
+# failing open for a named animal outside any human window.
+# ---------------------------------------------------------------------------
+
+def _gate_log_lines(caplog):
+    return [r.message for r in caplog.records
+            if any(t in r.message for t in _GOLDEN_TAGS)]
+
+
+async def _run_with_db_failure(system, tmp_path, identification, caplog):
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(return_value=identification)
+    system.database.log_detection = MagicMock(side_effect=Exception("disk full"))
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+    return telegram
+
+
+@pytest.mark.asyncio
+async def test_post_classification_error_fails_closed_for_review_class(
+    system, tmp_path, caplog
+):
+    telegram = await _run_with_db_failure(
+        system, tmp_path, _identification_no_animal(), caplog
+    )
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    assert not system._pending_review_tasks
+    assert len(_gate_log_lines(caplog)) == 1
+
+
+@pytest.mark.asyncio
+async def test_post_classification_error_fails_closed_for_unnamed_animal(
+    system, tmp_path, caplog
+):
+    telegram = await _run_with_db_failure(
+        system, tmp_path, _identification_unnamed_animal(), caplog
+    )
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    assert len(_gate_log_lines(caplog)) == 1
+
+
+@pytest.mark.asyncio
+async def test_post_classification_error_fails_closed_inside_human_window(
+    system, tmp_path, caplog
+):
+    """Even a named animal fails closed when a human was seen moments ago."""
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_human()
+    )
+    system.process_detection(img, 5000, None)  # records a HUMAN just now
+
+    telegram = await _run_with_db_failure(
+        system, tmp_path, _identification_named_species(), caplog
+    )
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    assert len(_gate_log_lines(caplog)) == 1
+
+
+@pytest.mark.asyncio
+async def test_post_classification_error_still_fails_open_for_named_animal(
+    system, tmp_path, caplog
+):
+    telegram = await _run_with_db_failure(
+        system, tmp_path, _identification_named_species(), caplog
+    )
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    assert _gate_log_lines(caplog) == []
+
+
+@pytest.mark.asyncio
+async def test_identify_species_error_fails_closed_inside_human_window(
+    system, tmp_path, caplog
+):
+    """identify_species itself raising (no classification at all) inside a
+    human window must not send the ERROR photo — one [FAIL-CLOSED] line that
+    names the burst instead of 'detection None'."""
+    img = tmp_path / "capture_20261003_120000_frame1.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_human()
+    )
+    system.process_detection(img, 5000, None)  # records a HUMAN just now
+
+    system.species_identifier.identify_species = MagicMock(
+        side_effect=Exception("model crashed")
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    lines = _gate_log_lines(caplog)
+    assert len(lines) == 1 and "[FAIL-CLOSED]" in lines[0]
+    assert img.name in lines[0]
+    assert "detection None" not in lines[0]
+
+
+@pytest.mark.asyncio
+async def test_identify_species_error_outside_human_window_still_sends(
+    system, tmp_path, caplog
+):
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    system.species_identifier.identify_species = MagicMock(
+        side_effect=Exception("model crashed")
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    assert _gate_log_lines(caplog) == []
+
+
+@pytest.mark.asyncio
+async def test_fail_closed_log_names_the_burst_after_db_error(system, tmp_path, caplog):
+    await _run_with_db_failure(system, tmp_path, _identification_no_animal(), caplog)
+    lines = _gate_log_lines(caplog)
+    assert len(lines) == 1 and "photo.jpg" in lines[0]
+    assert "detection None" not in lines[0]
+
+
+# ---------------------------------------------------------------------------
+# Task 3 fix round 1: ERROR and ANIMAL_UNCERTAIN results returned normally by
+# identify_species (it catches inference failures internally) bypassed every
+# human gate — a failed-inference burst 30s after a HUMAN burst was sent to
+# MAIN as a "Species ID failed" photo of the person. The Human-Proximity
+# gate's scope now includes both statuses.
+# ---------------------------------------------------------------------------
+
+def _identification_with_status(status):
+    from data_models import IdentificationResult, DetectionResult
+    det = DetectionResult(
+        animals_detected=status == 'animal_uncertain',
+        detection_count=1 if status == 'animal_uncertain' else 0,
+        bounding_boxes=[{'confidence': 0.6, 'category': '1'}]
+        if status == 'animal_uncertain' else [],
+        detections=[],
+        processing_time=0.1,
+    )
+    return IdentificationResult(
+        species_name="uuid;mammalia;carnivora;canidae;vulpes;vulpes;red fox"
+        if status == 'animal_uncertain' else "Unknown species",
+        confidence=0.3 if status == 'animal_uncertain' else 0.0,
+        api_success=status != 'error',
+        processing_time=0.5,
+        detection_result=det,
+        animals_detected=status == 'animal_uncertain',
+        status=status,
+        fallback_reason="inference failed" if status == 'error' else None,
+    )
+
+
+async def _run_status_burst(system, tmp_path, status, caplog, human_seconds_ago):
+    img = tmp_path / "photo.jpg"
+    img.write_bytes(b"fake")
+    if human_seconds_ago is not None:
+        system._human_events.add(datetime.now() - timedelta(seconds=human_seconds_ago))
+    system.species_identifier.identify_species = MagicMock(
+        return_value=_identification_with_status(status)
+    )
+    telegram = _mock_telegram(system)
+    system.system_monitor = MagicMock()
+    system.system_monitor.get_cpu_temperature.return_value = 20.0
+    system.cleanup_old_images = MagicMock()
+    with caplog.at_level("INFO"):
+        await system._process_and_notify_detection(img, 5000)
+    with sqlite3.connect(system.database.db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
+    return telegram, row
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["error", "animal_uncertain"])
+async def test_status_burst_after_human_is_muted_by_human_proximity(
+    system, tmp_path, caplog, status
+):
+    telegram, row = await _run_status_burst(system, tmp_path, status, caplog, 30)
+    telegram.send_photo_with_caption.assert_not_called()
+    telegram.send_media_group.assert_not_called()
+    lines = _gate_log_lines(caplog)
+    assert len(lines) == 1 and "[HUMAN-PROXIMITY]" in lines[0]
+    assert row['detection_status'] == status
+    assert row['human_proximity_muted'] == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["error", "animal_uncertain"])
+async def test_status_burst_without_nearby_human_still_sends(
+    system, tmp_path, caplog, status
+):
+    telegram, row = await _run_status_burst(system, tmp_path, status, caplog, None)
+    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
+    assert _gate_log_lines(caplog) == []
+    assert row['human_proximity_muted'] == 0

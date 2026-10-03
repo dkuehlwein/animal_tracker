@@ -1,9 +1,9 @@
 ---
 id: 33
 slug: animal-proximity-review-exemption
-status: running
+status: retired
+outcome: "RETIRED 2026-10-03 (human-led prune) - Animal-Proximity Review Exemption backward half removed; DB columns kept."
 validation: live   # code change, commit ea652bc; replayed over the full corpus before shipping
-occupies_active_slot: false  # notification-routing fix on an FN leak path, same shape as exp #26/#29/#32; exp #21 keeps the slot
 hypothesis: "When SpeciesNet has just named a real animal, a review-class burst arriving seconds later is far more likely to be the same animal than a fresh false positive — so the Review Sampling Gate, which is blind to that context, should not be allowed to discard it."
 created: 2026-09-20
 promoted_from: "night of 2026-09-20: burst 5389, a blackbird clearly visible in-frame 25s after the same bird was correctly identified in 5388, came back unclassifiable and was sampled out — it never reached Telegram in any form. Second measured instance of backlog #31's FN class."

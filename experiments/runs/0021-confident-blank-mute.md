@@ -1,9 +1,9 @@
 ---
 id: 29
 slug: confident-blank-mute
-status: running
+status: concluded
+outcome: "KEPT - gate/mechanism still live after the 2026-10-03 prune; closed with no further observation duty."
 validation: live   # code change; replayed against the shipped predicate over the full corpus before deploy
-occupies_active_slot: false  # mechanism repair in the scene-gate family (backlog #17); exp #21 keeps the slot
 hypothesis: "The Scene-Unchanged Gate asks 'do these pixels look like a recently-confirmed empty scene?' and that question does not separate animals from empty gardens. The classifier already answers a better one — 'is this frame blank?' — and its confidence in that answer does separate. Mute review-class bursts whose raw top-1 is SpeciesNet's generic blank verdict at high confidence."
 created: 2026-09-17
 promoted_from: "night of 2026-09-17: 21 of 23 triggers were wind in the bamboo, the scene gate muted zero of them, and measuring why produced both halves of this finding."

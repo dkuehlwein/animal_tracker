@@ -1,9 +1,9 @@
 ---
 id: 38
 slug: person-rows-dilute-fp-rate
-status: running
+status: concluded
+outcome: "KEPT - gate/mechanism still live after the 2026-10-03 prune; closed with no further observation duty."
 validation: live   # code change, commit 568746d; recomputed over the full corpus before shipping
-occupies_active_slot: false  # tick-side measurement plumbing, touches no live gate; exp #33 keeps the slot
 hypothesis: "A person-labelled trigger is neither a false alarm nor a wildlife detection, so counting it as a denominator success in fp_rate makes a person-heavy night print a flattering false-alarm rate that a later tick can misread as an FP win."
 created: 2026-09-24
 promoted_from: "night of 2026-09-23: 29 of 32 triggers person-labelled, fp_rate printed 0.094 — the lowest value in the whole of metrics/daily.csv — while every one of the 3 non-person triggers was a false positive. Filed as backlog #38 that night and deliberately not changed then (one change per tick)."

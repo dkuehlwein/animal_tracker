@@ -31,12 +31,6 @@ BOUNDS: dict[str, tuple[float, float]] = {
     # makes the phantom-HUMAN class larger — and capped at 0.7 so the loop can
     # never gut the privacy gate.
     "SPECIES_HUMAN_DETECTION_CONFIDENCE": (0.3, 0.7),
-    "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD": (0.80, 1.0),
-    # Boolean flag, not a range — present only so loop.deploy is allowed to
-    # flip it (deploy rejects keys not in BOUNDS). No config field_validator
-    # consumes this entry; booleans don't range-check. See Task 6 /
-    # experiments/PROTOCOL.md "Scene-gate ownership".
-    "PERFORMANCE_SCENE_GATE_ENABLED": (0, 1),
     "PERFORMANCE_BLUR_MUTE_MIN_LUMA": (0.0, 255.0),
     # REVIEW-channel sampling gate: fraction of surviving review-class
     # bursts actually sent to Telegram. 1.0 = send everything (rollback
@@ -111,25 +105,6 @@ BOUNDS: dict[str, tuple[float, float]] = {
     # measured animal ceiling — the config-level field_validator still allows
     # 0.0 so a human can disable the gate by hand (the rollback lever).
     "PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD": (0.87, 1.0),
-    # Unnamed-Animal Blank-Raw Mute Gate (exp #32, 2026-09-19): mutes an
-    # IDENTIFIED burst carrying SpeciesNet's fully-generic ";;;;;;animal"
-    # rollup when the classifier's raw top-1 over the crop is "blank" BELOW
-    # this score — the two models disagree AND the classifier is not even
-    # confident the crop is empty. This gate mutes BELOW the threshold, so
-    # unlike every other threshold here the FN-safe direction is DOWN and
-    # the dangerous bound is the UPPER one. The single known animal-labelled
-    # counter-example scores 0.9722, so the upper bound is deliberately
-    # 0.9522 = 0.9722 - 0.02 (the protocol's safety-margin rule, mirrored):
-    # the autonomous loop can never deploy a threshold that would have muted
-    # it. The config-level field_validator still allows 0.0 so a human can
-    # disable the gate by hand (the rollback lever).
-    "PERFORMANCE_UNNAMED_ANIMAL_BLANK_MUTE_THRESHOLD": (0.0, 0.9522),
-    # Animal-Proximity Review Exemption (exp #33, 2026-09-20): a review-class
-    # burst within this many seconds of the most recent named-animal
-    # IDENTIFIED detection is exempted from the Review Sampling Gate only
-    # (see config.py's field comment for the measured 5388/5389 case and the
-    # corpus-wide 180s/206s margin). 0.0 = disabled (rollback lever).
-    "PERFORMANCE_ANIMAL_PROXIMITY_WINDOW_SECONDS": (0.0, 600.0),
 }
 
 FEEDBACK_STARVED_DAYS = 3

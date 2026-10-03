@@ -389,7 +389,7 @@ class SpeciesIdentifier:
         # is reported as an IDENTIFIED species — a MAIN-channel alert on a
         # frame the model itself called empty. Route it to NO_ANIMAL, the same
         # review-class status an empty scene gets anywhere else, so the REVIEW
-        # prefix and the human/blur/scene/sampling mute stack all apply (an
+        # prefix and the human/blur/blank-confidence/sampling mute stack all apply (an
         # IDENTIFIED burst bypasses every one of those gates).
         if self._is_blank_prediction(final_species):
             logger.info(

@@ -1,7 +1,8 @@
 ---
 id: 9
 slug: human-gate-raw-classifier-leak
-status: running          # proposed | running | concluded | rolled_back | parked
+status: concluded
+outcome: "KEPT - gate/mechanism still live after the 2026-10-03 prune; closed with no further observation duty."
 validation: live         # code change, restart-gated; monitoring live post-restart
 hypothesis: "The human/privacy gate misses a class of person captures: SpeciesNet's ensemble can roll a confident homo-sapiens RAW classifier top-1 up into a generic label (';;;;;;animal', 'unclassifiable', blank) carrying NO 'homo' segment, while the MegaDetector person box sits below human_detection_confidence (0.30). Both existing gate paths then miss it and the person's photo escapes suppression — reaching MAIN when the generic ensemble label still notifies (id 1988, 07-13) or REVIEW when it is review-class (id 2548, 07-21). Fix: also fire DetectionStatus.HUMAN when the RAW classifier top-1 contains a 'homo' taxonomy segment AND the ensemble did not confidently ID a specific animal (so a real animal ID is never overridden)."
 created: 2026-07-21

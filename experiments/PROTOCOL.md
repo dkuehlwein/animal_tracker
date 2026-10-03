@@ -135,93 +135,44 @@ protocol never required.)
 - Volume collapse/explosion vs baseline → rollback.
 - Feedback-starved freeze: no human labels for 3 days → freeze, hold best_known_good.
 - One active experiment at a time. Respect `state.json.paused`.
+- **At most ONE experiment is open at a time.** There is no
+  `occupies_active_slot: false` side channel: every change that alters
+  detection, gating or notification behaviour is an experiment and takes the
+  single slot (`state.json.active_experiment_id`); close or retire the current
+  one before opening the next. Pure loop-infrastructure repairs that touch no
+  detection behaviour are not experiments and need no slot.
+- **Zero firings is not a "keep".** An experiment is not concluded "keep" because
+  its gate never fired. If the gate has had zero firings after its observation
+  window, retire it (remove the code) instead of keeping it; an unexercised gate
+  is unvalidated complexity, not a validated one. Privacy layers may be kept
+  only by an explicit human decision recorded in the JOURNAL.
 
-## Scene-gate ownership (2026-07-17, overridden 2026-07-26)
+## Scene-gate ownership (RETIRED 2026-10-03)
 
-> **STATUS: ENABLED at T=0.97 since 2026-07-26 by human override.** The HOLD
-> described in the next two paragraphs is HISTORY — read the "SUPERSEDED
-> 2026-07-26" block below before acting on anything in this section.
-
-The scene-unchanged gate (`src/scene_gate.py`, review-class bursts muted when
-near-identical to a recent empty-scene reference) shipped **disabled**
-(`scene_gate_enabled=False`, threshold placeholder `0.97`) because Task 5's
-offline validation (`scripts/validate_scene_gate.py`) found zero human
-`animal`/`animal_wrong_id`-labeled review-class rows with a frame still on
-disk — the 17 such rows corpus-wide all predate the ~100-burst retention
-window, and the 53 on-disk review-class frames that do survive are
-daytime-only. Per the FN-veto acceptance rule, no threshold may be chosen
-with zero counter-evidence. This is a normal HOLD state, not a pending
-human approval — per the Autonomy section above, enabling it is the loop's
-call to make once the evidence exists, same as any other lever.
-
-**Enablement procedure** — on any tick where new human `animal`/
-`animal_wrong_id` labels exist on review-class rows whose frames are still
-on disk: re-run `PYTHONPATH=src uv run python scripts/validate_scene_gate.py`
-from repo root. If the animal-labeled bucket is non-empty and yields a safe
-threshold, deploy via `loop.deploy` with delta
-`{"PERFORMANCE_SCENE_GATE_ENABLED": 1, "PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD": <T>}`
-(`PERFORMANCE_SCENE_GATE_ENABLED` is in `BOUNDS` in `src/loop/guardrails.py`
-purely so `loop.deploy` accepts it — it is a flag, not a range, and carries
-no config field-validator).
-
-**SUPERSEDED 2026-07-26 — human override, gate is now ENABLED at T=0.97.**
-Daniel directed enabling the scene gate despite the empty animal-labeled
-bucket, as an explicit accepted-risk decision to cut REVIEW volume (paired
-with the review-sampling gate deployed the same day). This overrides the
-FN-veto HOLD above and the threshold-selection rule below — **do not
-re-derive the threshold, and do not disable the gate on the grounds that
-the animal bucket is empty.** That condition is known, permanent for now
-(all animal-labeled review rows corpus-wide predate image retention), and
-has already been ruled on by a human.
-
-Threshold rationale, for the record: a fresh validator re-run on 2026-07-26
-scored 35 on-disk review-class frames (still all `unlabeled`; buckets
-`human_animal`/`human_fp` both n=0), distribution min 0.7376 / median 0.9534
-/ max 0.9793. `T=0.97` mutes 6/35 = 17% and sits just under the observed
-ceiling, so only near-identical frames are muted. It is the pre-registered
-placeholder, not an invented number.
-
-The **post-enable monitoring duty below still applies in full** and is now
-the primary safety net in place of the missing pre-validation: adjudicate
-every `scene_gate_muted=1` burst each tick, and treat a concealed animal as
-an FN-veto event exactly as described. Raising `T` remains in-bounds and is
-the preferred response; disabling the gate is still permitted if no in-bounds
-`T` would have prevented the mute — but only on such positive evidence of a
-real muted animal, never on absence-of-evidence.
-
-Caveat the loop must account for: the review-sampling gate deployed the same
-day cuts human label supply (and therefore FN detection power) roughly 4x —
-see "Review sampling" below. Do not read the resulting label scarcity as a
-feedback-starved freeze unless genuinely zero human labels arrive for 3 days.
-
-**Threshold-selection rule (SUPERSEDED — retained for history; see override
-above before applying):**
-`T = max(similarity over human animal-labeled rows) + 0.02` safety margin,
-clamped to `BOUNDS["PERFORMANCE_SCENE_GATE_SIMILARITY_THRESHOLD"]` = `(0.80,
-1.0)`. Raising the threshold is always the safe direction (mutes fewer
-bursts), so when in doubt round up, not down. Before enabling, also re-check
-the low-texture diagnostic the validation script prints: the corpus scored in
-Task 5 was daytime-only, and flat/low-texture dusk frames can inflate
-similarity scores in a way daytime frames don't exercise — if the corpus
-re-run still lacks dusk/dark review-class frames, treat that as a coverage
-gap and weight the threshold conservatively (or hold) rather than trusting
-the number blindly.
-
-**Post-enable monitoring (nightly duty, same shape as the blur-mute path):**
-once `scene_gate_enabled=True`, adjudicate every `scene_gate_muted=1` burst
-from the tick's ingest window for a concealed animal, exactly like the
-blur-mute (`below_sharpness_floor`) path already gets adjudicated. A
-concealed animal in a `scene_gate_muted=1` burst is an FN-veto event —
-respond the same tick by raising `scene_gate_similarity_threshold` strictly
-above that frame's recorded `scene_similarity` (within bounds), or by
-disabling the gate (`PERFORMANCE_SCENE_GATE_ENABLED: 0`) if no in-bounds
-threshold would have prevented the mute. Do not defer this to "next tick."
+> **STATUS: RETIRED by Daniel on 2026-10-03.** The Scene-Unchanged Gate
+> (`scene_gate_muted` / `scene_similarity` decision path) was removed from the
+> notification path in the human-led prune (see
+> `docs/superpowers/plans/2026-10-03-prune-gates-and-decide.md`). It had 0 mutes
+> since 2026-08-30 and its discriminator was refuted by exp #17/#30. The
+> `scene_gate_muted` / `scene_similarity` DB columns remain for history only.
+>
+> **The loop has NO duty on this gate any more.** Do not adjudicate
+> `scene_gate_muted` bursts, do not tune or re-enable `PERFORMANCE_SCENE_GATE_*`,
+> and do not run `scripts/validate_scene_gate.py` as a tick duty. The same
+> applies to the retired Unnamed-Animal Blank-Raw gate (exp #32) and the
+> Animal-Proximity Review Exemption (exp #33 backward half, exp #39 forward
+> half): there is nothing to adjudicate for them either. The old HOLD /
+> enablement / threshold-selection / post-enable-monitoring text was deleted
+> rather than kept, so nothing here can be mistaken for a live instruction.
 
 ## Review sampling (2026-07-26, Daniel's call)
 
 `PERFORMANCE_REVIEW_SAMPLE_RATE` (default `0.25`, in `BOUNDS`) sends only a
 deterministic ~1/4 sample of review-class bursts that survive the mute gates
-to Telegram. Precedence: Human > Blur > Scene > Sampling. Suppressed bursts
+to Telegram. Precedence is defined by `src/notification_gate.py::decide()`
+(first match wins): HUMAN-GATE > FAIL-CLOSED > HUMAN-PROXIMITY > BLUR >
+BLANK-CONF > REVIEW-SAMPLE > deferred REVIEW send (cancel-on-human) > send (the
+scene gate is retired). Suppressed bursts
 are still species-ID'd and DB-logged with `review_sampled_out=1`; nothing is
 lost from the corpus, only from Daniel's inbox.
 

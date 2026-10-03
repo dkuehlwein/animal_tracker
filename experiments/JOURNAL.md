@@ -3204,3 +3204,41 @@ Other gates: Blur 0 mutes despite 8/8 below-floor; Scene 0 of 4 evaluated
 and Human-Proximity had no firing opportunity; exp #35/#37 purge duty had no
 `human_proximity_muted=1` row to sweep. Restart stamped 2026-09-26T03:25:00+02:00 (verified:
 exp #37's 0bc9ec9 went live at the 09-24 03:30 restart, camera up since).
+
+## 2026-10-03 — human-led cleanup
+
+Daniel-led, not a loop tick. Context for future ticks; read before opening anything.
+
+**Loop was down Sep 26 – Oct 3.** The OAuth login expired; ticks failed 10-01..10-03
+(earlier failure logs had rotated out). A Telegram alert on a failed nightly run, with
+a dedicated "login expired" message, now exists (`src/loop/tickalert.py`, d253001).
+
+**Gates retired** (code removed, DB columns kept): the Scene-Unchanged Gate (0 mutes
+since 2026-08-30; exp #17/#30), the Unnamed-Animal Blank-Raw gate (exp #32), the
+Animal-Proximity Review Exemption backward half (exp #33) and forward half (exp #39),
+and the dead [GATE-SHADOW] log. **Kept:** HUMAN gate, burst human sweep, raw-homo
+trigger, Human-Proximity (window/density/demoted-band/unnamed-animal scope — #26/#27
+kept as privacy layers despite ~0 fires), Blur (+luma), Confident-Blank (#29), Review
+Sampling, deferred cancel-on-human, human/human-adjacent purge (#37), best-guess
+geofence caption (#28). `PERFORMANCE_SCENE_GATE_*` removed from `state.json.deployed`.
+
+**decide() refactor.** One ordered `decide()` in `src/notification_gate.py` is now the
+single source of precedence. Bugs fixed on the way: the deferred cancel-on-human only
+checked the latest human timestamp (now any human in (t, t+defer]); post-classification
+errors and species-ID exceptions inside a human window now fail closed ([FAIL-CLOSED]);
+Human-Proximity scope extended to ERROR and ANIMAL_UNCERTAIN statuses.
+
+**Ledger closed.** Every running/open experiment was concluded, retired or parked;
+`active_experiment_id` is null. PROTOCOL now says one experiment open at a time (no
+`occupies_active_slot: false` side channel) and that zero firings after the observation
+window means retire, not keep. Many past experiments were justified by 1-3 bursts and
+concluded "keep" on zero firings; do not repeat that pattern.
+
+**Review findings (human labels only):**
+- Sent/day fell ~55 -> ~6, mainly via HUMAN suppression + review sampling.
+- FP rate of SENT notifications is unchanged: phase A 0.67 [0.63-0.71] vs Sept 0.59 [0.47-0.69].
+- MAIN is ~93-98% real animals since the REVIEW prefix.
+- FN is unmeasured: `fn_rate` reads "unmeasured" in every daily.csv row, and 0 of 760 muted rows are human-labelled.
+- The headline `fp_rate` is mostly tier-1/tier-2 auto-labels and is computed over triggers, not notifications.
+- Human labelling collapsed: 2 of 31 sent rows labelled in the last week.
+- The "first zero-FP night" (09-25) was 0/7 with 1 human label, i.e. not evidence of anything.
