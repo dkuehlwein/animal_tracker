@@ -79,7 +79,7 @@ propose new columns, schema migrations, or additional logging instead.
   scene-recurrence / near-duplicate detection: aHash each frame, order by
   timestamp, Hamming-distance cluster — answered in ~30 lines, no new schema.
 
-**Retention caveat:** storage cleanup keeps only the most recent ~100 bursts.
+**Retention caveat:** storage cleanup keeps only the most recent ~300 bursts (`PERFORMANCE_MAX_IMAGES`).
 Image-based retro-analysis is time-boxed — run it this tick, not next tick.
 Do not assume DB rows older than the retention window still have frames on disk.
 

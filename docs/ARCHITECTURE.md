@@ -286,7 +286,7 @@ CREATE TABLE detections (
 - **ADR-003**: Multi-Frame Burst Capture with Sharpness Analysis
 
 ### Configuration
-- All settings documented in [CLAUDE.md](../CLAUDE.md)
+- Settings overview in [CLAUDE.md](../CLAUDE.md); detection-gate settings in [detection-gates.md](detection-gates.md)
 - Environment variable overrides for production deployment
 - Test configuration factory for unit tests
 
