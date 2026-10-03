@@ -3242,3 +3242,17 @@ concluded "keep" on zero firings; do not repeat that pattern.
 - The headline `fp_rate` is mostly tier-1/tier-2 auto-labels and is computed over triggers, not notifications.
 - Human labelling collapsed: 2 of 31 sent rows labelled in the last week.
 - The "first zero-FP night" (09-25) was 0/7 with 1 human label, i.e. not evidence of anything.
+
+## 2026-10-03 — tick (first after the 09-26..10-02 outage)
+
+Ingest 5456-5543: 88 triggers over 8 days. 18 HUMAN suppressed, 57 IDENTIFIED (blackbirds), 13 review-class.
+Tier-2 on 22 rows (all review-class + `;;;;;;animal`) used CLAHE crops. fp_rate 0.061 [0.024-0.146] over 66 labelled,
+but only 4 of those labels are human (fp_human 0/4), so the number is mostly auto-labels and not evidence.
+**FN found in the Confident-Blank gate (exp #29):** 3 of its 5 mutes this window show visible blackbirds (5468 0.937,
+5477 0.932, 5495 0.989). The 2 empty mutes scored 0.971/0.980, so the classes interleave. A CLAHE re-check of the 12
+older mutes still on disk found them all empty. Lifetime record: 16 empty / 3 animal, and the animal ceiling moved from 0.8475 at launch
+to 0.9885 in autumn dim light. Under 0021's pre-registered rule, max+0.02 is out of bounds, so I **opened exp #40
+`confident-blank-autumn-fn` and deployed `PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD=1.0`**, restart 2026-10-04T03:25.
+FN-veto passes by construction. Volume impact is about +0.75 REVIEW/day. Expected to conclude as retire-the-gate (zero firings).
+2 of the 3 animals were also sampled out at 0.5, which is a candidate next experiment once the slot frees up. Other gates: human-proximity
+muted 5504 (person legs) correctly. Blur 0. Not starved, not paused. Run file: runs/0029.

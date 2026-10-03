@@ -1,5 +1,5 @@
 {
-  "active_experiment_id": null,
+  "active_experiment_id": 40,
   "backlog": [
     {
       "hypothesis": "CONCLUDED 2026-06-15 (keep). Same-channel \ud83d\udd0d REVIEW prefix on status\u2208{NO_ANIMAL,UNCLASSIFIABLE} flags 99% of FP at 0 FN; live since 06-12, location-agnostic. Second-channel routing is OUT per Daniel (no 2nd channel \u2014 adds overhead, won't click two). See runs/0001 + LEARNINGS.",
@@ -289,6 +289,13 @@
       "slug": "leading-edge-animal-proximity",
       "status": "retired",
       "validation": "live"
+    },
+    {
+      "hypothesis": "ACTIVATED + DEPLOYED 2026-10-03 (env-only, restart 2026-10-04T03:25). Confident-Blank gate (exp #29) muted 3 visible blackbirds 09-27..09-30 (blank 0.9317/0.9366/0.9885) vs empty mutes 0.9709/0.9798; lifetime 16 empty / 3 animal. Pre-registered response (runs/0021): raise strictly above the animal score, max+0.02 out of bounds -> BOUNDS ceiling 1.0 (effectively off). FN-veto passes by construction; ~+0.75 REVIEW/day. Expected conclusion after 7 nights: zero firings -> retire the gate code. Rollback: redeploy 0.92. See runs/0029.",
+      "id": 40,
+      "slug": "confident-blank-autumn-fn",
+      "status": "running",
+      "validation": "live"
     }
   ],
   "baselines": {
@@ -296,6 +303,7 @@
   },
   "best_known_good": {},
   "deployed": {
+    "PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD": 1.0,
     "PERFORMANCE_HUMAN_DENSITY_COUNT": 8,
     "PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS": 1800,
     "PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS": 240,
@@ -374,6 +382,18 @@
         "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
       },
       "replaced_at": "2026-09-19T03:25:00+02:00"
+    },
+    {
+      "config": {
+        "PERFORMANCE_HUMAN_DENSITY_COUNT": 8,
+        "PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS": 1800,
+        "PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS": 240,
+        "PERFORMANCE_HUMAN_SWEEP_MAX_FRAMES": 4,
+        "PERFORMANCE_MAX_IMAGES": 300,
+        "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.5,
+        "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
+      },
+      "replaced_at": "2026-10-04T03:25:00+02:00"
     }
   ],
   "last_heartbeat_loopday": "2026-10-03",
@@ -421,9 +441,9 @@
   },
   "last_scene_change_alert_loopday": "2026-09-13",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-09-25",
-  "nightly_verdict": "A perfect day for the camera: 8 alerts, every single one a real visitor \u2014 a cat at dawn, a blackbird late morning, and one person (kept private, as always). No false alarms at all, the first time that has ever happened. One miss, though: a photo of the cat was thrown away by a coin flip 37 seconds before the camera recognised that same cat, so I taught it to wait a few minutes and keep such photos when the animal turns up right after.",
+  "last_tick_completed_day": "2026-10-03",
+  "nightly_verdict": "Busy week while the nightly check was offline: 88 triggers, mostly blackbirds, 18 people (all kept private), and only 4 empty-garden false alarms. But the 'confidently empty' filter silently hid 3 photos that actually showed a blackbird in the dim autumn light, so I switched that filter off from tomorrow morning \u2014 expect roughly one extra REVIEW photo a day.",
   "paused": false,
-  "pending_restart_at": null,
+  "pending_restart_at": "2026-10-04T03:25:00+02:00",
   "watermark": 5543
 }
