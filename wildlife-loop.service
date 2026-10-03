@@ -55,7 +55,11 @@ Environment="PYTHONPATH=/home/daniel/animal_tracker/src"
 # --dangerously-skip-permissions: required for unattended operation.
 # --model claude-opus-5-5: the judgment layer requires the stronger model (as specified in loop.md).
 # Pinned to an explicit model ID (2026-10-03) rather than the floating `opus` alias.
-ExecStart=/bin/bash -c 'cd /home/daniel/animal_tracker && PYTHONPATH=src /home/daniel/.local/bin/uv run python -m loop.nightgate || exit 0; /home/daniel/.local/bin/claude -p --dangerously-skip-permissions --model claude-opus-5-5 < /home/daniel/animal_tracker/experiments/loop.md'
+# Claude output is tee'd to data/logs/claude-tick-last.log (and still to the journal via stdout).
+# On a non-zero claude exit, loop.tickalert sends a once-per-loop-day Telegram alert (auth expiry vs
+# other failure; best-effort, never raises) and the unit then exits with claude's own status.
+# systemd note: `$$` is a literal `$` (systemd would otherwise expand `$`).
+ExecStart=/bin/bash -c 'cd /home/daniel/animal_tracker && PYTHONPATH=src /home/daniel/.local/bin/uv run python -m loop.nightgate || exit 0; mkdir -p data/logs; /home/daniel/.local/bin/claude -p --dangerously-skip-permissions --model claude-opus-5-5 < /home/daniel/animal_tracker/experiments/loop.md 2>&1 | tee data/logs/claude-tick-last.log; rc=$${PIPESTATUS[0]}; if [ $$rc -ne 0 ]; then PYTHONPATH=src /home/daniel/.local/bin/uv run python -m loop.tickalert --exit-code $$rc --log data/logs/claude-tick-last.log || true; fi; exit $$rc'
 StandardOutput=journal
 StandardError=journal
 
