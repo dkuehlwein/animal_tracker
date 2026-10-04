@@ -3256,3 +3256,19 @@ to 0.9885 in autumn dim light. Under 0021's pre-registered rule, max+0.02 is out
 FN-veto passes by construction. Volume impact is about +0.75 REVIEW/day. Expected to conclude as retire-the-gate (zero firings).
 2 of the 3 animals were also sampled out at 0.5, which is a candidate next experiment once the slot frees up. Other gates: human-proximity
 muted 5504 (person legs) correctly. Blur 0. Not starved, not paused. Run file: runs/0029.
+
+## 2026-10-04 — tick
+
+Ingest 5544-5563: 20 triggers (daylight 09:46-14:47). 7 HUMAN suppressed, 12 IDENTIFIED blackbirds (6 human-labelled `animal`),
+2 UNCLASSIFIABLE (both sampled out). fp_rate 0.077 [0.014-0.333] over 13 labelled, fp_human 0/6. Human labelling is back
+(6 labels on 10-04), so not starved. Not paused.
+**Exp #40 live** (03:30 restart verified via systemctl; deployed_config has threshold 1.0). Night 1 had no firing opportunity
+because no review-class row had a raw blank score ≥0.92 (5554 0.445). HOLD, 6 nights remain.
+Tier-2: 5546 person (sleeve; `;;;;;;animal`, human-proximity muted, correct), 5552 animal (blackbird, **sampled out**),
+5554 false_positive (empty, pond spray). 5552 is the 3rd sampled-out real animal in 8 days. It was event-covered by sent
+neighbours 5551/5553 (±30s). Queued backlog #41 `review-sample-rate-fn` (measure event-level loss first). Slot stays with #40.
+**Scene-watch alert fired 10-04 and was a false alarm.** Recent frames score 0/12 matches (median edge-NCC 0.35 vs the 3-7-day
+baseline). A side-by-side view shows the same framing, and phase correlation finds ≤3px shift. The newly running pond spray
+(right of centre) plus dim overcast light lowered edge similarity. 7-day cooldown, so no repeat. Watch whether
+it re-fires after cooldown. If it does, the baseline needs to roll past the spray onset (not a threshold change).
+Midday blackbird cluster 14:37-14:47: sharpness ~6, luma ~30 (overcast). These were IDENTIFIED, so the Blur gate is irrelevant. No action.

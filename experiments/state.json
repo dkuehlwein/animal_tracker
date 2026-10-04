@@ -296,6 +296,13 @@
       "slug": "confident-blank-autumn-fn",
       "status": "running",
       "validation": "live"
+    },
+    {
+      "hypothesis": "Review sampling at 0.5 drops real animals: sampled-out review-class bursts holding a visible blackbird 5468 (09-27), 5477 (09-29), 5552 (10-04). Candidate: raise PERFORMANCE_REVIEW_SAMPLE_RATE 0.5 -> 0.75 or 1.0 (in BOUNDS; PROTOCOL 'Review sampling' says FN evidence is the valid reason). Before opening, measure event-level loss: how many sampled-out animals had NO sent sibling within +/-120s (5552 had two). Opens only after exp #40 closes (one slot).",
+      "id": 41,
+      "slug": "review-sample-rate-fn",
+      "status": "queued",
+      "validation": "pending"
     }
   ],
   "baselines": {
@@ -441,8 +448,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-04",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-10-03",
-  "nightly_verdict": "Busy week while the nightly check was offline: 88 triggers, mostly blackbirds, 18 people (all kept private), and only 4 empty-garden false alarms. But the 'confidently empty' filter silently hid 3 photos that actually showed a blackbird in the dim autumn light, so I switched that filter off from tomorrow morning \u2014 expect roughly one extra REVIEW photo a day.",
+  "last_tick_completed_day": "2026-10-04",
+  "nightly_verdict": "Quiet Sunday: 20 triggers, mostly blackbirds (you confirmed 6), 7 people kept private and 1 empty-garden photo, so no change tonight while yesterday's 'confidently empty' switch-off settles in. Today's 'camera moved' alert was a false alarm: the view is unchanged, but the new pond spray threw off the check.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5563

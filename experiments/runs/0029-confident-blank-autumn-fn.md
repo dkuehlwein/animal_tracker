@@ -73,3 +73,25 @@ review sampling (0.5). The other sent review-class animals tonight were 5472 and
 currently catching real blackbirds that MegaDetector misses in dim light.
 Raising the sample rate on this FN evidence is in-bounds, but it is a separate experiment and
 must wait for this slot to close.
+
+## 2026-10-04 — night 1 (live since the 03:30 restart, verified via systemctl)
+
+Ingest 5544-5563: 20 triggers, all daylight 09:46-14:47. 7 HUMAN (suppressed),
+12 IDENTIFIED (blackbirds; Daniel labelled 6 of them `animal`), 2 UNCLASSIFIABLE
+(both sampled out). fp_rate 0.077 [0.014-0.333] over 13 labelled; fp_human 0/6.
+
+**Exp #40 had no firing opportunity.** Neither review-class row scored near the
+old 0.92 line: 5554 raw `blank` 0.445, and 5552's raw top was `aves` 0.178. So
+the change neither helped nor hurt tonight. Window continues (night 1 of 7).
+
+Tier-2 (CLAHE crops): 5546 `person` (`;;;;;;animal` IDENTIFIED, raw top blank 0.72;
+a knitted sleeve fills the right edge, already human-proximity muted, which is correct). 5552 `animal`:
+a clear blackbird by the gnome, **lost to review sampling**. 5554 `false_positive`
+(empty, pond spray running).
+
+**Review-sampling FN evidence grows.** 5552 is the third sampled-out real
+animal in 8 days (5468, 5477, 5552). Mitigation: 5552 sat between 5551 and 5553
+(both IDENTIFIED blackbird, sent, human-labelled `animal`, 30s either side), so
+Daniel still saw the visit. The sampling lost a photo, not the event. Queued as
+backlog #41 for when this slot frees. PROTOCOL allows raising the rate on
+genuine FN evidence, but one experiment at a time.
