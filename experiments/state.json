@@ -398,46 +398,46 @@
   ],
   "last_heartbeat_loopday": "2026-10-04",
   "last_metrics": {
-    "date": "2026-10-03",
+    "date": "2026-10-04",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.023818614832318334,
-      0.14572908678564217
+      0.013710421242556586,
+      0.3331395092109959
     ],
     "fp_claude_ci": [
-      0.08507676632916253,
-      0.43334278443814167
+      0.09453120573423074,
+      0.9054687942657693
     ],
-    "fp_claude_count": 4,
-    "fp_claude_rate": 0.21052631578947367,
-    "fp_count": 4,
+    "fp_claude_count": 1,
+    "fp_claude_rate": 0.5,
+    "fp_count": 1,
     "fp_human_ci": [
       0.0,
-      0.4898908364545973
+      0.3903342879021653
     ],
     "fp_human_count": 0,
     "fp_human_rate": 0.0,
     "fp_md_ci": [
       0.0,
-      0.08200980322579117
+      0.43448246478317476
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.06060606060606061,
+    "fp_rate": 0.07692307692307693,
     "fp_trustworthy": true,
-    "labeled_triggers": 66,
-    "n_cant_tell": 3,
-    "n_claude": 19,
-    "n_human": 4,
-    "n_human_suppressed": 18,
-    "n_md": 43,
+    "labeled_triggers": 13,
+    "n_cant_tell": 0,
+    "n_claude": 2,
+    "n_human": 6,
+    "n_human_suppressed": 6,
+    "n_md": 5,
     "n_person": 1,
-    "n_sampled_out": 3,
+    "n_sampled_out": 2,
     "n_unlabeled": 0,
-    "total_triggers": 88
+    "total_triggers": 20
   },
   "last_scene_change_alert_loopday": "2026-10-04",
   "last_staleness_alert_loopday": "2026-10-03",
@@ -445,5 +445,5 @@
   "nightly_verdict": "Busy week while the nightly check was offline: 88 triggers, mostly blackbirds, 18 people (all kept private), and only 4 empty-garden false alarms. But the 'confidently empty' filter silently hid 3 photos that actually showed a blackbird in the dim autumn light, so I switched that filter off from tomorrow morning \u2014 expect roughly one extra REVIEW photo a day.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5543
+  "watermark": 5563
 }
