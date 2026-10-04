@@ -396,7 +396,7 @@
       "replaced_at": "2026-10-04T03:25:00+02:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-10-03",
+  "last_heartbeat_loopday": "2026-10-04",
   "last_metrics": {
     "date": "2026-10-03",
     "error_count": 0,
@@ -439,11 +439,11 @@
     "n_unlabeled": 0,
     "total_triggers": 88
   },
-  "last_scene_change_alert_loopday": "2026-09-13",
+  "last_scene_change_alert_loopday": "2026-10-04",
   "last_staleness_alert_loopday": "2026-10-03",
   "last_tick_completed_day": "2026-10-03",
   "nightly_verdict": "Busy week while the nightly check was offline: 88 triggers, mostly blackbirds, 18 people (all kept private), and only 4 empty-garden false alarms. But the 'confidently empty' filter silently hid 3 photos that actually showed a blackbird in the dim autumn light, so I switched that filter off from tomorrow morning \u2014 expect roughly one extra REVIEW photo a day.",
   "paused": false,
-  "pending_restart_at": "2026-10-04T03:25:00+02:00",
+  "pending_restart_at": null,
   "watermark": 5543
 }
