@@ -95,3 +95,28 @@ animal in 8 days (5468, 5477, 5552). Mitigation: 5552 sat between 5551 and 5553
 Daniel still saw the visit. The sampling lost a photo, not the event. Queued as
 backlog #41 for when this slot frees. PROTOCOL allows raising the rate on
 genuine FN evidence, but one experiment at a time.
+
+## 2026-10-05 — night 2
+
+Ingest 5564-5568: 5 triggers, all in one blackbird visit 17:33-17:37 (dim, luma ~25,
+all below the sharpness floor). Camera healthy (up since the 10-04 03:30 restart, warm-up
+07:44, sunset stop 19:00, no errors). 0 HUMAN. 3 IDENTIFIED (`aves` bird) and 2 UNCLASSIFIABLE.
+Daniel labelled 4 `animal` (5564 5565 5567 5568). fp_rate 0/5, fp_human 0/4.
+
+**First counterfactual firing for exp #40, and it supports the change.** 5566 had raw top-1
+`blank` @ **0.9875**, which is above the old 0.92 threshold. At the old setting the Confident-Blank gate would have
+muted it. Tier-2 (CLAHE crops of frames 1/3/5) shows a **blackbird clearly visible**:
+motion-blurred in frame 1 and sharp, perched left of the tree trunk, in frames 3 and 5. That makes
+**4 animals at blank ≥0.93** (5468 0.937, 5477 0.932, 5495 0.989, 5566 0.988) against the
+2 recent empties at 0.971/0.980, so the classes still interleave. With the threshold at 1.0,
+`blank_confidence_muted=0` was correct.
+
+But 5566 was still lost: **review sampling dropped it** (`[REVIEW-SAMPLE]`, rate 0.5). This is the 4th
+sampled-out real animal in 9 days (5468, 5477, 5552, 5566). As with 5552, the visit itself
+reached Daniel: 5565 (−115 s) and 5567 (+55 s) were sent and human-labelled `animal`. So
+sampling lost a photo, not the event. 5564 shows the opposite case: an UNCLASSIFIABLE REVIEW send
+that Daniel labelled `animal`. REVIEW keeps catching blackbirds that MegaDetector misses in dim light.
+
+Decision: HOLD, night 2 of 7. The gate is now inert by design (no score can exceed 1.0). Retiring the code is
+still the expected conclusion at window close, and tonight's row adds evidence for it. Backlog #41 is updated
+with 5566. It still waits for this slot.

@@ -298,7 +298,7 @@
       "validation": "live"
     },
     {
-      "hypothesis": "Review sampling at 0.5 drops real animals: sampled-out review-class bursts holding a visible blackbird 5468 (09-27), 5477 (09-29), 5552 (10-04). Candidate: raise PERFORMANCE_REVIEW_SAMPLE_RATE 0.5 -> 0.75 or 1.0 (in BOUNDS; PROTOCOL 'Review sampling' says FN evidence is the valid reason). Before opening, measure event-level loss: how many sampled-out animals had NO sent sibling within +/-120s (5552 had two). Opens only after exp #40 closes (one slot).",
+      "hypothesis": "Review sampling at 0.5 drops real animals: sampled-out review-class bursts holding a visible blackbird 5468 (09-27), 5477 (09-29), 5552 (10-04), 5566 (10-05; raw blank 0.9875, sent siblings 5565/5567 at -115s/+55s). Candidate: raise PERFORMANCE_REVIEW_SAMPLE_RATE 0.5 -> 0.75 or 1.0 (in BOUNDS; PROTOCOL 'Review sampling' says FN evidence is the valid reason). Before opening, measure event-level loss: how many sampled-out animals had NO sent sibling within +/-120s (5552 had two). Opens only after exp #40 closes (one slot).",
       "id": 41,
       "slug": "review-sample-rate-fn",
       "status": "queued",
@@ -448,8 +448,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-04",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-10-04",
-  "nightly_verdict": "Quiet Sunday: 20 triggers, mostly blackbirds (you confirmed 6), 7 people kept private and 1 empty-garden photo, so no change tonight while yesterday's 'confidently empty' switch-off settles in. Today's 'camera moved' alert was a false alarm: the view is unchanged, but the new pond spray threw off the check.",
+  "last_tick_completed_day": "2026-10-05",
+  "nightly_verdict": "Quiet day: one blackbird visit at dusk (5 photos, you confirmed 4), no false alarms, no people. One of those photos would have been wrongly hidden under yesterday's old 'confidently empty' setting, so that switch-off is paying off; no change tonight, but another blackbird photo was dropped by the 50% random sampling, which is next in line to fix.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5568

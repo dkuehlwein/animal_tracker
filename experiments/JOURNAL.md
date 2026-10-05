@@ -3272,3 +3272,12 @@ baseline). A side-by-side view shows the same framing, and phase correlation fin
 (right of centre) plus dim overcast light lowered edge similarity. 7-day cooldown, so no repeat. Watch whether
 it re-fires after cooldown. If it does, the baseline needs to roll past the spray onset (not a threshold change).
 Midday blackbird cluster 14:37-14:47: sharpness ~6, luma ~30 (overcast). These were IDENTIFIED, so the Blur gate is irrelevant. No action.
+
+## 2026-10-05 — tick
+
+Ingest 5564-5568: 5 triggers, one dim blackbird visit 17:33-17:37 (luma ~25). 0 HUMAN, 3 IDENTIFIED, 2 UNCLASSIFIABLE.
+Daniel labelled 4 `animal`. fp_rate 0/5, fp_human 0/4. Camera healthy, no errors, not paused, not starved.
+**Exp #40 night 2: first counterfactual firing.** 5566 raw `blank` 0.9875 would have been muted at the old 0.92 threshold.
+Tier-2 shows a clear blackbird (frames 3/5), which makes 4 animals at blank ≥0.93. Threshold 1.0 correctly did not mute it. HOLD (5 nights remain).
+5566 was then **sampled out** (rate 0.5): the 4th sampled-out animal in 9 days, event-covered by sent 5565/5567 (−115 s/+55 s).
+5564 (UNCLASSIFIABLE, sent to REVIEW) was a human-confirmed blackbird. Backlog #41 updated. It still waits for the slot.
