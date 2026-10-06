@@ -3281,3 +3281,13 @@ Daniel labelled 4 `animal`. fp_rate 0/5, fp_human 0/4. Camera healthy, no errors
 Tier-2 shows a clear blackbird (frames 3/5), which makes 4 animals at blank ≥0.93. Threshold 1.0 correctly did not mute it. HOLD (5 nights remain).
 5566 was then **sampled out** (rate 0.5): the 4th sampled-out animal in 9 days, event-covered by sent 5565/5567 (−115 s/+55 s).
 5564 (UNCLASSIFIABLE, sent to REVIEW) was a human-confirmed blackbird. Backlog #41 updated. It still waits for the slot.
+
+## 2026-10-06 — tick
+
+Ingest 5569-5572: 4 triggers. 1 HUMAN (5569, suppressed), 1 NO_ANIMAL human-proximity muted (5570, tier-2 empty, so the mute was correct),
+1 UNCLASSIFIABLE sent to REVIEW (5571), 1 IDENTIFIED blackbird (5572, MAIN). fp_rate 2/3, all auto/tier-2; no human labels
+today (last 10-05, not starved). Not paused. Camera and deploy unit healthy.
+**Exp #40 night 3: the second counterfactual firing was a cost, not a save.** 5571 had raw `blank` 0.9686 and tier-2 shows it empty (fountain running),
+so the old 0.92 gate would have muted it correctly. Now it is one extra REVIEW ping. Window ledger: 1 animal recovered (5566) vs 1 empty sent (5571),
+as predicted. HOLD, 4 nights remain. Backlog #41 still waits for the slot.
+Side note: httpx INFO logs print the Telegram bot token in request URLs in the camera journal (pre-existing, not loop scope).

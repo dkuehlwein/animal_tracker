@@ -448,8 +448,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-04",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-10-05",
-  "nightly_verdict": "Quiet day: one blackbird visit at dusk (5 photos, you confirmed 4), no false alarms, no people. One of those photos would have been wrongly hidden under yesterday's old 'confidently empty' setting, so that switch-off is paying off; no change tonight, but another blackbird photo was dropped by the 50% random sampling, which is next in line to fix.",
+  "last_tick_completed_day": "2026-10-06",
+  "nightly_verdict": "Quiet day: one person (hidden as designed), one blackbird at dusk sent to you, and two empty-garden photos, one of which reached you as a REVIEW message. That empty photo would have been hidden under the old 'confidently empty' setting, so the switch-off costs about one extra message a day as expected; no change tonight, 4 nights left in the trial.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5572

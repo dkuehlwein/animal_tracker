@@ -120,3 +120,23 @@ that Daniel labelled `animal`. REVIEW keeps catching blackbirds that MegaDetecto
 Decision: HOLD, night 2 of 7. The gate is now inert by design (no score can exceed 1.0). Retiring the code is
 still the expected conclusion at window close, and tonight's row adds evidence for it. Backlog #41 is updated
 with 5566. It still waits for this slot.
+
+## 2026-10-06 — night 3
+
+Ingest 5569-5572: 4 triggers. Camera healthy: up since the 10-04 03:30 restart, deploy unit not failed, no errors.
+- 5569 (14:23) HUMAN, pc 0.84, suppressed `[HUMAN-GATE]`.
+- 5570 (14:25) NO_ANIMAL, `[HUMAN-PROXIMITY]`-muted (window). Standing duty: tier-2 shows it is empty, so the mute was correct.
+- 5571 (14:43) UNCLASSIFIABLE, sent to REVIEW.
+- 5572 (17:36) IDENTIFIED `aves` blackbird, a clear bird left of the trunk, sent to MAIN.
+
+No human labels today (the last ones were 10-05), so the loop is not starved. fp_rate 2/3, all on auto/tier-2 labels; fp_human n=0.
+
+**Second counterfactual firing for exp #40, and this one went the other way.** 5571 had raw top-1 `blank` @ **0.9686**,
+above the old 0.92 threshold. Tier-2 (CLAHE crops of frames 1/3/5) shows an empty garden with the fountain running.
+The old gate would have muted it *correctly*. At 1.0 it was sent as a REVIEW message, so the change cost one extra
+REVIEW ping. That matches the ~0.75/day volume prediction.
+
+Window ledger after 3 nights: 1 animal recovered (5566 @0.9875, though it was then sampled out), 1 empty sent
+(5571 @0.9686). Lifetime ≥0.92 scores: 4 animals (0.932-0.989) and 3 empties (0.9686-0.980). The classes still interleave,
+so there is no case for a lower threshold. HOLD, night 3 of 7. The expected conclusion is unchanged: retire the gate code at window close.
+5570 tier-2 `false_positive`, 5571 tier-2 `false_positive` (appended to detection_feedback).
