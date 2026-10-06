@@ -405,46 +405,46 @@
   ],
   "last_heartbeat_loopday": "2026-10-06",
   "last_metrics": {
-    "date": "2026-10-05",
+    "date": "2026-10-06",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.0,
-      0.43448246478317476
+      0.2076596008020477,
+      0.9385080552796037
     ],
     "fp_claude_ci": [
-      0.0,
-      0.7934506856227626
+      0.34238022750665303,
+      1.0
     ],
-    "fp_claude_count": 0,
-    "fp_claude_rate": 0.0,
-    "fp_count": 0,
+    "fp_claude_count": 2,
+    "fp_claude_rate": 1.0,
+    "fp_count": 2,
     "fp_human_ci": [
       0.0,
-      0.4898908364545973
+      1.0
     ],
     "fp_human_count": 0,
     "fp_human_rate": 0.0,
     "fp_md_ci": [
       0.0,
-      1.0
+      0.7934506856227626
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.0,
+    "fp_rate": 0.6666666666666666,
     "fp_trustworthy": true,
-    "labeled_triggers": 5,
+    "labeled_triggers": 3,
     "n_cant_tell": 0,
-    "n_claude": 1,
-    "n_human": 4,
-    "n_human_suppressed": 0,
-    "n_md": 0,
+    "n_claude": 2,
+    "n_human": 0,
+    "n_human_suppressed": 1,
+    "n_md": 1,
     "n_person": 0,
     "n_sampled_out": 1,
     "n_unlabeled": 0,
-    "total_triggers": 5
+    "total_triggers": 4
   },
   "last_scene_change_alert_loopday": "2026-10-04",
   "last_staleness_alert_loopday": "2026-10-03",
@@ -452,5 +452,5 @@
   "nightly_verdict": "Quiet day: one blackbird visit at dusk (5 photos, you confirmed 4), no false alarms, no people. One of those photos would have been wrongly hidden under yesterday's old 'confidently empty' setting, so that switch-off is paying off; no change tonight, but another blackbird photo was dropped by the 50% random sampling, which is next in line to fix.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5568
+  "watermark": 5572
 }
