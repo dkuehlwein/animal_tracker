@@ -160,4 +160,4 @@ Starvation watch: the last human labels were on 10-05. If tomorrow also brings n
 On a zero-trigger day there was nothing to label, so this is not a sign of Daniel disengaging.
 
 Infra (no slot): `loop.report` was replaying the previous day's `last_metrics` as "Last night: N images" on `no_data` nights.
-Fixed to render a no-new-images line instead (see JOURNAL for the commit).
+Fixed in 7727350: it now renders a no-new-images line instead.

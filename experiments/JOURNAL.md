@@ -3291,3 +3291,17 @@ today (last 10-05, not starved). Not paused. Camera and deploy unit healthy.
 so the old 0.92 gate would have muted it correctly. Now it is one extra REVIEW ping. Window ledger: 1 animal recovered (5566) vs 1 empty sent (5571),
 as predicted. HOLD, 4 nights remain. Backlog #41 still waits for the slot.
 Side note: httpx INFO logs print the Telegram bot token in request URLs in the camera journal (pre-existing, not loop scope).
+
+## 2026-10-07 — tick
+
+**Zero triggers** (ingest past 5572 was empty; `loop.metrics` returned `no_data` and kept the baseline). I verified that the camera was not blind.
+The service has been up since the 10-04 restart and logged no errors. Warm-up ran 07:42-07:47, then a sunset stop at 18:56. `motion_area` was 0 all day.
+Timelapse framing matches 10-06 and nothing blocks the lens. `fn_audit_timelapse.py` over 10-03..10-07 found no 10-07 frame in its top-25, so nothing points to
+an animal that came by without triggering. It was a still, empty day. Not paused. The last human labels were on 10-05, so tomorrow is the starvation-freeze edge,
+but with zero triggers there was nothing to label.
+**Exp #40 night 4:** no firing opportunity. HOLD, 3 nights remain.
+Infra (no slot), commit 7727350: `loop.report` now says "No new images today" when `last_metrics.date` is older than the loop day. Before, it replayed the stale
+numbers as "Last night". The check is `<`, not `!=`, because metrics stamps the calendar date, which is one day ahead of the loop day on post-midnight ticks.
+Test-hygiene note: 3 `test_blank_confidence_*` tests in `test_wildlife_system.py` fail on HEAD. They read the live `deployed_config.env`, where exp #40 set
+the threshold to 1.0. This is the config-reload gap documented at `test_wildlife_system.py:50`. It is a test-environment leak, not a code bug. Fix the test isolation
+when exp #40 concludes, or sooner.
