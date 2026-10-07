@@ -56,9 +56,11 @@ def test_report_main_no_send_renders_without_telegram(tmp_path, monkeypatch):
     import json
     import sys
 
+    from loop import state as state_mod
+
     state_path = tmp_path / "state.json"
     lm = {
-        "date": "2026-06-10",
+        "date": state_mod.loop_day(),
         "total_triggers": 10,
         "labeled_triggers": 8,
         "fp_count": 3,
@@ -169,9 +171,10 @@ def test_report_main_no_send_does_not_require_telegram_credentials(tmp_path, mon
     import json
     import sys
 
+    from loop import state as state_mod
     state_path = tmp_path / "state.json"
     lm = {
-        "date": "2026-06-10",
+        "date": state_mod.loop_day(),
         "total_triggers": 5,
         "labeled_triggers": 4,
         "fp_count": 1,
@@ -294,7 +297,7 @@ def _make_state(tmp_path, extra: dict | None = None):
     from loop import state as state_mod
     state_path = tmp_path / "state.json"
     lm = {
-        "date": "2026-06-10",
+        "date": state_mod.loop_day(),
         "total_triggers": 10,
         "labeled_triggers": 8,
         "fp_count": 3,
@@ -766,3 +769,61 @@ def test_summary_privacy_gate_line_order():
     priv_idx = next(i for i, l in enumerate(lines) if "privacy gate" in l)
     rem_idx = next(i for i, l in enumerate(lines) if "Not yet labelled" in l)
     assert md_idx < priv_idx < rem_idx
+
+
+# ---------------------------------------------------------------------------
+# Stale last_metrics (no_data night): don't replay yesterday's numbers
+# ---------------------------------------------------------------------------
+
+def test_summary_stale_metrics_renders_no_new_images_message():
+    """last_metrics.date != current loop day -> stale message, no tier breakdown."""
+    text = report.render_summary(
+        metrics=_metrics(),  # date 2026-06-10
+        state={"paused": False},
+        active_experiment={"slug": "notification-gate-live", "status": "running"},
+        current_loop_day="2026-06-11",
+    )
+    assert "No new images today" in text
+    assert "2026-06-10" in text
+    assert "images captured" not in text
+    assert "You labelled" not in text
+    assert "Active experiment: notification-gate-live [running]" in text
+
+
+def test_summary_stale_metrics_paused_keeps_paused_line():
+    text = report.render_summary(
+        metrics=_metrics(), state={"paused": True}, active_experiment={},
+        current_loop_day="2026-06-11",
+    )
+    assert "No new images today" in text
+    assert "PAUSED" in text
+    assert "Active experiment" not in text
+
+
+def test_summary_fresh_metrics_unchanged_when_date_matches():
+    text = report.render_summary(
+        metrics=_metrics(), state={"paused": False}, active_experiment={},
+        current_loop_day="2026-06-10",
+    )
+    assert "42 images captured" in text
+    assert "No new images" not in text
+
+
+def test_summary_post_midnight_tick_is_not_stale():
+    # metrics stamps the calendar date; after midnight that is loop_day + 1.
+    text = report.render_summary(
+        metrics=_metrics(), state={"paused": False}, active_experiment={},
+        current_loop_day="2026-06-09",
+    )
+    assert "42 images captured" in text
+    assert "No new images" not in text
+
+
+def test_summary_without_date_keeps_current_behaviour():
+    m = _metrics()
+    del m["date"]
+    text = report.render_summary(
+        metrics=m, state={"paused": False}, active_experiment={},
+        current_loop_day="2026-06-11",
+    )
+    assert "42 images captured" in text

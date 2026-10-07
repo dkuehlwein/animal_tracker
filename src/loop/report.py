@@ -55,10 +55,45 @@ def latest_journal_entry(journal_path: str | Path) -> str | None:
     return text if text else None
 
 
-def render_summary(metrics: dict, state: dict, active_experiment: dict) -> str:
-    """Daily summary: per-tier labelling breakdown. Plain English, no CI/jargon."""
+def _experiment_line(active_experiment: dict, paused: bool) -> str | None:
+    """Trailing "Active experiment" line; None when paused."""
+    if active_experiment and not paused:
+        return (
+            f"Active experiment: {active_experiment['slug']} "
+            f"[{active_experiment['status']}]"
+        )
+    if not paused:
+        return "Active experiment: none"
+    return None
+
+
+def render_summary(
+    metrics: dict,
+    state: dict,
+    active_experiment: dict,
+    current_loop_day: str | None = None,
+) -> str:
+    """Daily summary: per-tier labelling breakdown. Plain English, no CI/jargon.
+
+    When current_loop_day is given and last_metrics.date is older than it, the
+    night had no new detections (loop.metrics returns no_data and leaves
+    last_metrics untouched), so render a short stale message instead of
+    replaying the previous night's numbers as tonight's.
+    """
     paused = bool(state.get("paused", False))
     total = metrics.get("total_triggers", 0)
+
+    metrics_date = metrics.get("date")
+    # "<" not "!=": metrics stamps the calendar date, so a post-midnight tick
+    # writes loop_day + 1, which is fresh, not stale.
+    if current_loop_day and metrics_date and metrics_date < current_loop_day:
+        lines = [f"🦊 No new images today (last capture report: {metrics_date})."]
+        if paused:
+            lines.append("⏸️ PAUSED — tuning frozen until resumed")
+        exp_line = _experiment_line(active_experiment, paused)
+        if exp_line:
+            lines.append(exp_line)
+        return "\n".join(lines)
 
     lines = [f"🦊 Last night: {total} images captured."]
 
@@ -151,13 +186,9 @@ def render_summary(metrics: dict, state: dict, active_experiment: dict) -> str:
     if remainder > 0:
         lines.append(f"• Not yet labelled: {remainder}")
 
-    if active_experiment and not paused:
-        lines.append(
-            f"Active experiment: {active_experiment['slug']} "
-            f"[{active_experiment['status']}]"
-        )
-    elif not paused:
-        lines.append("Active experiment: none")
+    exp_line = _experiment_line(active_experiment, paused)
+    if exp_line:
+        lines.append(exp_line)
 
     return "\n".join(lines)
 
@@ -218,7 +249,9 @@ def main() -> None:
         active = next(
             (e for e in st.get("backlog", []) if e.get("id") == active_id), {}
         )
-        text = render_summary(metrics, st, active)
+        text = render_summary(
+            metrics, st, active, current_loop_day=state_mod.loop_day()
+        )
 
         # Read the agent's plain-English verdict (may be absent in older state shapes).
         verdict = st.get("nightly_verdict") or None  # treat empty string as absent
