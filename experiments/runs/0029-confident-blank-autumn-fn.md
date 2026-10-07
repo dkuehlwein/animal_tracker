@@ -140,3 +140,24 @@ Window ledger after 3 nights: 1 animal recovered (5566 @0.9875, though it was th
 (5571 @0.9686). Lifetime ≥0.92 scores: 4 animals (0.932-0.989) and 3 empties (0.9686-0.980). The classes still interleave,
 so there is no case for a lower threshold. HOLD, night 3 of 7. The expected conclusion is unchanged: retire the gate code at window close.
 5570 tier-2 `false_positive`, 5571 tier-2 `false_positive` (appended to detection_feedback).
+
+## 2026-10-07 — night 4
+
+**Zero triggers today.** Ingest past 5572 returned nothing. `loop.metrics` returned `no_data` and kept the 10-06 baseline.
+I checked that this was a quiet day, not a blind camera:
+- The camera has been up since the 10-04 03:30 restart, the deploy unit is not failed, and the logs show no errors. Sunrise warm-up
+  ran 07:42-07:47 and sunset stop came at 18:56 ("0 detections today"). `motion_area` was 0 on all ~7.8k monitoring lines.
+  The only `[DIAG-MOTION]` entries were sub-100 px contours.
+- Timelapse (2013 frames today): the framing matches 10-06 (14:50 frames compared by eye), nothing blocks the lens, and luma moved
+  normally through the day (24→70→1). So the camera was seeing a live, changing scene.
+- `scripts/fn_audit_timelapse.py` over 10-03..10-07 (10k frames): none of the top-25 transient-object candidates is from 10-07.
+  Every listed candidate sits next to a real trigger or is under 50 px. No animal that failed to trigger shows up.
+
+**Exp #40: no firing opportunity** (no review-class rows). Window ledger unchanged: 1 animal recovered (5566) vs 1 empty
+sent (5571). HOLD, night 4 of 7.
+
+Starvation watch: the last human labels were on 10-05. If tomorrow also brings none, the 3-day feedback-starved freeze applies.
+On a zero-trigger day there was nothing to label, so this is not a sign of Daniel disengaging.
+
+Infra (no slot): `loop.report` was replaying the previous day's `last_metrics` as "Last night: N images" on `no_data` nights.
+Fixed to render a no-new-images line instead (see JOURNAL for the commit).
