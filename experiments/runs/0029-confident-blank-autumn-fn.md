@@ -161,3 +161,23 @@ On a zero-trigger day there was nothing to label, so this is not a sign of Danie
 
 Infra (no slot): `loop.report` was replaying the previous day's `last_metrics` as "Last night: N images" on `no_data` nights.
 Fixed in 7727350: it now renders a no-new-images line instead.
+
+## 2026-10-08 — night 5
+
+Ingest 5573-5578: 6 triggers, all daylight 10:49-14:17 on a windy, overcast morning. Camera still up since the 10-04 03:30 restart; triggers flowed normally.
+- 5573 (10:49) UNCLASSIFIABLE, sampled out. Tier-2 `false_positive`.
+- 5574 (11:03) UNCLASSIFIABLE, sent to REVIEW. Tier-2 `false_positive`.
+- 5575 (11:25) UNCLASSIFIABLE, sent to REVIEW. Human `animal_wrong_id`.
+- 5576 (12:13) HUMAN, pc 0.58, suppressed `[HUMAN-GATE]`.
+- 5577 (12:36) UNCLASSIFIABLE, sent. Human `false_positive`.
+- 5578 (14:17) NO_ANIMAL, sent. Human `false_positive`.
+
+Tier-2 method: CLAHE full frames 1/3/5, plus per-frame crops at the point of largest difference from the burst median.
+In 5573 and 5574 the motion sits entirely in the wind-blown bamboo (top right), and no animal is visible anywhere.
+In 5575 the same crops also show only bamboo and yucca leaves. Daniel labelled it `animal_wrong_id`, and his label stands
+(human > tier-2). The animal is presumably small or hidden in a spot the motion crops missed. Noted, not overridden.
+fp_rate 4/5, fp_human 2/3. Daniel labelled on 10-08, so the starvation clock resets.
+
+**Exp #40: no firing opportunity.** The highest raw `blank` among review-class rows was 5574 at 0.9109, just under the old
+0.92 line. So the old gate would not have muted anything tonight either. Window ledger unchanged: 1 animal recovered (5566)
+vs 1 empty sent (5571). HOLD, night 5 of 7.

@@ -3305,3 +3305,11 @@ numbers as "Last night". The check is `<`, not `!=`, because metrics stamps the 
 Test-hygiene note: 3 `test_blank_confidence_*` tests in `test_wildlife_system.py` fail on HEAD. They read the live `deployed_config.env`, where exp #40 set
 the threshold to 1.0. This is the config-reload gap documented at `test_wildlife_system.py:50`. It is a test-environment leak, not a code bug. Fix the test isolation
 when exp #40 concludes, or sooner.
+
+## 2026-10-08 — tick
+
+Ingest 5573-5578: 6 triggers, 10:49-14:17, windy. 1 HUMAN suppressed, 4 UNCLASSIFIABLE (1 sampled out), 1 NO_ANIMAL. No IDENTIFIED.
+Daniel labelled 3 (5575 `animal_wrong_id`, 5577 and 5578 `false_positive`), so the starvation clock resets. Tier-2: 5573 and 5574 `false_positive`
+(motion localized to wind-blown bamboo). fp_rate 4/5, fp_human 2/3. The tier-2 crops of 5575 found no animal either. Daniel's label stands.
+**Exp #40 night 5:** no firing opportunity (max review-class raw blank 0.9109 < 0.92). HOLD, 2 nights remain. Expected conclusion stays: retire
+the Confident-Blank gate code at window close, then backlog #41 (review-sample-rate FN) takes the slot. Not paused, no deploy.
