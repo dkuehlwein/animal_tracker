@@ -3313,3 +3313,10 @@ Daniel labelled 3 (5575 `animal_wrong_id`, 5577 and 5578 `false_positive`), so t
 (motion localized to wind-blown bamboo). fp_rate 4/5, fp_human 2/3. The tier-2 crops of 5575 found no animal either. Daniel's label stands.
 **Exp #40 night 5:** no firing opportunity (max review-class raw blank 0.9109 < 0.92). HOLD, 2 nights remain. Expected conclusion stays: retire
 the Confident-Blank gate code at window close, then backlog #41 (review-sample-rate FN) takes the slot. Not paused, no deploy.
+
+## 2026-10-09
+Ingest 5579-5595: 17 triggers, 12:38-16:24, windy. All UNCLASSIFIABLE (`no cv result`), 10 REVIEW sent and 7 sampled out. 0 HUMAN, 0 IDENTIFIED.
+Tier-2: all 17 `false_positive` (bamboo/yucca wind motion; the MD boxes are on the static stone ornament). fp_rate 17/17 (tier-2 only), fp_human n=0.
+No human labels today. The last ones were 10-08, so not starved. **Exp #40 night 6:** no firing opportunity (max blank 0.9135 < 0.92). HOLD.
+The window closes tomorrow: retire the Confident-Blank gate code, then #41 takes the slot. Not paused, no deploy.
+Report: message 2 (verdict) timed out on first send; resent manually, delivered.

@@ -181,3 +181,24 @@ fp_rate 4/5, fp_human 2/3. Daniel labelled on 10-08, so the starvation clock res
 **Exp #40: no firing opportunity.** The highest raw `blank` among review-class rows was 5574 at 0.9109, just under the old
 0.92 line. So the old gate would not have muted anything tonight either. Window ledger unchanged: 1 animal recovered (5566)
 vs 1 empty sent (5571). HOLD, night 5 of 7.
+
+## 2026-10-09 — night 6
+
+Ingest 5579-5595: 17 triggers, all daylight 12:38-16:24 on another windy afternoon. Camera healthy: up since the 10-04 03:30 restart,
+sunrise warm-up 07:45-07:50, sunset stop 18:52 ("17 detections today"), no errors.
+All 17 are UNCLASSIFIABLE (`no cv result`: MegaDetector boxes at 0.21-0.41, but no classification). 0 HUMAN, 0 IDENTIFIED.
+10 went out as REVIEW messages and 7 were sampled out.
+
+Tier-2 method as on 10-08: CLAHE full frames plus per-frame crops at the point of largest difference from the burst median.
+**All 17 are `false_positive`.** The motion is in the wind-blown bamboo (top right) and the yucca. The few MD boxes
+(5585, 5589, 5590) sit on the static stone ornament left of the blue cup, which shows up unchanged in every frame. No animal in any burst.
+No human labels today (the last ones were 10-08), so the loop is not starved. fp_rate 17/17, all tier-2; fp_human n=0.
+
+**Exp #40: no firing opportunity.** The highest raw `blank` was 5594 at 0.9135, under the old 0.92 line, so the old gate
+would not have muted anything either. Window ledger unchanged: 1 animal recovered (5566) vs 1 empty sent (5571). HOLD, night 6 of 7.
+Tomorrow's tick closes the window. Per PROTOCOL ("zero firings is not a keep"), the expected conclusion is to retire the
+Confident-Blank gate code. Backlog #41 (review-sample-rate FN) then takes the slot.
+
+Observation, no action (the slot is occupied): two windy days in a row produced 23 bamboo REVIEW triggers. If wind FP volume
+persists, it is a candidate for an experiment after #41 (for example a motion-area or contour-location lever). Saved frames
+and the DB already hold the evidence, so no new instrumentation is needed.
