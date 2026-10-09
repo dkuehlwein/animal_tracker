@@ -405,46 +405,46 @@
   ],
   "last_heartbeat_loopday": "2026-10-09",
   "last_metrics": {
-    "date": "2026-10-08",
+    "date": "2026-10-09",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.37553462976252533,
-      0.9637758913675698
-    ],
-    "fp_claude_ci": [
-      0.34238022750665303,
+      0.8156818649911483,
       1.0
     ],
-    "fp_claude_count": 2,
-    "fp_claude_rate": 1.0,
-    "fp_count": 4,
-    "fp_human_ci": [
-      0.2076596008020477,
-      0.9385080552796037
+    "fp_claude_ci": [
+      0.8156818649911483,
+      1.0
     ],
-    "fp_human_count": 2,
-    "fp_human_rate": 0.6666666666666666,
+    "fp_claude_count": 17,
+    "fp_claude_rate": 1.0,
+    "fp_count": 17,
+    "fp_human_ci": [
+      0.0,
+      1.0
+    ],
+    "fp_human_count": 0,
+    "fp_human_rate": 0.0,
     "fp_md_ci": [
       0.0,
       1.0
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.8,
+    "fp_rate": 1.0,
     "fp_trustworthy": true,
-    "labeled_triggers": 5,
+    "labeled_triggers": 17,
     "n_cant_tell": 0,
-    "n_claude": 2,
-    "n_human": 3,
-    "n_human_suppressed": 1,
+    "n_claude": 17,
+    "n_human": 0,
+    "n_human_suppressed": 0,
     "n_md": 0,
     "n_person": 0,
-    "n_sampled_out": 1,
+    "n_sampled_out": 7,
     "n_unlabeled": 0,
-    "total_triggers": 6
+    "total_triggers": 17
   },
   "last_scene_change_alert_loopday": "2026-10-04",
   "last_staleness_alert_loopday": "2026-10-03",
@@ -452,5 +452,5 @@
   "nightly_verdict": "Windy morning: 6 photos, mostly bamboo moving in the wind, plus one person (not sent) and one shot you marked as an animal. No change tonight; the 'confidently empty' trial had nothing to judge and continues with 2 nights left.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5578
+  "watermark": 5595
 }
