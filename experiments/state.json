@@ -1,5 +1,5 @@
 {
-  "active_experiment_id": 40,
+  "active_experiment_id": null,
   "backlog": [
     {
       "hypothesis": "CONCLUDED 2026-06-15 (keep). Same-channel \ud83d\udd0d REVIEW prefix on status\u2208{NO_ANIMAL,UNCLASSIFIABLE} flags 99% of FP at 0 FN; live since 06-12, location-agnostic. Second-channel routing is OUT per Daniel (no 2nd channel \u2014 adds overhead, won't click two). See runs/0001 + LEARNINGS.",
@@ -291,16 +291,23 @@
       "validation": "live"
     },
     {
-      "hypothesis": "ACTIVATED + DEPLOYED 2026-10-03 (env-only, restart 2026-10-04T03:25). Confident-Blank gate (exp #29) muted 3 visible blackbirds 09-27..09-30 (blank 0.9317/0.9366/0.9885) vs empty mutes 0.9709/0.9798; lifetime 16 empty / 3 animal. Pre-registered response (runs/0021): raise strictly above the animal score, max+0.02 out of bounds -> BOUNDS ceiling 1.0 (effectively off). FN-veto passes by construction; ~+0.75 REVIEW/day. Expected conclusion after 7 nights: zero firings -> retire the gate code. Rollback: redeploy 0.92. See runs/0029.",
+      "hypothesis": "CONCLUDED 2026-10-10 (threshold 1.0 stands; gate code NOT removed). 7-night window: zero live firings by construction. Counterfactual @0.92: 1 animal recovered (5566, sampled out anyway) vs 3 empties un-muted (5571 sent; 5601 0.931 and 5603 0.938 fountain splash, both sampled out). Lifetime >=0.92 review-class: 4 animals (0.932-0.989) interleaved with 5 empties (0.931-0.980), so no in-bounds threshold separates them in autumn light. PROTOCOL's 'zero firings -> retire code' conflicts with the CLAUDE.md standing ruling that disabling this mute is human-only; code removal is the permanent form of disabling, so it is flagged to Daniel (verdict + JOURNAL), not done and not held: the slot is freed. Rollback: redeploy 0.92. See runs/0029.",
       "id": 40,
       "slug": "confident-blank-autumn-fn",
-      "status": "running",
+      "status": "concluded",
       "validation": "live"
     },
     {
-      "hypothesis": "Review sampling at 0.5 drops real animals: sampled-out review-class bursts holding a visible blackbird 5468 (09-27), 5477 (09-29), 5552 (10-04), 5566 (10-05; raw blank 0.9875, sent siblings 5565/5567 at -115s/+55s). Candidate: raise PERFORMANCE_REVIEW_SAMPLE_RATE 0.5 -> 0.75 or 1.0 (in BOUNDS; PROTOCOL 'Review sampling' says FN evidence is the valid reason). Before opening, measure event-level loss: how many sampled-out animals had NO sent sibling within +/-120s (5552 had two). Opens only after exp #40 closes (one slot).",
+      "hypothesis": "CONCLUDED 2026-10-10 (not adopted, no deploy). Event-level loss measured from DB + labels, 07-27..10-10 (70 days): 484 sampled-out review-class bursts (158 labelled), 8 labelled animal; 6 of those had a SENT sibling within +/-120s (visit still reached Daniel), only 2 event-lost (5468 09-27, 5477 09-29, both dusk/dawn blackbirds). Rate 0.5->1.0 adds ~6.9 REVIEW/day (~485 pings) to recover 2 events = ~1 catch per 240 pings, worse than the 1/155 ratio Daniel already judged not worth it (PROTOCOL 'Review sampling'). 0.75 halves both. Lower bound caveat: 326 sampled-out rows unlabelled. Re-open if event-lost animals exceed ~1/month.",
       "id": 41,
       "slug": "review-sample-rate-fn",
+      "status": "concluded",
+      "validation": "offline"
+    },
+    {
+      "hypothesis": "2026-10-10: garden fountain running produced 6 MAIN-channel FPs (5599 5606 5607 5609 5610 5611): IDENTIFIED via the ';;;;;;animal' rollup (MD 0.52-0.63 on splash) while raw top-1 was 'blank' 0.55-0.90. Lifetime rows with that signature (raw top-1 blank + animal rollup): 18 = 12 FP, 2 animal_wrong_id (2212/2213 @0.97-0.98), 1 cant_tell, 1 person, 1 unlabelled. Candidate: demote (not mute) such rows to REVIEW. This overlaps the Unnamed-Animal Blank-Raw gate Daniel retired 2026-10-03 (needs new evidence; 1 fountain day is thin, and the 2 animals sit at the same scores as FPs). Open only if the fountain/splash MAIN FPs recur on >=2 more days; check whether the pump is a one-off human action first.",
+      "id": 42,
+      "slug": "blank-raw-animal-rollup-main-fp",
       "status": "queued",
       "validation": "pending"
     }
@@ -448,8 +455,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-04",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-10-09",
-  "nightly_verdict": "Windy afternoon: all 17 photos were bamboo and yucca moving in the wind, no animals and no people. No change tonight; the 'confidently empty' trial again had nothing to judge and wraps up tomorrow.",
+  "last_tick_completed_day": "2026-10-10",
+  "nightly_verdict": "Fountain day: 16 of 18 photos were splashing water or wind in the bamboo, and the 2 blackbirds came through fine. No change deployed. The 'confidently empty' trial is over: it stays switched off because it was also hiding blackbirds. Removing its code entirely is your call, and the fountain alerts are on watch.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5613

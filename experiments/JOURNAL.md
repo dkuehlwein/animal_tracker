@@ -3320,3 +3320,15 @@ Tier-2: all 17 `false_positive` (bamboo/yucca wind motion; the MD boxes are on t
 No human labels today. The last ones were 10-08, so not starved. **Exp #40 night 6:** no firing opportunity (max blank 0.9135 < 0.92). HOLD.
 The window closes tomorrow: retire the Confident-Blank gate code, then #41 takes the slot. Not paused, no deploy.
 Report: message 2 (verdict) timed out on first send; resent manually, delivered.
+
+## 2026-10-10
+Ingest 5596-5613: 18 triggers, 11:08-17:12. Camera up since the 10-04 03:30 restart, deploy unit not failed. 0 HUMAN. Daniel labelled 5593-5595 `false_positive` late on 10-09, so not starved.
+Tier-2 (CLAHE frames 1/3/5 + crops at max diff from the burst median): 5597 and 5613 `animal` (blackbirds, IDENTIFIED `aves`, sent MAIN). The other 16 are `false_positive`:
+wind in the bamboo/yucca (5596 5600) and, new today, **the garden fountain running** (splash + ripples right of the blue spout). Six fountain bursts went to MAIN as
+IDENTIFIED `;;;;;;animal` (5599 5606 5607 5609 5610 5611; raw top-1 `blank` 0.55-0.90, MD 0.52-0.63). fp_rate 16/18 (tier-2 only), fp_human n=0.
+**Exp #40 CLOSED (night 7).** Counterfactual firings @0.92 tonight: 5601 (0.931) and 5603 (0.938), both empty fountain bursts and both sampled out, so there was no visible effect.
+Window ledger: 1 animal recovered vs 3 empties un-muted. Lifetime animal/empty scores interleave at 0.93-0.99, so the threshold stays 1.0. Gate code **not** removed:
+PROTOCOL's zero-firings→retire rule conflicts with CLAUDE.md, which makes disabling this mute human-only. Code removal is the permanent form of that, so I flagged it to Daniel rather than doing it. Nothing is held: the slot is free.
+**#41 closed, not adopted** (offline, from DB + labels): 07-27..10-10 had 8 sampled-out animal bursts. 6 had a sent sibling within ±120s and only 2 were event-lost (5468, 5477).
+Rate 1.0 = ~485 extra pings for 2 events (1/240), worse than the 1/155 Daniel rejected. **#42 queued:** raw-top-1-blank + `;;;;;;animal` rollup → lifetime 12 FP / 2 animal / 1 cant_tell / 1 person,
+animals interleaved with FPs at 0.97. It overlaps the gate Daniel retired 10-03. Open it only if fountain MAIN FPs recur on ≥2 more days. Slot empty, not paused, no deploy.

@@ -1,7 +1,7 @@
 ---
 id: 40
 slug: confident-blank-autumn-fn
-status: running
+status: concluded
 validation: live   # env delta; replay stub, so validated by re-scoring every blank_confidence_muted row
 hypothesis: "The Confident-Blank gate (exp #29) no longer separates empty gardens from animals. In autumn light SpeciesNet scores dim frames holding a visible blackbird as `blank` at 0.93-0.99, inside the range of truly empty frames (0.92-0.99). No in-bounds threshold keeps the gate's pre-registered max(animal)+0.02 margin, so the threshold goes to the BOUNDS ceiling 1.0, which turns the mute off in practice."
 created: 2026-10-03
@@ -202,3 +202,23 @@ Confident-Blank gate code. Backlog #41 (review-sample-rate FN) then takes the sl
 Observation, no action (the slot is occupied): two windy days in a row produced 23 bamboo REVIEW triggers. If wind FP volume
 persists, it is a candidate for an experiment after #41 (for example a motion-area or contour-location lever). Saved frames
 and the DB already hold the evidence, so no new instrumentation is needed.
+
+## 2026-10-10 — night 7, CONCLUDED
+
+Ingest 5596-5613: 18 triggers. Tier-2: 2 blackbirds (5597, 5613), 16 `false_positive` (bamboo wind, plus the garden fountain running all afternoon).
+
+**Counterfactual firings @0.92 tonight:** 5601 (raw blank 0.9311) and 5603 (0.9380), both UNCLASSIFIABLE, both empty (fountain splash only), and both
+**sampled out**. The old gate would have muted them correctly, but review sampling had already dropped them, so the change made no visible difference.
+
+**Final window ledger (10-04..10-10):** 0 live firings (by construction at 1.0). At the old 0.92: 1 animal recovered (5566 @0.9875, sampled out
+regardless; siblings reached Daniel) vs 3 empties un-muted (5571 sent; 5601, 5603 sampled out). Net cost: 1 extra REVIEW ping in 7 nights.
+Lifetime review-class ≥0.92: 4 animals (0.932-0.989) interleaved with 5 empties (0.931-0.980). No in-bounds threshold below 1.0 keeps the
+pre-registered margin, so **the threshold stays at 1.0**.
+
+**Decision on code removal: not done, flagged to Daniel.** The pre-registered expectation was "zero firings → retire the code" (PROTOCOL).
+But CLAUDE.md's standing rulings make *disabling* this mute (threshold 0) human-only, and deleting the gate is the irreversible-by-env form of
+disabling it. Where two written rules conflict, the narrower human-only ruling wins. This is not a hold: the slot is released tonight and nothing waits
+on approval. If Daniel wants the code gone, it is a mechanical prune (notification_gate BLANK-CONF branch, config field, BOUNDS entry, docs §, tests).
+The `blank_confidence_muted` column stays either way.
+
+status: concluded (threshold 1.0 retained; code retained pending Daniel's call). Rollback: redeploy 0.92.
