@@ -3332,3 +3332,12 @@ PROTOCOL's zero-firings→retire rule conflicts with CLAUDE.md, which makes disa
 **#41 closed, not adopted** (offline, from DB + labels): 07-27..10-10 had 8 sampled-out animal bursts. 6 had a sent sibling within ±120s and only 2 were event-lost (5468, 5477).
 Rate 1.0 = ~485 extra pings for 2 events (1/240), worse than the 1/155 Daniel rejected. **#42 queued:** raw-top-1-blank + `;;;;;;animal` rollup → lifetime 12 FP / 2 animal / 1 cant_tell / 1 person,
 animals interleaved with FPs at 0.97. It overlaps the gate Daniel retired 10-03. Open it only if fountain MAIN FPs recur on ≥2 more days. Slot empty, not paused, no deploy.
+
+## 2026-10-11
+Ingest 5614-5628: 15 triggers, 12:31-15:30, windy with the fountain running. Camera up since the 10-04 03:30 restart; deploy unit not failed. 0 HUMAN.
+Statuses: 6 NO_ANIMAL, 8 UNCLASSIFIABLE (8 sampled out across both), 1 IDENTIFIED. No human labels since 10-09 21:26. That is 2 days, so not starved yet: tomorrow without labels is the freeze edge.
+Tier-2 (CLAHE frames 1/3/5, max-diff crops and the annotated MD-box frames): all 15 are `false_positive`, from bamboo/yucca wind and fountain splash. fp_rate 15/15 (tier-2 only), fp_human n=0.
+**5624 was a MAIN FP with a new signature:** IDENTIFIED `phasianidae family` (raw top-1 `silver pheasant`, MD 0.41). It was the first phasianidae row ever, and the boxes sat on the static striped stone and the spout-stone ornaments plus a pink leaf.
+5625 (raw top-1 `bird`) has the same boxes, so these ornaments are a standing MD bait. Motion came from wind in the grass/yucca, and the frames are identical in the boxes.
+**#42 recurrence 0/2:** the fountain bursts all went to review-class tonight, and none came through the `;;;;;;animal` rollup to MAIN. Stay queued. Slot empty, not paused, no deploy.
+The exp #40 code-removal question is still with Daniel.
