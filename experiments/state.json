@@ -412,22 +412,22 @@
   ],
   "last_heartbeat_loopday": "2026-10-12",
   "last_metrics": {
-    "date": "2026-10-11",
+    "date": "2026-10-12",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.7961166989641515,
-      1.0
+      0.05668215145437519,
+      0.5098375284633583
     ],
     "fp_claude_ci": [
-      0.7961166989641515,
-      1.0
+      0.05668215145437519,
+      0.5098375284633583
     ],
-    "fp_claude_count": 15,
-    "fp_claude_rate": 1.0,
-    "fp_count": 15,
+    "fp_claude_count": 2,
+    "fp_claude_rate": 0.2,
+    "fp_count": 2,
     "fp_human_ci": [
       0.0,
       1.0
@@ -440,18 +440,18 @@
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 1.0,
+    "fp_rate": 0.2,
     "fp_trustworthy": true,
-    "labeled_triggers": 15,
+    "labeled_triggers": 10,
     "n_cant_tell": 0,
-    "n_claude": 15,
+    "n_claude": 10,
     "n_human": 0,
     "n_human_suppressed": 0,
     "n_md": 0,
-    "n_person": 0,
-    "n_sampled_out": 8,
+    "n_person": 1,
+    "n_sampled_out": 2,
     "n_unlabeled": 0,
-    "total_triggers": 15
+    "total_triggers": 11
   },
   "last_scene_change_alert_loopday": "2026-10-04",
   "last_staleness_alert_loopday": "2026-10-03",
@@ -459,5 +459,5 @@
   "nightly_verdict": "Windy day with the fountain running: all 15 photos were moving bamboo, grass or splashing water, and no animals came by. The one main-channel alert, a 'pheasant', was really the bird-shaped garden stones, so nothing has changed.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5628
+  "watermark": 5639
 }
