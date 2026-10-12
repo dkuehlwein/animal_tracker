@@ -3341,3 +3341,15 @@ Tier-2 (CLAHE frames 1/3/5, max-diff crops and the annotated MD-box frames): all
 5625 (raw top-1 `bird`) has the same boxes, so these ornaments are a standing MD bait. Motion came from wind in the grass/yucca, and the frames are identical in the boxes.
 **#42 recurrence 0/2:** the fountain bursts all went to review-class tonight, and none came through the `;;;;;;animal` rollup to MAIN. Stay queued. Slot empty, not paused, no deploy.
 The exp #40 code-removal question is still with Daniel.
+
+## 2026-10-12
+Ingest 5629-5639: 11 triggers, 10:33-18:19. Camera up since the 10-04 03:30 restart; deploy unit not failed. 0 HUMAN, 0 ERROR.
+Statuses: 8 IDENTIFIED (6 `aves` bird, 2 `;;;;;;animal` rollup: 5630 and 5633), 3 UNCLASSIFIABLE (2 sampled out).
+Tier-2 (frames 1/3/5, max-diff crops, CLAHE edge crops): **5629-5636 `animal`**, all Eurasian blackbirds at the pond edge in two visits (10:33-10:49, 13:41-13:45). All 8 went to MAIN, so 0 FN among captured visits.
+5637 and 5638 `false_positive` (fountain splash; 5637's raw top-1 'ocellated turkey' sits on the static duck ornament, MD 0.27).
+**5639 `person` (tier-2):** frame 1 only, at 18:18 dusk, shows a dark-blue vertical band across the full right edge. It reads as a close-range trouser leg walking past. person_confidence 0.42 < 0.5 gate, so the status stayed UNCLASSIFIABLE. Sampled out, so nothing was sent.
+This is the known close-up partial-body leak path (cf. #11). The sampler kept it out of Telegram, not the privacy gate. Logged as a data point; there is no tuning tonight (freeze below).
+fp_rate 2/10 (tier-2 only; person excluded), fp_human n=0.
+**FEEDBACK-STARVED FREEZE tripped:** the last human label was 10-09 21:26, 3 days ago, so `feedback_starved_since` = 2026-10-12. Hold current config. The slot is empty anyway.
+**#42 recurrence 0/2** after two watch days. The fountain ran but no raw-blank rollup reached MAIN, and today's two rollup MAIN rows were real blackbirds (raw 'bird'). Close #42 if the next fountain day is also 0.
+Not paused, no deploy. The exp #40 code-removal question is still with Daniel.

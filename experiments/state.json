@@ -305,7 +305,7 @@
       "validation": "offline"
     },
     {
-      "hypothesis": "2026-10-10: garden fountain running produced 6 MAIN-channel FPs (5599 5606 5607 5609 5610 5611): IDENTIFIED via the ';;;;;;animal' rollup (MD 0.52-0.63 on splash) while raw top-1 was 'blank' 0.55-0.90. Lifetime rows with that signature (raw top-1 blank + animal rollup): 18 = 12 FP, 2 animal_wrong_id (2212/2213 @0.97-0.98), 1 cant_tell, 1 person, 1 unlabelled. Candidate: demote (not mute) such rows to REVIEW. This overlaps the Unnamed-Animal Blank-Raw gate Daniel retired 2026-10-03 (needs new evidence; 1 fountain day is thin, and the 2 animals sit at the same scores as FPs). Open only if the fountain/splash MAIN FPs recur on >=2 more days; check whether the pump is a one-off human action first. 2026-10-11 recurrence check: fountain ran again (5614 5618 5619 5621 5623) but every splash burst routed NO_ANIMAL/UNCLASSIFIABLE, none reached MAIN via the rollup. Recurrence count 0/2. The day's only MAIN FP (5624) is a different signature: specific-species IDENTIFIED (raw top-1 'silver pheasant', rollup phasianidae, MD 0.41) on the STATIC striped stone + spout-stone ornaments (MD boxes identical to 5625's), motion from wind on grass. First phasianidae row ever; watch for recurrence before treating as a pattern.",
+      "hypothesis": "2026-10-10: garden fountain running produced 6 MAIN-channel FPs (5599 5606 5607 5609 5610 5611): IDENTIFIED via the ';;;;;;animal' rollup (MD 0.52-0.63 on splash) while raw top-1 was 'blank' 0.55-0.90. Lifetime rows with that signature (raw top-1 blank + animal rollup): 18 = 12 FP, 2 animal_wrong_id (2212/2213 @0.97-0.98), 1 cant_tell, 1 person, 1 unlabelled. Candidate: demote (not mute) such rows to REVIEW. This overlaps the Unnamed-Animal Blank-Raw gate Daniel retired 2026-10-03 (needs new evidence; 1 fountain day is thin, and the 2 animals sit at the same scores as FPs). Open only if the fountain/splash MAIN FPs recur on >=2 more days; check whether the pump is a one-off human action first. 2026-10-11 recurrence check: fountain ran again (5614 5618 5619 5621 5623) but every splash burst routed NO_ANIMAL/UNCLASSIFIABLE, none reached MAIN via the rollup. Recurrence count 0/2. The day's only MAIN FP (5624) is a different signature: specific-species IDENTIFIED (raw top-1 'silver pheasant', rollup phasianidae, MD 0.41) on the STATIC striped stone + spout-stone ornaments (MD boxes identical to 5625's), motion from wind on grass. First phasianidae row ever; watch for recurrence before treating as a pattern. 2026-10-12 recurrence check: fountain ran again (splash in 5632-5638) but no raw-blank + rollup row reached MAIN. The two ';;;;;;animal' MAIN rows (5630, 5633) were REAL blackbirds with raw top-1 'bird', not 'blank', which is a reminder that the rollup also carries animals. Recurrence count 0/2 after two watch days. If the next fountain day also stays 0, close #42 as not reproduced.",
       "id": 42,
       "slug": "blank-raw-animal-rollup-main-fp",
       "status": "queued",
@@ -326,7 +326,7 @@
     "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.5,
     "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
   },
-  "feedback_starved_since": null,
+  "feedback_starved_since": "2026-10-12",
   "history": [
     {
       "config": {},
@@ -455,8 +455,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-04",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-10-11",
-  "nightly_verdict": "Windy day with the fountain running: all 15 photos were moving bamboo, grass or splashing water, and no animals came by. The one main-channel alert, a 'pheasant', was really the bird-shaped garden stones, so nothing has changed.",
+  "last_tick_completed_day": "2026-10-12",
+  "nightly_verdict": "A good bird day: 8 of the 11 photos were a blackbird visiting the pond, and all of them reached the main channel; the 2 false alarms were the fountain splashing. No new labels from you for 3 days, so tuning is frozen until you label a few photos; nothing changed.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5639
