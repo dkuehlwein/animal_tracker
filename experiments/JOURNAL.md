@@ -3353,3 +3353,9 @@ fp_rate 2/10 (tier-2 only; person excluded), fp_human n=0.
 **FEEDBACK-STARVED FREEZE tripped:** the last human label was 10-09 21:26, 3 days ago, so `feedback_starved_since` = 2026-10-12. Hold current config. The slot is empty anyway.
 **#42 recurrence 0/2** after two watch days. The fountain ran but no raw-blank rollup reached MAIN, and today's two rollup MAIN rows were real blackbirds (raw 'bird'). Close #42 if the next fountain day is also 0.
 Not paused, no deploy. The exp #40 code-removal question is still with Daniel.
+
+## 2026-10-13
+Ingest past 5639: **0 triggers**. The Pi **rebooted unplanned at 06:47:46** (uptime start; no persistent journal, so the cause is unknown, power loss likely). wildlife-camera came up at 06:48 before sunrise and monitored 07:51-18:43; deploy unit not failed.
+Zero triggers is a calm day, not a fault: the heartbeat motion_area is 0 on ~99.9% of lines on normal days too (10-12: 3 nonzero of 7541). Timelapse luma tracks daylight (mean 63-71 at midday). The 13:00 frame matches 10-12 13:00 in aim and scene. No scene-watch alert.
+**Freeze lifted:** Daniel labelled 27 rows (5596-5637) at 10-12 21:27, after yesterday's commit. **Self-audit:** tier-2 vs human = **27/27 agree**. That covers the 6 fountain `;;;;;;animal` MAIN FPs, 5624 'pheasant' (stone ornaments) and the 8 blackbirds 5629-5636. `feedback_starved_since` cleared.
+metrics: no_data, baseline preserved. No tier-2 needed. #42 recurrence still 0/2: no fountain data today, so the counter does not advance. Slot empty, not paused, no deploy. The exp #40 code-removal question is still with Daniel.
