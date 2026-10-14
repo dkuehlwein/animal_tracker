@@ -412,22 +412,22 @@
   ],
   "last_heartbeat_loopday": "2026-10-14",
   "last_metrics": {
-    "date": "2026-10-12",
+    "date": "2026-10-14",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.05668215145437519,
-      0.5098375284633583
+      0.13684428582359742,
+      0.6942576053973727
     ],
     "fp_claude_ci": [
-      0.05668215145437519,
-      0.5098375284633583
+      0.13684428582359742,
+      0.6942576053973727
     ],
-    "fp_claude_count": 2,
-    "fp_claude_rate": 0.2,
-    "fp_count": 2,
+    "fp_claude_count": 3,
+    "fp_claude_rate": 0.375,
+    "fp_count": 3,
     "fp_human_ci": [
       0.0,
       1.0
@@ -440,18 +440,18 @@
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.2,
+    "fp_rate": 0.375,
     "fp_trustworthy": true,
-    "labeled_triggers": 10,
+    "labeled_triggers": 8,
     "n_cant_tell": 0,
-    "n_claude": 10,
+    "n_claude": 8,
     "n_human": 0,
     "n_human_suppressed": 0,
     "n_md": 0,
-    "n_person": 1,
-    "n_sampled_out": 2,
+    "n_person": 2,
+    "n_sampled_out": 1,
     "n_unlabeled": 0,
-    "total_triggers": 11
+    "total_triggers": 10
   },
   "last_scene_change_alert_loopday": "2026-10-04",
   "last_staleness_alert_loopday": "2026-10-03",
@@ -459,5 +459,5 @@
   "nightly_verdict": "A quiet day: nothing in the garden moved enough to trigger the camera (it also rebooted itself at 06:47, but was watching normally all day). Thanks for labelling 27 photos last night \u2014 they matched my own calls exactly, so tuning is unfrozen; nothing needed changing.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5639
+  "watermark": 5649
 }
