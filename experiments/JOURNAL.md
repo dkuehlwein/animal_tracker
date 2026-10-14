@@ -3359,3 +3359,13 @@ Ingest past 5639: **0 triggers**. The Pi **rebooted unplanned at 06:47:46** (upt
 Zero triggers is a calm day, not a fault: the heartbeat motion_area is 0 on ~99.9% of lines on normal days too (10-12: 3 nonzero of 7541). Timelapse luma tracks daylight (mean 63-71 at midday). The 13:00 frame matches 10-12 13:00 in aim and scene. No scene-watch alert.
 **Freeze lifted:** Daniel labelled 27 rows (5596-5637) at 10-12 21:27, after yesterday's commit. **Self-audit:** tier-2 vs human = **27/27 agree**. That covers the 6 fountain `;;;;;;animal` MAIN FPs, 5624 'pheasant' (stone ornaments) and the 8 blackbirds 5629-5636. `feedback_starved_since` cleared.
 metrics: no_data, baseline preserved. No tier-2 needed. #42 recurrence still 0/2: no fountain data today, so the counter does not advance. Slot empty, not paused, no deploy. The exp #40 code-removal question is still with Daniel.
+
+## 2026-10-14
+Ingest 5640-5649: 10 triggers, 13:11-15:49. Camera up since the 10-13 06:48 reboot; deploy unit not failed. Fountain running.
+Statuses: 7 IDENTIFIED (5 `aves` bird, 2 `;;;;;;animal` rollup: 5641, 5642), 2 UNCLASSIFIABLE (5640 sampled out; 5648 human_proximity_muted), 1 HUMAN (5649, taxon arm homo 0.97, pc 0.02).
+Tier-2 (contact sheets + CLAHE box crops): **5643-5647 `animal`**, one blackbird visit 15:07-15:12 by the pond-edge flower, all MAIN. 5640 `false_positive` (fountain, raw blank 0.918, sampled out).
+**5641/5642 `false_positive` reached MAIN**: rollup `;;;;;;animal`, raw top-1 blank 0.937/0.919, MD boxes 0.59/0.63 on the static stone ornaments left of the spout. Motion came from the spout. This is exactly the #42 signature.
+**5648 `person`**: blue clothing intrudes from the top edge in frames 3-4, 23 s before 5649 (jeans walking through, HUMAN). Deferred REVIEW send was cancelled by 5649 → muted. The leading-edge privacy path worked as designed.
+fp_rate 3/8 (tier-2 only; 2 person excluded), fp_human n=0. Last human label 10-12 21:27 = 2 days; the freeze edge is tomorrow.
+**#42 recurrence 1/2** (first fountain day with raw-blank rollup MAIN FPs since 10-10). Stays queued. Design caveat: the lifetime animals 2212/2213 at raw blank 0.97-0.98 score above today's FPs, so a score cut cannot separate them; measure before proposing.
+Slot empty, not paused, no deploy. The exp #40 code-removal question is still with Daniel.
