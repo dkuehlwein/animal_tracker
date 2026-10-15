@@ -326,7 +326,7 @@
     "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.5,
     "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
   },
-  "feedback_starved_since": null,
+  "feedback_starved_since": "2026-10-15",
   "history": [
     {
       "config": {},
@@ -455,8 +455,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-04",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-10-14",
-  "nightly_verdict": "Fountain afternoon: the camera caught a blackbird six times and correctly blocked a passer-by, but the fountain splash also caused 2 false 'animal' alerts. No change yet \u2014 this is the first repeat of that pattern; one more fountain day like this and I'll start a fix.",
+  "last_tick_completed_day": "2026-10-15",
+  "nightly_verdict": "Blackbird afternoon: all 16 alerts today were the same blackbird foraging by the pond, and none were false alarms. No change made \u2014 I haven't had your feedback for 3 days, so tuning is paused until you label a few photos.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5665

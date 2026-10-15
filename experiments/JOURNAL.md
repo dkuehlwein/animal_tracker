@@ -3369,3 +3369,12 @@ Tier-2 (contact sheets + CLAHE box crops): **5643-5647 `animal`**, one blackbird
 fp_rate 3/8 (tier-2 only; 2 person excluded), fp_human n=0. Last human label 10-12 21:27 = 2 days; the freeze edge is tomorrow.
 **#42 recurrence 1/2** (first fountain day with raw-blank rollup MAIN FPs since 10-10). Stays queued. Design caveat: the lifetime animals 2212/2213 at raw blank 0.97-0.98 score above today's FPs, so a score cut cannot separate them; measure before proposing.
 Slot empty, not paused, no deploy. The exp #40 code-removal question is still with Daniel.
+
+## 2026-10-15
+Ingest 5650-5665: 16 triggers, 13:00-13:19 plus one at 17:50. Camera up since the 10-13 06:48 reboot; deploy unit not failed. 0 HUMAN, 0 ERROR.
+Statuses: 14 IDENTIFIED `aves` bird (MD 0.59-0.85), 1 UNCLASSIFIABLE (5661, not sampled out, so sent as REVIEW), 1 `;;;;;;animal` rollup (5665, raw top-1 `corvus species` 0.21, MD 0.75).
+Tier-2 (frames 1/3/5 contact sheets): **all 16 `animal`**. A single Eurasian blackbird foraged at the pond edge and flower for 13:00-13:19 and came back at 17:50 dusk. Every burst reached Telegram (15 MAIN, 1 REVIEW), so there was 0 FN among captured visits.
+5665 is a correct rollup MAIN send: a real bird with raw corvus, not raw blank. It is NOT the #42 signature.
+fp_rate 0/16 (tier-2 only), fp_human n=0.
+**FEEDBACK-STARVED FREEZE tripped:** the last human label was 10-12 21:27, 3 days ago, so `feedback_starved_since` = 2026-10-15. Hold the current config.
+**#42 recurrence stays 1/2:** today had no raw-blank rollup MAIN FPs. Stays queued. Slot empty, not paused, no deploy. The exp #40 code-removal question is still with Daniel.
