@@ -412,18 +412,18 @@
   ],
   "last_heartbeat_loopday": "2026-10-16",
   "last_metrics": {
-    "date": "2026-10-15",
+    "date": "2026-10-16",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
       0.0,
-      0.1936076805344365
+      0.4898908364545973
     ],
     "fp_claude_ci": [
       0.0,
-      0.1936076805344365
+      0.4898908364545973
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
@@ -442,16 +442,16 @@
     "fp_md_rate": 0.0,
     "fp_rate": 0.0,
     "fp_trustworthy": true,
-    "labeled_triggers": 16,
+    "labeled_triggers": 4,
     "n_cant_tell": 0,
-    "n_claude": 16,
+    "n_claude": 4,
     "n_human": 0,
     "n_human_suppressed": 0,
     "n_md": 0,
-    "n_person": 0,
+    "n_person": 1,
     "n_sampled_out": 0,
     "n_unlabeled": 0,
-    "total_triggers": 16
+    "total_triggers": 5
   },
   "last_scene_change_alert_loopday": "2026-10-04",
   "last_staleness_alert_loopday": "2026-10-03",
@@ -459,5 +459,5 @@
   "nightly_verdict": "Blackbird afternoon: all 16 alerts today were the same blackbird foraging by the pond, and none were false alarms. No change made \u2014 I haven't had your feedback for 3 days, so tuning is paused until you label a few photos.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5665
+  "watermark": 5670
 }
