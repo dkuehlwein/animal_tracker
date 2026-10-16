@@ -3378,3 +3378,12 @@ Tier-2 (frames 1/3/5 contact sheets): **all 16 `animal`**. A single Eurasian bla
 fp_rate 0/16 (tier-2 only), fp_human n=0.
 **FEEDBACK-STARVED FREEZE tripped:** the last human label was 10-12 21:27, 3 days ago, so `feedback_starved_since` = 2026-10-15. Hold the current config.
 **#42 recurrence stays 1/2:** today had no raw-blank rollup MAIN FPs. Stays queued. Slot empty, not paused, no deploy. The exp #40 code-removal question is still with Daniel.
+
+## 2026-10-16
+Ingest 5666-5670: 5 triggers, 14:20-15:50. Camera up since the 10-13 06:48 reboot; deploy unit not failed. 0 ERROR.
+Statuses: 1 HUMAN (5666, taxon arm homo, pc 0.02), 4 IDENTIFIED (3 `aves` bird, 1 `;;;;;;animal` rollup 5667 with raw top-1 `bird`).
+Tier-2 (frames 1/3/5 contact sheets): **5666 `person`** — dark clothing at extreme close range fills the left third of frame 1, gone by frame 3; HUMAN gate suppressed it as designed. **5667-5670 `animal`**: one Eurasian blackbird foraging left of the pond by the flower, 15:47-15:50, all MAIN, 0 FN among captured visits.
+5667 is a correct rollup MAIN send (real bird, raw `bird`), NOT the #42 signature.
+fp_rate 0/4 (tier-2 only; person excluded), fp_human n=0.
+**Freeze lifted:** Daniel labelled 23 rows (5641-5665) at 10-15 21:15-21:17. **Self-audit:** tier-2 vs human = **23/23 agree** (incl. the two #42-signature fountain MAIN FPs 5641/5642 and the 10-15 blackbird visit). `feedback_starved_since` cleared.
+**#42 recurrence stays 1/2:** no fountain bursts today. Stays queued. Slot empty, not paused, no deploy. The exp #40 code-removal question is still with Daniel.

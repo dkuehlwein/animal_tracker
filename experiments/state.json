@@ -326,7 +326,7 @@
     "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.5,
     "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
   },
-  "feedback_starved_since": "2026-10-15",
+  "feedback_starved_since": null,
   "history": [
     {
       "config": {},
@@ -455,8 +455,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-04",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-10-15",
-  "nightly_verdict": "Blackbird afternoon: all 16 alerts today were the same blackbird foraging by the pond, and none were false alarms. No change made \u2014 I haven't had your feedback for 3 days, so tuning is paused until you label a few photos.",
+  "last_tick_completed_day": "2026-10-16",
+  "nightly_verdict": "Quiet day: one blackbird visit around 15:48 (all 4 photos sent to you) and one person walking past at 14:20, which was correctly kept private. No false alarms and no change made; thanks for yesterday's labels, which matched my calls 23 out of 23, so tuning is unfrozen.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5670
