@@ -3387,3 +3387,12 @@ Tier-2 (frames 1/3/5 contact sheets): **5666 `person`** — dark clothing at ext
 fp_rate 0/4 (tier-2 only; person excluded), fp_human n=0.
 **Freeze lifted:** Daniel labelled 23 rows (5641-5665) at 10-15 21:15-21:17. **Self-audit:** tier-2 vs human = **23/23 agree** (incl. the two #42-signature fountain MAIN FPs 5641/5642 and the 10-15 blackbird visit). `feedback_starved_since` cleared.
 **#42 recurrence stays 1/2:** no fountain bursts today. Stays queued. Slot empty, not paused, no deploy. The exp #40 code-removal question is still with Daniel.
+
+## 2026-10-17
+Ingest 5671-5685: 15 triggers, 10:35-17:55. Camera up since the 10-13 06:48 reboot; deploy unit not failed. 0 ERROR.
+Statuses: 1 HUMAN (5671, taxon arm homo, pc 0.02), 4 review-class (5672 UNCLASSIFIABLE raw 'palawan peacock-pheasant' MD 0.49; 5673 NO_ANIMAL; 5674/5675 UNCLASSIFIABLE raw blank), 10 IDENTIFIED (9 `aves` bird, 1 `;;;;;;animal` rollup 5677 with raw top-1 'red junglefowl').
+Tier-2 (contact sheets + CLAHE crops of the review-class rows): **5671 `person`**: dim 10:35 frames 1-2 show a dark close-range figure crossing left-centre and then right. The HUMAN gate suppressed it as designed. **5672-5675 `false_positive`**: empty garden; 5673/5674 have the fountain running. 5672-5674 sampled out, **5675 sent as REVIEW** (only REVIEW ping today). **5676-5685 `animal`**: a Eurasian blackbird at the pond edge/flower in two visits (15:14-15:17, 17:36-17:55 dusk), all MAIN. 0 FN among captured visits.
+5677 is a correct rollup MAIN send (real bird, raw junglefowl), NOT the #42 signature. 5672's phasianidae raw sits on the static stone ornaments, the same bait as 5624. It stayed review-class.
+fp_rate 4/14 (tier-2 only; person excluded), fp_human n=0.
+**Self-audit:** Daniel labelled 5667-5670 `animal` at 10-16 21:49, so tier-2 vs human = **4/4 agree**. Not starved.
+**#42 recurrence stays 1/2:** the fountain ran but no raw-blank rollup reached MAIN. Stays queued. Slot empty, not paused, no deploy. The exp #40 code-removal question is still with Daniel.
