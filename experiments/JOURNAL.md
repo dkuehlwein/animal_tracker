@@ -3396,3 +3396,12 @@ Tier-2 (contact sheets + CLAHE crops of the review-class rows): **5671 `person`*
 fp_rate 4/14 (tier-2 only; person excluded), fp_human n=0.
 **Self-audit:** Daniel labelled 5667-5670 `animal` at 10-16 21:49, so tier-2 vs human = **4/4 agree**. Not starved.
 **#42 recurrence stays 1/2:** the fountain ran but no raw-blank rollup reached MAIN. Stays queued. Slot empty, not paused, no deploy. The exp #40 code-removal question is still with Daniel.
+
+## 2026-10-18
+Ingest 5686-5688: 3 triggers, 14:57-16:04. Camera active, deploy unit not failed. 0 ERROR.
+Statuses: 1 HUMAN (5686, taxon arm homo 0.97, pc 0.80), 2 IDENTIFIED (5687 `aves` bird 0.73; 5688 `;;;;;;animal` rollup 0.70 with raw top-1 `bird` 0.24).
+Tier-2 (5-frame contact sheets): **5686 `person`**: blue-jeaned legs crossing the left half of the frame at close range in frames 1-3, gone by frame 4. The HUMAN gate suppressed it as designed. **5687/5688 `animal`**: a Eurasian blackbird left of the pond by the flower at dusk (16:03-16:04, luma low, below the sharpness floor), both sent to MAIN. 0 FN among captured visits.
+5688 is a correct rollup MAIN send (real bird, raw `bird`), NOT the #42 signature.
+fp_rate 0/2 (tier-2 only; person excluded), fp_human n=0.
+**Self-audit:** no new human labels since 10-16 21:49, so there is nothing to reconcile. Not starved yet: the 3-day freeze would trip after 10-19 21:49 if no labels arrive.
+**#42 recurrence stays 1/2:** no fountain bursts today. Slot empty, not paused, no deploy. The exp #40 code-removal question is still with Daniel.
