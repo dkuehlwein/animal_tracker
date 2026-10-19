@@ -3405,3 +3405,12 @@ Tier-2 (5-frame contact sheets): **5686 `person`**: blue-jeaned legs crossing th
 fp_rate 0/2 (tier-2 only; person excluded), fp_human n=0.
 **Self-audit:** no new human labels since 10-16 21:49, so there is nothing to reconcile. Not starved yet: the 3-day freeze would trip after 10-19 21:49 if no labels arrive.
 **#42 recurrence stays 1/2:** no fountain bursts today. Slot empty, not paused, no deploy. The exp #40 code-removal question is still with Daniel.
+
+## 2026-10-19
+Ingest 5689-5711: 23 triggers, 17:37-18:17, one continuous gardening session. Camera up since the 10-13 06:48 reboot; deploy unit not failed. 0 ERROR.
+Statuses: 20 HUMAN (pc 0.00-0.91), 3 NO_ANIMAL (5691, 5700, 5701), all `human_proximity_muted`. **0 Telegram sends today** (5701 also sampled out).
+Tier-2 (5-frame contact sheets, gain 2.5x): **all 20 HUMAN rows `person`** (jeans legs, a magenta top at extreme close range, a white bucket and tools). **5701 `person`**: dark legs cross the frame in frames 2-5. **5691/5700 `false_positive`**: empty garden. The privacy chain did its job: no leaks.
+fp_rate 2/2 (tier-2 only; 21 person excluded), fp_human n=0.
+**Scene change (nightgate scene_watch alert fired today, match_fraction 0.08, 1/12):** this is NOT a re-aim. The camera framing is unchanged (pond, blue marker, bamboo and bamboo cane all sit in the same places). The garden was rearranged: the foreground fuchsia/coleus and the yucca are gone, and a large yellow pot with a multi-stem tree now stands in the left foreground, about 1/3 of the frame wide, covering the lower-left corner where the blackbird foraged on 10-16..10-18. Expect (a) the edge baseline to stay "changed" until it rolls over (3-7 days; the alert cooldown is 7d, so no re-alert), (b) possible new wind-sway FPs from the tree stems, and (c) fewer animal views in the lower left. Watch volume and review-class FPs over the next nights before attributing any change to config.
+**Self-audit:** Daniel labelled 13 rows (5675-5688) at 10-19 12:40-12:42; tier-2 vs human = **13/13 agree**. Not starved (`feedback_starved_since` stays null).
+**#42 recurrence stays 1/2:** no fountain bursts. Slot empty, not paused, no deploy. The exp #40 code-removal question is still with Daniel.
