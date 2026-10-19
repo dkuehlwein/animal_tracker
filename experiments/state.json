@@ -410,7 +410,7 @@
       "replaced_at": "2026-10-04T03:25:00+02:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-10-18",
+  "last_heartbeat_loopday": "2026-10-19",
   "last_metrics": {
     "date": "2026-10-18",
     "error_count": 0,
@@ -453,7 +453,7 @@
     "n_unlabeled": 0,
     "total_triggers": 3
   },
-  "last_scene_change_alert_loopday": "2026-10-04",
+  "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
   "last_tick_completed_day": "2026-10-18",
   "nightly_verdict": "Quiet day: a blackbird visited the pond at dusk and both photos were sent to you, and one person walking past at 14:57 was correctly kept private. No false alarms and no change made.",
