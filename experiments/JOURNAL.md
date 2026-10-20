@@ -3414,3 +3414,11 @@ fp_rate 2/2 (tier-2 only; 21 person excluded), fp_human n=0.
 **Scene change (nightgate scene_watch alert fired today, match_fraction 0.08, 1/12):** this is NOT a re-aim. The camera framing is unchanged (pond, blue marker, bamboo and bamboo cane all sit in the same places). The garden was rearranged: the foreground fuchsia/coleus and the yucca are gone, and a large yellow pot with a multi-stem tree now stands in the left foreground, about 1/3 of the frame wide, covering the lower-left corner where the blackbird foraged on 10-16..10-18. Expect (a) the edge baseline to stay "changed" until it rolls over (3-7 days; the alert cooldown is 7d, so no re-alert), (b) possible new wind-sway FPs from the tree stems, and (c) fewer animal views in the lower left. Watch volume and review-class FPs over the next nights before attributing any change to config.
 **Self-audit:** Daniel labelled 13 rows (5675-5688) at 10-19 12:40-12:42; tier-2 vs human = **13/13 agree**. Not starved (`feedback_starved_since` stays null).
 **#42 recurrence stays 1/2:** no fountain bursts. Slot empty, not paused, no deploy. The exp #40 code-removal question is still with Daniel.
+
+## 2026-10-20
+Quiet day: **3 triggers** (5712-5714), 0 errors. **5712/5713** (10:12, 10:13) IDENTIFIED `;aves;;;;;bird` rollup, MAIN sends; Daniel labelled both `animal` (16:50). **5714** (11:03) NO_ANIMAL, `[REVIEW-SAMPLE]` sampled out (person_conf 0.22, sub-threshold).
+Tier-2 (5-frame contact sheet): **5714 `false_positive`**, an empty garden in all 5 frames with nothing hidden; the sampled-out burst is not an FN. The new yellow-potted tree (10-19) sits in the same spot, and no stem-sway FP pattern is visible yet (the only blank is 1 burst).
+fp_rate 1/3 (the 1 FP is tier-2 only); fp_human 0/2.
+**Volume:** 3 vs baseline 27. Two of the last three days had 3 triggers each (10-18, 10-20), and 10-19's 23 was a gardening session. Nothing was deployed since 10-04, so no config change is a rollback candidate. The likely drivers are autumn and the potted tree covering the lower-left foraging spot. Keep watching; this is not a guardrail action.
+**Self-audit:** human vs tier-1 2/2 agree. Not starved.
+**#42 recurrence stays 1/2:** no fountain bursts. Slot empty, not paused, FN unmeasured, so no deploy. The exp #40 code-removal question is still with Daniel.

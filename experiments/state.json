@@ -455,8 +455,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-10-19",
-  "nightly_verdict": "Busy gardening session around 17:40-18:20: 23 photos, 21 with people in them, and all of them correctly kept private, so nothing was sent. The scene alert today comes from the garden being rearranged (new yellow-potted tree in the left foreground), not from the camera being moved. No change made.",
+  "last_tick_completed_day": "2026-10-20",
+  "nightly_verdict": "Quiet day: 3 photos, two of a bird this morning that you confirmed as animals, plus one empty-garden shot that was correctly held back. No change made; the low volume looks like autumn plus the new potted tree hiding the lower-left corner, not a camera problem.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5714
