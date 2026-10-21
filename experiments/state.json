@@ -412,25 +412,25 @@
   ],
   "last_heartbeat_loopday": "2026-10-21",
   "last_metrics": {
-    "date": "2026-10-20",
+    "date": "2026-10-21",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.06149194472039621,
-      0.7923403991979522
+      0.09746059290024889,
+      0.5656453011761291
     ],
     "fp_claude_ci": [
-      0.20654931437723745,
-      1.0
+      0.09746059290024889,
+      0.5656453011761291
     ],
-    "fp_claude_count": 1,
-    "fp_claude_rate": 1.0,
-    "fp_count": 1,
+    "fp_claude_count": 3,
+    "fp_claude_rate": 0.2727272727272727,
+    "fp_count": 3,
     "fp_human_ci": [
       0.0,
-      0.6576197724933469
+      1.0
     ],
     "fp_human_count": 0,
     "fp_human_rate": 0.0,
@@ -440,18 +440,18 @@
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.3333333333333333,
+    "fp_rate": 0.2727272727272727,
     "fp_trustworthy": true,
-    "labeled_triggers": 3,
+    "labeled_triggers": 11,
     "n_cant_tell": 0,
-    "n_claude": 1,
-    "n_human": 2,
+    "n_claude": 11,
+    "n_human": 0,
     "n_human_suppressed": 0,
     "n_md": 0,
-    "n_person": 0,
-    "n_sampled_out": 1,
+    "n_person": 2,
+    "n_sampled_out": 3,
     "n_unlabeled": 0,
-    "total_triggers": 3
+    "total_triggers": 13
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
@@ -459,5 +459,5 @@
   "nightly_verdict": "Quiet day: 3 photos, two of a bird this morning that you confirmed as animals, plus one empty-garden shot that was correctly held back. No change made; the low volume looks like autumn plus the new potted tree hiding the lower-left corner, not a camera problem.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5714
+  "watermark": 5727
 }
