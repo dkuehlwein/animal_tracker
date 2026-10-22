@@ -412,22 +412,22 @@
   ],
   "last_heartbeat_loopday": "2026-10-22",
   "last_metrics": {
-    "date": "2026-10-21",
+    "date": "2026-10-22",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.09746059290024889,
-      0.5656453011761291
+      0.8843331823158513,
+      0.9960664011171667
     ],
     "fp_claude_ci": [
-      0.09746059290024889,
-      0.5656453011761291
+      0.8843331823158513,
+      0.9960664011171667
     ],
-    "fp_claude_count": 3,
-    "fp_claude_rate": 0.2727272727272727,
-    "fp_count": 3,
+    "fp_claude_count": 44,
+    "fp_claude_rate": 0.9777777777777777,
+    "fp_count": 44,
     "fp_human_ci": [
       0.0,
       1.0
@@ -440,18 +440,18 @@
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.2727272727272727,
+    "fp_rate": 0.9777777777777777,
     "fp_trustworthy": true,
-    "labeled_triggers": 11,
+    "labeled_triggers": 45,
     "n_cant_tell": 0,
-    "n_claude": 11,
+    "n_claude": 45,
     "n_human": 0,
     "n_human_suppressed": 0,
     "n_md": 0,
-    "n_person": 2,
-    "n_sampled_out": 3,
+    "n_person": 0,
+    "n_sampled_out": 24,
     "n_unlabeled": 0,
-    "total_triggers": 13
+    "total_triggers": 45
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
@@ -459,5 +459,5 @@
   "nightly_verdict": "Good bird day: a blackbird visited twice around the new potted tree and you got 5 alerts of it; 3 more shots of it were hidden behind the flower ornament and missed by the AI, but the visit reached you anyway. Two people this evening were kept private, and 2 of today's review pings were just wind. No change made.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5727
+  "watermark": 5772
 }
