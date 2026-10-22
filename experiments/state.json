@@ -455,8 +455,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-10-21",
-  "nightly_verdict": "Good bird day: a blackbird visited twice around the new potted tree and you got 5 alerts of it; 3 more shots of it were hidden behind the flower ornament and missed by the AI, but the visit reached you anyway. Two people this evening were kept private, and 2 of today's review pings were just wind. No change made.",
+  "last_tick_completed_day": "2026-10-22",
+  "nightly_verdict": "Windy day: 44 of 45 triggers were the bamboo moving, and 20 of those reached you as empty review pings. The one real visit was a blackbird at dusk by the potted tree. No change made, because every filter that would cut the wind pings would also have hidden yesterday's partly-hidden blackbird.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5772
