@@ -3440,3 +3440,11 @@ fp_rate 44/45 (tier-2 only), fp_human n=0.
 **Lever check (no deploy):** the confident-blank mute could not have helped (max raw blank today 0.775, below the 0.87 loop floor). Motion threshold/ROI levers are FN-vetoed on record (exp #3/#4/#35: birds perch in the same bamboo). "No MD box -> mute" is FN-vetoed by yesterday's occluded blackbird bursts 5717/5720 (no box, NO_ANIMAL). Wind days are the review-sampling lever's job, and that is a volume lever Daniel has already set.
 **#42 recurrence stays 1/2:** the fountain ran, but no raw-blank `;;;;;;animal` row reached MAIN (no rollup rows at all).
 **Self-audit:** no human labels since 10-20 16:50, nothing to reconcile. Not starved yet; the 3-day freeze trips after 10-23 16:50 if no labels arrive. Slot empty, not paused, FN unmeasured, so no deploy. The exp #40 code-removal question is still with Daniel.
+
+## 2026-10-23
+Ingest 5773-5776: **4 triggers**, 13:12-16:49, 0 ERROR. Camera + feedback services active, deploy unit not failed, nothing pending. Volume 4 vs baseline 27 (low, consistent with the autumn/potted-tree trend since 10-18; nothing deployed since 10-04, so no rollback candidate).
+Statuses: 1 HUMAN (5773, taxon `human` 0.96, pc 0.94), 3 NO_ANIMAL (5774-5776, no MD box). 5775 `[REVIEW-SAMPLE]` sampled out; 5774/5776 sent as REVIEW (2 empty pings). 5774/5776 are below the sharpness floor but not blur-muted (dusk luma < 70, as designed).
+Tier-2 (5-frame contact sheets): **5773 `person`**: a dark trouser leg fills the right edge of frame 1, gone by frame 2; HUMAN gate suppressed it. **5774-5776 `false_positive`**: empty garden, wind in bamboo/grass/tree stems, fountain running in 5775. Nothing in the lower-left foraging spot. 0 FN among captured bursts.
+fp_rate 3/3 (tier-2 only; 1 person excluded), fp_human n=0.
+**FEEDBACK-STARVED FREEZE tripped:** the last human label was 10-20 16:50, 3 days ago, so `feedback_starved_since` = 2026-10-23. Hold current config. The slot is empty anyway.
+**#42 recurrence stays 1/2:** fountain ran, no `;;;;;;animal` rollup row reached MAIN. Slot empty, not paused, frozen, FN unmeasured, so no deploy. The exp #40 code-removal question is still with Daniel.

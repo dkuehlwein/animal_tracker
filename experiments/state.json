@@ -326,7 +326,7 @@
     "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.5,
     "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
   },
-  "feedback_starved_since": null,
+  "feedback_starved_since": "2026-10-23",
   "history": [
     {
       "config": {},
@@ -455,8 +455,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-10-22",
-  "nightly_verdict": "Windy day: 44 of 45 triggers were the bamboo moving, and 20 of those reached you as empty review pings. The one real visit was a blackbird at dusk by the potted tree. No change made, because every filter that would cut the wind pings would also have hidden yesterday's partly-hidden blackbird.",
+  "last_tick_completed_day": "2026-10-23",
+  "nightly_verdict": "Quiet day: 4 triggers \u2014 one person walking past (correctly kept private) and three empty-garden wind alarms, two of which reached you as review pings. No change made; tuning is now on hold because there have been no labels from you for three days.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5776
