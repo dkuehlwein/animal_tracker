@@ -412,22 +412,22 @@
   ],
   "last_heartbeat_loopday": "2026-10-23",
   "last_metrics": {
-    "date": "2026-10-22",
+    "date": "2026-10-23",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.8843331823158513,
-      0.9960664011171667
+      0.4385029682449546,
+      1.0
     ],
     "fp_claude_ci": [
-      0.8843331823158513,
-      0.9960664011171667
+      0.4385029682449546,
+      1.0
     ],
-    "fp_claude_count": 44,
-    "fp_claude_rate": 0.9777777777777777,
-    "fp_count": 44,
+    "fp_claude_count": 3,
+    "fp_claude_rate": 1.0,
+    "fp_count": 3,
     "fp_human_ci": [
       0.0,
       1.0
@@ -440,18 +440,18 @@
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.9777777777777777,
+    "fp_rate": 1.0,
     "fp_trustworthy": true,
-    "labeled_triggers": 45,
+    "labeled_triggers": 3,
     "n_cant_tell": 0,
-    "n_claude": 45,
+    "n_claude": 3,
     "n_human": 0,
     "n_human_suppressed": 0,
     "n_md": 0,
-    "n_person": 0,
-    "n_sampled_out": 24,
+    "n_person": 1,
+    "n_sampled_out": 1,
     "n_unlabeled": 0,
-    "total_triggers": 45
+    "total_triggers": 4
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
@@ -459,5 +459,5 @@
   "nightly_verdict": "Windy day: 44 of 45 triggers were the bamboo moving, and 20 of those reached you as empty review pings. The one real visit was a blackbird at dusk by the potted tree. No change made, because every filter that would cut the wind pings would also have hidden yesterday's partly-hidden blackbird.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5772
+  "watermark": 5776
 }
