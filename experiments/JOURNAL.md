@@ -3448,3 +3448,12 @@ Tier-2 (5-frame contact sheets): **5773 `person`**: a dark trouser leg fills the
 fp_rate 3/3 (tier-2 only; 1 person excluded), fp_human n=0.
 **FEEDBACK-STARVED FREEZE tripped:** the last human label was 10-20 16:50, 3 days ago, so `feedback_starved_since` = 2026-10-23. Hold current config. The slot is empty anyway.
 **#42 recurrence stays 1/2:** fountain ran, no `;;;;;;animal` rollup row reached MAIN. Slot empty, not paused, frozen, FN unmeasured, so no deploy. The exp #40 code-removal question is still with Daniel.
+
+## 2026-10-24
+Ingest 5777-5792: **16 triggers**, 10:25-16:01, 0 ERROR. Camera + feedback services active, deploy unit not failed, nothing pending. Volume 16 vs baseline 27.
+Statuses: 16 NO_ANIMAL, none with a MegaDetector box (raw top-1 NULL), pc 0.03-0.20. No HUMAN, no human-proximity, blur or confident-blank mutes. 7 `[REVIEW-SAMPLE]` sampled out, so **9 empty REVIEW pings**, 0 MAIN.
+Tier-2 (5-frame contact sheets + diff heatmap, then a full-res crop of the strongest non-bamboo motion per burst): **5777-5792 `false_positive`**. Wind in the bamboo (upper right) everywhere. Outside the bamboo the motion peak is the flower ornament + a fluttering leaf in the yellow pot (8 of 16), pond-edge reflections, grass and tree stems. Fountain running from ~14:36 (5786 on). Nothing in the lower-left foraging spot. 0 FN among captured bursts. (Tier-2 rows tonight carry local-time `created_at`; earlier tier-2 rows are UTC. Cosmetic only, since the freeze keys on human labels.)
+fp_rate 16/16 (15 tier-2 + 1 human), fp_human 1/1.
+**Freeze lifted:** Daniel labelled 32 bursts on 10-24 (~12:05 UTC: 25 false_positive, 7 animal incl. 5772 dusk blackbird). Self-audit: 31 overlap tier-2, **0 disagreements**. `feedback_starved_since` cleared.
+**Lever check (no deploy):** same as 10-22. With no box and no raw top-1, confident-blank cannot reach these rows. Motion/ROI levers are FN-vetoed on record (#3/#4/#35). A "no MD box -> mute" lever is FN-vetoed by 5717/5720. Sampling is a volume lever Daniel has already set.
+**#42 recurrence stays 1/2:** the fountain ran, but no `;;;;;;animal` rollup row appeared. Slot empty, not paused, not frozen, FN unmeasured, no lever clears the FN-veto, so no deploy. The exp #40 code-removal question is still with Daniel.

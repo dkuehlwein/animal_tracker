@@ -326,7 +326,7 @@
     "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.5,
     "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
   },
-  "feedback_starved_since": "2026-10-23",
+  "feedback_starved_since": null,
   "history": [
     {
       "config": {},
@@ -455,8 +455,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-10-23",
-  "nightly_verdict": "Quiet day: 4 triggers \u2014 one person walking past (correctly kept private) and three empty-garden wind alarms, two of which reached you as review pings. No change made; tuning is now on hold because there have been no labels from you for three days.",
+  "last_tick_completed_day": "2026-10-24",
+  "nightly_verdict": "Windy day: all 16 triggers were empty garden (bamboo in the wind, fountain running), 9 of them reached you as review pings. Thanks for today's labels, which lift the tuning hold; still no change, because every lever that would cut these alarms has been shown to also hide birds.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5792
