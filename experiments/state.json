@@ -410,7 +410,7 @@
       "replaced_at": "2026-10-04T03:25:00+02:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-10-24",
+  "last_heartbeat_loopday": "2026-10-25",
   "last_metrics": {
     "date": "2026-10-25",
     "error_count": 0,
@@ -455,8 +455,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-10-24",
-  "nightly_verdict": "Windy day: all 16 triggers were empty garden (bamboo in the wind, fountain running), 9 of them reached you as review pings. Thanks for today's labels, which lift the tuning hold; still no change, because every lever that would cut these alarms has been shown to also hide birds.",
+  "last_tick_completed_day": "2026-10-25",
+  "nightly_verdict": "Another windy day: all 14 triggers were empty garden (bamboo in the wind, fountain running), and 6 of them reached you as review pings. No change, because every lever that would cut these alarms has been shown to also hide birds.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5806

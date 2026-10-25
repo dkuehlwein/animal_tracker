@@ -3457,3 +3457,12 @@ fp_rate 16/16 (15 tier-2 + 1 human), fp_human 1/1.
 **Freeze lifted:** Daniel labelled 32 bursts on 10-24 (~12:05 UTC: 25 false_positive, 7 animal incl. 5772 dusk blackbird). Self-audit: 31 overlap tier-2, **0 disagreements**. `feedback_starved_since` cleared.
 **Lever check (no deploy):** same as 10-22. With no box and no raw top-1, confident-blank cannot reach these rows. Motion/ROI levers are FN-vetoed on record (#3/#4/#35). A "no MD box -> mute" lever is FN-vetoed by 5717/5720. Sampling is a volume lever Daniel has already set.
 **#42 recurrence stays 1/2:** the fountain ran, but no `;;;;;;animal` rollup row appeared. Slot empty, not paused, not frozen, FN unmeasured, no lever clears the FN-veto, so no deploy. The exp #40 code-removal question is still with Daniel.
+
+## 2026-10-25
+Ingest 5793-5806: **14 triggers**, 10:57-14:15 CET (DST ended 03:00 today; the camera ran through it cleanly and stopped at sunset 17:19 CET). 0 ERROR. Camera + feedback services active, nothing pending deploy. Volume 14 vs baseline 27.
+Statuses: 14 NO_ANIMAL, none with a MegaDetector box or a raw top-1. 8 `[REVIEW-SAMPLE]` sampled out, so **6 empty REVIEW pings** (5793/5794/5797/5799/5800/5803) reached Telegram. 10 are below the sharpness floor but not blur-muted (overcast, luma < 70, as designed). No HUMAN, no human-proximity mutes.
+Tier-2 (5-frame contact sheets + diff heatmap): **5793-5806 `false_positive`**. Wind in the bamboo (upper right) everywhere. Secondary motion is the leaf by the stone left of the pot, the red/white flower ornament, tree stems and grass. The fountain was running in 5795/5797/5803/5806. Nothing in the lower-left foraging spot. 0 FN among captured bursts.
+fp_rate 14/14 (tier-2 only), fp_human n=0.
+**Self-audit:** no human labels since 10-24 12:05 UTC, nothing new to reconcile. Not starved (the freeze would trip after 10-27 12:05).
+**Lever check (no deploy):** same as 10-22/10-24. With no box and no raw top-1, confident-blank cannot reach these rows. Motion/ROI levers are FN-vetoed on record (#3/#4/#35). "No MD box -> mute" is FN-vetoed by 5717/5720. Sampling is a volume lever Daniel has already set.
+**#42 recurrence stays 1/2:** the fountain ran, but no `;;;;;;animal` rollup row appeared. Slot empty, not paused, not frozen, FN unmeasured, no lever clears the FN-veto, so no deploy. The exp #40 code-removal question is still with Daniel.
