@@ -412,22 +412,22 @@
   ],
   "last_heartbeat_loopday": "2026-10-25",
   "last_metrics": {
-    "date": "2026-10-25",
+    "date": "2026-10-26",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.7846891972623643,
-      1.0
+      0.5428286758313405,
+      0.8530124489791204
     ],
     "fp_claude_ci": [
-      0.7846891972623643,
-      1.0
+      0.5428286758313405,
+      0.8530124489791204
     ],
-    "fp_claude_count": 14,
-    "fp_claude_rate": 1.0,
-    "fp_count": 14,
+    "fp_claude_count": 21,
+    "fp_claude_rate": 0.7241379310344828,
+    "fp_count": 21,
     "fp_human_ci": [
       0.0,
       1.0
@@ -440,18 +440,18 @@
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 1.0,
+    "fp_rate": 0.7241379310344828,
     "fp_trustworthy": true,
-    "labeled_triggers": 14,
+    "labeled_triggers": 29,
     "n_cant_tell": 0,
-    "n_claude": 14,
+    "n_claude": 29,
     "n_human": 0,
     "n_human_suppressed": 0,
     "n_md": 0,
     "n_person": 0,
-    "n_sampled_out": 8,
+    "n_sampled_out": 9,
     "n_unlabeled": 0,
-    "total_triggers": 14
+    "total_triggers": 29
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
@@ -459,5 +459,5 @@
   "nightly_verdict": "Another windy day: all 14 triggers were empty garden (bamboo in the wind, fountain running), and 6 of them reached you as review pings. No change, because every lever that would cut these alarms has been shown to also hide birds.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5806
+  "watermark": 5835
 }
