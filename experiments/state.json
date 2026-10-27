@@ -326,7 +326,7 @@
     "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.5,
     "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
   },
-  "feedback_starved_since": null,
+  "feedback_starved_since": "2026-10-27",
   "history": [
     {
       "config": {},
@@ -410,7 +410,7 @@
       "replaced_at": "2026-10-04T03:25:00+02:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-10-26",
+  "last_heartbeat_loopday": "2026-10-27",
   "last_metrics": {
     "date": "2026-10-27",
     "error_count": 0,
@@ -455,8 +455,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-10-26",
-  "nightly_verdict": "A blackbird visited around 11am and all 7 alerts you got for it were real; the other 21 triggers were bamboo and leaves moving in the wind. No change deployed, because the levers that would cut the wind alarms would also hide birds like today's.",
+  "last_tick_completed_day": "2026-10-27",
+  "nightly_verdict": "Quiet, windless day: a blackbird visited around 11:35 and you got 5 real alerts for it; the 6th photo of the same bird wasn't sent because the species model missed it. Nothing changed tonight, and tuning is paused until you label a few recent photos (none since Saturday).",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5841
