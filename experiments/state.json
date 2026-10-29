@@ -1,5 +1,5 @@
 {
-  "active_experiment_id": null,
+  "active_experiment_id": 43,
   "backlog": [
     {
       "hypothesis": "CONCLUDED 2026-06-15 (keep). Same-channel \ud83d\udd0d REVIEW prefix on status\u2208{NO_ANIMAL,UNCLASSIFIABLE} flags 99% of FP at 0 FN; live since 06-12, location-agnostic. Second-channel routing is OUT per Daniel (no 2nd channel \u2014 adds overhead, won't click two). See runs/0001 + LEARNINGS.",
@@ -310,6 +310,13 @@
       "slug": "blank-raw-animal-rollup-main-fp",
       "status": "queued",
       "validation": "pending"
+    },
+    {
+      "hypothesis": "2026-10-29: raise PERFORMANCE_REVIEW_SAMPLE_RATE 0.5->0.75. Lost visits from sampling now at #41's ~1/month re-open bar (5468, 5477, 5844/5845; all dusk/dawn blackbirds). About +2 REVIEW/day. See runs/0030.",
+      "id": 43,
+      "slug": "review-sample-rate-075",
+      "status": "active",
+      "validation": "live"
     }
   ],
   "baselines": {
@@ -323,10 +330,10 @@
     "PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS": 240,
     "PERFORMANCE_HUMAN_SWEEP_MAX_FRAMES": 4,
     "PERFORMANCE_MAX_IMAGES": 300,
-    "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.5,
+    "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.75,
     "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
   },
-  "feedback_starved_since": "2026-10-27",
+  "feedback_starved_since": null,
   "history": [
     {
       "config": {},
@@ -408,9 +415,22 @@
         "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
       },
       "replaced_at": "2026-10-04T03:25:00+02:00"
+    },
+    {
+      "config": {
+        "PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD": 1.0,
+        "PERFORMANCE_HUMAN_DENSITY_COUNT": 8,
+        "PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS": 1800,
+        "PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS": 240,
+        "PERFORMANCE_HUMAN_SWEEP_MAX_FRAMES": 4,
+        "PERFORMANCE_MAX_IMAGES": 300,
+        "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.5,
+        "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
+      },
+      "replaced_at": "2026-10-30T03:25:00+01:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-10-28",
+  "last_heartbeat_loopday": "2026-10-29",
   "last_metrics": {
     "date": "2026-10-29",
     "error_count": 0,
@@ -455,9 +475,9 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-10-28",
-  "nightly_verdict": "Quiet day: the two midday alerts were wind, but a blackbird visited at dusk around 16:00 and you never saw it, because both photos were in the half of 'probably empty' shots that aren't sent. I'd normally send more of those shots after that, but tuning stays paused until you label a few recent photos (none since Saturday).",
+  "last_tick_completed_day": "2026-10-29",
+  "nightly_verdict": "A quiet morning: one blackbird visit around 10:20, all 5 alerts were real, and thanks for labelling 44 photos (every label matched my own calls). Because Tuesday's dusk blackbird was never sent to you, from tomorrow I'll send 3 in 4 of the 'probably empty' shots instead of half, about 2 more per day; /rollback undoes it.",
   "paused": false,
-  "pending_restart_at": null,
+  "pending_restart_at": "2026-10-30T03:25:00+01:00",
   "watermark": 5850
 }
