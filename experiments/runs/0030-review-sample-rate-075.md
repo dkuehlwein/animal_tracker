@@ -40,3 +40,16 @@ Per PROTOCOL "Review sampling", fp_rate is not affected, and this experiment mus
 - Escalate to 1.0 only if a visit is still lost to sampling at 0.75.
 
 ## Observations
+
+### Night 1 — 2026-10-30 (rate 0.75 live since the 03:30:11 restart, verified via systemctl + wildlife-deploy journal)
+
+- 3 triggers (5851-5853), 09:33-10:27, overcast morning (luma ~28-29). 0 ERROR.
+- 5851 IDENTIFIED `aves;bird` (MD 0.85), blackbird under the left tree → MAIN.
+- 5852 NO_ANIMAL, no box, pc 0.24, **sampled out** (the 1-in-4 drop at 0.75). Tier-2 `animal`: the same blackbird
+  is visible behind the trunk in frames 1-3 and flies off (motion blur) in frame 4. The visit was **delivered**,
+  because 5851 reached MAIN 26 s earlier, so this is a burst-level miss only (same class as 5717/5720/5841).
+  It is also another #31/#36 data point: a dark bird in low light (luma ~28) that SpeciesNet did not box.
+- 5853 IDENTIFIED `aves;bird` (MD 0.85): a **Eurasian magpie** walking past the pot. It is the first magpie in this
+  scene, and it went to MAIN.
+- REVIEW pings sent: 0 (the only review-class burst was sampled out). Too little volume to judge the +2/day prediction.
+- Lost visits to sampling: 0. Keep observing.
