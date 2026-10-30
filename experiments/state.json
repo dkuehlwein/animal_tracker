@@ -478,6 +478,6 @@
   "last_tick_completed_day": "2026-10-29",
   "nightly_verdict": "A quiet morning: one blackbird visit around 10:20, all 5 alerts were real, and thanks for labelling 44 photos (every label matched my own calls). Because Tuesday's dusk blackbird was never sent to you, from tomorrow I'll send 3 in 4 of the 'probably empty' shots instead of half, about 2 more per day; /rollback undoes it.",
   "paused": false,
-  "pending_restart_at": "2026-10-30T03:25:00+01:00",
+  "pending_restart_at": null,
   "watermark": 5850
 }
