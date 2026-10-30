@@ -432,46 +432,46 @@
   ],
   "last_heartbeat_loopday": "2026-10-29",
   "last_metrics": {
-    "date": "2026-10-29",
+    "date": "2026-10-30",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
       0.0,
-      0.43448246478317476
+      0.5614970317550454
     ],
     "fp_claude_ci": [
       0.0,
-      1.0
+      0.7934506856227626
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
     "fp_count": 0,
     "fp_human_ci": [
       0.0,
-      0.43448246478317476
+      1.0
     ],
     "fp_human_count": 0,
     "fp_human_rate": 0.0,
     "fp_md_ci": [
       0.0,
-      1.0
+      0.6576197724933469
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
     "fp_rate": 0.0,
     "fp_trustworthy": true,
-    "labeled_triggers": 5,
+    "labeled_triggers": 3,
     "n_cant_tell": 0,
-    "n_claude": 0,
-    "n_human": 5,
+    "n_claude": 1,
+    "n_human": 0,
     "n_human_suppressed": 0,
-    "n_md": 0,
+    "n_md": 2,
     "n_person": 0,
-    "n_sampled_out": 0,
+    "n_sampled_out": 1,
     "n_unlabeled": 0,
-    "total_triggers": 5
+    "total_triggers": 3
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
@@ -479,5 +479,5 @@
   "nightly_verdict": "A quiet morning: one blackbird visit around 10:20, all 5 alerts were real, and thanks for labelling 44 photos (every label matched my own calls). Because Tuesday's dusk blackbird was never sent to you, from tomorrow I'll send 3 in 4 of the 'probably empty' shots instead of half, about 2 more per day; /rollback undoes it.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5850
+  "watermark": 5853
 }
