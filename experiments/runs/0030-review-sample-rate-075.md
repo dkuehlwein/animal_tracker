@@ -53,3 +53,12 @@ Per PROTOCOL "Review sampling", fp_rate is not affected, and this experiment mus
   scene, and it went to MAIN.
 - REVIEW pings sent: 0 (the only review-class burst was sampled out). Too little volume to judge the +2/day prediction.
 - Lost visits to sampling: 0. Keep observing.
+
+### Night 2 — 2026-10-31 (rate 0.75 live)
+
+- 5 triggers (5854-5858), 08:25-11:30 (DB time), 0 ERROR. All five are IDENTIFIED and went to MAIN. 5854-5857 are `aves;bird`
+  (MD 0.66-0.88). 5858 is the `;;;;;;animal` rollup (MD 0.77) with raw top-1 `bird`, not `blank`. Annotated frames for 5857
+  and 5858 were checked: both show a blackbird by the trunk / stone edge. Tier-1 `animal` stands, so no tier-2 was needed.
+- Review-class bursts: 0, so nothing was sampled out and no REVIEW pings were sent. This night says nothing about the
+  prediction, either way.
+- Lost visits to sampling: 0. Running total under 0.75: 0 lost visits and 1 burst-level miss (5852) in 2 nights.

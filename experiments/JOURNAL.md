@@ -3506,3 +3506,10 @@ Ingest 5851-5853: **3 triggers**, 09:33-10:27, 0 ERROR. Volume 3 vs baseline 27 
 5851 blackbird → MAIN; 5853 **magpie** (first in this scene) → MAIN. 5852 NO_ANIMAL with no box was sampled out. Tier-2 `animal`: the same blackbird is behind the trunk in frames 1-3. The visit was delivered via 5851 26 s earlier, so this is a burst-level miss only, not a lost visit. It adds a #31/#36 point (dark bird, luma ~28, no MD box).
 fp_rate 0/3 (tier-1 + tier-2; no new human labels since 10-29 15:54 UTC). FN unmeasured.
 **Exp #43 night 1:** 0 REVIEW sent, 0 lost visits. Keep observing (window to ~11-20). No deploy, not paused, not frozen (last human labels 10-29).
+
+## 2026-10-31
+Services: camera + feedback active, deploy unit not failed, nothing pending. Ingest 5854-5858: **5 triggers**, 08:25-11:30 (DB time), 0 ERROR. Volume 5 vs baseline 27 (calm day).
+All 5 are IDENTIFIED → **5 MAIN, 0 REVIEW-class**. 5854-5857 `aves;bird`. 5858 is the `;;;;;;animal` rollup with raw top-1 `bird`: a real blackbird (frames checked). It is the 7th straight rollup row since 10-26 to carry a real bird, and #42's raw-blank signature did not recur (stays 1/2). Tier-1 `animal` holds on all 5, so no tier-2.
+**Self-audit:** 3 new human labels (10-30 23:09-23:10 UTC): 5851 and 5853 `animal`, 5842 `false_positive`. All 3 agree with tier-1/tier-2.
+fp_rate 0/5 (tier-1), CI [0, 0.43]. FN unmeasured.
+**Exp #43 night 2:** no review-class bursts, so nothing was sampled and the night is uninformative. 0 lost visits so far. Keep observing (window to ~11-20). No deploy. Not paused, not frozen (last human labels 10-30).
