@@ -222,3 +222,5 @@ on approval. If Daniel wants the code gone, it is a mechanical prune (notificati
 The `blank_confidence_muted` column stays either way.
 
 status: concluded (threshold 1.0 retained; code retained pending Daniel's call). Rollback: redeploy 0.92.
+
+Update 2026-11-01: Daniel retired the gate (human-led, not a loop experiment). Outcome: retired - code removed in commit 50c1515; goes live on the 2026-11-02 03:30 restart. See docs/detection-gates.md section 15.

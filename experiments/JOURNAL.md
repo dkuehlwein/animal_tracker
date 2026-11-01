@@ -3513,3 +3513,6 @@ All 5 are IDENTIFIED → **5 MAIN, 0 REVIEW-class**. 5854-5857 `aves;bird`. 5858
 **Self-audit:** 3 new human labels (10-30 23:09-23:10 UTC): 5851 and 5853 `animal`, 5842 `false_positive`. All 3 agree with tier-1/tier-2.
 fp_rate 0/5 (tier-1), CI [0, 0.43]. FN unmeasured.
 **Exp #43 night 2:** no review-class bursts, so nothing was sampled and the night is uninformative. 0 lost visits so far. Keep observing (window to ~11-20). No deploy. Not paused, not frozen (last human labels 10-30).
+
+## 2026-11-01 (human-led)
+Daniel retired the Confident-Blank gate (`[BLANK-CONF]`, exp #29/#40): decide() branch, evaluator, flag wiring, config field + validator and BOUNDS entry removed (commit 50c1515); DB column `blank_confidence_muted` kept (NULL on new rows). Not a loop experiment, so the experiment slot is untouched (exp #43 still active). `PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD` dropped from `deployed`; `pending_restart_at` stamped 2026-11-02T03:25+01:00 so the 03:30 deploy timer restarts the camera onto the new code. The loop no longer needs to adjudicate `blank_confidence_muted` rows. Exp #40 closed as retired (runs/0029).
