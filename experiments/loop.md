@@ -32,8 +32,8 @@ every 2h, gated to the night window.
 **Checkpoint as you go** (see `PROTOCOL.md`): use
 `python -m loop.checkpoint --message <msg>` after each expensive or irreversible
 step. Specifically:
-- After tier-2 adjudication (step 3): `python -m loop.checkpoint --message "tick: tier-2 adjudication done"`
-- After `loop.metrics` (step 4): `python -m loop.checkpoint --message "tick: metrics written"`
+- After tier-2 adjudication (PROTOCOL step 3): `python -m loop.checkpoint --message "tick: tier-2 adjudication done"`
+- After `loop.metrics` (PROTOCOL step 4): `python -m loop.checkpoint --message "tick: metrics written"`
 
 A fresh tick has no memory and resumes from committed state, so never re-spend
 tokens on work already on disk.
@@ -52,7 +52,7 @@ tokens on work already on disk.
   Record the resulting commit SHA in the run file so the change is auditable and
   revertible.
 - A code change only goes live on a **camera restart**. Stamp `pending_restart_at`
-  in `state.json` (same ~60-min-pre-sunrise window as an env deploy) so
+  in `state.json` to a tz-aware time ≤ 03:30 tonight (e.g. `2026-11-02T03:25+01:00`) — `wildlife-deploy.timer` fires once at 03:30 and restarts only if the stamp is ≤ now, so a later stamp slips a full day — so
   `apply_pending_deploy` reloads it; if you also ship an env delta, `loop.deploy`
   already stamps the restart for you.
 - **Same gates still apply** to code changes: FN-veto, `paused`, feedback-starved
@@ -69,10 +69,14 @@ If your hypothesis could be tested from data already on disk, test it — do not
 propose new columns, schema migrations, or additional logging instead.
 
 **What already exists:**
-- `detections` DB — `timestamp`, `image_path`, `motion_area`, `contour_count`,
-  `largest_contour_area`, `foreground_pixel_count`, `hour_of_day`,
-  `gate_would_suppress`, `background_drift`, `detection_status`, and the
-  append-only `detection_feedback` labels.
+- `detections` DB — motion fields (`motion_area`, `contour_count`,
+  `largest_contour_area`, `foreground_pixel_count`, `background_drift`),
+  `detection_status`, `person_confidence`, the per-gate flags
+  (`human_proximity_muted`, `below_sharpness_floor`/`sharpness_score`,
+  `review_sampled_out`, …; full list with semantics in `docs/detection-gates.md`),
+  and the append-only `detection_feedback` labels.
+- **Timelapse frames** (`timelapse_writer.py`) — a low-rate stream independent of
+  motion; the corpus for false-negative audits (animals the trigger stream missed).
 - **Real captured frames at `detections.image_path` under `data/images/`.**
   OpenCV/numpy are installed; write and run a throwaway script in-tick
   (`uv run python <script>` from repo root, `PYTHONPATH=src`). For example,
@@ -95,9 +99,10 @@ is found by `Config()`. The `PYTHONPATH=src` prefix exposes the `loop.*` package
 # Full nightly chain (unattended — no manual glue needed between steps):
 cd /home/daniel/animal_tracker
 
-# 1. Ingest: pull all detections from the DB, starting past the stored watermark.
-#    (Use --since-id 0 to replay the full history; normally omit to use watermark.)
-PYTHONPATH=src uv run python -m loop.ingest --since-id 0
+# 1. Ingest: pure read of detections with id > --since-id. It does NOT read the
+#    watermark itself (default 0 = full history) — pass state["watermark"]:
+PYTHONPATH=src uv run python -m loop.ingest \
+    --since-id "$(python3 -c 'import json;print(json.load(open("experiments/state.json")).get("watermark") or 0)')"
 
 # 2. Measure: compute FP/FN metrics, write last_metrics into state.json, AND
 #    advance state["watermark"] to the new watermark automatically.

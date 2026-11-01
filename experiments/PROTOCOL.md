@@ -14,9 +14,12 @@ state from this git notebook; there is no hidden stage machine.
 Before concluding that a question requires new logging, columns, or schema changes,
 verify it cannot be answered from already-captured artifacts:
 
-- **`detections` DB rows** — `id`, `timestamp`, `image_path`, `motion_area`,
-  `contour_count`, `largest_contour_area`, `foreground_pixel_count`, `hour_of_day`,
-  `gate_would_suppress`, `background_drift`, `detection_status`.
+- **`detections` DB rows** — motion fields, `detection_status`, `person_confidence`
+  and the per-gate flags (`human_proximity_muted`, `below_sharpness_floor`,
+  `review_sampled_out`, …); full column list with semantics in
+  `docs/detection-gates.md`.
+- **Timelapse frames** (`timelapse_writer.py`) — low-rate, motion-independent; the
+  corpus for false-negative audits.
 - **Saved frames on disk** — `detections.image_path` points to the actual captured
   JPGs under `data/images/`. These are analyzable offline with OpenCV (perceptual /
   average hashing, frame similarity, clustering, centroid tracking, etc.).
@@ -26,8 +29,8 @@ verify it cannot be answered from already-captured artifacts:
   (`uv run python ...` from repo root, `PYTHONPATH=src`; OpenCV/numpy installed).
 - **`detection_feedback` labels** — append-only human/tier-2 ground truth.
 
-**Retention caveat**: storage cleanup retains only the most recent bursts (~100 of
-however many triggers exist in the DB). Image-based retro-analysis is time-boxed —
+**Retention caveat**: storage cleanup retains only the most recent ~300 bursts
+(`PERFORMANCE_MAX_IMAGES`). Image-based retro-analysis is time-boxed —
 run it promptly rather than deferring, and do not assume older DB rows still have
 frames on disk.
 
@@ -41,7 +44,7 @@ All `python -m loop.*` commands MUST be run from the **repo root**
 `Config()`. Running from inside `src/` fails with a missing-token validation error.
 
 ```
-PYTHONPATH=src uv run python -m loop.ingest --since-id <watermark>
+PYTHONPATH=src uv run python -m loop.ingest --since-id <state["watermark"]>   # default 0 = full history; ingest does not read state
 PYTHONPATH=src uv run python -m loop.metrics [--state <path>] [--date <YYYY-MM-DD>]
 PYTHONPATH=src uv run python -m loop.report --mode summary [--state <path>] [--no-send]
 ```
@@ -75,8 +78,9 @@ on `loop.report` to render without calling Telegram (safe for dry runs and testi
 8. **Validate** — Layer A = `python -m loop.replay` (STUB → "skipped"). Layer B =
    bounds + predicted live effect. FN-veto: reject FP wins that worsen (or risk, if
    FN unmeasured) FN.
-9. **Deploy** — `python -m loop.deploy --delta '{...}' --restart-at <pre-sunrise>`;
-   writes state.json + renders env + stamps the restart.
+9. **Deploy** — `python -m loop.deploy --delta '{...}' --restart-at <≤03:30 tz-aware>`;
+   writes state.json + renders env + stamps the restart. The restart stamp must be
+   a tz-aware time ≤ 03:30 tonight (e.g. `2026-11-02T03:25+01:00`) — `wildlife-deploy.timer` fires once at 03:30 and restarts only if the stamp is ≤ now, so a later stamp slips a full day.
 10. **Record** — update `runs/NNNN-<slug>.md` (front matter + observations), append
     a `JOURNAL.md` line, update `state.json` pointers. Before reporting, set
     `state["nightly_verdict"]` to a ≤2-sentence plain-English verdict (no jargon,
@@ -112,7 +116,7 @@ watermark (which `loop.metrics` now persists automatically).
   **commit it separately with the experiment id in the message** (e.g.
   `fix(motion): exp #4 (mog2-recurrent-frames) — <what/why>`); note the SHA in the
   run file. A code change only takes effect on a **camera restart**, so stamp
-  `pending_restart_at` (pre-sunrise window) just like an env deploy.
+  `pending_restart_at` (tz-aware, ≤ 03:30) just like an env deploy.
 - All decision gates below apply equally to code and env changes.
 
 ## Autonomy: the gates below are the ONLY approval mechanism
@@ -157,8 +161,7 @@ protocol never required.)
 > `scene_gate_muted` / `scene_similarity` DB columns remain for history only.
 >
 > **The loop has NO duty on this gate any more.** Do not adjudicate
-> `scene_gate_muted` bursts, do not tune or re-enable `PERFORMANCE_SCENE_GATE_*`,
-> and do not run `scripts/validate_scene_gate.py` as a tick duty. The same
+> `scene_gate_muted` bursts, and do not tune or re-enable `PERFORMANCE_SCENE_GATE_*`. The same
 > applies to the retired Unnamed-Animal Blank-Raw gate (exp #32) and the
 > Animal-Proximity Review Exemption (exp #33 backward half, exp #39 forward
 > half): there is nothing to adjudicate for them either. The old HOLD /
@@ -167,8 +170,8 @@ protocol never required.)
 
 ## Review sampling (2026-07-26, Daniel's call)
 
-`PERFORMANCE_REVIEW_SAMPLE_RATE` (default `0.25`, in `BOUNDS`) sends only a
-deterministic ~1/4 sample of review-class bursts that survive the mute gates
+`PERFORMANCE_REVIEW_SAMPLE_RATE` (code default `0.25`, in `BOUNDS`; live value in
+`experiments/deployed_config.env`) sends only a deterministic fraction of review-class bursts that survive the mute gates
 to Telegram. Precedence is defined by `src/notification_gate.py::decide()`
 (first match wins): HUMAN-GATE > FAIL-CLOSED > HUMAN-PROXIMITY > BLUR >
 BLANK-CONF > REVIEW-SAMPLE > deferred REVIEW send (cancel-on-human) > send (the

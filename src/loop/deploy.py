@@ -6,8 +6,9 @@ Steps, in order:
   2. Update state.json: new deployed = old deployed merged with delta; push the
      previous deployed onto history; keep best_known_good.
   3. Render experiments/deployed_config.env from state.json.deployed.
-  4. Stamp pending_restart_at (computed by the caller, ~60 min pre-sunrise); the
-     wildlife-deploy.timer applies it pre-sunrise.
+  4. Stamp pending_restart_at (computed by the caller: tz-aware, <= 03:30); the
+     wildlife-deploy.timer fires once at 03:30 and applies it iff stamp <= now,
+     so a later stamp slips a full day.
 
 rollback() restores best_known_good, re-renders the env, and stamps a restart.
 Writes go through state.save_state (atomic temp+rename) and an atomic env render.
