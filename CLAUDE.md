@@ -50,7 +50,7 @@ Use VIM, not nano, for console edits.
 - **`data_models.py`**: `MotionResult`, `DetectionResult`, `IdentificationResult`, `DetectionRecord`, `DetectionStatus` (named `data_models` to avoid clashing with YOLO's `models`)
 - **`exceptions.py`**: unified exception hierarchy
 - **`utils.py`**: `PerformanceTimer`, `MotionVisualizer`, `SharpnessAnalyzer`, `SunChecker`, `extract_common_name`, taxonomy-label helpers (`is_blank_label`, `is_unnamed_animal_label`)
-- **`src/loop/`**: deterministic, token-free loop tools — `nightgate` (pre-gate + heartbeat), `ingest`, `metrics` (FP/FN with Wilson CIs, owns the watermark), `report`, `deploy` (only writer of live config → `experiments/deployed_config.env`), `apply_pending_deploy` (pre-sunrise restart, `wildlife-deploy.timer`), `guardrails` (BOUNDS, FN-veto, freeze), `checkpoint`, `endtick`, `state`, `scene_watch` (camera re-aim watchdog), `replay` (stub)
+- **`src/loop/`**: deterministic, token-free loop tools — `nightgate` (pre-gate + heartbeat), `ingest`, `metrics` (FP/FN with Wilson CIs, owns the watermark), `report`, `deploy` (only writer of live config → `experiments/deployed_config.env`), `apply_pending_deploy` (pre-sunrise restart, `wildlife-deploy.timer`), `guardrails` (BOUNDS, FN-veto, freeze), `checkpoint`, `endtick`, `state`, `scene_watch` (camera re-aim watchdog), `tickalert` (Telegram alert when the nightly `claude -p` run fails, e.g. expired OAuth), `replay` (stub)
 
 ### Data Flow
 
@@ -74,7 +74,7 @@ Notification precedence — implemented once, in `notification_gate.decide()` (f
    - `[FAIL-CLOSED]` — processing error on a review-class / unnamed-animal burst, or on any burst (incl. a species-ID failure) inside a human window/density: muted instead of sent as an ERROR photo
 2. `[HUMAN-PROXIMITY]` Human-Proximity — window OR density OR demoted-band; review-class, ERROR and ANIMAL_UNCERTAIN bursts, plus `;;;;;;animal` IDENTIFIED bursts
 3. `[BLUR]` Blur — below sharpness floor AND luma ≥ 70, review-class only
-4. `[BLANK-CONF]` Confident-Blank — raw top-1 `blank` ≥ 0.92, review-class only
+4. `[BLANK-CONF]` Confident-Blank — raw top-1 `blank` ≥ threshold (default 0.92; live value in `experiments/deployed_config.env`), review-class only
 5. `[REVIEW-SAMPLE]` Review Sampling — deterministic fraction sent
 6. `[REVIEW-DEFER]` Deferred send — surviving REVIEW sends held 240s, cancelled if any HUMAN burst lands in that window
 
@@ -95,12 +95,13 @@ MAIN-channel (non-review, non-human) alerts are never delayed. Photos of HUMAN a
 
 All parameters have env-var overrides with prefixes `CAMERA_`, `MOTION_`, `PERFORMANCE_`, `STORAGE_`, `SPECIES_`, `LOCATION_` + field name (see `src/config.py`; gate settings tabulated in `docs/detection-gates.md`). `.env` holds secrets and hand overrides; **`experiments/deployed_config.env` is rendered by `loop.deploy` from `state.json` — never hand-edit it** — and overrides `.env` for `MOTION_*`, `PERFORMANCE_*`, `SPECIES_*`.
 
-`.env` must define `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Values worth knowing (code default → live value where different):
+`.env` must define `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`. Values worth knowing (code default → live value where different). **Loop-managed values (`PERFORMANCE_*`, `SPECIES_*` gate settings) change nightly — read `experiments/deployed_config.env` for the live ones;** values marked (.env) below are human-set and stable.
 
 - Motion: `MOTION_THRESHOLD` 2000 → **800** (.env); `MOTION_MIN_CONTOUR_AREA` 50; `MOTION_CONSECUTIVE_REQUIRED` 2; color filtering off (`MOTION_ENABLE_COLOR_FILTERING`, `MOTION_MIN_COLOR_VARIANCE` 200).
 - Camera: auto-exposure (`CAMERA_EXPOSURE_TIME`/`CAMERA_ANALOGUE_GAIN` unset). `CAMERA_AE_EXPOSURE_MODE` code default `short` → **`normal`** (.env; exp #7 rolled back — AE bias didn't fix dusk sharpness). Degrades gracefully if libcamera's enum is unavailable.
 - Timing/storage: `PERFORMANCE_COOLDOWN_PERIOD` 30s; `PERFORMANCE_MAX_IMAGES` 300 bursts; `STORAGE_LOG_DIR` `data/logs` (rotating `wildlife.log`, 5MB×5, INFO+; DEBUG stays console-only; never crashes if unwritable).
-- Species: `SPECIES_COUNTRY_CODE` DEU, `SPECIES_ADMIN1_REGION` NW (Bonn geofence), `SPECIES_UNKNOWN_SPECIES_THRESHOLD` 0.5, `SPECIES_HUMAN_DETECTION_CONFIDENCE` 0.3 → **0.5** (deployed, exp #14).
+- Species: `SPECIES_COUNTRY_CODE` DEU, `SPECIES_ADMIN1_REGION` NW (Bonn geofence), `SPECIES_UNKNOWN_SPECIES_THRESHOLD` 0.5, `SPECIES_HUMAN_DETECTION_CONFIDENCE` 0.3 (loop-managed).
+- Camera focus: `CAMERA_LENS_POSITION` 0.5 (.env, manual focus).
 - Debug: `PERFORMANCE_SEND_ANNOTATED_IMAGE` (motion overlay alongside the photo; default false).
 
 ## Species Identification

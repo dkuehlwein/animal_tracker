@@ -32,7 +32,7 @@ status × flags × levers). The per-gate DB flags are computed earlier, in
 `WildlifeSystem.process_detection`, and persisted with the semantics below; `decide()`
 only turns them into one routing decision. "Default" = code default
 in `src/config.py`; **deployed** values are from `experiments/deployed_config.env`
-(as of 2026-10-03) where they differ.
+(as of 2026-11-01) where they differ — `deployed_config.env` is authoritative if this table lags.
 
 | # | Gate | What it does | Key setting(s) — default (deployed) | DB column | Log tag | Rollback lever | Origin |
 |---|------|--------------|-------------------------------------|-----------|---------|----------------|--------|
@@ -41,8 +41,8 @@ in `src/config.py`; **deployed** values are from `experiments/deployed_config.en
 | 1b | Fail-closed on processing error (Task 3, 2026-10-03) | If `process_detection` raises, the ERROR-photo fallback is not sent when: *after* species ID (e.g. the DB write failed) the burst is review-class, unnamed-animal, already human-proximity-muted, or inside a human window/density; or species ID *itself* raised and the burst's capture time is inside a human window/density (read from the recent-human store). Also fails closed if that human check itself errors. Otherwise (e.g. a named animal, or an ID failure with no human around) the ERROR photo still sends. A HUMAN result still falls back to HUMAN (row 1). The log line names the burst by photo file and capture time, since it has no detection id | — | — (row may not exist) | `[FAIL-CLOSED]` | `git revert` | review bug MEDIUM-2 |
 | 2 | Human-Proximity (window OR density, demoted-band widening) | Mute review-class, ERROR, ANIMAL_UNCERTAIN and unnamed-animal bursts near or amid human activity | `PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS` 120 (**240**); `..._HUMAN_DENSITY_WINDOW_SECONDS` 1800; `..._HUMAN_DENSITY_COUNT` 8; `..._HUMAN_DEMOTED_PERSON_FLOOR` 0.3; `..._HUMAN_DEMOTED_WINDOW_SECONDS` 1800 | `human_proximity_muted` | `[HUMAN-PROXIMITY]` | window `=0`; density count `=0`; demoted window `=0` | runs/0010, 0018, 0019 |
 | 3 | Blur (luma-conditioned) | Mute below-sharpness-floor review-class bursts, only when bright enough that low sharpness means blur | `PERFORMANCE_MIN_SHARPNESS_THRESHOLD` 11.0; `PERFORMANCE_BLUR_MUTE_MIN_LUMA` 70 | `sharpness_score`, `below_sharpness_floor` | `[BLUR]` | no dedicated lever; `PERFORMANCE_BLUR_MUTE_MIN_LUMA=255` effectively disables, or `git revert 683f5f3` | runs/0005, 0007 |
-| 4 | Confident-Blank | Mute review-class bursts whose raw top-1 is `blank` at ≥ threshold | `PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD` 0.92 | `blank_confidence_muted` | `[BLANK-CONF]` | `=0` (human only; loop bounds 0.87–1.0) | runs/0021 |
-| 5 | Review Sampling | Send only a deterministic fraction of surviving review-class bursts | `PERFORMANCE_REVIEW_SAMPLE_RATE` 0.25 (**0.5**) | `review_sampled_out` | `[REVIEW-SAMPLE]` | rate `=1.0` | runs/0009 |
+| 4 | Confident-Blank | Mute review-class bursts whose raw top-1 is `blank` at ≥ threshold | `PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD` 0.92 (**1.0**) | `blank_confidence_muted` | `[BLANK-CONF]` | `=0` (human only; loop bounds 0.87–1.0) | runs/0021 |
+| 5 | Review Sampling | Send only a deterministic fraction of surviving review-class bursts | `PERFORMANCE_REVIEW_SAMPLE_RATE` 0.25 (**0.75**) | `review_sampled_out` | `[REVIEW-SAMPLE]` | rate `=1.0` | runs/0009 |
 | 6 | Deferred REVIEW send (cancel-on-human) | Hold surviving review sends; cancel if a HUMAN burst lands within the hold | `PERFORMANCE_REVIEW_DEFER_SECONDS` 240 | `human_proximity_muted` (follow-up UPDATE) | `[REVIEW-DEFER]` | `=0` | runs/0010 |
 | — | Send | MAIN (IDENTIFIED / ANIMAL_UNCERTAIN / ERROR) or 🔍 REVIEW (review-class) | `PERFORMANCE_REVIEW_PREFIX_ENABLED` true | — | — | — | runs/0001 |
 
