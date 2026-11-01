@@ -64,7 +64,7 @@ class DatabaseManager:
         # scene_gate_muted; unlike review_sampled_out this is written on the
         # initial INSERT (no detection_id dependency).
         "human_proximity_muted": "BOOLEAN",
-        # Confident-Blank Mute Gate (exp #29): True when a review-class
+        # RETIRED 2026-11-01 (NULL on new rows; history only). Confident-Blank Mute Gate (exp #29): True when a review-class
         # burst's raw classifier top-1 was SpeciesNet's generic "blank"
         # label at or above blank_confidence_mute_threshold, False when
         # review-class and evaluated but not muted, NULL when the status
