@@ -36,7 +36,7 @@ Use VIM, not nano, for console edits.
 ## Architecture
 
 - **`wildlife_system.py`**: main orchestrator and event loop; owns `process_detection` (species ID, burst human sweep, per-gate flags, DB write) and `_process_and_notify_detection` (executes the `decide()` result, deferred REVIEW sends)
-- **`notification_gate.py`**: `decide(ctx) -> Decision` — the single ordered source of notification-gate precedence; `RecentHumanEvents` store of HUMAN timestamps; the human-proximity / blank-confidence evaluators
+- **`notification_gate.py`**: `decide(ctx) -> Decision` — the single ordered source of notification-gate precedence; `RecentHumanEvents` store of HUMAN timestamps; the human-proximity evaluator
 - **`config.py`**: pydantic-settings dataclasses (`CameraConfig`, `MotionConfig`, `PerformanceConfig`, `StorageConfig`, `SpeciesConfig`, `LocationConfig`); env-var overrides; validators consume `loop/guardrails.BOUNDS`; `Config.create_test_config()` for tests
 - **`camera_manager.py`**: dual-stream Picamera2 (high-res capture + low-res motion stream); `MockCameraManager` for tests
 - **`motion_detector.py`**: MOG2 background subtraction, central-region weighting, consecutive-detection filter, optional color-variance filter
@@ -74,18 +74,17 @@ Notification precedence — implemented once, in `notification_gate.decide()` (f
    - `[FAIL-CLOSED]` — processing error on a review-class / unnamed-animal burst, or on any burst (incl. a species-ID failure) inside a human window/density: muted instead of sent as an ERROR photo
 2. `[HUMAN-PROXIMITY]` Human-Proximity — window OR density OR demoted-band; review-class, ERROR and ANIMAL_UNCERTAIN bursts, plus `;;;;;;animal` IDENTIFIED bursts
 3. `[BLUR]` Blur — below sharpness floor AND luma ≥ 70, review-class only
-4. `[BLANK-CONF]` Confident-Blank — raw top-1 `blank` ≥ threshold (default 0.92; live value in `experiments/deployed_config.env`), review-class only
-5. `[REVIEW-SAMPLE]` Review Sampling — deterministic fraction sent
-6. `[REVIEW-DEFER]` Deferred send — surviving REVIEW sends held 240s, cancelled if any HUMAN burst lands in that window
+4. `[REVIEW-SAMPLE]` Review Sampling — deterministic fraction sent
+5. `[REVIEW-DEFER]` Deferred send — surviving REVIEW sends held 240s, cancelled if any HUMAN burst lands in that window
 
 MAIN-channel (non-review, non-human) alerts are never delayed. Photos of HUMAN and human-adjacent/human-proximity-muted bursts are purged after 48h; DB rows are kept.
 
 ### Standing rulings the loop must obey
 
 - **No human pre-approval step exists.** If a change passes the guardrails, ship it (PROTOCOL.md "Autonomy"). Daniel's levers are post-hoc: `/pause`, `/rollback`, `git revert`.
-- **Scene gate, Unnamed-Animal Blank-Raw gate and Animal-Proximity exemption were retired by Daniel 2026-10-03** (docs/detection-gates.md §15). The earlier "scene gate is human-ruled ON" ruling is void; do not re-add them without new evidence. DB columns remain (NULL on new rows).
+- **Scene gate, Unnamed-Animal Blank-Raw gate and Animal-Proximity exemption were retired by Daniel 2026-10-03; the Confident-Blank gate (`[BLANK-CONF]`) on 2026-11-01** (docs/detection-gates.md §15). The earlier "scene gate is human-ruled ON" ruling is void; do not re-add them without new evidence. DB columns remain (NULL on new rows).
 - **Review sampling is a volume lever, not an FP lever.** Never credit it with an fp_rate change; fewer labels is intended, not a freeze trigger (PROTOCOL.md "Review sampling").
-- **Mute thresholds the loop may not cross**: `BLANK_CONFIDENCE_MUTE_THRESHOLD` loop range `[0.87, 1.0]`; `HUMAN_DETECTION_CONFIDENCE` `[0.3, 0.7]`. Setting the blank-confidence threshold to `0` (disable) is human-only. All ranges: `src/loop/guardrails.py::BOUNDS`.
+- **Mute thresholds the loop may not cross**: `HUMAN_DETECTION_CONFIDENCE` `[0.3, 0.7]`. All ranges: `src/loop/guardrails.py::BOUNDS`.
 - **Auto-labels are not truth.** Headline fp_rate uses human labels only; `cant_tell` and `person` are excluded from its denominator.
 - **No second Telegram channel** — likely-FPs use the same-channel 🔍 REVIEW prefix.
 - **Analyze existing data first** (DB rows + frames on disk + labels) before proposing new instrumentation (`experiments/loop.md`).

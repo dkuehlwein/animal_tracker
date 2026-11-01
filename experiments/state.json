@@ -324,7 +324,6 @@
   },
   "best_known_good": {},
   "deployed": {
-    "PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD": 1.0,
     "PERFORMANCE_HUMAN_DENSITY_COUNT": 8,
     "PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS": 1800,
     "PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS": 240,
@@ -478,6 +477,6 @@
   "last_tick_completed_day": "2026-10-31",
   "nightly_verdict": "Five alerts this morning, all real blackbird visits, with no false alarms and no 'probably empty' shots at all. Nothing changed tonight; we're still watching whether yesterday's 3-in-4 sending catches more birds.",
   "paused": false,
-  "pending_restart_at": null,
+  "pending_restart_at": "2026-11-02T03:25:00+01:00",
   "watermark": 5858
 }

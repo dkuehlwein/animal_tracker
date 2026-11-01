@@ -41,7 +41,6 @@ in `src/config.py`; **deployed** values are from `experiments/deployed_config.en
 | 1b | Fail-closed on processing error (Task 3, 2026-10-03) | If `process_detection` raises, the ERROR-photo fallback is not sent when: *after* species ID (e.g. the DB write failed) the burst is review-class, unnamed-animal, already human-proximity-muted, or inside a human window/density; or species ID *itself* raised and the burst's capture time is inside a human window/density (read from the recent-human store). Also fails closed if that human check itself errors. Otherwise (e.g. a named animal, or an ID failure with no human around) the ERROR photo still sends. A HUMAN result still falls back to HUMAN (row 1). The log line names the burst by photo file and capture time, since it has no detection id | — | — (row may not exist) | `[FAIL-CLOSED]` | `git revert` | review bug MEDIUM-2 |
 | 2 | Human-Proximity (window OR density, demoted-band widening) | Mute review-class, ERROR, ANIMAL_UNCERTAIN and unnamed-animal bursts near or amid human activity | `PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS` 120 (**240**); `..._HUMAN_DENSITY_WINDOW_SECONDS` 1800; `..._HUMAN_DENSITY_COUNT` 8; `..._HUMAN_DEMOTED_PERSON_FLOOR` 0.3; `..._HUMAN_DEMOTED_WINDOW_SECONDS` 1800 | `human_proximity_muted` | `[HUMAN-PROXIMITY]` | window `=0`; density count `=0`; demoted window `=0` | runs/0010, 0018, 0019 |
 | 3 | Blur (luma-conditioned) | Mute below-sharpness-floor review-class bursts, only when bright enough that low sharpness means blur | `PERFORMANCE_MIN_SHARPNESS_THRESHOLD` 11.0; `PERFORMANCE_BLUR_MUTE_MIN_LUMA` 70 | `sharpness_score`, `below_sharpness_floor` | `[BLUR]` | no dedicated lever; `PERFORMANCE_BLUR_MUTE_MIN_LUMA=255` effectively disables, or `git revert 683f5f3` | runs/0005, 0007 |
-| 4 | Confident-Blank | Mute review-class bursts whose raw top-1 is `blank` at ≥ threshold | `PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD` 0.92 (**1.0**) | `blank_confidence_muted` | `[BLANK-CONF]` | `=0` (human only; loop bounds 0.87–1.0) | runs/0021 |
 | 5 | Review Sampling | Send only a deterministic fraction of surviving review-class bursts | `PERFORMANCE_REVIEW_SAMPLE_RATE` 0.25 (**0.75**) | `review_sampled_out` | `[REVIEW-SAMPLE]` | rate `=1.0` | runs/0009 |
 | 6 | Deferred REVIEW send (cancel-on-human) | Hold surviving review sends; cancel if a HUMAN burst lands within the hold | `PERFORMANCE_REVIEW_DEFER_SECONDS` 240 | `human_proximity_muted` (follow-up UPDATE) | `[REVIEW-DEFER]` | `=0` | runs/0010 |
 | — | Send | MAIN (IDENTIFIED / ANIMAL_UNCERTAIN / ERROR) or 🔍 REVIEW (review-class) | `PERFORMANCE_REVIEW_PREFIX_ENABLED` true | — | — | — | runs/0001 |
@@ -198,27 +197,13 @@ Related: `CAMERA_AE_EXPOSURE_MODE` (exp #7, runs/0006) tried to lift dusk sharpn
 `short` AE bias; it could not and was rolled back — `.env` sets `normal` (code default is
 still `short`).
 
-## 7. Confident-Blank Mute Gate (exp #29, commit `3c2856c`, runs/0021)
+## 7. Confident-Blank Mute Gate — retired 2026-11-01
 
-Mute a review-class burst when the classifier's **raw** top-1 (`top_species_raw`, before
-geofence/rollup) `is_blank_label` with score ≥ `PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD`
-(0.92).
-
-- Evidence (182 review-class rows with blank raw top-1): the 5 human-labelled
-  animal/animal_wrong_id rows score 0.6431–**0.8475**; 42 confirmed FPs median 0.9219,
-  max 0.9825. 0.92 mutes 52/182 (29%), zero animal- and zero person-labelled (highest
-  person row 0.9116). Margin 0.0725 = 3.6× the pre-registered `max(animal)+0.02` rule.
-- This is the "different discriminator" exps #16/#17 called for: scene similarity
-  (the since-retired Scene-Unchanged Gate) did *not* separate animal (0.7886–0.9202) from
-  FP (0.5335–0.9675); classifier blank-confidence does.
-- **Loop BOUNDS `(0.87, 1.0)`** = 0.8475 + 0.02: the loop can never deploy at/below the
-  animal ceiling. Config allows `[0, 1]` so a *human* can set `0.0` = DISABLE
-  (special-cased; a literal `>= 0.0` would mute everything).
-- Persisted on INSERT; `NULL` when not review-class or disabled. Fails open to `False`.
+See §15. (Section number kept so cross-references stay stable.)
 
 ## 9. Review Sampling Gate (runs/0009, exp #10)
 
-Of review-class bursts surviving gates 1–4, only `PERFORMANCE_REVIEW_SAMPLE_RATE` are
+Of review-class bursts surviving gates 1–3, only `PERFORMANCE_REVIEW_SAMPLE_RATE` are
 sent. Deterministic per burst: `_review_sample_fraction(detection_id)` = sha256 →
 [0,1); muted when fraction ≥ rate. `None` id → always sends; rate ≥ 1.0 never samples
 out (rollback); ≤ 0.0 always does.
@@ -261,7 +246,7 @@ all nullable, no backfill:
 | `scene_similarity`, `scene_gate_muted` | retired (§15); column kept, NULL on new rows |
 | `review_sampled_out` | §9 (follow-up UPDATE) |
 | `human_proximity_muted` | §4 / §10 (also set on unnamed-animal IDENTIFIED rows) |
-| `blank_confidence_muted` | §7 |
+| `blank_confidence_muted` | retired (§15); column kept, NULL on new rows |
 | `unnamed_animal_blank_muted` | retired (§15); column kept, NULL on new rows |
 
 Sharpness luma is in `sharpness_info` but is not a DB column.
@@ -337,7 +322,7 @@ NULL); the `PERFORMANCE_*` env vars may still be present in `.env` /
 - **Scene-Unchanged Gate** (`src/scene_gate.py`, `[SCENE-GATE]`, `scene_similarity`,
   `scene_gate_muted`, `PERFORMANCE_SCENE_GATE_*`; runs/0009, 0022; introduced in
   `53e9bd6`) — 0 mutes since 2026-08-30; near-vacuous at T=0.982 and
-  superseded as FP lever by Confident-Blank (§7). The "human-ruled ON" ruling is void.
+  superseded as FP lever by Confident-Blank (itself retired, see below). The "human-ruled ON" ruling is void.
   `src/loop/scene_watch.py` (camera re-aim watchdog) is separate and unaffected.
 - **Unnamed-Animal Blank-Raw Mute Gate** (exp #32, `[UNNAMED-BLANK]`,
   `unnamed_animal_blank_muted`, `PERFORMANCE_UNNAMED_ANIMAL_BLANK_MUTE_THRESHOLD`;
@@ -351,3 +336,18 @@ NULL); the `PERFORMANCE_*` env vars may still be present in `.env` /
   no background task); `_deferred_review_send` is the cancel-on-human phase only (§10).
 - Dead code: `[GATE-SHADOW]` log line, `DatabaseManager.get_recent_review_detections`,
   `scripts/validate_scene_gate.py`.
+
+## Retired 2026-11-01
+
+Retired by Daniel; code, config field + validator, `guardrails.BOUNDS` entry and tests
+removed. The DB column `blank_confidence_muted` stays (history; NULL on new rows). A stale
+`PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD` env var is ignored (`extra='ignore'`), and
+`loop.deploy.rollback` drops keys no longer in `BOUNDS`.
+
+- **Confident-Blank Mute Gate** (exp #29, commit `3c2856c`, `[BLANK-CONF]`,
+  `blank_confidence_muted`, `PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD`, evaluator
+  `evaluate_blank_confidence`; runs/0021, 0029) — exp #40 found it muting real blackbirds
+  in autumn light (3 of 5 mutes in its window were animals; SpeciesNet scores dim bird
+  frames as `blank` 0.93-0.99, inside the empty-frame range); the threshold was set to 1.0
+  (zero firings since) and the gate is now removed. `utils.is_blank_label` stays (used
+  elsewhere/tests).

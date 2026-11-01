@@ -124,3 +124,18 @@ def test_species_unknown_threshold_key_end_to_end(paths, monkeypatch):
     from config import SpeciesConfig
     cfg = SpeciesConfig(_env_file=(str(paths["env"]), str(paths["env"])))
     assert cfg.unknown_species_threshold == 0.75
+
+
+def test_rollback_drops_keys_no_longer_in_bounds(paths):
+    """A best_known_good snapshot holding a retired lever must not re-render it."""
+    _seed_state(paths, deployed={
+        "MOTION_THRESHOLD": 2000,
+        "PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD": 1.0,
+    })
+    result = deploy.rollback(
+        state_path=paths["state"], env_path=paths["env"],
+        restart_at="2026-06-11T05:00:00+02:00",
+    )
+    assert "PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD" not in result["deployed"]
+    assert "BLANK_CONFIDENCE" not in paths["env"].read_text()
+    assert "MOTION_THRESHOLD=2000" in paths["env"].read_text()

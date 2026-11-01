@@ -11,7 +11,7 @@ sys.path.append('src')
 
 from notification_gate import (  # noqa: E402
     Action, Channel, Decision, GateContext, RecentHumanEvents, decide,
-    evaluate_blank_confidence, evaluate_human_proximity, human_events_horizon_seconds,
+    evaluate_human_proximity, human_events_horizon_seconds,
 )
 from tests.test_wildlife_system import _golden_combos, _golden_expected_outcome  # noqa: E402
 
@@ -20,7 +20,6 @@ def _cfg(**overrides):
     base = dict(
         suppress_human_alerts=True,
         blur_mute_min_luma=70.0,
-        blank_confidence_mute_threshold=0.92,
         review_sample_rate=0.25,
         review_defer_seconds=240.0,
         human_proximity_window_seconds=120.0,
@@ -36,7 +35,7 @@ def _cfg(**overrides):
 def test_decide_matches_golden_precedence_for_every_combination():
     mismatches = []
     for combo in _golden_combos():
-        status, suppress, unnamed, prox, (below, luma), blank, sampled, defer = combo
+        status, suppress, unnamed, prox, (below, luma), sampled, defer = combo
         ctx = GateContext(
             status=status,
             config=_cfg(suppress_human_alerts=suppress, review_defer_seconds=defer),
@@ -46,7 +45,6 @@ def test_decide_matches_golden_precedence_for_every_combination():
             below_sharpness_floor=below,
             sharpness_score=5.0,
             luma=luma,
-            blank_confidence_muted=blank,
             top_species_raw='uuid;;;;;;blank',
             top_species_score=0.95,
             review_sampled_out=sampled,
@@ -164,13 +162,3 @@ def test_proximity_uses_any_in_window_not_only_latest():
     to-the-burst) one is also in the store."""
     ev = RecentHumanEvents([_at(0), _at(500)])
     assert evaluate_human_proximity(_at(100), None, ev, _cfg()) == (True, 'window')
-
-
-# --- evaluate_blank_confidence --------------------------------------------
-
-def test_blank_confidence_flag_semantics():
-    assert evaluate_blank_confidence('no_animal', 'u;;;;;;blank', 0.92, 0.92) is True
-    assert evaluate_blank_confidence('no_animal', 'u;;;;;;blank', 0.91, 0.92) is False
-    assert evaluate_blank_confidence('no_animal', 'u;;;;;;blank', None, 0.92) is False
-    assert evaluate_blank_confidence('identified', 'u;;;;;;blank', 0.99, 0.92) is None
-    assert evaluate_blank_confidence('no_animal', 'u;;;;;;blank', 0.99, 0.0) is None

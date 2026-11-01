@@ -15,7 +15,6 @@ burst is sent to Telegram, muted, or deferred.
                      generic unnamed-animal label
     BLUR             review-class, below the sharpness floor, and the frame
                      is bright enough (luma known and >= blur_mute_min_luma)
-    BLANK-CONF       review-class and blank_confidence_muted
     REVIEW-SAMPLE    review-class and review_sampled_out
     (DEFER)          review-class and review_defer_seconds > 0
     (SEND)           everything else
@@ -23,13 +22,13 @@ burst is sent to Telegram, muted, or deferred.
 Because the first match wins, a suppressed burst always produces exactly one
 suppression log line, tagged with the gate that decided it.
 
-The per-gate inputs (human_proximity_muted, blank_confidence_muted,
+The per-gate inputs (human_proximity_muted,
 review_sampled_out, below_sharpness_floor) are computed earlier, in
 `WildlifeSystem.process_detection`, and persisted to their own DB columns
 with unchanged semantics — the nightly loop's metrics read those columns.
-`decide()` only turns them into one routing decision. The two evaluators
-that compute those flags from raw inputs (`evaluate_human_proximity`,
-`evaluate_blank_confidence`) live here too, next to the store of recent
+`decide()` only turns them into one routing decision. The evaluator
+that computes the human-proximity flag from raw inputs
+(`evaluate_human_proximity`) lives here too, next to the store of recent
 HUMAN-status timestamps they read (`RecentHumanEvents`).
 """
 
@@ -42,7 +41,6 @@ from datetime import datetime, timedelta
 from typing import Any, Iterable, Iterator, List, Optional, Tuple
 
 from data_models import DetectionStatus, is_human_detection, is_review_detection
-from utils import is_blank_label
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +85,6 @@ class GateContext:
     below_sharpness_floor: bool = False
     sharpness_score: Optional[float] = None
     luma: Optional[float] = None
-    blank_confidence_muted: bool = False
     top_species_raw: Optional[str] = None
     top_species_score: Optional[float] = None
     review_sampled_out: bool = False
@@ -153,13 +150,6 @@ def decide(ctx: GateContext) -> Decision:
         return mute("BLUR",
                     f"sharpness={_fmt(ctx.sharpness_score, '.1f')}, "
                     f"luma={_fmt(ctx.luma, '.1f')}, no animal found")
-
-    if review and ctx.blank_confidence_muted:
-        return mute("BLANK-CONF",
-                    f"raw_top1={ctx.top_species_raw}, "
-                    f"score={_fmt(ctx.top_species_score, '.3f')} >= "
-                    f"threshold={_fmt(cfg.blank_confidence_mute_threshold, '.3f')}, "
-                    f"no animal found")
 
     if review and ctx.review_sampled_out:
         return mute("REVIEW-SAMPLE",
@@ -309,19 +299,3 @@ def evaluate_human_proximity(burst_time: datetime, person_confidence: Optional[f
     if density_muted:
         return True, "density"
     return False, None
-
-
-def evaluate_blank_confidence(status, top_species_raw: Optional[str],
-                              top_species_score: Optional[float],
-                              threshold: float) -> Optional[bool]:
-    """Confident-Blank gate flag: None when the gate doesn't apply (not
-    review-class, or threshold 0.0 = disabled), else whether the classifier's
-    raw top-1 is the generic blank label at or above `threshold`."""
-    if threshold <= 0.0 or not is_review_detection(status):
-        return None
-    return bool(
-        top_species_raw
-        and is_blank_label(top_species_raw)
-        and top_species_score is not None
-        and top_species_score >= threshold
-    )

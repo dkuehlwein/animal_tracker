@@ -132,8 +132,7 @@ def _identification_no_animal_with_person(person_confidence):
 def _identification_no_animal_with_top1(label, score):
     """Same as `_identification_no_animal()` but carrying a
     `top_classifier_prediction` in `metadata` — the raw, pre-rollup
-    classifier top-1 that `process_detection` reads to drive the
-    Confident-Blank Mute Gate (exp #29) and persists to the
+    classifier top-1 that `process_detection` reads and persists to the
     `top_species_raw`/`top_species_score` DB columns."""
     result = _identification_no_animal()
     result.metadata = {'top_classifier_prediction': {'label': label, 'score': score}}
@@ -977,7 +976,7 @@ def test_capture_and_select_best_frame_populates_luma(system, tmp_path, monkeypa
 # ---------------------------------------------------------------------------
 # REVIEW-sampling gate (wildlife_system._review_sample_fraction /
 # is_review_sampled_out / notification wiring). Precedence (see
-# notification_gate.decide): Human > Human-Proximity > Blur > Confident-Blank
+# notification_gate.decide): Human > Human-Proximity > Blur
 # > Sampling — a notification-volume lever only, the burst is still
 # species-ID'd and DB-logged regardless of whether it's sent.
 # ---------------------------------------------------------------------------
@@ -1192,7 +1191,7 @@ async def test_sampled_out_flag_ignored_for_non_review_status(system, tmp_path):
 # Human/Privacy Gate itself, so such bursts leak a recognizable person to
 # REVIEW as no_animal. Mute review-class bursts that land within
 # human_proximity_window_seconds of the most recent HUMAN-status detection.
-# Precedence: Human > Human-Proximity > Blur > Confident-Blank > Sampling.
+# Precedence: Human > Human-Proximity > Blur > Sampling.
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
@@ -2484,269 +2483,12 @@ async def test_named_species_unaffected_by_unnamed_animal_widening(system, tmp_p
     assert row['human_proximity_muted'] is None
 
 
-# ---------------------------------------------------------------------------
-# Confident-Blank Mute Gate (exp #29, 2026-09-17): mute a review-class burst
-# when the classifier's RAW top-1 prediction is SpeciesNet's fully-generic
-# "blank" label at or above blank_confidence_mute_threshold (default 0.92).
-# Precedence: Human/Privacy > Human-Proximity > Blur > Confident-Blank >
-# Review Sampling > Deferred Send.
+# Retired Confident-Blank Mute Gate (exp #29, removed 2026-11-01): a HUMAN
+# burst with a confident-blank top-1 is still muted by the human gate only.
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_blank_confidence_at_threshold_suppresses_notification(system, tmp_path, caplog):
-    """A review-class burst whose raw top-1 is blank at exactly the
-    threshold is muted: no Telegram send, a [BLANK-CONF] log line, and the
-    DB row records blank_confidence_muted + top_species_raw/score."""
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal_with_top1(
-            "f1856211-d0e3-4ac6-8016-16aacd8d0dbe;;;;;;blank", 0.92
-        )
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    with caplog.at_level("INFO"):
-        await system._process_and_notify_detection(img, 5000)
-
-    telegram.send_photo_with_caption.assert_not_called()
-    telegram.send_media_group.assert_not_called()
-    telegram.send_detection_notification.assert_not_called()
-    telegram.send_document.assert_not_called()
-    system.cleanup_old_images.assert_called_once()
-    assert any("[BLANK-CONF]" in r.message for r in caplog.records)
-
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
-    assert row is not None
-    assert row['blank_confidence_muted'] == 1
-    assert row['top_species_raw'] == "f1856211-d0e3-4ac6-8016-16aacd8d0dbe;;;;;;blank"
-    assert row['top_species_score'] == pytest.approx(0.92)
-
-
-@pytest.mark.asyncio
-async def test_blank_confidence_above_threshold_suppresses_notification(system, tmp_path):
-    """Comfortably above threshold also mutes."""
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal_with_top1("uuid;;;;;;blank", 0.98)
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    await system._process_and_notify_detection(img, 5000)
-
-    telegram.send_photo_with_caption.assert_not_called()
-    telegram.send_media_group.assert_not_called()
-
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
-    assert row['blank_confidence_muted'] == 1
-
-
-@pytest.mark.asyncio
-async def test_blank_confidence_below_threshold_still_notifies(system, tmp_path):
-    """Just below threshold does not mute — the burst still sends as a
-    normal (REVIEW-prefixed) notification, and blank_confidence_muted is
-    False (evaluated-but-not-muted), not NULL."""
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal_with_top1("uuid;;;;;;blank", 0.91)
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    await system._process_and_notify_detection(img, 5000)
-
-    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
-
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
-    assert row['blank_confidence_muted'] == 0
-
-
-@pytest.mark.asyncio
-async def test_blank_confidence_not_muted_for_non_blank_label(system, tmp_path):
-    """A high-confidence but NON-blank raw top-1 (e.g. a real species guess)
-    must never trip this gate."""
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal_with_top1(
-            "uuid;mammalia;carnivora;felidae;felis;catus;domestic cat", 0.99
-        )
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    await system._process_and_notify_detection(img, 5000)
-
-    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
-
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
-    assert row['blank_confidence_muted'] == 0
-
-
-@pytest.mark.asyncio
-async def test_blank_confidence_missing_score_does_not_mute(system, tmp_path):
-    """No top_classifier_prediction in metadata (score is None) must not
-    mute — fails open."""
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal()
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    await system._process_and_notify_detection(img, 5000)
-
-    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
-
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
-    assert row['blank_confidence_muted'] == 0
-
-
-@pytest.mark.asyncio
-async def test_blank_confidence_threshold_zero_disables_gate(system, tmp_path):
-    """threshold=0.0 disables the gate entirely (the rollback lever):
-    blank_confidence_muted stays NULL ("gate didn't apply") even for a
-    would-have-muted blank/high-score burst, and the burst still notifies."""
-    system.config.performance.blank_confidence_mute_threshold = 0.0
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal_with_top1("uuid;;;;;;blank", 0.99)
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    await system._process_and_notify_detection(img, 5000)
-
-    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
-
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
-    assert row['blank_confidence_muted'] is None
-
-
-@pytest.mark.asyncio
-async def test_blank_confidence_muted_none_for_non_review_status(system, tmp_path):
-    """A non-review-class (IDENTIFIED animal) status leaves
-    blank_confidence_muted NULL regardless of what the raw top-1 says —
-    the gate only ever evaluates review-class bursts."""
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    identified = _identification(True, boxes=[{'confidence': 0.7}])
-    identified.metadata = {
-        'top_classifier_prediction': {'label': 'uuid;;;;;;blank', 'score': 0.99}
-    }
-    system.species_identifier.identify_species = MagicMock(return_value=identified)
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    await system._process_and_notify_detection(img, 5000)
-
-    assert telegram.send_photo_with_caption.called or telegram.send_media_group.called
-
-    with sqlite3.connect(system.database.db_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT * FROM detections ORDER BY id DESC LIMIT 1").fetchone()
-    assert row['blank_confidence_muted'] is None
-
-
-@pytest.mark.asyncio
-async def test_blur_wins_over_blank_confidence_single_log(system, tmp_path, caplog):
-    """A below-floor blurry review-class burst that is ALSO blank-confident
-    is suppressed via the blur gate only — exactly one suppression log,
-    [BLUR], not [BLANK-CONF]."""
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal_with_top1("uuid;;;;;;blank", 0.99)
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    with caplog.at_level("INFO"):
-        await system._process_and_notify_detection(
-            img, 5000, sharpness_info=_below_floor_sharpness_info()
-        )
-
-    telegram.send_photo_with_caption.assert_not_called()
-    telegram.send_media_group.assert_not_called()
-
-    gate_logs = [
-        r.message for r in caplog.records
-        if "HUMAN-GATE" in r.message or "[HUMAN-PROXIMITY]" in r.message
-        or "[BLUR]" in r.message or "[BLANK-CONF]" in r.message
-        or "[SCENE-GATE]" in r.message or "[REVIEW-SAMPLE]" in r.message
-    ]
-    assert len(gate_logs) == 1
-    assert "[BLUR]" in gate_logs[0]
-
-
-@pytest.mark.asyncio
-async def test_blank_confidence_wins_over_sampling_single_log(system, tmp_path, caplog):
-    """A blank-confident review-class burst is suppressed via the
-    blank-confidence gate, not double-suppressed or mis-attributed to
-    sampling, even at rate=0.0."""
-    system.config.performance.review_sample_rate = 0.0
-    img = tmp_path / "photo.jpg"
-    img.write_bytes(b"fake")
-    system.species_identifier.identify_species = MagicMock(
-        return_value=_identification_no_animal_with_top1("uuid;;;;;;blank", 0.99)
-    )
-    telegram = _mock_telegram(system)
-    system.system_monitor = MagicMock()
-    system.system_monitor.get_cpu_temperature.return_value = 20.0
-    system.cleanup_old_images = MagicMock()
-
-    with caplog.at_level("INFO"):
-        await system._process_and_notify_detection(img, 5000)
-
-    telegram.send_photo_with_caption.assert_not_called()
-    telegram.send_media_group.assert_not_called()
-
-    gate_logs = [
-        r.message for r in caplog.records
-        if "HUMAN-GATE" in r.message or "[HUMAN-PROXIMITY]" in r.message
-        or "[BLUR]" in r.message or "[BLANK-CONF]" in r.message
-        or "[SCENE-GATE]" in r.message or "[REVIEW-SAMPLE]" in r.message
-    ]
-    assert len(gate_logs) == 1
-    assert "[BLANK-CONF]" in gate_logs[0]
-
-
-@pytest.mark.asyncio
-async def test_human_wins_over_blank_confidence_single_log(system, tmp_path, caplog):
+async def test_human_burst_with_blank_top1_single_human_gate_log(system, tmp_path, caplog):
     """A HUMAN burst is suppressed by the human gate, not blank-confidence —
     single suppression log, even with a blank/high-score top-1 in
     metadata."""
@@ -2771,7 +2513,7 @@ async def test_human_wins_over_blank_confidence_single_log(system, tmp_path, cap
     gate_logs = [
         r.message for r in caplog.records
         if "HUMAN-GATE" in r.message or "[HUMAN-PROXIMITY]" in r.message
-        or "[BLUR]" in r.message or "[BLANK-CONF]" in r.message
+        or "[BLUR]" in r.message
         or "[SCENE-GATE]" in r.message or "[REVIEW-SAMPLE]" in r.message
     ]
     assert len(gate_logs) == 1
@@ -2794,7 +2536,7 @@ def _unnamed_animal_with_top1(label, score, confidence=0.58):
 @pytest.mark.asyncio
 async def test_unnamed_animal_blank_muted_none_for_review_class(system, tmp_path):
     """A review-class burst is not this shape — the gate leaves the column
-    NULL and the Confident-Blank gate owns that population instead."""
+    NULL (the Confident-Blank gate that once owned it is also retired)."""
     img = tmp_path / "photo.jpg"
     img.write_bytes(b"fake")
     system.species_identifier.identify_species = MagicMock(
@@ -2890,7 +2632,7 @@ async def test_animal_proximity_exemption_does_not_override_human_proximity_gate
     gate_logs = [
         r.message for r in caplog.records
         if "HUMAN-GATE" in r.message or "[HUMAN-PROXIMITY]" in r.message
-        or "[BLUR]" in r.message or "[BLANK-CONF]" in r.message
+        or "[BLUR]" in r.message
         or "[SCENE-GATE]" in r.message or "[REVIEW-SAMPLE]" in r.message
     ]
     assert len(gate_logs) == 1
@@ -2935,7 +2677,7 @@ async def test_ordinary_review_burst_deferred_then_sent(system, tmp_path):
 # process_detection stubbed to return that combination), and asserts the
 # routing outcome matches `_golden_expected_outcome` — a literal transcription
 # of the post-Task-2 precedence:
-#   HUMAN-GATE > HUMAN-PROXIMITY > BLUR > BLANK-CONF > REVIEW-SAMPLE
+#   HUMAN-GATE > HUMAN-PROXIMITY > BLUR > REVIEW-SAMPLE
 #   > (review-class & defer>0 -> DEFER) > SEND
 # This test was written and passing against the old inline flag-recombination
 # chains BEFORE they were replaced by notification_gate.decide(), so it pins
@@ -2950,7 +2692,7 @@ _GOLDEN_STATUSES = (
 # (below_sharpness_floor, luma) — luma None = unknown, 30 = dark, 80 = bright
 _GOLDEN_BLUR = ((False, 80.0), (True, None), (True, 30.0), (True, 80.0))
 _GOLDEN_TAGS = (
-    "[HUMAN-GATE]", "[HUMAN-PROXIMITY]", "[BLUR]", "[BLANK-CONF]",
+    "[HUMAN-GATE]", "[HUMAN-PROXIMITY]", "[BLUR]",
     "[REVIEW-SAMPLE]", "[REVIEW-DEFER]", "[FAIL-CLOSED]",
 )
 
@@ -2962,13 +2704,12 @@ def _golden_combos():
         (False, True),          # unnamed_animal
         (False, True),          # human_proximity_muted
         _GOLDEN_BLUR,
-        (False, True),          # blank_confidence_muted
         (False, True),          # review_sampled_out
         (0.0, 240.0),           # review_defer_seconds
     )
 
 
-def _golden_expected_outcome(status, suppress, unnamed, prox, blur, blank, sampled, defer,
+def _golden_expected_outcome(status, suppress, unnamed, prox, blur, sampled, defer,
                              min_luma=70.0):
     review = status in ('no_animal', 'unclassifiable')
     below_floor, luma = blur
@@ -2980,8 +2721,6 @@ def _golden_expected_outcome(status, suppress, unnamed, prox, blur, blank, sampl
         return ('MUTE', '[HUMAN-PROXIMITY]')
     if review and below_floor and luma is not None and luma >= min_luma:
         return ('MUTE', '[BLUR]')
-    if review and blank:
-        return ('MUTE', '[BLANK-CONF]')
     if review and sampled:
         return ('MUTE', '[REVIEW-SAMPLE]')
     if review and defer > 0:
@@ -3002,7 +2741,7 @@ async def test_golden_notification_precedence(system, tmp_path, caplog):
     mismatches = []
     n = 0
     for combo in _golden_combos():
-        status, suppress, unnamed, prox, blur, blank, sampled, defer = combo
+        status, suppress, unnamed, prox, blur, sampled, defer = combo
         below_floor, luma = blur
         system.config.performance.suppress_human_alerts = suppress
         system.config.performance.review_defer_seconds = defer
@@ -3015,7 +2754,6 @@ async def test_golden_notification_precedence(system, tmp_path, caplog):
             'unnamed_animal': unnamed,
             'human_proximity_muted': prox,
             'human_proximity_mute_reason': 'window' if prox else None,
-            'blank_confidence_muted': blank,
             'top_species_raw': 'uuid;;;;;;blank', 'top_species_score': 0.95,
             'review_sampled_out': sampled,
         }
@@ -3049,7 +2787,7 @@ async def test_golden_notification_precedence(system, tmp_path, caplog):
             mismatches.append((combo, expected, actual))
         n += 1
 
-    assert n == 1536
+    assert n == 768
     assert not mismatches, mismatches[:10]
 
 

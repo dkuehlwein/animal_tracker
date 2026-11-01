@@ -31,7 +31,7 @@ from feedback_protocol import build_feedback_keyboard
 from timelapse_writer import TimelapseWriter
 from data_models import DetectionStatus, is_review_detection, is_human_detection
 from notification_gate import (
-    Action, GateContext, RecentHumanEvents, decide, evaluate_blank_confidence,
+    Action, GateContext, RecentHumanEvents, decide,
     evaluate_human_proximity, human_events_horizon_seconds, is_human_proximity_scope,
 )
 
@@ -426,19 +426,6 @@ class WildlifeSystem:
             # one place: notification_gate.decide(). See
             # docs/detection-gates.md for each gate's evidence and levers.
             #
-            # Confident-Blank Mute Gate (exp #29): the classifier's RAW top-1
-            # is the generic blank label at/above
-            # blank_confidence_mute_threshold. None = gate didn't apply (not
-            # review-class, or threshold 0.0 = disabled). Fails open to False.
-            try:
-                blank_confidence_muted = evaluate_blank_confidence(
-                    species_result.status, top_species_raw, top_species_score,
-                    self.config.performance.blank_confidence_mute_threshold,
-                )
-            except Exception as e:
-                logger.error(f"Error computing blank-confidence mute gate: {e}")
-                blank_confidence_muted = False
-
             # Human-Proximity Mute Gate (window | demoted-band | density, read
             # from the recent-human store). Evaluated for review-class bursts,
             # IDENTIFIED bursts carrying SpeciesNet's fully-generic
@@ -492,7 +479,6 @@ class WildlifeSystem:
                 top_species_raw=top_species_raw,
                 top_species_score=top_species_score,
                 human_proximity_muted=human_proximity_muted,
-                blank_confidence_muted=blank_confidence_muted,
             )
 
             logger.info(f"Detection {detection_id} logged: {species_result.species_name} "
@@ -531,7 +517,6 @@ class WildlifeSystem:
                 'human_proximity_muted': human_proximity_muted,
                 'human_proximity_mute_reason': human_proximity_mute_reason,
                 'unnamed_animal': is_unnamed_animal,
-                'blank_confidence_muted': blank_confidence_muted,
                 'top_species_raw': top_species_raw,
                 'top_species_score': top_species_score,
             }
@@ -1006,7 +991,6 @@ class WildlifeSystem:
             below_sharpness_floor=bool(sharpness_info.get('below_sharpness_floor')),
             sharpness_score=sharpness_info.get('sharpness_score'),
             luma=sharpness_info.get('luma'),
-            blank_confidence_muted=bool(species_result.get('blank_confidence_muted')),
             top_species_raw=species_result.get('top_species_raw'),
             top_species_score=species_result.get('top_species_score'),
             review_sampled_out=bool(species_result.get('review_sampled_out')),

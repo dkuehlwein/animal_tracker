@@ -70,7 +70,10 @@ def deploy(delta: dict, state_path, env_path, restart_at: str) -> dict:
 def rollback(state_path, env_path, restart_at: str) -> dict:
     """Restore best_known_good → re-render env → stamp restart."""
     st = state_mod.load_state(state_path)
-    bkg = dict(st.get("best_known_good", {}))
+    # Drop keys retired since the snapshot was taken (no longer in BOUNDS) so a
+    # stale lever never gets rendered into the live env.
+    bkg = {k: v for k, v in st.get("best_known_good", {}).items()
+           if k in guardrails.BOUNDS}
     st["history"] = st.get("history", []) + [
         {"config": dict(st.get("deployed", {})), "rolled_back_at": restart_at}
     ]
