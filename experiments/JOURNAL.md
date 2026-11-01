@@ -3516,3 +3516,11 @@ fp_rate 0/5 (tier-1), CI [0, 0.43]. FN unmeasured.
 
 ## 2026-11-01 (human-led)
 Daniel retired the Confident-Blank gate (`[BLANK-CONF]`, exp #29/#40): decide() branch, evaluator, flag wiring, config field + validator and BOUNDS entry removed (commit 50c1515); DB column `blank_confidence_muted` kept (NULL on new rows). Not a loop experiment, so the experiment slot is untouched (exp #43 still active). `PERFORMANCE_BLANK_CONFIDENCE_MUTE_THRESHOLD` dropped from `deployed`; `pending_restart_at` stamped 2026-11-02T03:25+01:00 so the 03:30 deploy timer restarts the camera onto the new code. The loop no longer needs to adjudicate `blank_confidence_muted` rows. Exp #40 closed as retired (runs/0029).
+
+## 2026-11-01
+Services: camera + feedback active (camera up since 10-30 03:30:11), deploy unit not failed, deploy timer armed for 11-02 03:30, and `pending_restart_at` 2026-11-02T03:25+01:00 (Daniel's Confident-Blank retirement) is still pending. Ingest 5859-5861: **3 triggers**, 12:35-13:16 (DB time), 0 ERROR. Volume 3 vs baseline 27 (calm day).
+5859 `aves;bird` + 5860 `;;;;;;animal` rollup (raw top-1 `bird`): one bird visit → 2 MAIN. 5861 NO_ANIMAL, no box, pc 0.43, not sampled out → deferred 240 s → **1 REVIEW** sent at 13:20:56. Tier-2 (contact sheet + diff): empty scene (bamboo wind + global light change), so `false_positive` holds. #42 stays 1/2.
+**Self-audit:** 5 new human labels (10-31 21:51 UTC, 5854-5858 all `animal`) agree with tier-1.
+fp_rate 1/3 (tier-1 only), CI [0.06, 0.79]. FN unmeasured.
+**Exp #43 night 3:** 1 REVIEW (empty), 0 sampled out, 0 lost visits. Keep observing. No deploy. Not paused, not frozen.
+**Infra note (not an experiment):** `httpx` INFO lines in `data/logs/wildlife.log` include the full Telegram bot token in request URLs. This is flagged to Daniel (token rotation is his call). No code was changed tonight. The fix would be to set the `httpx` logger to WARNING.

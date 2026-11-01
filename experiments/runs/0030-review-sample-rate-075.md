@@ -62,3 +62,15 @@ Per PROTOCOL "Review sampling", fp_rate is not affected, and this experiment mus
 - Review-class bursts: 0, so nothing was sampled out and no REVIEW pings were sent. This night says nothing about the
   prediction, either way.
 - Lost visits to sampling: 0. Running total under 0.75: 0 lost visits and 1 burst-level miss (5852) in 2 nights.
+
+### Night 3 — 2026-11-01 (rate 0.75 live; camera not yet restarted onto the Confident-Blank retirement code, that restart is stamped for 11-02 03:25)
+
+- 3 triggers (5859-5861), 12:35-13:16 (DB time), 0 ERROR.
+- 5859 IDENTIFIED `aves;bird` (MD 0.82) and 5860 the `;;;;;;animal` rollup (MD 0.72, raw top-1 `bird` 0.32): one bird visit 53 s
+  apart, both sent to MAIN. Tier-1 `animal` stands; frames were not re-inspected.
+- 5861 NO_ANIMAL, no MD box, person_confidence 0.43 (below the 0.5 human gate), motion_area 26490 with background_drift 13.7.
+  **Not sampled out.** It was held 240 s by the deferred-send gate and sent as 🔍 REVIEW at 13:20:56. Tier-2 check on a 5-frame
+  contact sheet + diff heatmap: the scene is empty. The only change is bamboo leaves moving in the upper right, plus a
+  whole-frame light change. Tier-1 `false_positive` holds.
+- REVIEW pings sent: 1 (an empty frame). Lost visits to sampling: 0. Running total under 0.75: 0 lost visits and 1 burst-level
+  miss (5852) in 3 nights, with 1 REVIEW ping. Keep observing (window to ~11-20).
