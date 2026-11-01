@@ -431,14 +431,14 @@
   ],
   "last_heartbeat_loopday": "2026-10-31",
   "last_metrics": {
-    "date": "2026-10-31",
+    "date": "2026-11-01",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.0,
-      0.43448246478317476
+      0.06149194472039621,
+      0.7923403991979522
     ],
     "fp_claude_ci": [
       0.0,
@@ -446,7 +446,7 @@
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 0,
+    "fp_count": 1,
     "fp_human_ci": [
       0.0,
       1.0
@@ -454,23 +454,23 @@
     "fp_human_count": 0,
     "fp_human_rate": 0.0,
     "fp_md_ci": [
-      0.0,
-      0.43448246478317476
+      0.06149194472039621,
+      0.7923403991979522
     ],
-    "fp_md_count": 0,
-    "fp_md_rate": 0.0,
-    "fp_rate": 0.0,
+    "fp_md_count": 1,
+    "fp_md_rate": 0.3333333333333333,
+    "fp_rate": 0.3333333333333333,
     "fp_trustworthy": true,
-    "labeled_triggers": 5,
+    "labeled_triggers": 3,
     "n_cant_tell": 0,
     "n_claude": 0,
     "n_human": 0,
     "n_human_suppressed": 0,
-    "n_md": 5,
+    "n_md": 3,
     "n_person": 0,
     "n_sampled_out": 0,
     "n_unlabeled": 0,
-    "total_triggers": 5
+    "total_triggers": 3
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
@@ -478,5 +478,5 @@
   "nightly_verdict": "Five alerts this morning, all real blackbird visits, with no false alarms and no 'probably empty' shots at all. Nothing changed tonight; we're still watching whether yesterday's 3-in-4 sending catches more birds.",
   "paused": false,
   "pending_restart_at": "2026-11-02T03:25:00+01:00",
-  "watermark": 5858
+  "watermark": 5861
 }
