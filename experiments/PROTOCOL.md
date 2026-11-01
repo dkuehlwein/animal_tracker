@@ -43,16 +43,45 @@ All `python -m loop.*` commands MUST be run from the **repo root**
 (`/home/daniel/animal_tracker`) with `PYTHONPATH=src` so that `.env` is found by
 `Config()`. Running from inside `src/` fails with a missing-token validation error.
 
-```
-PYTHONPATH=src uv run python -m loop.ingest --since-id <state["watermark"]>   # default 0 = full history; ingest does not read state
-PYTHONPATH=src uv run python -m loop.metrics [--state <path>] [--date <YYYY-MM-DD>]
-PYTHONPATH=src uv run python -m loop.report --mode summary [--state <path>] [--no-send]
+```bash
+cd /home/daniel/animal_tracker
+
+# Ingest — pure read of detections with id > --since-id. It does NOT read the
+# watermark itself (default 0 = full history), so pass state["watermark"]:
+PYTHONPATH=src uv run python -m loop.ingest \
+    --since-id "$(python3 -c 'import json;print(json.load(open("experiments/state.json")).get("watermark") or 0)')"
+
+# Measure — writes last_metrics into state.json AND advances state["watermark"].
+PYTHONPATH=src uv run python -m loop.metrics --state experiments/state.json [--date YYYY-MM-DD]
+
+# Report — the real nightly send (message 1 = metrics, message 2 = nightly_verdict).
+PYTHONPATH=src uv run python -m loop.report --mode summary --state experiments/state.json
+
+# Checkpoint — stages experiments/ and commits (never pushes).
+PYTHONPATH=src uv run python -m loop.checkpoint --message "tick: metrics written"
+
+# Deploy — bounded env delta + restart stamp (see Daily cycle step 9).
+PYTHONPATH=src uv run python -m loop.deploy --delta '{...}' --restart-at 2026-11-02T03:25+01:00
+
+# Mark tonight complete — final step only (Daily cycle step 12).
+PYTHONPATH=src uv run python -m loop.endtick
+
+# Dry run with temp state + CSV copies (metrics otherwise rewrites experiments/metrics/daily.csv):
+cp experiments/state.json /tmp/state_test.json
+PYTHONPATH=src uv run python -m loop.metrics --state /tmp/state_test.json --csv /tmp/daily_test.csv
+PYTHONPATH=src uv run python -m loop.report --mode summary --state /tmp/state_test.json --no-send
 ```
 
-`loop.metrics` writes `last_metrics` into `state.json` automatically (flat shape
-with top-level `date` + metric fields including `fp_ci` as a list). `loop.report`
-reads it directly — no manual reshaping required between stages. Use `--no-send`
-on `loop.report` to render without calling Telegram (safe for dry runs and testing).
+Invariants:
+- `loop.metrics` owns the watermark and the flat `last_metrics` shape (top-level
+  `date` + metric fields, `fp_ci` as a list); `loop.report` reads it directly. Never
+  hand-write the watermark or reshape `last_metrics`.
+- `--no-send` renders and prints without calling Telegram. Use it ONLY for dry runs —
+  left on the real tick, the summary is silently not delivered.
+- `loop.nightgate` owns gating and heartbeats; never send a heartbeat from the tick.
+- Never poll Telegram — the feedback sidecar owns `getUpdates`. `/pause` and
+  `/rollback` arrive via the sidecar and land in `state.json`; honor
+  `state.json.paused`.
 
 ## Daily cycle (one nightly run, resumable)
 1. **Gate** — handled deterministically by `loop.nightgate` (runs before the LLM
@@ -88,10 +117,11 @@ on `loop.report` to render without calling Telegram (safe for dry runs and testi
     FN unmeasured so threshold hold stands."` The report sends this as Telegram
     message 2. JOURNAL.md stays dense and git-only.
 11. **Report** — `python -m loop.report --mode summary` (sends message 1 = metrics
-    summary; message 2 = `state["nightly_verdict"]` if set); commit + push.
-12. **Mark complete** — `python -m loop.endtick` stamps
+    summary; message 2 = `state["nightly_verdict"]` if set).
+12. **Mark complete, then commit + push** — `python -m loop.endtick` stamps
     `state.json["last_tick_completed_day"] = loop_day()` so the rest of tonight's 2h
-    ticks skip (one Opus session/night). Run this ONLY after a fully successful tick.
+    ticks skip (one Opus session/night); then commit + push the notebook (so the
+    stamp is committed). Run `endtick` ONLY after a fully successful tick.
     It is the LLM's final explicit action, deliberately NOT a systemd `&& endtick`: if
     the tick is interrupted (usage limit, crash, hang) or any step failed, `endtick`
     never runs, the day stays unmarked, and the next tick RESUMES from committed state.
@@ -116,15 +146,20 @@ watermark (which `loop.metrics` now persists automatically).
   **commit it separately with the experiment id in the message** (e.g.
   `fix(motion): exp #4 (mog2-recurrent-frames) — <what/why>`); note the SHA in the
   run file. A code change only takes effect on a **camera restart**, so stamp
-  `pending_restart_at` (tz-aware, ≤ 03:30) just like an env deploy.
-- All decision gates below apply equally to code and env changes.
+  `pending_restart_at` (tz-aware, ≤ 03:30) just like an env deploy; if you also
+  ship an env delta, `loop.deploy` already stamps it.
+- All decision gates below (FN-veto, `paused`, feedback-starved freeze, one
+  experiment at a time, volume collapse/explosion) apply equally to code and env
+  changes.
 
 ## Autonomy: the gates below are the ONLY approval mechanism
 
 There is NO human pre-approval ("greenlight") step in this protocol, and there
 never was. If a change passes the guardrail gates, ship it yourself — this
 explicitly includes changes that alter REVIEW volume, notification routing, or
-the human-privacy gate. Daniel's controls are post-hoc, not pre-approval:
+the human-privacy gate, and retiring a non-privacy gate's code under the
+zero-firings rule (exp #40's code removal waited ~4 weeks on Daniel before he
+removed it himself on 2026-11-01). Daniel's controls are post-hoc, not pre-approval:
 `/pause`, `/rollback`, `state.json.paused`, `git revert`. Holding an experiment
 while "recommending greenlight in the verdict" is a protocol violation — decide
 and act within the gates. (2026-07-17: Daniel explicitly reaffirmed this after
