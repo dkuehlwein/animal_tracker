@@ -431,7 +431,7 @@
   ],
   "last_heartbeat_loopday": "2026-11-01",
   "last_metrics": {
-    "date": "2026-11-01",
+    "date": "2026-11-02",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
@@ -465,18 +465,18 @@
     "n_cant_tell": 0,
     "n_claude": 0,
     "n_human": 0,
-    "n_human_suppressed": 0,
+    "n_human_suppressed": 1,
     "n_md": 3,
     "n_person": 0,
     "n_sampled_out": 0,
     "n_unlabeled": 0,
-    "total_triggers": 3
+    "total_triggers": 4
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
   "last_tick_completed_day": "2026-11-01",
   "nightly_verdict": "Three alerts today. Two were a real bird visit and one was an empty 'probably nothing' shot of wind in the bamboo. Nothing changed tonight. Separately, the camera log stores the Telegram bot token in plain text, so it's worth rotating the token and quieting that logger.",
   "paused": false,
-  "pending_restart_at": "2026-11-02T03:25:00+01:00",
-  "watermark": 5861
+  "pending_restart_at": null,
+  "watermark": 5865
 }
