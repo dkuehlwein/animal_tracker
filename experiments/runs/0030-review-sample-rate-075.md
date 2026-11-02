@@ -74,3 +74,12 @@ Per PROTOCOL "Review sampling", fp_rate is not affected, and this experiment mus
   whole-frame light change. Tier-1 `false_positive` holds.
 - REVIEW pings sent: 1 (an empty frame). Lost visits to sampling: 0. Running total under 0.75: 0 lost visits and 1 burst-level
   miss (5852) in 3 nights, with 1 REVIEW ping. Keep observing (window to ~11-20).
+
+### Night 4 — 2026-11-02 (rate 0.75 live; camera restarted 03:30:11 onto the Confident-Blank retirement code, verified via the wildlife-deploy journal + systemctl)
+
+- 4 triggers (5862-5865), 0 ERROR.
+- 5862 IDENTIFIED `aves;bird` (MD 0.76) and 5863 the `;;;;;;animal` rollup (MD 0.79, raw top-1 `bird` 0.43): one bird visit 25 s apart at 10:03-10:04, both sent to MAIN. Tier-1 `animal` stands.
+- 5864 (16:23) NO_ANIMAL, no box, pc 0.05. Not sampled out. The deferred REVIEW send was cancelled because 5865 (HUMAN, pc 0.89) landed 88 s later (`human_proximity_muted=1`). Tier-2 check on a contact sheet + diff: frame 1 has a large dark near-lens occlusion over the right half (consistent with the person passing), and frames 2-5 show the empty scene with bamboo movement. No animal, so this is not a false negative. Tier-1 `false_positive` stands.
+- 5865 HUMAN → muted by the human gate.
+- REVIEW pings sent: 0. Sampled out: 0. Lost visits to sampling: 0. Running total under 0.75: 0 lost visits and 1 burst-level miss (5852) in 4 nights, with 1 REVIEW ping. Keep observing (window to ~11-20).
+- No human labels since 10-31 21:51 (2 days; the freeze trips at 3). This is a low-volume period: only 4 MAIN alerts and 1 REVIEW were sent across 11-01 and 11-02.

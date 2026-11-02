@@ -3524,3 +3524,10 @@ Services: camera + feedback active (camera up since 10-30 03:30:11), deploy unit
 fp_rate 1/3 (tier-1 only), CI [0.06, 0.79]. FN unmeasured.
 **Exp #43 night 3:** 1 REVIEW (empty), 0 sampled out, 0 lost visits. Keep observing. No deploy. Not paused, not frozen.
 **Infra note (not an experiment):** `httpx` INFO lines in `data/logs/wildlife.log` include the full Telegram bot token in request URLs. This is flagged to Daniel (token rotation is his call). No code was changed tonight. The fix would be to set the `httpx` logger to WARNING.
+
+## 2026-11-02
+Services: camera restarted 11-02 03:30:11 onto the Confident-Blank retirement code (wildlife-deploy journal: "applied deploy stamped 2026-11-02T03:25"), `pending_restart_at` cleared, feedback active, deploy unit not failed. Ingest 5862-5865: **4 triggers**, 0 ERROR. Volume 4 vs baseline 27 is above the collapse threshold (2.7), and it was a calm, short November day.
+5862 `aves;bird` + 5863 `;;;;;;animal` rollup (raw top-1 `bird`): one bird visit → 2 MAIN. 5864 NO_ANIMAL (no box) at 16:23: the deferred REVIEW send was cancelled by 5865 HUMAN 88 s later. Tier-2 (contact sheet + diff): a near-lens dark occlusion in frame 1, then the empty scene. No animal and no FN, so `false_positive` holds. 5865 HUMAN was muted.
+fp_rate 1/3 (tier-1 only), CI [0.06, 0.79]. FN unmeasured. **No new human labels** (last 10-31 21:51, 2 days; the freeze trips at 3).
+**Exp #43 night 4:** 0 REVIEW sent, 0 sampled out, 0 lost visits. Keep observing. No deploy. Not paused, not frozen.
+Reminder still open: the bot token appears in `httpx` INFO log lines (flagged 11-01; rotation is Daniel's call).

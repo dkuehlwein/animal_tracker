@@ -429,7 +429,7 @@
       "replaced_at": "2026-10-30T03:25:00+01:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-11-01",
+  "last_heartbeat_loopday": "2026-11-02",
   "last_metrics": {
     "date": "2026-11-02",
     "error_count": 0,
@@ -474,8 +474,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-11-01",
-  "nightly_verdict": "Three alerts today. Two were a real bird visit and one was an empty 'probably nothing' shot of wind in the bamboo. Nothing changed tonight. Separately, the camera log stores the Telegram bot token in plain text, so it's worth rotating the token and quieting that logger.",
+  "last_tick_completed_day": "2026-11-02",
+  "nightly_verdict": "Quiet day: one bird visit (2 alerts), plus an empty shot that was muted because a person walked through right after. Nothing changed tonight. The bot-token-in-logs issue from yesterday is still open.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5865
