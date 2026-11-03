@@ -3531,3 +3531,10 @@ Services: camera restarted 11-02 03:30:11 onto the Confident-Blank retirement co
 fp_rate 1/3 (tier-1 only), CI [0.06, 0.79]. FN unmeasured. **No new human labels** (last 10-31 21:51, 2 days; the freeze trips at 3).
 **Exp #43 night 4:** 0 REVIEW sent, 0 sampled out, 0 lost visits. Keep observing. No deploy. Not paused, not frozen.
 Reminder still open: the bot token appears in `httpx` INFO log lines (flagged 11-01; rotation is Daniel's call).
+
+## 2026-11-03 tick
+Services: camera active since the 11-02 03:30:11 restart. The 11-03 03:30 deploy run found no stamp, `pending_restart_at` is null, and feedback is active. Ingest 5866-5867: **2 triggers**, 0 ERROR, one `aves;bird` visit → 2 MAIN.
+**Volume guardrail breached (2 < collapse floor 2.7 = 0.1×27). Investigated and dismissed; no rollback.** The camera is alive: sunrise warm-up completed at 07:32, `Monitoring... motion_area=…` was logged all day, the sunset stop came at 17:02, and the timelapse wrote 1717 frames. The timelapse FN screen found no animal that failed to trigger. Volume has been 2-6/day since 10-27 (short, calm November days). Nothing deployed could reduce captures: exp #43 only adds sends. Rolling back would change nothing. Follow-up: the baseline of 27/night is a summer figure, so the collapse floor will keep firing through winter. Re-baselining is a guardrail change, so it was left for a deliberate decision rather than made in passing.
+fp_rate 0/2 (tier-1 only), CI [0, 0.66]. FN unmeasured (timelapse screen: 0 misses). **No new human labels** (last 10-31 21:51 UTC). The 3-day freeze trips after 11-03 21:51 UTC, so the next tick will see it frozen unless Daniel labels.
+**Exp #43 night 5:** 0 review-class, 0 sampled out, 0 lost visits. Keep observing. No deploy. Not paused.
+Still open: the bot token is visible in `httpx` INFO log lines (seen again today at the 17:02 sunset sendMessage). Rotating it is Daniel's call.

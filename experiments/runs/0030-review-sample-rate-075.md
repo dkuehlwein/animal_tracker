@@ -83,3 +83,13 @@ Per PROTOCOL "Review sampling", fp_rate is not affected, and this experiment mus
 - 5865 HUMAN → muted by the human gate.
 - REVIEW pings sent: 0. Sampled out: 0. Lost visits to sampling: 0. Running total under 0.75: 0 lost visits and 1 burst-level miss (5852) in 4 nights, with 1 REVIEW ping. Keep observing (window to ~11-20).
 - No human labels since 10-31 21:51 (2 days; the freeze trips at 3). This is a low-volume period: only 4 MAIN alerts and 1 REVIEW were sent across 11-01 and 11-02.
+
+### Night 5 — 2026-11-03 (rate 0.75 live; no restart since 11-02 03:30:11, wildlife-deploy ran 11-03 03:30:10 with no stamp)
+
+- 2 triggers (5866-5867), 12:14-12:15, 0 ERROR. Both IDENTIFIED `aves;bird` (one bird visit) → MAIN. Tier-1 `animal` stands.
+- Review-class bursts: 0. Nothing was sampled out and no REVIEW pings were sent, so this night says nothing about the prediction.
+- Timelapse FN screen (1717 frames, 07:27-17:02, 20 s cadence; largest connected change blob per consecutive pair): the
+  only large local change was the 12:15 visit, which did trigger (blob ~1500 px). The next candidates (11:22, 11:59, ≤270 px)
+  were inspected visually and showed leaf and light changes, with no animal. No missed visit was found at this cadence.
+- Lost visits to sampling: 0. Running total under 0.75: 0 lost visits and 1 burst-level miss (5852) in 5 nights, with 1 REVIEW ping.
+  Review-class volume has been near zero since 11-01, so the +2/day cost prediction can't be checked yet. Keep observing (to ~11-20).
