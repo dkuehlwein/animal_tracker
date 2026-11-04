@@ -3538,3 +3538,11 @@ Services: camera active since the 11-02 03:30:11 restart. The 11-03 03:30 deploy
 fp_rate 0/2 (tier-1 only), CI [0, 0.66]. FN unmeasured (timelapse screen: 0 misses). **No new human labels** (last 10-31 21:51 UTC). The 3-day freeze trips after 11-03 21:51 UTC, so the next tick will see it frozen unless Daniel labels.
 **Exp #43 night 5:** 0 review-class, 0 sampled out, 0 lost visits. Keep observing. No deploy. Not paused.
 Still open: the bot token is visible in `httpx` INFO log lines (seen again today at the 17:02 sunset sendMessage). Rotating it is Daniel's call.
+
+## 2026-11-04 tick
+Services: camera active since 11-02 03:30:11. The 11-04 03:30 deploy run found no stamp, `pending_restart_at` is null, and feedback is active. Ingest 5868-5871: **4 triggers**, 0 ERROR. Volume 4 is above the collapse floor of 2.7.
+5868-5870: one bird visit → 3 MAIN. 5871 UNCLASSIFIABLE, MD 0.41 box on the rock/blue pot → **1 REVIEW** (deferred, sent 14:06:56). Tier-2 crop check: static rock, only bamboo moving, so `false_positive` holds.
+**Self-audit:** 3 new human labels (11-03 21:12 UTC; 5859/5860 `animal`, 5861 `false_positive`) agree with tier-1. **Freeze not tripped** (labels landed before the 3-day mark).
+fp_rate 1/4 (tier-1 only), CI [0.05, 0.70]. FN unmeasured.
+**Exp #43 night 6:** 1 REVIEW (empty), 0 sampled out, 0 lost visits. Keep observing to ~11-20. No deploy. Not paused.
+Still open: re-baseline volume for winter (deliberate guardrail decision); bot token in `httpx` INFO logs (rotation is Daniel's call).

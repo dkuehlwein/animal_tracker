@@ -93,3 +93,11 @@ Per PROTOCOL "Review sampling", fp_rate is not affected, and this experiment mus
   were inspected visually and showed leaf and light changes, with no animal. No missed visit was found at this cadence.
 - Lost visits to sampling: 0. Running total under 0.75: 0 lost visits and 1 burst-level miss (5852) in 5 nights, with 1 REVIEW ping.
   Review-class volume has been near zero since 11-01, so the +2/day cost prediction can't be checked yet. Keep observing (to ~11-20).
+
+### Night 6 — 2026-11-04 (rate 0.75 live; no restart since 11-02 03:30:11, wildlife-deploy ran 11-04 03:30:10 with no stamp)
+
+- 4 triggers (5868-5871), 0 ERROR.
+- 5868-5870 (12:51-12:52) IDENTIFIED `aves;bird` (MD 0.70-0.89): one bird visit, 3 MAIN. All three are below the sharpness floor (6.0-6.2), but the BLUR gate is review-class only, so they were sent. Tier-1 `animal` stands.
+- 5871 (14:02) UNCLASSIFIABLE (`no cv result`), one MD box 0.41 on the rock with the blue pot, top raw `blank` 0.19, pc 0.0. **Not sampled out.** It was held 240 s and sent as 🔍 REVIEW at 14:06:56. Tier-2 check (box-region crop across all 5 frames): the rock and pot are static and only the bamboo leaves move, so the scene is empty. Tier-1 `false_positive` holds.
+- REVIEW pings sent: 1 (empty). Sampled out: 0. Lost visits to sampling: 0. Running total under 0.75: 0 lost visits and 1 burst-level miss (5852) in 6 nights, with 2 REVIEW pings. Keep observing (to ~11-20).
+- Human labels resumed: 3 labels arrived 11-03 21:12 (5859/5860 `animal`, 5861 `false_positive`), all agreeing with tier-1. So the feedback-starved freeze did not trip, and Daniel is still labelling REVIEW pings.

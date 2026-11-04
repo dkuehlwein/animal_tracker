@@ -429,7 +429,7 @@
       "replaced_at": "2026-10-30T03:25:00+01:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-11-03",
+  "last_heartbeat_loopday": "2026-11-04",
   "last_metrics": {
     "date": "2026-11-04",
     "error_count": 0,
@@ -474,8 +474,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-11-03",
-  "nightly_verdict": "Very quiet day: one bird visit (2 alerts), nothing else. The camera is working fine; I checked the all-day timelapse and found no animal it missed, so the low count is just a calm November day. No changes tonight; no labels for 3 days now, so tuning pauses until some come in.",
+  "last_tick_completed_day": "2026-11-04",
+  "nightly_verdict": "Quiet day: one bird visit (3 alerts) and one empty-garden review photo (only the bamboo moved). Your 3 labels from last night all match my calls. No changes tonight; the review-rate test keeps running until about Nov 20.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5871
