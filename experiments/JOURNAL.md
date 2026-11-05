@@ -3546,3 +3546,10 @@ Services: camera active since 11-02 03:30:11. The 11-04 03:30 deploy run found n
 fp_rate 1/4 (tier-1 only), CI [0.05, 0.70]. FN unmeasured.
 **Exp #43 night 6:** 1 REVIEW (empty), 0 sampled out, 0 lost visits. Keep observing to ~11-20. No deploy. Not paused.
 Still open: re-baseline volume for winter (deliberate guardrail decision); bot token in `httpx` INFO logs (rotation is Daniel's call).
+
+## 2026-11-05 tick
+Services: camera active since 11-02 03:30:11; 11-05 03:30 deploy run found no stamp; feedback active. Ingest 5872-5875: **4 triggers** (dusk, 15:13-15:20), 0 ERROR.
+5872 blackbird → MAIN (`;;;;;;animal` rollup). 5873/5874 UNCLASSIFIABLE → REVIEW; **tier-2 overturns tier-1 to `animal`** (blackbird behind the gnome, same visit). 5875 UNCLASSIFIABLE → REVIEW; **tier-2 `person`**: blurred blue figure in the selected frame, pc 0.376 (exp #14 watch band), sweep of frames 2-5 empty. Not recognizable → pre-registered rollback criterion not met, threshold stays 0.50; noted as candidate next experiment (lower toward 0.35) if it recurs.
+fp_rate 0/3 (tier-2 + tier-1), CI [0, 0.56]. FN unmeasured. **Self-audit:** no human labels (last 11-03 21:12 UTC); tier-1 was wrong on 2/4 (dusk blackbird → `false_positive`), consistent with backlog #31. Freeze trips after 11-06 21:12 UTC.
+**Exp #43 night 7:** 3 REVIEW (2 animal, 1 person), 0 sampled out, 0 lost visits; all sample fractions < 0.5 so 0.75 made no difference tonight. Keep observing to ~11-20. No deploy. Not paused.
+Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call).
