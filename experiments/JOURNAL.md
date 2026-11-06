@@ -3553,3 +3553,10 @@ Services: camera active since 11-02 03:30:11; 11-05 03:30 deploy run found no st
 fp_rate 0/3 (tier-2 + tier-1), CI [0, 0.56]. FN unmeasured. **Self-audit:** no human labels (last 11-03 21:12 UTC); tier-1 was wrong on 2/4 (dusk blackbird → `false_positive`), consistent with backlog #31. Freeze trips after 11-06 21:12 UTC.
 **Exp #43 night 7:** 3 REVIEW (2 animal, 1 person), 0 sampled out, 0 lost visits; all sample fractions < 0.5 so 0.75 made no difference tonight. Keep observing to ~11-20. No deploy. Not paused.
 Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call).
+
+## 2026-11-06 tick
+Services: camera active since 11-02 03:30:11; 11-06 03:30 deploy run found no stamp; feedback active. Ingest 5876-5878: **3 triggers** (dusk, 15:30-15:31), 0 ERROR.
+5876/5878 blackbird → MAIN (`aves;bird`, MD 0.87/0.74). 5877 UNCLASSIFIABLE (raw `blank`) → **sampled out**; **tier-2 overturns tier-1 to `animal`** (blackbird beside the gnome, same visit). Visit delivered by siblings → burst-level miss, not a lost visit.
+fp_rate 0/3 (tier-1 + tier-2), CI [0, 0.56]. FN unmeasured. **Self-audit:** no human labels; tier-1 wrong on 1/3 (dusk blackbird → `false_positive` again, backlog #31 class; 3 such overturns in 2 nights). Freeze trips after 11-06 21:12 UTC.
+**Exp #43 night 8:** 0 REVIEW, 1 sampled out (animal, visit delivered), 0 lost visits. Keep observing to ~11-20. No deploy. Not paused. Volume 3 vs baseline 27: same seasonal low as 11-03 (camera alive, one real visit captured).
+Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call).
