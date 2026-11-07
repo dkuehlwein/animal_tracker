@@ -431,18 +431,18 @@
   ],
   "last_heartbeat_loopday": "2026-11-06",
   "last_metrics": {
-    "date": "2026-11-06",
+    "date": "2026-11-07",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
       0.0,
-      0.5614970317550454
+      1.0
     ],
     "fp_claude_ci": [
       0.0,
-      0.7934506856227626
+      1.0
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
@@ -455,22 +455,22 @@
     "fp_human_rate": 0.0,
     "fp_md_ci": [
       0.0,
-      0.6576197724933469
+      1.0
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
     "fp_rate": 0.0,
     "fp_trustworthy": true,
-    "labeled_triggers": 3,
-    "n_cant_tell": 0,
-    "n_claude": 1,
+    "labeled_triggers": 0,
+    "n_cant_tell": 1,
+    "n_claude": 0,
     "n_human": 0,
     "n_human_suppressed": 0,
-    "n_md": 2,
+    "n_md": 0,
     "n_person": 0,
-    "n_sampled_out": 1,
+    "n_sampled_out": 0,
     "n_unlabeled": 0,
-    "total_triggers": 3
+    "total_triggers": 1
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
@@ -478,5 +478,5 @@
   "nightly_verdict": "Quiet dusk: one blackbird visit, 2 alerts sent. A third photo of the same bird was held back by review sampling, but you already got the visit, so nothing was lost and nothing changes tonight.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5878
+  "watermark": 5879
 }
