@@ -332,7 +332,7 @@
     "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.75,
     "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
   },
-  "feedback_starved_since": null,
+  "feedback_starved_since": "2026-11-06",
   "history": [
     {
       "config": {},
@@ -429,7 +429,7 @@
       "replaced_at": "2026-10-30T03:25:00+01:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-11-06",
+  "last_heartbeat_loopday": "2026-11-07",
   "last_metrics": {
     "date": "2026-11-07",
     "error_count": 0,
@@ -474,8 +474,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-11-06",
-  "nightly_verdict": "Quiet dusk: one blackbird visit, 2 alerts sent. A third photo of the same bird was held back by review sampling, but you already got the visit, so nothing was lost and nothing changes tonight.",
+  "last_tick_completed_day": "2026-11-07",
+  "nightly_verdict": "Quiet day: one alert at 13:49, a dark blur right in front of the lens (probably someone's leg) and no animal. No labels from you since Nov 3, so tuning is frozen until you label a few photos; nothing changes tonight.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5879

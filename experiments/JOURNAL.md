@@ -3560,3 +3560,10 @@ Services: camera active since 11-02 03:30:11; 11-06 03:30 deploy run found no st
 fp_rate 0/3 (tier-1 + tier-2), CI [0, 0.56]. FN unmeasured. **Self-audit:** no human labels; tier-1 wrong on 1/3 (dusk blackbird → `false_positive` again, backlog #31 class; 3 such overturns in 2 nights). Freeze trips after 11-06 21:12 UTC.
 **Exp #43 night 8:** 0 REVIEW, 1 sampled out (animal, visit delivered), 0 lost visits. Keep observing to ~11-20. No deploy. Not paused. Volume 3 vs baseline 27: same seasonal low as 11-03 (camera alive, one real visit captured).
 Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call).
+
+## 2026-11-07 tick
+Services: camera active since 11-02 03:30:11; no stamp pending; feedback active. Ingest 5879: **1 trigger** (13:49), 0 ERROR.
+5879 UNCLASSIFIABLE (raw `blank` 0.95, MD 0.33, pc 0.244) → sent 🔍 REVIEW after the 240 s deferral. **Tier-2 `cant_tell`:** a near-lens dark navy column fills frame 1 (likely a trouser leg, unconfirmable); frames 3-5 empty. Same class as 5864. Not a recognizable person; pc below the watch band.
+fp_rate 0/0 (1 cant_tell excluded), CI [0, 1]. FN unmeasured. **FEEDBACK-STARVED FREEZE tripped**: last human label 11-03 21:12 UTC, so `feedback_starved_since` = 2026-11-06. Hold current config.
+**Exp #43 night 9:** 1 REVIEW, 0 sampled out, 0 lost visits. Keep observing to ~11-20. No deploy (frozen, and nothing pending). Not paused. Volume 1 vs baseline 27: winter/midday low; the camera is alive and monitoring.
+Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call).
