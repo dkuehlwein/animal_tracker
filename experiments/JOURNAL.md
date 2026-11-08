@@ -3567,3 +3567,10 @@ Services: camera active since 11-02 03:30:11; no stamp pending; feedback active.
 fp_rate 0/0 (1 cant_tell excluded), CI [0, 1]. FN unmeasured. **FEEDBACK-STARVED FREEZE tripped**: last human label 11-03 21:12 UTC, so `feedback_starved_since` = 2026-11-06. Hold current config.
 **Exp #43 night 9:** 1 REVIEW, 0 sampled out, 0 lost visits. Keep observing to ~11-20. No deploy (frozen, and nothing pending). Not paused. Volume 1 vs baseline 27: winter/midday low; the camera is alive and monitoring.
 Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call).
+
+## 2026-11-08 tick
+Services: camera active since 11-02 03:30:11; no stamp pending; feedback active. Ingest 5880-5886: **7 triggers** (08:27-08:41), 0 ERROR.
+5880/5882 HUMAN muted. 5881 HUMAN-PROXIMITY muted, **tier-2 `person`** (near-lens navy blur frame 1, rest empty, no concealed animal). 5883/5885/5886 blackbird → MAIN, human `animal`. 5884 sampled out, **tier-2 overturns to `animal`** (visit delivered by siblings; burst-level miss, backlog #31 class).
+fp_rate 0/4 (3 human, 1 tier-2; 5881 person excluded), CI [0, 0.49]. FN unmeasured. **Freeze lifted** by 14 human labels. **Self-audit:** 5873/5874 tier-2 agreed with human; 5875 tier-2 `person` vs human `false_positive`; 5879 tier-2 `cant_tell` vs human `person`. Tier-1 wrong on 5873/5874.
+**Exp #43 night 10:** 0 REVIEW, 1 sampled out, 0 lost visits. No deploy (slot occupied, observing to ~11-20). **Literal revert criterion (freeze tripped 11-07) overridden by judgement**, not passed: 6 pings in 10 nights is no fatigue signal and all 6 are now human-labelled; a second freeze before ~11-20 reverts. Exp #14 band: no second in-band person (5875 human FP; 5879 pc 0.244 below BOUNDS), threshold held. Not paused.
+Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call).
