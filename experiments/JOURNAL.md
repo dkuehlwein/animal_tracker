@@ -3574,3 +3574,10 @@ Services: camera active since 11-02 03:30:11; no stamp pending; feedback active.
 fp_rate 0/4 (3 human, 1 tier-2; 5881 person excluded), CI [0, 0.49]. FN unmeasured. **Freeze lifted** by 14 human labels. **Self-audit:** 5873/5874 tier-2 agreed with human; 5875 tier-2 `person` vs human `false_positive`; 5879 tier-2 `cant_tell` vs human `person`. Tier-1 wrong on 5873/5874.
 **Exp #43 night 10:** 0 REVIEW, 1 sampled out, 0 lost visits. No deploy (slot occupied, observing to ~11-20). **Literal revert criterion (freeze tripped 11-07) overridden by judgement**, not passed: 6 pings in 10 nights is no fatigue signal and all 6 are now human-labelled; a second freeze before ~11-20 reverts. Exp #14 band: no second in-band person (5875 human FP; 5879 pc 0.244 below BOUNDS), threshold held. Not paused.
 Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call).
+
+## 2026-11-09 tick
+Services: camera active since 11-02 03:30:11; 11-09 03:30 deploy run found no stamp; feedback active. Ingest past 5886: **0 triggers**. metrics: `no_data`, baseline preserved.
+Camera not blind: sunrise warm-up 07:37:47, sunset stop 16:53:13, 1659 timelapse frames, no frozen frames. **Timelapse FN screen with positive control:** 11-08's blackbird visit scores up to 1587 px at the trigger times; today's max is 106 px, top candidates viewed = bamboo leaves. 20 s cadence limits this to visits longer than one interval.
+No tier-2 needed, no new human labels (last 11-08 08:47 UTC; freeze trips after 11-11 08:47 UTC). fp_rate not computed (no rows). FN unmeasured.
+**Exp #43 night 11:** 0 REVIEW, 0 sampled out, 0 lost visits. No deploy (slot occupied, observing to ~11-20). Not paused. Volume 0 vs baseline 27: seasonal low, camera alive, nothing deployed could reduce captures.
+Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call).
