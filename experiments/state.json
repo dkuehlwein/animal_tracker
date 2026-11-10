@@ -429,7 +429,7 @@
       "replaced_at": "2026-10-30T03:25:00+01:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-11-09",
+  "last_heartbeat_loopday": "2026-11-10",
   "last_metrics": {
     "date": "2026-11-08",
     "error_count": 0,
@@ -474,8 +474,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-11-09",
-  "nightly_verdict": "Nothing triggered the camera today, and that looks genuine: it watched from sunrise to sunset, and the biggest changes I could find in the day's 20-second snapshots were bamboo leaves. No changes tonight; REVIEW photos stay at 75%.",
+  "last_tick_completed_day": "2026-11-10",
+  "nightly_verdict": "Nothing triggered the camera again today. It watched from sunrise to sunset, and the day's 20-second snapshots showed only bamboo moving in the wind. No changes tonight; REVIEW photos stay at 75%.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5886

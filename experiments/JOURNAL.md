@@ -3581,3 +3581,9 @@ Camera not blind: sunrise warm-up 07:37:47, sunset stop 16:53:13, 1659 timelapse
 No tier-2 needed, no new human labels (last 11-08 08:47 UTC; freeze trips after 11-11 08:47 UTC). fp_rate not computed (no rows). FN unmeasured.
 **Exp #43 night 11:** 0 REVIEW, 0 sampled out, 0 lost visits. No deploy (slot occupied, observing to ~11-20). Not paused. Volume 0 vs baseline 27: seasonal low, camera alive, nothing deployed could reduce captures.
 Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call).
+
+## 2026-11-10 — tick
+0 triggers for the 2nd day running (ingest empty, metrics no_data, baseline preserved). Camera live 07:44-16:51 per log; 1652 timelapse frames, overcast (median luma 29).
+**Timelapse FN screen with positive control:** the 11-08 blackbird scores 1283 px; today's max is 231 px. Top 3 candidates viewed: bamboo. A static dark/white patch near (0.55,0.2) is confirmed scenery across 11-08 and 11-10.
+No tier-2, no new human labels (freeze due after 11-11 08:47 UTC). **Exp #43 night 12:** 0 pings, 0 sampled out, 0 lost visits; no deploy. Not paused.
+Still open: re-baseline volume for winter (27/night baseline vs ~0-7 now); bot token in `httpx` INFO logs (rotation is Daniel's call).
