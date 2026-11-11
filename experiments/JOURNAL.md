@@ -3587,3 +3587,11 @@ Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotat
 **Timelapse FN screen with positive control:** the 11-08 blackbird scores 1283 px; today's max is 231 px. Top 3 candidates viewed: bamboo. A static dark/white patch near (0.55,0.2) is confirmed scenery across 11-08 and 11-10.
 No tier-2, no new human labels (freeze due after 11-11 08:47 UTC). **Exp #43 night 12:** 0 pings, 0 sampled out, 0 lost visits; no deploy. Not paused.
 Still open: re-baseline volume for winter (27/night baseline vs ~0-7 now); bot token in `httpx` INFO logs (rotation is Daniel's call).
+
+## 2026-11-11 tick
+Services: camera active since 11-02 03:30:11; no stamp pending; feedback active. Ingest 5887-5892: **6 triggers** (13:31-14:27), 0 ERROR.
+5887-5890 `aves;bird` → MAIN (5887 = magpie). 5891 UNCLASSIFIABLE → sent REVIEW; **tier-2 overturns to `animal`** (blackbird, frames 1-2; #31 class). 5892 NO_ANIMAL → sent REVIEW; **tier-2 `person`** (near-lens navy column, same class as 5864/5879/5881; pc 0.098, unrecognisable).
+fp_rate 0/5 (tier-1 + tier-2; 5892 person excluded), CI [0, 0.43]. FN unmeasured. No new human labels.
+**FEEDBACK-STARVED FREEZE tripped** 11-11 08:47 UTC → `feedback_starved_since` 2026-11-11; hold config.
+**Exp #43 night 13:** 2 REVIEW (both fraction < 0.5, so no evidence on 0.75), 0 sampled out, 0 lost visits. **Revert decided against, explicitly:** 0 pings were sent between the last label and the trip, so the empty inbox is not fatigue, and a revert would be a change during a freeze. New binding criterion: revert if 5891/5892 are still human-unlabelled at the 11-14 tick. No deploy. Not paused.
+Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call); near-lens trouser-leg bursts (4 so far) reach REVIEW below any in-bounds person threshold.
