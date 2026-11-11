@@ -431,14 +431,14 @@
   ],
   "last_heartbeat_loopday": "2026-11-10",
   "last_metrics": {
-    "date": "2026-11-08",
+    "date": "2026-11-11",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
       0.0,
-      0.4898908364545973
+      0.43448246478317476
     ],
     "fp_claude_ci": [
       0.0,
@@ -449,28 +449,28 @@
     "fp_count": 0,
     "fp_human_ci": [
       0.0,
-      0.5614970317550454
+      1.0
     ],
     "fp_human_count": 0,
     "fp_human_rate": 0.0,
     "fp_md_ci": [
       0.0,
-      1.0
+      0.4898908364545973
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
     "fp_rate": 0.0,
     "fp_trustworthy": true,
-    "labeled_triggers": 4,
+    "labeled_triggers": 5,
     "n_cant_tell": 0,
     "n_claude": 1,
-    "n_human": 3,
-    "n_human_suppressed": 2,
-    "n_md": 0,
+    "n_human": 0,
+    "n_human_suppressed": 0,
+    "n_md": 4,
     "n_person": 1,
-    "n_sampled_out": 1,
+    "n_sampled_out": 0,
     "n_unlabeled": 0,
-    "total_triggers": 7
+    "total_triggers": 6
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
@@ -478,5 +478,5 @@
   "nightly_verdict": "Nothing triggered the camera again today. It watched from sunrise to sunset, and the day's 20-second snapshots showed only bamboo moving in the wind. No changes tonight; REVIEW photos stay at 75%.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5886
+  "watermark": 5892
 }
