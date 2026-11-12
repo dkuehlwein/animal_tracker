@@ -3595,3 +3595,10 @@ fp_rate 0/5 (tier-1 + tier-2; 5892 person excluded), CI [0, 0.43]. FN unmeasured
 **FEEDBACK-STARVED FREEZE tripped** 11-11 08:47 UTC → `feedback_starved_since` 2026-11-11; hold config.
 **Exp #43 night 13:** 2 REVIEW (both fraction < 0.5, so no evidence on 0.75), 0 sampled out, 0 lost visits. **Revert decided against, explicitly:** 0 pings were sent between the last label and the trip, so the empty inbox is not fatigue, and a revert would be a change during a freeze. New binding criterion: revert if 5891/5892 are still human-unlabelled at the 11-14 tick. No deploy. Not paused.
 Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call); near-lens trouser-leg bursts (4 so far) reach REVIEW below any in-bounds person threshold.
+
+## 2026-11-12 tick
+Services: camera active since 11-02 03:30:11; no stamp pending; feedback active. Ingest 5893: **1 trigger** (13:30), 0 ERROR.
+5893 HUMAN (homo 0.86, pc 0.33) muted. Frames: near-lens navy trouser leg in frame 1, rest empty, no concealed animal (5th trouser-leg burst; gate caught this one).
+fp_rate 0/0 (only row privacy-suppressed). FN unmeasured. **Freeze lifted**: Daniel labelled 5887-5892 on 11-12 ~11:31 UTC. **Self-audit:** 5891 tier-2 = human `animal`; 5892 tier-2 `person` vs human `false_positive` (near-lens class is labelled inconsistently by the human too: 5875, 5879, 5892).
+**Exp #43 night 14:** 0 REVIEW, 0 sampled out, 0 lost visits. Night-13 revert criterion passed (5891/5892 labelled within a day). Observe to ~11-20. No deploy. Not paused.
+Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call).

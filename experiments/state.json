@@ -332,7 +332,7 @@
     "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.75,
     "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
   },
-  "feedback_starved_since": "2026-11-11",
+  "feedback_starved_since": null,
   "history": [
     {
       "config": {},
@@ -429,7 +429,7 @@
       "replaced_at": "2026-10-30T03:25:00+01:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-11-11",
+  "last_heartbeat_loopday": "2026-11-12",
   "last_metrics": {
     "date": "2026-11-12",
     "error_count": 0,
@@ -474,8 +474,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-11-11",
-  "nightly_verdict": "A magpie and a blackbird visited around midday and all 4 bird photos went straight through; the 2 REVIEW photos were a blackbird and a blurry trouser leg close to the lens. No changes tonight. No labels since Sunday, so tuning is paused until you label, but nothing was sent to label until today, so REVIEW photos stay at 75% for now.",
+  "last_tick_completed_day": "2026-11-12",
+  "nightly_verdict": "Quiet day: one capture, a trouser leg brushing past the lens, correctly kept private. Thanks for labelling yesterday's photos; tuning is unpaused, and REVIEW photos stay at 75% while the test runs to about 20 Nov.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5893
