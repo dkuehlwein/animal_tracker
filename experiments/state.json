@@ -431,18 +431,18 @@
   ],
   "last_heartbeat_loopday": "2026-11-11",
   "last_metrics": {
-    "date": "2026-11-11",
+    "date": "2026-11-12",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
       0.0,
-      0.43448246478317476
+      1.0
     ],
     "fp_claude_ci": [
       0.0,
-      0.7934506856227626
+      1.0
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
@@ -455,22 +455,22 @@
     "fp_human_rate": 0.0,
     "fp_md_ci": [
       0.0,
-      0.4898908364545973
+      1.0
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
     "fp_rate": 0.0,
     "fp_trustworthy": true,
-    "labeled_triggers": 5,
+    "labeled_triggers": 0,
     "n_cant_tell": 0,
-    "n_claude": 1,
+    "n_claude": 0,
     "n_human": 0,
-    "n_human_suppressed": 0,
-    "n_md": 4,
-    "n_person": 1,
+    "n_human_suppressed": 1,
+    "n_md": 0,
+    "n_person": 0,
     "n_sampled_out": 0,
     "n_unlabeled": 0,
-    "total_triggers": 6
+    "total_triggers": 1
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
@@ -478,5 +478,5 @@
   "nightly_verdict": "A magpie and a blackbird visited around midday and all 4 bird photos went straight through; the 2 REVIEW photos were a blackbird and a blurry trouser leg close to the lens. No changes tonight. No labels since Sunday, so tuning is paused until you label, but nothing was sent to label until today, so REVIEW photos stay at 75% for now.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5892
+  "watermark": 5893
 }
