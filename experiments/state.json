@@ -429,7 +429,7 @@
       "replaced_at": "2026-10-30T03:25:00+01:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-11-12",
+  "last_heartbeat_loopday": "2026-11-13",
   "last_metrics": {
     "date": "2026-11-13",
     "error_count": 0,
@@ -474,8 +474,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-11-12",
-  "nightly_verdict": "Quiet day: one capture, a trouser leg brushing past the lens, correctly kept private. Thanks for labelling yesterday's photos; tuning is unpaused, and REVIEW photos stay at 75% while the test runs to about 20 Nov.",
+  "last_tick_completed_day": "2026-11-13",
+  "nightly_verdict": "Busier day: 10 captures. A blackbird and a crow-type bird were caught, two people were correctly kept private, and six empty photos came from wind in the bamboo. Thanks for labelling them all; no changes tonight, and REVIEW photos stay at 75% until the test ends around 20 Nov.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5903

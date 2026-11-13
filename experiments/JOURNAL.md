@@ -3602,3 +3602,10 @@ Services: camera active since 11-02 03:30:11; no stamp pending; feedback active.
 fp_rate 0/0 (only row privacy-suppressed). FN unmeasured. **Freeze lifted**: Daniel labelled 5887-5892 on 11-12 ~11:31 UTC. **Self-audit:** 5891 tier-2 = human `animal`; 5892 tier-2 `person` vs human `false_positive` (near-lens class is labelled inconsistently by the human too: 5875, 5879, 5892).
 **Exp #43 night 14:** 0 REVIEW, 0 sampled out, 0 lost visits. Night-13 revert criterion passed (5891/5892 labelled within a day). Observe to ~11-20. No deploy. Not paused.
 Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call).
+
+## 2026-11-13 tick
+Services: camera active since 11-02 03:30:11; no stamp pending; feedback active. Ingest 5894-5903: **10 triggers** (08:49-15:52), 0 ERROR.
+5894/5901 HUMAN muted (person walking past / at the left edge with a bag; frames viewed, no concealed animal). 5895-5900 REVIEW, all human `false_positive`: bamboo wind; MD boxes the static flower ornament (0.21-0.31) on raw `blank`, so they route UNCLASSIFIABLE (the known decoy class). 5902 `aves;bird` → MAIN (animal). 5903 UNCLASSIFIABLE → REVIEW, human `animal`: a blackbird is visible in all frames, but MD boxed the ornament instead (#31; tier-1 was wrong).
+fp_rate 6/8 = 0.75 (human labels only, MAIN 0 FP). FN unmeasured. All 8 sent bursts were human-labelled the same day, so no tier-2 was needed.
+**Exp #43 night 15:** 7 REVIEW, 0 sampled out, 0 lost visits. Sample fractions show only 5896/5900 (both FP) were extra sends at 0.75; 5903 would have gone at 0.5 and its visit also reached MAIN. Observe to ~11-20. No deploy. Not paused, no freeze.
+Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call).
