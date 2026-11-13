@@ -431,14 +431,14 @@
   ],
   "last_heartbeat_loopday": "2026-11-12",
   "last_metrics": {
-    "date": "2026-11-12",
+    "date": "2026-11-13",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.0,
-      1.0
+      0.40927543031016883,
+      0.9285207872478909
     ],
     "fp_claude_ci": [
       0.0,
@@ -446,31 +446,31 @@
     ],
     "fp_claude_count": 0,
     "fp_claude_rate": 0.0,
-    "fp_count": 0,
+    "fp_count": 6,
     "fp_human_ci": [
-      0.0,
-      1.0
+      0.40927543031016883,
+      0.9285207872478909
     ],
-    "fp_human_count": 0,
-    "fp_human_rate": 0.0,
+    "fp_human_count": 6,
+    "fp_human_rate": 0.75,
     "fp_md_ci": [
       0.0,
       1.0
     ],
     "fp_md_count": 0,
     "fp_md_rate": 0.0,
-    "fp_rate": 0.0,
+    "fp_rate": 0.75,
     "fp_trustworthy": true,
-    "labeled_triggers": 0,
+    "labeled_triggers": 8,
     "n_cant_tell": 0,
     "n_claude": 0,
-    "n_human": 0,
-    "n_human_suppressed": 1,
+    "n_human": 8,
+    "n_human_suppressed": 2,
     "n_md": 0,
     "n_person": 0,
     "n_sampled_out": 0,
     "n_unlabeled": 0,
-    "total_triggers": 1
+    "total_triggers": 10
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
@@ -478,5 +478,5 @@
   "nightly_verdict": "Quiet day: one capture, a trouser leg brushing past the lens, correctly kept private. Thanks for labelling yesterday's photos; tuning is unpaused, and REVIEW photos stay at 75% while the test runs to about 20 Nov.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5893
+  "watermark": 5903
 }
