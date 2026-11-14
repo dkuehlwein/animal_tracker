@@ -1,5 +1,5 @@
 {
-  "active_experiment_id": 43,
+  "active_experiment_id": 44,
   "backlog": [
     {
       "hypothesis": "CONCLUDED 2026-06-15 (keep). Same-channel \ud83d\udd0d REVIEW prefix on status\u2208{NO_ANIMAL,UNCLASSIFIABLE} flags 99% of FP at 0 FN; live since 06-12, location-agnostic. Second-channel routing is OUT per Daniel (no 2nd channel \u2014 adds overhead, won't click two). See runs/0001 + LEARNINGS.",
@@ -312,9 +312,16 @@
       "validation": "pending"
     },
     {
-      "hypothesis": "2026-10-29: raise PERFORMANCE_REVIEW_SAMPLE_RATE 0.5->0.75. Lost visits from sampling now at #41's ~1/month re-open bar (5468, 5477, 5844/5845; all dusk/dawn blackbirds). About +2 REVIEW/day. See runs/0030.",
+      "hypothesis": "2026-10-29: raise PERFORMANCE_REVIEW_SAMPLE_RATE 0.5->0.75. Lost visits from sampling now at #41's ~1/month re-open bar (5468, 5477, 5844/5845; all dusk/dawn blackbirds). About +2 REVIEW/day. See runs/0030. CONCLUDED 2026-11-14 (escalated): 5909, a male blackbird, was sampled out with no sibling sent, so a visit was lost at 0.75; in the 0.75 window all 4 sampled-out bursts were blackbirds. Pre-registered escalation to 1.0 opened as exp #44 (runs/0031).",
       "id": 43,
       "slug": "review-sample-rate-075",
+      "status": "concluded",
+      "validation": "live"
+    },
+    {
+      "hypothesis": "2026-11-14: raise PERFORMANCE_REVIEW_SAMPLE_RATE 0.75->1.0 (exp #43's pre-registered escalation). 5909 lost a blackbird visit at 0.75; 4/4 sampled-out bursts in the 0.75 window were animals. Cost ~+0.25 REVIEW/day. Restart 11-15T03:25. See runs/0031.",
+      "id": 44,
+      "slug": "review-sample-rate-1",
       "status": "active",
       "validation": "live"
     }
@@ -329,7 +336,7 @@
     "PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS": 240,
     "PERFORMANCE_HUMAN_SWEEP_MAX_FRAMES": 4,
     "PERFORMANCE_MAX_IMAGES": 300,
-    "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.75,
+    "PERFORMANCE_REVIEW_SAMPLE_RATE": 1.0,
     "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
   },
   "feedback_starved_since": null,
@@ -427,9 +434,21 @@
         "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
       },
       "replaced_at": "2026-10-30T03:25:00+01:00"
+    },
+    {
+      "config": {
+        "PERFORMANCE_HUMAN_DENSITY_COUNT": 8,
+        "PERFORMANCE_HUMAN_DENSITY_WINDOW_SECONDS": 1800,
+        "PERFORMANCE_HUMAN_PROXIMITY_WINDOW_SECONDS": 240,
+        "PERFORMANCE_HUMAN_SWEEP_MAX_FRAMES": 4,
+        "PERFORMANCE_MAX_IMAGES": 300,
+        "PERFORMANCE_REVIEW_SAMPLE_RATE": 0.75,
+        "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
+      },
+      "replaced_at": "2026-11-15T03:25+01:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-11-13",
+  "last_heartbeat_loopday": "2026-11-14",
   "last_metrics": {
     "date": "2026-11-14",
     "error_count": 0,
@@ -474,9 +493,9 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-11-13",
-  "nightly_verdict": "Busier day: 10 captures. A blackbird and a crow-type bird were caught, two people were correctly kept private, and six empty photos came from wind in the bamboo. Thanks for labelling them all; no changes tonight, and REVIEW photos stay at 75% until the test ends around 20 Nov.",
+  "last_tick_completed_day": "2026-11-14",
+  "nightly_verdict": "Quiet day: five people walking past were kept private, and one blackbird photo was held back by the 75% REVIEW sampling, so you never saw that visit. All four photos held back in the last two weeks were blackbirds, so from tomorrow every REVIEW photo is sent (about one extra photo every four days).",
   "paused": false,
-  "pending_restart_at": null,
+  "pending_restart_at": "2026-11-15T03:25+01:00",
   "watermark": 5909
 }

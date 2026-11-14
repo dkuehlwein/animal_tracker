@@ -3609,3 +3609,10 @@ Services: camera active since 11-02 03:30:11; no stamp pending; feedback active.
 fp_rate 6/8 = 0.75 (human labels only, MAIN 0 FP). FN unmeasured. All 8 sent bursts were human-labelled the same day, so no tier-2 was needed.
 **Exp #43 night 15:** 7 REVIEW, 0 sampled out, 0 lost visits. Sample fractions show only 5896/5900 (both FP) were extra sends at 0.75; 5903 would have gone at 0.5 and its visit also reached MAIN. Observe to ~11-20. No deploy. Not paused, no freeze.
 Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call).
+
+## 2026-11-14 tick
+Services: camera active since 11-02 03:30:11; no stamp pending; feedback active. Ingest 5904-5909: **6 triggers** (09:17-14:57), 0 ERROR.
+5904-5908 HUMAN muted (person in jeans walking past near the lens; frames viewed, no concealed animal). 5909 NO_ANIMAL (no box, raw NULL) **sampled out**; **tier-2 overturns to `animal`**: a male blackbird left of the ornament in all 5 frames (#31/#36 class). No other trigger that afternoon → **visit lost at 0.75**.
+fp_rate 0/1 (tier-2 only; no human labels today), FN unmeasured. No freeze.
+**Exp #43 concluded (night 16):** its pre-registered "escalate to 1.0 if a visit is still lost at 0.75" fired. In the 0.75 window all 4 sampled-out bursts were blackbirds (3 delivered via siblings, 1 lost). **Exp #44 opened + deployed:** `PERFORMANCE_REVIEW_SAMPLE_RATE` 0.75→1.0, restart 11-15T03:25+01:00. Volume lever only (FN-veto N/A, captures unchanged), ~+0.25 REVIEW/day. Observe to ~11-28. Not paused.
+Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call).

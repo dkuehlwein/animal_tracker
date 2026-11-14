@@ -1,0 +1,36 @@
+---
+id: 44
+slug: review-sample-rate-1
+status: active
+validation: live   # env delta; replay stub
+hypothesis: "Review sampling at 0.75 still loses whole animal visits (5909, 11-14), and in the 0.75 window every sampled-out burst (4/4) was a blackbird. In late autumn, review-class volume is low and its sampled-out tail is mostly low-light birds SpeciesNet does not box (#31/#36). Setting the rate to 1.0 removes visit loss to sampling for ~+0.25 REVIEW pings/day."
+created: 2026-11-14
+promoted_from: "exp #43 pre-registered exit: 'escalate to 1.0 only if a visit is still lost to sampling at 0.75' (runs/0030 night 16)"
+confidence: medium   # cost side is measured (4 extra pings in 16 nights); benefit n is small but 4/4
+delta: {"PERFORMANCE_REVIEW_SAMPLE_RATE": 1.0}   # was 0.75
+commit: none   # env-only
+restart_at: 2026-11-15T03:25+01:00
+---
+
+## Evidence (rows 5851-5909, 10-30..11-14, rate 0.75)
+
+- 21 review-class bursts, 4 sampled out: 5852, 5877, 5884, 5909. All 4 are animals (tier-2, frames checked).
+- 3 were delivered via a sibling burst; 5909 (male blackbird, 14:57) had no sibling and the visit was lost.
+- Lost visits to sampling since 07-27: 5468, 5477, 5844/5845, 5909 = 4 in ~110 days, and 2 of them in the last 17 days.
+
+## Decision
+
+Escalate per exp #43's pre-registered criterion. In BOUNDS (0.0-1.0). Volume lever: only adds sends, cannot raise FN
+(FN-veto N/A) and changes no captures (volume guardrail N/A). Not paused, no freeze, slot freed by concluding #43.
+Per PROTOCOL "Review sampling", never credit this with an fp_rate change. At 1.0 the sampling gate is effectively off;
+it stays in code (0 sampled out is the intended outcome, not a zero-firings retirement case while the knob is in use).
+
+## Prediction / exit criteria (observe ≥14 days, to ~2026-11-28)
+
+- `review_sampled_out` = 0 on every row after the 11-15 03:30 restart (verifies the deploy).
+- REVIEW pings rise by only ~0.25/active day vs the 0.75 window (15 pings / 16 nights ≈ 0.9/night).
+- Keep if Daniel keeps labelling REVIEW pings (no freeze tied to a real ping stall) and no `/rollback`.
+- Revert to 0.75 if a feedback-starved freeze trips while pings sat unlabelled (fatigue), or on `/rollback`.
+- Revisit downward only when spring volume returns (sampling was a summer-volume fix: ~44 REVIEW/night in July).
+
+## Observations

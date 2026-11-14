@@ -1,7 +1,7 @@
 ---
 id: 43
 slug: review-sample-rate-075
-status: active
+status: concluded   # 2026-11-14: escalated to 1.0 per the pre-registered criterion (visit 5909 lost at 0.75) -> exp #44, runs/0031
 validation: live   # env delta; replay stub. Evidence is offline: every sampled-out burst since 10-09 is labelled
 hypothesis: "Review sampling at 0.5 now loses whole animal visits at roughly the ~1/month re-open bar exp #41 set. Every lost visit so far (5468, 5477, 5844/5845) is a dusk or dawn blackbird that SpeciesNet gave no box (#31/#36), and in late autumn dusk falls inside capture hours. Raising the rate to 0.75 should roughly halve visit-level losses for about +2 REVIEW pings/day."
 created: 2026-10-29
@@ -186,3 +186,12 @@ Per PROTOCOL "Review sampling", fp_rate is not affected, and this experiment mus
 - REVIEW pings sent: 7. Sampled out: 0. Lost visits to sampling: 0. Running total under 0.75: 0 lost visits and 3 burst-level misses in 15 nights, with 15 REVIEW pings. Today is the first REVIEW-heavy day of the window (7 vs the predicted ~5.8/active day), and Daniel labelled all of them on the same day, so there is no sign of fatigue. Keep observing to ~11-20.
 - fp_rate 6/8 = 0.75 (human labels only, CI [0.41, 0.93]); all 6 FPs are review-class sends, and MAIN had 0 FPs. FN unmeasured. Per PROTOCOL, this experiment is not credited with any fp_rate change either way.
 - Self-audit: no tier-2 rows tonight, so there is nothing to reconcile. Tier-1 vs human: 5903 tier-1 `false_positive` → human `animal` (the #31 class again); the other 7 agree.
+
+### Night 16 — 2026-11-14 (rate 0.75 live; camera up since 11-02 03:30:11, no stamp pending) — CONCLUDED
+
+- 6 triggers (5904-5909, 09:17-14:57 local), 0 ERROR.
+- 5904-5908 HUMAN (pc 0.19-0.81; homo taxon on 4, MD person box on 5906) → muted. Frames viewed: all five are a person in jeans walking past close to the lens. No concealed animal in any of them.
+- 5909 NO_ANIMAL (no box, raw NULL, pc 0.04, luma low, 14:57) → **sampled out**, not proximity-muted (49 min after 5908). **Tier-2 overturns tier-1 `false_positive` → `animal`:** a male blackbird (orange beak) stands left of the ornament in frames 1-5. Brightened full-res crop checked against 5906's empty frame at the same spot. No other trigger between 14:08 and the sunset stop, so **nothing from this visit reached Daniel: a lost visit at 0.75.** Same #31/#36 class (dark bird, low light, no MD box).
+- Window total under 0.75 (16 nights): 21 review-class bursts, **4 sampled out, and all 4 were blackbirds** (5852, 5877, 5884 delivered via siblings; 5909 lost). 0 REVIEW pings tonight; running total 15 REVIEW pings in 16 nights, and Daniel labelled every one (no fatigue).
+- **Exit: pre-registered "escalate to 1.0 only if a visit is still lost to sampling at 0.75" fired.** At 0.75 the sampled-out stream was 4/4 animals, so going to 1.0 costs ~4 extra pings in 16 nights (~0.25/day), each of which was an animal this window. That is far better than the 1/155 ratio that motivated sampling. Concluded; escalation opened as exp #44 (runs/0031).
+- Self-audit: no new human labels since 11-13; tier-1 wrong again on a low-light blackbird (5909), the 6th tier-1 overturn of this class under 0.75.
