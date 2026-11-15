@@ -34,3 +34,10 @@ it stays in code (0 sampled out is the intended outcome, not a zero-firings reti
 - Revisit downward only when spring volume returns (sampling was a summer-volume fix: ~44 REVIEW/night in July).
 
 ## Observations
+
+### Night 1 (2026-11-15, rows 5910-5928)
+
+- Deploy verified: camera restarted 11-15 03:30:11 (systemctl); `review_sampled_out`=0 on all 11 review-class rows, no `[REVIEW-SAMPLE]` log lines.
+- 19 triggers: 7 HUMAN (5913-5916, 5918, 5919, 5926; two via `[HUMAN-SWEEP]`), 1 `[HUMAN-PROXIMITY]` mute (5917, a hand at the top-left edge, no animal), 10 REVIEW sent (after deferral).
+- Tier-2 (frames viewed): 5927 + 5928 = blackbird left of the ornament at dusk (15:39/15:40, sharpness 4.6/4.8, MD no box), the #31/#36 class again. The other 8 REVIEW = bamboo/grass wind FPs.
+- Counterfactual at 0.75 (`is_review_sampled_out(id, 0.75)`): 5920, 5922, 5923, 5924 would have been held back, all FPs. Both blackbird bursts would have been sent anyway. **Cost today: +4 pings, 0 visits saved.** One windy day ≫ predicted +0.25/day; one day is no trend. Keep observing to ~11-28.

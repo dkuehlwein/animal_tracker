@@ -448,7 +448,7 @@
       "replaced_at": "2026-11-15T03:25+01:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-11-14",
+  "last_heartbeat_loopday": "2026-11-15",
   "last_metrics": {
     "date": "2026-11-15",
     "error_count": 0,
@@ -493,8 +493,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-11-14",
-  "nightly_verdict": "Quiet day: five people walking past were kept private, and one blackbird photo was held back by the 75% REVIEW sampling, so you never saw that visit. All four photos held back in the last two weeks were blackbirds, so from tomorrow every REVIEW photo is sent (about one extra photo every four days).",
+  "last_tick_completed_day": "2026-11-15",
+  "nightly_verdict": "Windy day: 10 REVIEW photos were sent. Two of them showed a blackbird at dusk, and the other eight were bamboo moving in the wind. Now that every REVIEW photo is sent, you got 4 extra ones today, all empty, so I'm watching whether the extra photos are worth it; no change for now.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5928

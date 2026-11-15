@@ -3616,3 +3616,10 @@ Services: camera active since 11-02 03:30:11; no stamp pending; feedback active.
 fp_rate 0/1 (tier-2 only; no human labels today), FN unmeasured. No freeze.
 **Exp #43 concluded (night 16):** its pre-registered "escalate to 1.0 if a visit is still lost at 0.75" fired. In the 0.75 window all 4 sampled-out bursts were blackbirds (3 delivered via siblings, 1 lost). **Exp #44 opened + deployed:** `PERFORMANCE_REVIEW_SAMPLE_RATE` 0.75→1.0, restart 11-15T03:25+01:00. Volume lever only (FN-veto N/A, captures unchanged), ~+0.25 REVIEW/day. Observe to ~11-28. Not paused.
 Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call).
+
+## 2026-11-15 tick
+Services: camera restarted 11-15 03:30:11 → exp #44 (REVIEW_SAMPLE_RATE 1.0) live, verified via systemctl + `review_sampled_out`=0 on all review rows. Ingest 5910-5928: **19 triggers**, 0 ERROR.
+7 HUMAN muted (11:05-13:22; 5913/5919 escalated by HUMAN-SWEEP), 5917 HUMAN-PROXIMITY (a hand at the edge, no animal). 10 REVIEW sent: tier-2 **5927/5928 blackbird** at dusk (MD no box, #31/#36 class); 8 bamboo/grass wind FPs.
+fp_rate 10/12 (tier-2 + 1 tier-1; no human labels yet today), FN unmeasured. Last human label 11-13 (11-14 had nothing to label): freeze trips if none arrive by 11-16.
+**Exp #44 night 1:** at 0.75, 4 extra pings (5920, 5922-5924) would have been held back, all FPs; both blackbirds would have been sent anyway. Cost +4 pings and 0 visits saved today; a windy day, so not a trend. No change, no deploy.
+Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call); resource_manager logs "Purged 446 … (0 files)" on every burst (re-scans already-purged rows; harmless, log noise only).
