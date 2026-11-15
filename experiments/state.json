@@ -496,6 +496,6 @@
   "last_tick_completed_day": "2026-11-14",
   "nightly_verdict": "Quiet day: five people walking past were kept private, and one blackbird photo was held back by the 75% REVIEW sampling, so you never saw that visit. All four photos held back in the last two weeks were blackbirds, so from tomorrow every REVIEW photo is sent (about one extra photo every four days).",
   "paused": false,
-  "pending_restart_at": "2026-11-15T03:25+01:00",
+  "pending_restart_at": null,
   "watermark": 5909
 }
