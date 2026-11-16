@@ -339,7 +339,7 @@
     "PERFORMANCE_REVIEW_SAMPLE_RATE": 1.0,
     "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
   },
-  "feedback_starved_since": null,
+  "feedback_starved_since": "2026-11-16",
   "history": [
     {
       "config": {},
@@ -448,7 +448,7 @@
       "replaced_at": "2026-11-15T03:25+01:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-11-15",
+  "last_heartbeat_loopday": "2026-11-16",
   "last_metrics": {
     "date": "2026-11-16",
     "error_count": 0,
@@ -493,8 +493,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-11-15",
-  "nightly_verdict": "Windy day: 10 REVIEW photos were sent. Two of them showed a blackbird at dusk, and the other eight were bamboo moving in the wind. Now that every REVIEW photo is sent, you got 4 extra ones today, all empty, so I'm watching whether the extra photos are worth it; no change for now.",
+  "last_tick_completed_day": "2026-11-16",
+  "nightly_verdict": "Quiet day: one person was kept private, a blackbird visit came through at 11am, and the two REVIEW photos were bamboo in the wind. You haven't labelled since Friday so I'm holding all settings; if there are still no labels by Wednesday I'll go back to sending only 75% of REVIEW photos.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5934

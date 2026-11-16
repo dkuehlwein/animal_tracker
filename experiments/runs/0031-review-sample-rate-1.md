@@ -41,3 +41,9 @@ it stays in code (0 sampled out is the intended outcome, not a zero-firings reti
 - 19 triggers: 7 HUMAN (5913-5916, 5918, 5919, 5926; two via `[HUMAN-SWEEP]`), 1 `[HUMAN-PROXIMITY]` mute (5917, a hand at the top-left edge, no animal), 10 REVIEW sent (after deferral).
 - Tier-2 (frames viewed): 5927 + 5928 = blackbird left of the ornament at dusk (15:39/15:40, sharpness 4.6/4.8, MD no box), the #31/#36 class again. The other 8 REVIEW = bamboo/grass wind FPs.
 - Counterfactual at 0.75 (`is_review_sampled_out(id, 0.75)`): 5920, 5922, 5923, 5924 would have been held back, all FPs. Both blackbird bursts would have been sent anyway. **Cost today: +4 pings, 0 visits saved.** One windy day ≫ predicted +0.25/day; one day is no trend. Keep observing to ~11-28.
+
+### Night 2 (2026-11-16, rows 5929-5934)
+
+- 6 triggers: 5929 HUMAN (HUMAN-SWEEP), 5931-5933 blackbird to MAIN, 2 REVIEW sent (5930, 5934: bamboo wind FPs, tier-2 from frames).
+- Counterfactual at 0.75: only 5930 (fraction 0.980, FP) held back; 5934 (0.303) sent anyway. **Cost today +1 ping, 0 visits saved. Running total: +5 pings, 0 visits saved.**
+- Feedback-starved freeze tripped (last human label 11-13 17:25 UTC). The literal revert criterion is met (12 unlabelled pings since then), but held by judgement: only 5 of the 12 are due to 1.0, and Daniel's 3-4-day batch labelling produced freezes at the same rate under 0.75. **Pre-registered tightening:** no human label by the 11-18 tick → revert to 0.75.

@@ -3623,3 +3623,13 @@ Services: camera restarted 11-15 03:30:11 → exp #44 (REVIEW_SAMPLE_RATE 1.0) l
 fp_rate 10/12 (tier-2 + 1 tier-1; no human labels yet today), FN unmeasured. Last human label 11-13 (11-14 had nothing to label): freeze trips if none arrive by 11-16.
 **Exp #44 night 1:** at 0.75, 4 extra pings (5920, 5922-5924) would have been held back, all FPs; both blackbirds would have been sent anyway. Cost +4 pings and 0 visits saved today; a windy day, so not a trend. No change, no deploy.
 Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call); resource_manager logs "Purged 446 … (0 files)" on every burst (re-scans already-purged rows; harmless, log noise only).
+
+## 2026-11-16 tick
+Services: camera active since 11-15 03:30:11 (systemctl), exp #44 (REVIEW_SAMPLE_RATE 1.0) live. Ingest 5929-5934: **6 triggers**, 0 ERROR.
+5929 HUMAN muted (10:31, escalated by HUMAN-SWEEP). 5931-5933 blackbird to MAIN (10:56-10:58; `;;;;;;animal` / `aves` IDENTIFIED, raw top-1 bird, tier-2 5931 animal from frames). 2 REVIEW sent: 5930 + 5934 = bamboo wind FPs (MD box only on the ornament, `no cv result`).
+fp_rate 2/5 (tier-2 + tier-1; no human labels), FN unmeasured.
+**FEEDBACK-STARVED FREEZE tripped:** last human label 11-13 17:25 UTC, 3 days ago → `feedback_starved_since` = 2026-11-16. Hold config.
+**Exp #44 night 2:** 2 REVIEW, 0 sampled out. At 0.75 only 5930 (fraction 0.98, FP) would have been held back; 5934 (0.30) sent anyway. Running cost +5 pings, 0 visits saved over 2 nights.
+**Literal revert criterion ("freeze trips while pings sat unlabelled") is met, but held by judgement, explicitly:** 12 REVIEW pings since the last label, of which only 5 are extra over 0.75. Daniel's labelling cadence is batch-every-3-4-days under 0.75 as well (freezes 10-12, 10-15, 10-23, 10-27, 11-07, 11-11), so one freeze is his normal rhythm, not fatigue caused by 1.0. Reverting would also be a change during a freeze. **Pre-registered:** if no human label arrives by the 11-18 tick (5 days, longer than any gap in the 0.75 window), revert to 0.75 as exp #44's rollback.
+No deploy. Not paused.
+Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call); resource_manager "Purged … (0 files)" log noise.
