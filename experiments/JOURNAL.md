@@ -3633,3 +3633,11 @@ fp_rate 2/5 (tier-2 + tier-1; no human labels), FN unmeasured.
 **Literal revert criterion ("freeze trips while pings sat unlabelled") is met, but held by judgement, explicitly:** 12 REVIEW pings since the last label, of which only 5 are extra over 0.75. Daniel's labelling cadence is batch-every-3-4-days under 0.75 as well (freezes 10-12, 10-15, 10-23, 10-27, 11-07, 11-11), so one freeze is his normal rhythm, not fatigue caused by 1.0. Reverting would also be a change during a freeze. **Pre-registered:** if no human label arrives by the 11-18 tick (5 days, longer than any gap in the 0.75 window), revert to 0.75 as exp #44's rollback.
 No deploy. Not paused.
 Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call); resource_manager "Purged … (0 files)" log noise.
+
+## 2026-11-17 tick
+Services: camera active since 11-15 03:30:11 (systemctl), exp #44 (REVIEW_SAMPLE_RATE 1.0) live; feedback active. Ingest 5935-5949: **15 triggers**, 0 ERROR.
+7 HUMAN muted (5941, 5943-5948, 14:28-14:34, person gardening near the lens). 5942 HUMAN-PROXIMITY mute (frames: empty garden, no animal). 7 REVIEW sent (5935-5940, 5949), all human `false_positive` (bamboo wind; MD boxes the ornament on raw `blank`, or no box). No MAIN sends.
+fp_rate 8/8 (7 human + 1 tier-1 on the muted 5942), human-only 7/7. FN unmeasured.
+**Freeze lifted:** Daniel labelled 26 rows (5911-5940, 5949) at ~17:16 UTC, clearing the backlog. Self-audit: tier-2 agrees with the human on all 13 overlapping rows.
+**Exp #44 night 3:** 0 sampled out. At 0.75 only 5939 (FP) would have been held back. Running total: +6 pings, 0 visits saved. The pre-registered 11-18 revert criterion passes (labels arrived), so keep observing to ~11-28. No deploy. Not paused.
+Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call); resource_manager "Purged … (0 files)" log noise; bamboo/ornament REVIEW FPs (7/7 today) remain the dominant FP class.

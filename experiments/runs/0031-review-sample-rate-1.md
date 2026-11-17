@@ -47,3 +47,10 @@ it stays in code (0 sampled out is the intended outcome, not a zero-firings reti
 - 6 triggers: 5929 HUMAN (HUMAN-SWEEP), 5931-5933 blackbird to MAIN, 2 REVIEW sent (5930, 5934: bamboo wind FPs, tier-2 from frames).
 - Counterfactual at 0.75: only 5930 (fraction 0.980, FP) held back; 5934 (0.303) sent anyway. **Cost today +1 ping, 0 visits saved. Running total: +5 pings, 0 visits saved.**
 - Feedback-starved freeze tripped (last human label 11-13 17:25 UTC). The literal revert criterion is met (12 unlabelled pings since then), but held by judgement: only 5 of the 12 are due to 1.0, and Daniel's 3-4-day batch labelling produced freezes at the same rate under 0.75. **Pre-registered tightening:** no human label by the 11-18 tick → revert to 0.75.
+
+### Night 3 (2026-11-17, rows 5935-5949)
+
+- 15 triggers, 0 ERROR. 7 HUMAN muted (5941, 5943-5948, 14:28-14:34: a person gardening near the lens, cutting back plants; 5948 frames checked, person only). 5942 `[HUMAN-PROXIMITY]` mute (frames checked: empty garden, no animal). 7 REVIEW sent (5935-5940, 5949): all human `false_positive` (bamboo wind; MD boxes the ornament at 0.22-0.40 on raw `blank`, or no box).
+- **Freeze lifted:** Daniel labelled 26 rows on 11-17 ~17:16-17:20 UTC (5911-5940, 5949), clearing the whole backlog including all 12 pings that were unlabelled at the 11-16 freeze. The pre-registered 11-18 revert criterion passes: the 11-16 freeze was his normal batch rhythm, not fatigue.
+- Self-audit: tier-2 matches the human label on all 13 overlapping rows (5911/5912/5920-5925/5930/5934 FP; 5927/5931 animal; 5928 tier-2 `animal` vs human `animal_wrong_id`, still an animal).
+- Counterfactual at 0.75: only 5939 (fraction 0.986, FP) would have been held back. **Cost today: +1 ping, 0 visits saved. Running total over 3 nights: +6 pings, 0 visits saved.** Keep observing to ~11-28.
