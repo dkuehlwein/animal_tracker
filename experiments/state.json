@@ -450,46 +450,46 @@
   ],
   "last_heartbeat_loopday": "2026-11-17",
   "last_metrics": {
-    "date": "2026-11-17",
+    "date": "2026-11-18",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
     "fn_rate": "unmeasured",
     "fp_ci": [
-      0.6755924351161198,
-      1.0
+      0.027866481213768224,
+      0.3010336452284873
     ],
     "fp_claude_ci": [
+      0.15003898915214947,
+      0.8499610108478506
+    ],
+    "fp_claude_count": 2,
+    "fp_claude_rate": 0.5,
+    "fp_count": 2,
+    "fp_human_ci": [
       0.0,
       1.0
     ],
-    "fp_claude_count": 0,
-    "fp_claude_rate": 0.0,
-    "fp_count": 8,
-    "fp_human_ci": [
-      0.6456695649333126,
-      1.0
-    ],
-    "fp_human_count": 7,
-    "fp_human_rate": 1.0,
+    "fp_human_count": 0,
+    "fp_human_rate": 0.0,
     "fp_md_ci": [
-      0.20654931437723745,
-      1.0
+      0.0,
+      0.1936076805344365
     ],
-    "fp_md_count": 1,
-    "fp_md_rate": 1.0,
-    "fp_rate": 1.0,
+    "fp_md_count": 0,
+    "fp_md_rate": 0.0,
+    "fp_rate": 0.1,
     "fp_trustworthy": true,
-    "labeled_triggers": 8,
+    "labeled_triggers": 20,
     "n_cant_tell": 0,
-    "n_claude": 0,
-    "n_human": 7,
-    "n_human_suppressed": 7,
-    "n_md": 1,
+    "n_claude": 4,
+    "n_human": 0,
+    "n_human_suppressed": 0,
+    "n_md": 16,
     "n_person": 0,
     "n_sampled_out": 0,
     "n_unlabeled": 0,
-    "total_triggers": 15
+    "total_triggers": 20
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
@@ -497,5 +497,5 @@
   "nightly_verdict": "Busy afternoon with gardening (7 photos of a person kept private) and 7 REVIEW photos of bamboo moving in the wind; no animals today. Thanks for catching up on the labels, which lifts the freeze; I'm keeping all REVIEW photos switched on and changing nothing.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5949
+  "watermark": 5969
 }
