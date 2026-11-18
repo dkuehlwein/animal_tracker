@@ -448,7 +448,7 @@
       "replaced_at": "2026-11-15T03:25+01:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-11-17",
+  "last_heartbeat_loopday": "2026-11-18",
   "last_metrics": {
     "date": "2026-11-18",
     "error_count": 0,
@@ -493,8 +493,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-11-17",
-  "nightly_verdict": "Busy afternoon with gardening (7 photos of a person kept private) and 7 REVIEW photos of bamboo moving in the wind; no animals today. Thanks for catching up on the labels, which lifts the freeze; I'm keeping all REVIEW photos switched on and changing nothing.",
+  "last_tick_completed_day": "2026-11-18",
+  "nightly_verdict": "Good bird day: two blackbird visits (morning and dusk) went straight to the main feed, and only 2 REVIEW photos of bamboo in the wind. I'm keeping all REVIEW photos switched on and changing nothing.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5969

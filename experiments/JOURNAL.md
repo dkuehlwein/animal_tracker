@@ -3641,3 +3641,9 @@ fp_rate 8/8 (7 human + 1 tier-1 on the muted 5942), human-only 7/7. FN unmeasure
 **Freeze lifted:** Daniel labelled 26 rows (5911-5940, 5949) at ~17:16 UTC, clearing the backlog. Self-audit: tier-2 agrees with the human on all 13 overlapping rows.
 **Exp #44 night 3:** 0 sampled out. At 0.75 only 5939 (FP) would have been held back. Running total: +6 pings, 0 visits saved. The pre-registered 11-18 revert criterion passes (labels arrived), so keep observing to ~11-28. No deploy. Not paused.
 Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call); resource_manager "Purged … (0 files)" log noise; bamboo/ornament REVIEW FPs (7/7 today) remain the dominant FP class.
+
+## 2026-11-18 — tick (rows 5950-5969)
+
+20 triggers, 0 ERROR, 0 HUMAN. 18 MAIN blackbird bursts (10:28-10:45 visit of 14 bursts, two birds at once in 5954; 15:30-15:32 dusk visit of 4). 2 REVIEW sent (5964, 5965): bamboo wind FPs, tier-2 from frames. fp_rate 0.10 (2/20, tier-2 + MD auto-labels only, no human labels yet).
+**Exp #44 night 4:** 0 sampled out; at 0.75 both REVIEW bursts would have been sent anyway (fractions 0.31/0.26). Running total: +6 pings, 0 visits saved. Keep observing to ~11-28. No deploy. Not paused, no freeze.
+Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call); resource_manager "Purged … (0 files)" log noise; bamboo/ornament REVIEW FPs remain the dominant FP class.

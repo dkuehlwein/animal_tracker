@@ -54,3 +54,9 @@ it stays in code (0 sampled out is the intended outcome, not a zero-firings reti
 - **Freeze lifted:** Daniel labelled 26 rows on 11-17 ~17:16-17:20 UTC (5911-5940, 5949), clearing the whole backlog including all 12 pings that were unlabelled at the 11-16 freeze. The pre-registered 11-18 revert criterion passes: the 11-16 freeze was his normal batch rhythm, not fatigue.
 - Self-audit: tier-2 matches the human label on all 13 overlapping rows (5911/5912/5920-5925/5930/5934 FP; 5927/5931 animal; 5928 tier-2 `animal` vs human `animal_wrong_id`, still an animal).
 - Counterfactual at 0.75: only 5939 (fraction 0.986, FP) would have been held back. **Cost today: +1 ping, 0 visits saved. Running total over 3 nights: +6 pings, 0 visits saved.** Keep observing to ~11-28.
+
+### Night 4 (2026-11-18, rows 5950-5969)
+
+- 20 triggers, 0 ERROR, 0 HUMAN, 0 `[HUMAN-PROXIMITY]`. 18 MAIN: 5950-5963 (10:28-10:45, blackbird visit, 14 bursts; 5954 frames checked: two blackbirds by the ornament) and 5966-5969 (15:30-15:32, dusk blackbird, 5968 checked). 2 REVIEW sent after the 240s deferral: 5964 (13:35) and 5965 (14:41), `no cv result`, MD boxes 0.23-0.24, frames checked: empty garden, bamboo wind FPs (tier-2 `false_positive`).
+- `review_sampled_out`=0 on both review-class rows. Counterfactual at 0.75: fractions 0.306 / 0.258, so both would have been sent anyway. **Cost today: +0 pings, 0 visits saved. Running total over 4 nights: +6 pings, 0 visits saved.**
+- No human labels yet for 5950-5969 (last human label 11-17 17:19 UTC; no freeze). Keep observing to ~11-28. No deploy.
