@@ -3647,3 +3647,9 @@ Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotat
 20 triggers, 0 ERROR, 0 HUMAN. 18 MAIN blackbird bursts (10:28-10:45 visit of 14 bursts, two birds at once in 5954; 15:30-15:32 dusk visit of 4). 2 REVIEW sent (5964, 5965): bamboo wind FPs, tier-2 from frames. fp_rate 0.10 (2/20, tier-2 + MD auto-labels only, no human labels yet).
 **Exp #44 night 4:** 0 sampled out; at 0.75 both REVIEW bursts would have been sent anyway (fractions 0.31/0.26). Running total: +6 pings, 0 visits saved. Keep observing to ~11-28. No deploy. Not paused, no freeze.
 Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotation is Daniel's call); resource_manager "Purged … (0 files)" log noise; bamboo/ornament REVIEW FPs remain the dominant FP class.
+
+## 2026-11-19 — tick (rows 5970-5972)
+
+3 triggers, 0 ERROR, 0 HUMAN, 0 MAIN. 3 REVIEW sent (5970, 5971, 5972): dark bamboo-wind FPs, MD boxes on static stones/blue pipe/trellis edge, tier-2 from frames. fp_rate 1.00 (3/3, tier-2 only; tiny n). Daniel labelled all of 5950-5969 on 11-18; tier-2 matched on all 4 overlaps.
+**Exp #44 night 5:** 0 sampled out; at 0.75, 5970 and 5972 (both FP) would have been held back. Running total: +8 pings, 0 visits saved. Keep observing to ~11-28. No deploy. Not paused, no freeze. Low volume is seasonal, not the change (sampling is post-capture).
+Still open: re-baseline volume for winter (27/night is stale; last 5 nights 19/6/15/20/3); bot token in `httpx` INFO logs (rotation is Daniel's call); resource_manager purge log noise; bamboo/ornament REVIEW FPs remain the dominant FP class.

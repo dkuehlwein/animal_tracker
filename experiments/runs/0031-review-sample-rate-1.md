@@ -60,3 +60,11 @@ it stays in code (0 sampled out is the intended outcome, not a zero-firings reti
 - 20 triggers, 0 ERROR, 0 HUMAN, 0 `[HUMAN-PROXIMITY]`. 18 MAIN: 5950-5963 (10:28-10:45, blackbird visit, 14 bursts; 5954 frames checked: two blackbirds by the ornament) and 5966-5969 (15:30-15:32, dusk blackbird, 5968 checked). 2 REVIEW sent after the 240s deferral: 5964 (13:35) and 5965 (14:41), `no cv result`, MD boxes 0.23-0.24, frames checked: empty garden, bamboo wind FPs (tier-2 `false_positive`).
 - `review_sampled_out`=0 on both review-class rows. Counterfactual at 0.75: fractions 0.306 / 0.258, so both would have been sent anyway. **Cost today: +0 pings, 0 visits saved. Running total over 4 nights: +6 pings, 0 visits saved.**
 - No human labels yet for 5950-5969 (last human label 11-17 17:19 UTC; no freeze). Keep observing to ~11-28. No deploy.
+
+### Night 5 (2026-11-19, rows 5970-5972)
+
+- 3 triggers, 0 ERROR, 0 HUMAN, 0 `[HUMAN-PROXIMITY]`, 0 MAIN. All 3 REVIEW sent after the 240s deferral: 5970 (11:09), 5971 (13:11), 5972 (15:05), all `no cv result` with raw top-1 `blank`, below the sharpness floor (dark, luma < 70 so no BLUR mute). Frames checked: empty garden, MD boxes 0.23-0.40 on the static stones, the blue pipe and the left trellis edge; motion point in the bamboo. Tier-2 `false_positive` x3.
+- 5970 `person_confidence` 0.31 (< 0.5 gate) is the left-edge trellis strip; no person in any frame; the burst human sweep ran and found nothing.
+- `review_sampled_out`=0 on all 3. Counterfactual at 0.75: 5970 (0.868) and 5972 (0.858) would have been held back, both FPs; 5971 (0.282) sent anyway. **Cost today: +2 pings, 0 visits saved. Running total over 5 nights: +8 pings, 0 visits saved.**
+- Self-audit: Daniel labelled all of 5950-5969 on 11-18 19:29-19:32; tier-2 agrees on all 4 overlaps (5964/5965 FP, 5954 animal, 5968 tier-2 `animal` vs human `animal_wrong_id`, still an animal). No freeze.
+- Low volume (3 vs the stale 27/night baseline) is a quiet, dark late-autumn day, not caused by this change: sampling acts after capture and logging, so it cannot reduce triggers. Camera service up since 11-15 03:30, monitoring normally. Keep observing to ~11-28. No deploy.
