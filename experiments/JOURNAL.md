@@ -3653,3 +3653,10 @@ Still open: re-baseline volume for winter; bot token in `httpx` INFO logs (rotat
 3 triggers, 0 ERROR, 0 HUMAN, 0 MAIN. 3 REVIEW sent (5970, 5971, 5972): dark bamboo-wind FPs, MD boxes on static stones/blue pipe/trellis edge, tier-2 from frames. fp_rate 1.00 (3/3, tier-2 only; tiny n). Daniel labelled all of 5950-5969 on 11-18; tier-2 matched on all 4 overlaps.
 **Exp #44 night 5:** 0 sampled out; at 0.75, 5970 and 5972 (both FP) would have been held back. Running total: +8 pings, 0 visits saved. Keep observing to ~11-28. No deploy. Not paused, no freeze. Low volume is seasonal, not the change (sampling is post-capture).
 Still open: re-baseline volume for winter (27/night is stale; last 5 nights 19/6/15/20/3); bot token in `httpx` INFO logs (rotation is Daniel's call); resource_manager purge log noise; bamboo/ornament REVIEW FPs remain the dominant FP class.
+
+## 2026-11-20 — tick (row 5973)
+
+1 trigger: 5973 REVIEW sent (13:13, NO_ANIMAL, MD 0 boxes), empty-garden wind FP, tier-2 from frames. fp_rate 1.00 (1/1, tier-2 only). Daniel labelled 5970-5972 on 11-20; tier-2 matched 3/3.
+**Exp #44 night 6:** 0 sampled out; at 0.75, 5973 (0.562) would have been sent anyway. Running total: +8 pings, 0 visits saved. Keep observing to ~11-28. No deploy. Not paused, no freeze.
+Infra slip: tier-2 insert errored before metrics; recovered by restoring state.json/daily.csv from git and re-running `loop.metrics`. Insert tier-2 via sqlite3 or `DatabaseManager(Config())`, never `DatabaseManager(path)`.
+Still open: winter volume re-baseline (27/night stale; last 6 nights 19/6/15/20/3/1); bot token in `httpx` INFO logs (Daniel's call); bamboo/ornament REVIEW FPs remain the dominant FP class.

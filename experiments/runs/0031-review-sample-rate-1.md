@@ -68,3 +68,10 @@ it stays in code (0 sampled out is the intended outcome, not a zero-firings reti
 - `review_sampled_out`=0 on all 3. Counterfactual at 0.75: 5970 (0.868) and 5972 (0.858) would have been held back, both FPs; 5971 (0.282) sent anyway. **Cost today: +2 pings, 0 visits saved. Running total over 5 nights: +8 pings, 0 visits saved.**
 - Self-audit: Daniel labelled all of 5950-5969 on 11-18 19:29-19:32; tier-2 agrees on all 4 overlaps (5964/5965 FP, 5954 animal, 5968 tier-2 `animal` vs human `animal_wrong_id`, still an animal). No freeze.
 - Low volume (3 vs the stale 27/night baseline) is a quiet, dark late-autumn day, not caused by this change: sampling acts after capture and logging, so it cannot reduce triggers. Camera service up since 11-15 03:30, monitoring normally. Keep observing to ~11-28. No deploy.
+
+### Night 6 (2026-11-20, row 5973)
+
+- 1 trigger, 0 ERROR, 0 HUMAN, 0 `[HUMAN-PROXIMITY]`, 0 MAIN. 5973 (13:13) NO_ANIMAL, MD 0 boxes (11 sub-floor detections), pc 0.06, sharpness 15.6 (above floor), REVIEW sent after the 240s deferral (sendPhoto 13:17:54). Frames checked: empty garden, bamboo/grass wind; intra-burst diff only 424 px, centred. Tier-2 `false_positive`.
+- `review_sampled_out`=0. Counterfactual at 0.75: fraction 0.562, so it would have been sent anyway. **Cost today: +0 pings, 0 visits saved. Running total over 6 nights: +8 pings, 0 visits saved.**
+- Self-audit: Daniel labelled 5970-5972 on 11-20 08:45; tier-2 agrees 3/3 (all FP). No freeze.
+- Tick note (infra, no behaviour change): first tier-2 insert failed (`DatabaseManager` needs a `Config`), so `loop.metrics` ran without it; restored state.json + daily.csv from the pre-metrics commit and re-ran `loop.metrics` (watermark rewritten by the tool, not by hand). Keep observing to ~11-28. No deploy.
