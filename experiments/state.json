@@ -460,11 +460,11 @@
       1.0
     ],
     "fp_claude_ci": [
-      0.0,
+      0.20654931437723745,
       1.0
     ],
-    "fp_claude_count": 0,
-    "fp_claude_rate": 0.0,
+    "fp_claude_count": 1,
+    "fp_claude_rate": 1.0,
     "fp_count": 1,
     "fp_human_ci": [
       0.0,
@@ -473,19 +473,19 @@
     "fp_human_count": 0,
     "fp_human_rate": 0.0,
     "fp_md_ci": [
-      0.20654931437723745,
+      0.0,
       1.0
     ],
-    "fp_md_count": 1,
-    "fp_md_rate": 1.0,
+    "fp_md_count": 0,
+    "fp_md_rate": 0.0,
     "fp_rate": 1.0,
     "fp_trustworthy": true,
     "labeled_triggers": 1,
     "n_cant_tell": 0,
-    "n_claude": 0,
+    "n_claude": 1,
     "n_human": 0,
     "n_human_suppressed": 0,
-    "n_md": 1,
+    "n_md": 0,
     "n_person": 0,
     "n_sampled_out": 0,
     "n_unlabeled": 0,
