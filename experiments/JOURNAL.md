@@ -3660,3 +3660,8 @@ Still open: re-baseline volume for winter (27/night is stale; last 5 nights 19/6
 **Exp #44 night 6:** 0 sampled out; at 0.75, 5973 (0.562) would have been sent anyway. Running total: +8 pings, 0 visits saved. Keep observing to ~11-28. No deploy. Not paused, no freeze.
 Infra slip: tier-2 insert errored before metrics; recovered by restoring state.json/daily.csv from git and re-running `loop.metrics`. Insert tier-2 via sqlite3 or `DatabaseManager(Config())`, never `DatabaseManager(path)`.
 Still open: winter volume re-baseline (27/night stale; last 6 nights 19/6/15/20/3/1); bot token in `httpx` INFO logs (Daniel's call); bamboo/ornament REVIEW FPs remain the dominant FP class.
+
+## 2026-11-21 — tick (exp #44 night 7)
+2 triggers: 5974 REVIEW sent (11:17, UNCLASSIFIABLE, MD 0.24 on trellis edge), bamboo-wind FP, tier-2 from frames; 5975 HUMAN muted (person's legs, frame checked). fp_rate 1.00 (1/1, tier-2 only). Daniel labelled 5973 FP; tier-2 matched.
+**Exp #44 night 7:** 0 sampled out; at 0.75, 5974 (0.216) would have been sent anyway. Running total: +8 pings, 0 visits saved. Keep observing to ~11-28. No deploy. Not paused, no freeze.
+Still open: winter volume re-baseline (27/night stale; last 7 nights 19/6/15/20/3/1/2); bot token in `httpx` INFO logs (Daniel's call); bamboo REVIEW FPs remain the dominant FP class.

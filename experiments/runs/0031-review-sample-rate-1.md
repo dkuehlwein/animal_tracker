@@ -75,3 +75,9 @@ it stays in code (0 sampled out is the intended outcome, not a zero-firings reti
 - `review_sampled_out`=0. Counterfactual at 0.75: fraction 0.562, so it would have been sent anyway. **Cost today: +0 pings, 0 visits saved. Running total over 6 nights: +8 pings, 0 visits saved.**
 - Self-audit: Daniel labelled 5970-5972 on 11-20 08:45; tier-2 agrees 3/3 (all FP). No freeze.
 - Tick note (infra, no behaviour change): first tier-2 insert failed (`DatabaseManager` needs a `Config`), so `loop.metrics` ran without it; restored state.json + daily.csv from the pre-metrics commit and re-ran `loop.metrics` (watermark rewritten by the tool, not by hand). Keep observing to ~11-28. No deploy.
+
+### Night 7 (2026-11-21, rows 5974-5975)
+
+- 2 triggers, 0 ERROR, 0 MAIN, 0 `[HUMAN-PROXIMITY]`. 5974 (11:17) UNCLASSIFIABLE (`no cv result`, raw top-1 `blank` 0.82), MD box 0.24 on the left trellis strip, pc 0.05, sharpness 9.8 (below floor, dark so no BLUR mute); REVIEW sent after the 240s deferral (sendMediaGroup 11:22:08). Frames checked: empty garden, motion point in the bamboo. Tier-2 `false_positive`. 5975 (11:40) HUMAN (classifier `human` 0.91), `[HUMAN-GATE]` muted; frame checked: a person's legs walking past the lens, no animal. 22 min after 5974, so outside the deferral window.
+- `review_sampled_out`=0. Counterfactual at 0.75: fraction 0.216, so it would have been sent anyway. **Cost today: +0 pings, 0 visits saved. Running total over 7 nights: +8 pings, 0 visits saved.**
+- Self-audit: Daniel labelled 5973 `false_positive` on 11-21 06:24; tier-2 agrees. No freeze. Keep observing to ~11-28. No deploy.

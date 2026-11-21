@@ -448,7 +448,7 @@
       "replaced_at": "2026-11-15T03:25+01:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-11-20",
+  "last_heartbeat_loopday": "2026-11-21",
   "last_metrics": {
     "date": "2026-11-21",
     "error_count": 0,
@@ -493,8 +493,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-11-20",
-  "nightly_verdict": "Very quiet day: one photo, empty garden with plants moving in the wind, sent as REVIEW. No animals or people. All REVIEW photos stay switched on and nothing changes tonight.",
+  "last_tick_completed_day": "2026-11-21",
+  "nightly_verdict": "Quiet day: one empty-garden photo with bamboo moving in the wind (sent as REVIEW) and one person walking past (muted, as intended). No animals; all REVIEW photos stay switched on and nothing changes tonight.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5975
