@@ -450,7 +450,7 @@
   ],
   "last_heartbeat_loopday": "2026-11-20",
   "last_metrics": {
-    "date": "2026-11-20",
+    "date": "2026-11-21",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
@@ -484,12 +484,12 @@
     "n_cant_tell": 0,
     "n_claude": 1,
     "n_human": 0,
-    "n_human_suppressed": 0,
+    "n_human_suppressed": 1,
     "n_md": 0,
     "n_person": 0,
     "n_sampled_out": 0,
     "n_unlabeled": 0,
-    "total_triggers": 1
+    "total_triggers": 2
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
@@ -497,5 +497,5 @@
   "nightly_verdict": "Very quiet day: one photo, empty garden with plants moving in the wind, sent as REVIEW. No animals or people. All REVIEW photos stay switched on and nothing changes tonight.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5973
+  "watermark": 5975
 }
