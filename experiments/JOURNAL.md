@@ -3665,3 +3665,9 @@ Still open: winter volume re-baseline (27/night stale; last 6 nights 19/6/15/20/
 2 triggers: 5974 REVIEW sent (11:17, UNCLASSIFIABLE, MD 0.24 on trellis edge), bamboo-wind FP, tier-2 from frames; 5975 HUMAN muted (person's legs, frame checked). fp_rate 1.00 (1/1, tier-2 only). Daniel labelled 5973 FP; tier-2 matched.
 **Exp #44 night 7:** 0 sampled out; at 0.75, 5974 (0.216) would have been sent anyway. Running total: +8 pings, 0 visits saved. Keep observing to ~11-28. No deploy. Not paused, no freeze.
 Still open: winter volume re-baseline (27/night stale; last 7 nights 19/6/15/20/3/1/2); bot token in `httpx` INFO logs (Daniel's call); bamboo REVIEW FPs remain the dominant FP class.
+
+## 2026-11-22 — tick (exp #44 night 8)
+9 triggers: 5976 REVIEW sent (09:51, UNCLASSIFIABLE, MD 0.27 on pond edge). Frames show a male blackbird, Daniel labelled it `animal`. 5977-5984 are 8 HUMAN bursts at 10:12-10:17, all `[HUMAN-GATE]` muted. fp_rate 0.00 (0/1, human).
+**Exp #44 night 8: first visit saved.** 5976's fraction is 0.864, so at 0.75 it would have been sampled out, and with no sibling burst the visit would have been lost. Running total: +9 pings, 1 visit saved. Keep observing to ~11-28. No deploy. Not paused, no freeze.
+Infra watch: one `sendMediaGroup` 400 `image_process_failed` on 5976; the document fallback delivered it (only occurrence in the logs).
+Still open: winter volume re-baseline (27/night is stale); bot token in `httpx` INFO logs (Daniel's call); bamboo REVIEW FPs are still the main FP class.
