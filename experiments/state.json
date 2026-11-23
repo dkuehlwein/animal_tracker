@@ -448,7 +448,7 @@
       "replaced_at": "2026-11-15T03:25+01:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-11-22",
+  "last_heartbeat_loopday": "2026-11-23",
   "last_metrics": {
     "date": "2026-11-23",
     "error_count": 0,
@@ -493,8 +493,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-11-22",
-  "nightly_verdict": "A blackbird visited the pond at 09:51 in a dark photo the AI couldn't name. It reached you as a REVIEW photo only because all REVIEW photos are switched on, and it is the first visit that setting has saved. The 8 photos of a person around 10:15 were muted as intended, and nothing changes tonight.",
+  "last_tick_completed_day": "2026-11-23",
+  "nightly_verdict": "One blackbird visited the pond at 10:10, and both photos reached you as named bird alerts. No false alarms and no REVIEW photos today, so nothing changes.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5986

@@ -88,3 +88,9 @@ it stays in code (0 sampled out is the intended outcome, not a zero-firings reti
 - **First visit saved by this experiment.** `review_sampled_out`=0. Counterfactual at 0.75: fraction 0.864, so 5976 would have been held back. No other burst between 09:00 and 10:12, so no sibling would have delivered it and the visit would have been lost. **Cost today: +1 ping, 1 visit saved. Running total over 8 nights: +9 pings, 1 visit saved.** This matches the pre-registered mechanism: a dark-frame blackbird that SpeciesNet boxes weakly and does not classify.
 - Delivery note (infra, not behaviour): `sendMediaGroup` returned 400 `image_process_failed` at 09:55:53. The existing fallback (`sendMessage` + `sendDocument`, both 200) still delivered it, and Daniel labelled it. This is the only such error in all rotated logs; logged as a watch item, no fix.
 - Self-audit: Daniel labelled 5974 `false_positive` (11-22 11:51); tier-2 agrees. No freeze. Keep observing to ~11-28. No deploy.
+
+### Night 9 (2026-11-23, rows 5985-5986)
+
+- 2 triggers, 0 ERROR, 0 HUMAN, 0 `[HUMAN-PROXIMITY]`, 0 review-class. Both MAIN, sent immediately: 5985 (10:10:02) IDENTIFIED `;aves;;;;;bird` 0.83, MD 0.82 box; 5986 (10:10:36) IDENTIFIED `;aves;;;;;bird` 0.72, MD boxes 0.57 + 0.26 (the 0.26 is the yellow/red ornament). Frames checked: a blackbird at the pond's left edge (5985) and then by the right-hand rocks (5986), so one visit. Both below the sharpness floor (6.5/6.4, dark morning). This does not matter for MAIN rows. Tier-2 `animal` x2.
+- No review-class row, so the sample rate decided nothing tonight. **Cost today: +0 pings, 0 visits saved. Running total over 9 nights: +9 pings, 1 visit saved.**
+- Self-audit: no new human labels since last tick (5974/5976 were audited on night 8). The last human label was 11-22 11:51, so no freeze. Keep observing to ~11-28. No deploy.

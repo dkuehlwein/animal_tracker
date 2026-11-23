@@ -3671,3 +3671,8 @@ Still open: winter volume re-baseline (27/night stale; last 7 nights 19/6/15/20/
 **Exp #44 night 8: first visit saved.** 5976's fraction is 0.864, so at 0.75 it would have been sampled out, and with no sibling burst the visit would have been lost. Running total: +9 pings, 1 visit saved. Keep observing to ~11-28. No deploy. Not paused, no freeze.
 Infra watch: one `sendMediaGroup` 400 `image_process_failed` on 5976; the document fallback delivered it (only occurrence in the logs).
 Still open: winter volume re-baseline (27/night is stale); bot token in `httpx` INFO logs (Daniel's call); bamboo REVIEW FPs are still the main FP class.
+
+## 2026-11-23 — tick (exp #44 night 9)
+2 triggers: 5985/5986 MAIN at 10:10 (IDENTIFIED `bird` rollup, 0.83/0.72), one blackbird visit, frames checked, tier-2 `animal` x2. fp_rate 0.00 (0/2, tier-2 only; no human labels yet).
+**Exp #44 night 9:** no review-class rows, so sampling was not exercised. Running total: +9 pings, 1 visit saved. Keep observing to ~11-28. No deploy. Not paused, no freeze.
+Still open: winter volume re-baseline (27/night stale; last 9 nights 19/6/15/20/3/1/2/9/2); bot token in `httpx` INFO logs (Daniel's call); bamboo REVIEW FPs remain the main FP class.
