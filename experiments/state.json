@@ -450,7 +450,7 @@
   ],
   "last_heartbeat_loopday": "2026-11-23",
   "last_metrics": {
-    "date": "2026-11-23",
+    "date": "2026-11-24",
     "error_count": 0,
     "error_rate": 0.0,
     "fn_ci": null,
@@ -497,5 +497,5 @@
   "nightly_verdict": "One blackbird visited the pond at 10:10, and both photos reached you as named bird alerts. No false alarms and no REVIEW photos today, so nothing changes.",
   "paused": false,
   "pending_restart_at": null,
-  "watermark": 5986
+  "watermark": 5988
 }
