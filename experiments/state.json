@@ -448,7 +448,7 @@
       "replaced_at": "2026-11-15T03:25+01:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-11-23",
+  "last_heartbeat_loopday": "2026-11-24",
   "last_metrics": {
     "date": "2026-11-24",
     "error_count": 0,
@@ -493,8 +493,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-11-23",
-  "nightly_verdict": "One blackbird visited the pond at 10:10, and both photos reached you as named bird alerts. No false alarms and no REVIEW photos today, so nothing changes.",
+  "last_tick_completed_day": "2026-11-24",
+  "nightly_verdict": "A magpie visited at 09:51, and both photos reached you as named bird alerts. No false alarms and no REVIEW photos today, so nothing changes.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5988

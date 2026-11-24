@@ -94,3 +94,9 @@ it stays in code (0 sampled out is the intended outcome, not a zero-firings reti
 - 2 triggers, 0 ERROR, 0 HUMAN, 0 `[HUMAN-PROXIMITY]`, 0 review-class. Both MAIN, sent immediately: 5985 (10:10:02) IDENTIFIED `;aves;;;;;bird` 0.83, MD 0.82 box; 5986 (10:10:36) IDENTIFIED `;aves;;;;;bird` 0.72, MD boxes 0.57 + 0.26 (the 0.26 is the yellow/red ornament). Frames checked: a blackbird at the pond's left edge (5985) and then by the right-hand rocks (5986), so one visit. Both below the sharpness floor (6.5/6.4, dark morning). This does not matter for MAIN rows. Tier-2 `animal` x2.
 - No review-class row, so the sample rate decided nothing tonight. **Cost today: +0 pings, 0 visits saved. Running total over 9 nights: +9 pings, 1 visit saved.**
 - Self-audit: no new human labels since last tick (5974/5976 were audited on night 8). The last human label was 11-22 11:51, so no freeze. Keep observing to ~11-28. No deploy.
+
+### Night 10 (2026-11-24, rows 5987-5988)
+
+- 2 triggers, 0 ERROR, 0 HUMAN, 0 `[HUMAN-PROXIMITY]`, 0 review-class. Both MAIN, sent immediately (sendMediaGroup 200 at 09:51:57): 5987 (09:51:44) IDENTIFIED `;aves;;;;;bird` 0.91, MD 0.87 box at the bottom edge; 5988 (09:52:15) IDENTIFIED `;aves;;;;;bird` 0.68, MD 0.64 box by the left trellis. Frames checked: a **magpie** (black/white, blue wing sheen), first walking past close to the lens and then on the grass at left. One visit. Both below the sharpness floor (5.1/5.1, dark morning), which does not matter for MAIN rows. Tier-2 `animal` x2.
+- No review-class row, so the sample rate decided nothing tonight. **Cost today: +0 pings, 0 visits saved. Running total over 10 nights: +9 pings, 1 visit saved.**
+- Self-audit: no new human labels since night 8 (last 11-22 11:51 UTC, ~2 days, so under the 3-day freeze bar). Keep observing to ~11-28. No deploy.
