@@ -339,7 +339,7 @@
     "PERFORMANCE_REVIEW_SAMPLE_RATE": 1.0,
     "SPECIES_HUMAN_DETECTION_CONFIDENCE": 0.5
   },
-  "feedback_starved_since": null,
+  "feedback_starved_since": "2026-11-25",
   "history": [
     {
       "config": {},
@@ -448,7 +448,7 @@
       "replaced_at": "2026-11-15T03:25+01:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-11-24",
+  "last_heartbeat_loopday": "2026-11-25",
   "last_metrics": {
     "date": "2026-11-25",
     "error_count": 0,
@@ -493,8 +493,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-11-24",
-  "nightly_verdict": "A magpie visited at 09:51, and both photos reached you as named bird alerts. No false alarms and no REVIEW photos today, so nothing changes.",
+  "last_tick_completed_day": "2026-11-25",
+  "nightly_verdict": "One alert today at 10:28 was a false alarm: wind in the bamboo, with a rock and the garden ornament mistaken for an animal. No labels from you for 3 days, so tuning is frozen and nothing changes.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5989

@@ -3681,3 +3681,9 @@ Still open: winter volume re-baseline (27/night stale; last 9 nights 19/6/15/20/
 2 triggers: 5987/5988 MAIN at 09:51-09:52 (IDENTIFIED `bird` rollup, 0.91/0.68), one magpie visit, frames checked, tier-2 `animal` x2. fp_rate 0.00 (0/2, tier-2 only; no human labels).
 **Exp #44 night 10:** no review-class rows, so sampling was not exercised. Running total: +9 pings, 1 visit saved. Keep observing to ~11-28. No deploy. Not paused, no freeze (last human label 11-22; freeze triggers if none by ~11-25).
 Still open: winter volume re-baseline (27/night stale; last 10 nights 19/6/15/20/3/1/2/9/2/2); bot token in `httpx` INFO logs (Daniel's call); bamboo REVIEW FPs remain the main FP class.
+
+## 2026-11-25 — tick (exp #44 night 11)
+1 trigger: 5989 MAIN at 10:28 (IDENTIFIED `;;;;;;animal` rollup 0.60, raw top `blank` 0.49). Frames checked: static rock + blue pipe, ornament, trellis; bamboo wind. Tier-2 `false_positive`. fp_rate 1/1 (tier-2 only; no human labels).
+**Exp #44 night 11:** no review-class rows. Running total: +9 pings, 1 visit saved. Keep observing to ~11-28. No deploy.
+**FEEDBACK-STARVED FREEZE tripped:** last human label 11-22 11:51 UTC, 3 days ago → `feedback_starved_since` = 2026-11-25. Hold config.
+Still open: `;;;;;;animal`-rollup MAIN FPs on rock/ornament boxes (5989 is another; worth an experiment once #44 closes and labels return); winter volume re-baseline (27/night stale; last 11 nights 19/6/15/20/3/1/2/9/2/2/1); bot token in `httpx` INFO logs (Daniel's call).
