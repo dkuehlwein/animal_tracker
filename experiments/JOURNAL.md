@@ -3687,3 +3687,8 @@ Still open: winter volume re-baseline (27/night stale; last 10 nights 19/6/15/20
 **Exp #44 night 11:** no review-class rows. Running total: +9 pings, 1 visit saved. Keep observing to ~11-28. No deploy.
 **FEEDBACK-STARVED FREEZE tripped:** last human label 11-22 11:51 UTC, 3 days ago → `feedback_starved_since` = 2026-11-25. Hold config.
 Still open: `;;;;;;animal`-rollup MAIN FPs on rock/ornament boxes (5989 is another; worth an experiment once #44 closes and labels return); winter volume re-baseline (27/night stale; last 11 nights 19/6/15/20/3/1/2/9/2/2/1); bot token in `httpx` INFO logs (Daniel's call).
+
+## 2026-11-26 — tick (exp #44 night 12)
+8 triggers, all real birds (tier-2 `animal` x8): a woodpigeon visit 12:01-12:05 (5990-5995; 5 MAIN + 5993 REVIEW) and a blackbird 12:24-12:25 (5996 MAIN + 5997 REVIEW). Both review rows are `no cv result` with MD boxing only static rock+pipe/ornament/trellis at 0.2-0.3 while the bird at the motion point went unboxed. fp_rate 0/8 (tier-2 only; no human labels).
+**Exp #44 night 12:** counterfactual at 0.75 = 0.352/0.325, so both would have been sent anyway. Running total: +9 pings, 1 visit saved. Keep observing to ~11-28. No deploy.
+**Freeze continues** (no human labels since 11-22 11:51 UTC). Still open: `;;;;;;animal`-rollup MAIN FPs on static-object boxes (but the same boxes appear on real-bird bursts, see 5993/5997); winter volume re-baseline (27/night stale); bot token in `httpx` INFO logs (Daniel's call).

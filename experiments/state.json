@@ -448,7 +448,7 @@
       "replaced_at": "2026-11-15T03:25+01:00"
     }
   ],
-  "last_heartbeat_loopday": "2026-11-25",
+  "last_heartbeat_loopday": "2026-11-26",
   "last_metrics": {
     "date": "2026-11-26",
     "error_count": 0,
@@ -493,8 +493,8 @@
   },
   "last_scene_change_alert_loopday": "2026-10-19",
   "last_staleness_alert_loopday": "2026-10-03",
-  "last_tick_completed_day": "2026-11-25",
-  "nightly_verdict": "One alert today at 10:28 was a false alarm: wind in the bamboo, with a rock and the garden ornament mistaken for an animal. No labels from you for 3 days, so tuning is frozen and nothing changes.",
+  "last_tick_completed_day": "2026-11-26",
+  "nightly_verdict": "All 8 alerts today were real birds: a woodpigeon at the pond around 13:00 and a blackbird around 13:25. No labels from you since 22 Nov, so tuning stays frozen and nothing changes.",
   "paused": false,
   "pending_restart_at": null,
   "watermark": 5997
